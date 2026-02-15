@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, version, isLatest, downloadUrlWindows, downloadUrlMac, downloadUrlLinux FROM releases WHERE isLatest = 1 LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, version, isLatest, downloadUrlWindows, downloadUrlMac, downloadUrlLinux FROM releases WHERE isLatest = 1 LIMIT 1;",
+  "rows": [
+    {
+      "id": "150001",
+      "version": "7.0.0",
+      "isLatest": "1",
+      "downloadUrlWindows": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/IpwoxwvdzHxAWDdo.exe",
+      "downloadUrlMac": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/YwSQIqhSVZTdyzvc.zip",
+      "downloadUrlLinux": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/TptCtldiPFfJqyqp.AppImage"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tversion\tisLatest\tdownloadUrlWindows\tdownloadUrlMac\tdownloadUrlLinux\n150001\t7.0.0\t1\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/IpwoxwvdzHxAWDdo.exe\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/YwSQIqhSVZTdyzvc.zip\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/TptCtldiPFfJqyqp.AppImage\n",
+  "stderr": "",
+  "execution_time_ms": 1522
+}

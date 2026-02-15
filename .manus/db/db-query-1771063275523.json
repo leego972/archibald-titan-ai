@@ -1,0 +1,50 @@
+{
+  "query": "SELECT id, version, downloadUrlWindows, downloadUrlLinux, downloadUrlMac, isLatest FROM releases ORDER BY id DESC LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, version, downloadUrlWindows, downloadUrlLinux, downloadUrlMac, isLatest FROM releases ORDER BY id DESC LIMIT 5",
+  "rows": [
+    {
+      "id": "150001",
+      "version": "6.0.1",
+      "downloadUrlWindows": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/DBQexgRsbzcCeApO.exe",
+      "downloadUrlLinux": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/rjkGLyFZVHBJioNF.AppImage",
+      "downloadUrlMac": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/hFUOyfCsKhNMFVvj.zip",
+      "isLatest": "1"
+    },
+    {
+      "id": "120001",
+      "version": "5.1.0",
+      "downloadUrlWindows": "NULL",
+      "downloadUrlLinux": "NULL",
+      "downloadUrlMac": "NULL",
+      "isLatest": "0"
+    },
+    {
+      "id": "90001",
+      "version": "4.0.0",
+      "downloadUrlWindows": "NULL",
+      "downloadUrlLinux": "NULL",
+      "downloadUrlMac": "NULL",
+      "isLatest": "0"
+    },
+    {
+      "id": "60001",
+      "version": "3.0.0",
+      "downloadUrlWindows": "NULL",
+      "downloadUrlLinux": "NULL",
+      "downloadUrlMac": "NULL",
+      "isLatest": "0"
+    },
+    {
+      "id": "30001",
+      "version": "2.0.0",
+      "downloadUrlWindows": "NULL",
+      "downloadUrlLinux": "NULL",
+      "downloadUrlMac": "NULL",
+      "isLatest": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tversion\tdownloadUrlWindows\tdownloadUrlLinux\tdownloadUrlMac\tisLatest\n150001\t6.0.1\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/DBQexgRsbzcCeApO.exe\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/rjkGLyFZVHBJioNF.AppImage\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/hFUOyfCsKhNMFVvj.zip\t1\n120001\t5.1.0\tNULL\tNULL\tNULL\t0\n90001\t4.0.0\tNULL\tNULL\tNULL\t0\n60001\t3.0.0\tNULL\tNULL\tNULL\t0\n30001\t2.0.0\tNULL\tNULL\tNULL\t0\n",
+  "stderr": "",
+  "execution_time_ms": 1519
+}

@@ -1,0 +1,22 @@
+{
+  "query": "SELECT id, version, title, isLatest, isPrerelease, downloadCount, fileSizeMb, \n  LEFT(downloadUrlWindows, 80) as windowsUrl,\n  LEFT(downloadUrlMac, 80) as macUrl,\n  LEFT(downloadUrlLinux, 80) as linuxUrl\nFROM releases ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, version, title, isLatest, isPrerelease, downloadCount, fileSizeMb, \n  LEFT(downloadUrlWindows, 80) as windowsUrl,\n  LEFT(downloadUrlMac, 80) as macUrl,\n  LEFT(downloadUrlLinux, 80) as linuxUrl\nFROM releases ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "version": "1.0.0",
+      "title": "Archibald Titan v1.0.0",
+      "isLatest": "1",
+      "isPrerelease": "0",
+      "downloadCount": "0",
+      "fileSizeMb": "185",
+      "windowsUrl": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904",
+      "macUrl": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904",
+      "linuxUrl": "https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tversion\ttitle\tisLatest\tisPrerelease\tdownloadCount\tfileSizeMb\twindowsUrl\tmacUrl\tlinuxUrl\n1\t1.0.0\tArchibald Titan v1.0.0\t1\t0\t0\t185\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904\n",
+  "stderr": "",
+  "execution_time_ms": 1480
+}

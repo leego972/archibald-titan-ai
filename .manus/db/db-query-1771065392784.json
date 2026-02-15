@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE releases SET downloadUrlWindows = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/IpwoxwvdzHxAWDdo.exe', downloadUrlLinux = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/TptCtldiPFfJqyqp.AppImage', downloadUrlMac = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/YwSQIqhSVZTdyzvc.zip', sha512Windows = 'Z30qAT31GP0iy5iJjt6E9c01Uft6+ieix95nKZN76DxegY0J29J6/Lr7q7lQlr/6B9pq2IxErmVcmmWk1GlSlQ==', sha512Linux = 'dg5B8IIVWWwsScq7MO1wL2aCO5+//x2nMxA9rDH6iqOSM7hQQ8URRvwQwC0znuwQAL9+pjECaU+Q/YrOJY23nw==', sha512Mac = 'tUJ7/BY+4mLhW5UUkNZXVkLj8yURjvfYUowLVs/PU9EUyo1CNw9Z6CgYVdDQc+6NB48h/HfYeNgO10pFVT3y5A==', fileSizeWindows = 89180101, fileSizeLinux = 116886063, fileSizeMac = 108446810 WHERE isLatest = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute UPDATE releases SET downloadUrlWindows = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/IpwoxwvdzHxAWDdo.exe', downloadUrlLinux = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/TptCtldiPFfJqyqp.AppImage', downloadUrlMac = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/YwSQIqhSVZTdyzvc.zip', sha512Windows = 'Z30qAT31GP0iy5iJjt6E9c01Uft6+ieix95nKZN76DxegY0J29J6/Lr7q7lQlr/6B9pq2IxErmVcmmWk1GlSlQ==', sha512Linux = 'dg5B8IIVWWwsScq7MO1wL2aCO5+//x2nMxA9rDH6iqOSM7hQQ8URRvwQwC0znuwQAL9+pjECaU+Q/YrOJY23nw==', sha512Mac = 'tUJ7/BY+4mLhW5UUkNZXVkLj8yURjvfYUowLVs/PU9EUyo1CNw9Z6CgYVdDQc+6NB48h/HfYeNgO10pFVT3y5A==', fileSizeWindows = 89180101, fileSizeLinux = 116886063, fileSizeMac = 108446810 WHERE isLatest = 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1699
+}

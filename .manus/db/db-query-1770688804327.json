@@ -1,0 +1,21 @@
+{
+  "query": "SELECT * FROM subscriptions LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT * FROM subscriptions LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "stripeCustomerId": "cus_Tx0DmDdIkvs940",
+      "stripeSubscriptionId": "sub_1Sz6DnL9noJJt9eFR3vXNjGZ",
+      "plan": "pro",
+      "status": "active",
+      "currentPeriodEnd": "NULL",
+      "createdAt": "2026-02-10 01:58:40",
+      "updatedAt": "2026-02-10 01:58:40"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tstripeCustomerId\tstripeSubscriptionId\tplan\tstatus\tcurrentPeriodEnd\tcreatedAt\tupdatedAt\n1\t1\tcus_Tx0DmDdIkvs940\tsub_1Sz6DnL9noJJt9eFR3vXNjGZ\tpro\tactive\tNULL\t2026-02-10 01:58:40\t2026-02-10 01:58:40\n",
+  "stderr": "",
+  "execution_time_ms": 1530
+}

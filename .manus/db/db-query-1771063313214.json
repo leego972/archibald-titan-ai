@@ -1,0 +1,58 @@
+{
+  "query": "SELECT id, version, isLatest, downloadUrlWindows IS NOT NULL as hasWin, downloadUrlLinux IS NOT NULL as hasLinux, downloadUrlMac IS NOT NULL as hasMac FROM releases ORDER BY id DESC",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, version, isLatest, downloadUrlWindows IS NOT NULL as hasWin, downloadUrlLinux IS NOT NULL as hasLinux, downloadUrlMac IS NOT NULL as hasMac FROM releases ORDER BY id DESC",
+  "rows": [
+    {
+      "id": "150001",
+      "version": "7.0.0",
+      "isLatest": "1",
+      "hasWin": "1",
+      "hasLinux": "1",
+      "hasMac": "1"
+    },
+    {
+      "id": "120001",
+      "version": "5.1.0",
+      "isLatest": "0",
+      "hasWin": "0",
+      "hasLinux": "0",
+      "hasMac": "0"
+    },
+    {
+      "id": "90001",
+      "version": "4.0.0",
+      "isLatest": "0",
+      "hasWin": "0",
+      "hasLinux": "0",
+      "hasMac": "0"
+    },
+    {
+      "id": "60001",
+      "version": "3.0.0",
+      "isLatest": "0",
+      "hasWin": "0",
+      "hasLinux": "0",
+      "hasMac": "0"
+    },
+    {
+      "id": "30001",
+      "version": "2.0.0",
+      "isLatest": "0",
+      "hasWin": "0",
+      "hasLinux": "0",
+      "hasMac": "0"
+    },
+    {
+      "id": "1",
+      "version": "1.0.0",
+      "isLatest": "0",
+      "hasWin": "1",
+      "hasLinux": "1",
+      "hasMac": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tversion\tisLatest\thasWin\thasLinux\thasMac\n150001\t7.0.0\t1\t1\t1\t1\n120001\t5.1.0\t0\t0\t0\t0\n90001\t4.0.0\t0\t0\t0\t0\n60001\t3.0.0\t0\t0\t0\t0\n30001\t2.0.0\t0\t0\t0\t0\n1\t1.0.0\t0\t1\t1\t1\n",
+  "stderr": "",
+  "execution_time_ms": 1513
+}

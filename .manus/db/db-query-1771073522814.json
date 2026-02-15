@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, email, name, role, passwordHash IS NOT NULL as hasPassword, openId FROM users WHERE email = 'leego972@gmail.com' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, email, name, role, passwordHash IS NOT NULL as hasPassword, openId FROM users WHERE email = 'leego972@gmail.com' LIMIT 1;",
+  "rows": [
+    {
+      "id": "300016",
+      "email": "leego972@gmail.com",
+      "name": "Lee Gold",
+      "role": "admin",
+      "hasPassword": "0",
+      "openId": "RZYjTQaKHW6U3tCgmpYNKd"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\trole\thasPassword\topenId\n300016\tleego972@gmail.com\tLee Gold\tadmin\t0\tRZYjTQaKHW6U3tCgmpYNKd\n",
+  "stderr": "",
+  "execution_time_ms": 1690
+}

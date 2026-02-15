@@ -1,0 +1,14 @@
+{
+  "query": "SELECT id, version FROM releases ORDER BY id DESC LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, version FROM releases ORDER BY id DESC LIMIT 1;",
+  "rows": [
+    {
+      "id": "120001",
+      "version": "v5.0.0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tversion\n120001\tv5.0.0\n",
+  "stderr": "",
+  "execution_time_ms": 1545
+}

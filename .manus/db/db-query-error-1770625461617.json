@@ -1,0 +1,8 @@
+{
+  "query": "SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders, ft.providerId, ft.status as taskStatus, ft.error FROM fetcherJobs fj LEFT JOIN fetcherTasks ft ON fj.id = ft.jobId ORDER BY fj.id DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders, ft.providerId, ft.status as taskStatus, ft.error FROM fetcherJobs fj LEFT JOIN fetcherTasks ft ON fj.id = ft.jobId ORDER BY fj.id DESC;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'f68pur9acqywkea4plprrs.fetcherJobs' doesn't exist"
+  ]
+}

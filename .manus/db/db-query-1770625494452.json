@@ -1,0 +1,69 @@
+{
+  "query": "SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders FROM fetcher_jobs fj ORDER BY fj.id DESC; SELECT ft.id, ft.jobId, ft.providerId, ft.status, ft.errorMessage FROM fetcher_tasks ft ORDER BY ft.id DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders FROM fetcher_jobs fj ORDER BY fj.id DESC; SELECT ft.id, ft.jobId, ft.providerId, ft.status, ft.errorMessage FROM fetcher_tasks ft ORDER BY ft.id DESC;",
+  "rows": [
+    {
+      "id": "2",
+      "status": "failed",
+      "completedProviders": "0",
+      "failedProviders": "1",
+      "totalProviders": "1"
+    },
+    {
+      "id": "1",
+      "status": "failed",
+      "completedProviders": "0",
+      "failedProviders": "1",
+      "totalProviders": "1"
+    },
+    {
+      "id": "id",
+      "status": "jobId",
+      "completedProviders": "providerId",
+      "failedProviders": "status",
+      "totalProviders": "errorMessage"
+    },
+    {
+      "id": "2",
+      "status": "2",
+      "completedProviders": "godaddy",
+      "failedProviders": "failed",
+      "totalProviders": "Could not extract or create GoDaddy API keys"
+    },
+    {
+      "id": "1",
+      "status": "1",
+      "completedProviders": "godaddy",
+      "failedProviders": "failed",
+      "totalProviders": "GoDaddy login failed: TimeoutError: elementHandle.click: Timeout 30000ms exceeded."
+    }
+  ],
+  "messages": [
+    "Call log:",
+    "  - attempting click action",
+    "    2 × waiting for element to be visible, enabled and stable",
+    "      - element is visible, enabled and stable",
+    "      - scrolling into view if needed",
+    "      - done scrolling",
+    "      - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events",
+    "    - retrying click action",
+    "    - waiting 20ms",
+    "    2 × waiting for element to be visible, enabled and stable",
+    "      - element is visible, enabled and stable",
+    "      - scrolling into view if needed",
+    "      - done scrolling",
+    "      - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events",
+    "    - retrying click action",
+    "      - waiting 100ms",
+    "    57 × waiting for element to be visible, enabled and stable",
+    "       - element is visible, enabled and stable",
+    "       - scrolling into view if needed",
+    "       - done scrolling",
+    "       - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events",
+    "     - retrying click action",
+    "       - waiting 500ms"
+  ],
+  "stdout": "id\tstatus\tcompletedProviders\tfailedProviders\ttotalProviders\n2\tfailed\t0\t1\t1\n1\tfailed\t0\t1\t1\nid\tjobId\tproviderId\tstatus\terrorMessage\n2\t2\tgodaddy\tfailed\tCould not extract or create GoDaddy API keys\n1\t1\tgodaddy\tfailed\tGoDaddy login failed: TimeoutError: elementHandle.click: Timeout 30000ms exceeded.\nCall log:\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    57 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - <div class=\"_49nrahp\">…</div> from <div data-version=\"2500\" class=\"ux-disrupt-backdrop\">…</div> subtree intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n\n",
+  "stderr": "",
+  "execution_time_ms": 1713
+}

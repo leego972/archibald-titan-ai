@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, userId, plan, status FROM subscriptions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, userId, plan, status FROM subscriptions;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "plan": "pro",
+      "status": "active"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tplan\tstatus\n1\t1\tpro\tactive\n",
+  "stderr": "",
+  "execution_time_ms": 1600
+}

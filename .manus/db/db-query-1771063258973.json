@@ -1,0 +1,49 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'releases' ORDER BY ORDINAL_POSITION",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'releases' ORDER BY ORDINAL_POSITION",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "version"
+    },
+    {
+      "COLUMN_NAME": "title"
+    },
+    {
+      "COLUMN_NAME": "changelog"
+    },
+    {
+      "COLUMN_NAME": "downloadUrlWindows"
+    },
+    {
+      "COLUMN_NAME": "downloadUrlMac"
+    },
+    {
+      "COLUMN_NAME": "downloadUrlLinux"
+    },
+    {
+      "COLUMN_NAME": "fileSizeMb"
+    },
+    {
+      "COLUMN_NAME": "isLatest"
+    },
+    {
+      "COLUMN_NAME": "isPrerelease"
+    },
+    {
+      "COLUMN_NAME": "downloadCount"
+    },
+    {
+      "COLUMN_NAME": "publishedAt"
+    },
+    {
+      "COLUMN_NAME": "createdAt"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\nversion\ntitle\nchangelog\ndownloadUrlWindows\ndownloadUrlMac\ndownloadUrlLinux\nfileSizeMb\nisLatest\nisPrerelease\ndownloadCount\npublishedAt\ncreatedAt\n",
+  "stderr": "",
+  "execution_time_ms": 1577
+}

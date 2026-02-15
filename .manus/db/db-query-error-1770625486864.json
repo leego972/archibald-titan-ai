@@ -1,0 +1,8 @@
+{
+  "query": "SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders, ft.providerId, ft.status as taskStatus, ft.error FROM fetcher_jobs fj LEFT JOIN fetcher_tasks ft ON fj.id = ft.jobId ORDER BY fj.id DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT fj.id, fj.status, fj.completedProviders, fj.failedProviders, fj.totalProviders, ft.providerId, ft.status as taskStatus, ft.error FROM fetcher_jobs fj LEFT JOIN fetcher_tasks ft ON fj.id = ft.jobId ORDER BY fj.id DESC;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'ft.error' in 'field list'"
+  ]
+}

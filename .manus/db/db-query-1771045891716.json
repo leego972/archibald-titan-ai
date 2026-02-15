@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `desktop_licenses` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `userId` int NOT NULL,\n  `deviceId` varchar(128) NOT NULL,\n  `deviceName` varchar(256),\n  `platform` varchar(32) NOT NULL,\n  `licenseKey` varchar(512) NOT NULL,\n  `status` enum('active','revoked','expired') NOT NULL DEFAULT 'active',\n  `lastValidatedAt` timestamp,\n  `lastIpAddress` varchar(64),\n  `activatedAt` timestamp NOT NULL DEFAULT (now()),\n  `expiresAt` timestamp NOT NULL,\n  `revokedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `desktop_licenses_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute CREATE TABLE `desktop_licenses` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `userId` int NOT NULL,\n  `deviceId` varchar(128) NOT NULL,\n  `deviceName` varchar(256),\n  `platform` varchar(32) NOT NULL,\n  `licenseKey` varchar(512) NOT NULL,\n  `status` enum('active','revoked','expired') NOT NULL DEFAULT 'active',\n  `lastValidatedAt` timestamp,\n  `lastIpAddress` varchar(64),\n  `activatedAt` timestamp NOT NULL DEFAULT (now()),\n  `expiresAt` timestamp NOT NULL,\n  `revokedAt` timestamp,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `desktop_licenses_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1912
+}

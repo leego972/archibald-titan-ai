@@ -1,0 +1,13 @@
+{
+  "query": "SHOW TABLES LIKE 'totp_secrets';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SHOW TABLES LIKE 'totp_secrets';",
+  "rows": [
+    {
+      "Tables_in_F68pUR9acQYwkEa4pLPrRs (totp_secrets)": "totp_secrets"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_F68pUR9acQYwkEa4pLPrRs (totp_secrets)\ntotp_secrets\n",
+  "stderr": "",
+  "execution_time_ms": 1644
+}

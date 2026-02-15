@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE releases SET sha512Windows = 'Wh2ry1Egb8JQL2+6T8jBzNF7C3K5bNzA/Bz924rM8Y9sYdTmZIXXalQvPyOhuZRM7zFy4D28zjYw8P0n/zRKfA==', sha512Mac = 'v5tkf27c/asYYb8B/qLW1QLlyDqe/MsBSm8sr7b1n8kOpUrFBVE1NVqhqLEXL1qPeJ1HX9ZoyXv8pB0ySXOU+A==', sha512Linux = 'i4QHxwVxVhhHpyU0HG+9TTb4g1WhjOTBKdu1otlHg3GxyG/+BTMTz0vHkYRShJECLrNQv5XeNAhlZdpzEx55FQ==', fileSizeWindows = 85826849, fileSizeMac = 108115574, fileSizeLinux = 116529491 WHERE isLatest = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute UPDATE releases SET sha512Windows = 'Wh2ry1Egb8JQL2+6T8jBzNF7C3K5bNzA/Bz924rM8Y9sYdTmZIXXalQvPyOhuZRM7zFy4D28zjYw8P0n/zRKfA==', sha512Mac = 'v5tkf27c/asYYb8B/qLW1QLlyDqe/MsBSm8sr7b1n8kOpUrFBVE1NVqhqLEXL1qPeJ1HX9ZoyXv8pB0ySXOU+A==', sha512Linux = 'i4QHxwVxVhhHpyU0HG+9TTb4g1WhjOTBKdu1otlHg3GxyG/+BTMTz0vHkYRShJECLrNQv5XeNAhlZdpzEx55FQ==', fileSizeWindows = 85826849, fileSizeMac = 108115574, fileSizeLinux = 116529491 WHERE isLatest = 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1504
+}

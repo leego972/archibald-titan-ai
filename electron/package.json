@@ -1,0 +1,72 @@
+{
+  "name": "archibald-titan",
+  "version": "7.0.0",
+  "description": "Archibald Titan - The World's Most Advanced Local AI Agent",
+  "main": "main.js",
+  "author": "Archibald Titan Team",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:win": "electron-builder --win nsis",
+    "build:mac": "electron-builder --mac zip",
+    "build:all": "electron-builder --linux AppImage --win nsis --mac zip"
+  },
+  "build": {
+    "appId": "com.archibald.titan",
+    "productName": "ArchibaldTitan",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "local-server.js",
+      "splash.html",
+      "icon.png",
+      "icon.ico",
+      "public/**/*",
+      "node_modules/**/*"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "icon": "icon.png",
+      "category": "Utility"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "mac": {
+      "target": "zip",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Archibald Titan"
+    },
+    "asarUnpack": [
+      "node_modules/sql.js/dist/**"
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://architabot-f68pur9a.manus.space/api/desktop/update"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.7.3",
+    "express": "^4.21.0",
+    "sql.js": "^1.10.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

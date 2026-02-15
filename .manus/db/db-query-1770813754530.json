@@ -1,0 +1,33 @@
+{
+  "query": "SELECT * FROM releases LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT * FROM releases LIMIT 1;",
+  "rows": [],
+  "messages": [
+    "1\t1.0.0\tArchibald Titan v1.0.0\t**Archibald Titan v1.0.0 — Stable Release**",
+    "**New Features:**",
+    "- Autonomous credential retrieval from 15+ providers",
+    "- AES-256-GCM encrypted vault — keys never stored in plaintext",
+    "- Stealth Playwright browser with device fingerprinting",
+    "- Integrated CAPTCHA solving (reCAPTCHA, hCaptcha, image)",
+    "- Residential proxy pool with automatic rotation",
+    "- Kill switch with emergency shutdown code",
+    "- Export credentials as JSON, CSV, or .env",
+    "- Customizable dashboard with drag-and-drop widgets",
+    "- API access with scoped key management",
+    "- Team management with role-based access",
+    "- Audit logs for full activity tracking",
+    "- Credential health monitoring",
+    "**Security:**",
+    "- All credentials encrypted at rest with AES-256-GCM",
+    "- Session-based authentication via Manus OAuth",
+    "- Proxy credentials encrypted separately",
+    "- Kill switch for instant emergency shutdown",
+    "**Platforms:**",
+    "- Windows (.exe installer)",
+    "- macOS (.zip archive)",
+    "- Linux (.AppImage)\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/ZTpzVStkgaDSOOyH.exe\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/uJmlkklQAvDEarRD.zip\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/mCCEJPnbLuiLuOUV.AppImage\t185\t0\t0\t0\t2026-02-10 10:11:18\t2026-02-10 10:11:18"
+  ],
+  "stdout": "id\tversion\ttitle\tchangelog\tdownloadUrlWindows\tdownloadUrlMac\tdownloadUrlLinux\tfileSizeMb\tisLatest\tisPrerelease\tdownloadCount\tpublishedAt\tcreatedAt\n1\t1.0.0\tArchibald Titan v1.0.0\t**Archibald Titan v1.0.0 — Stable Release**\n\n**New Features:**\n- Autonomous credential retrieval from 15+ providers\n- AES-256-GCM encrypted vault — keys never stored in plaintext\n- Stealth Playwright browser with device fingerprinting\n- Integrated CAPTCHA solving (reCAPTCHA, hCaptcha, image)\n- Residential proxy pool with automatic rotation\n- Kill switch with emergency shutdown code\n- Export credentials as JSON, CSV, or .env\n- Customizable dashboard with drag-and-drop widgets\n- API access with scoped key management\n- Team management with role-based access\n- Audit logs for full activity tracking\n- Credential health monitoring\n\n**Security:**\n- All credentials encrypted at rest with AES-256-GCM\n- Session-based authentication via Manus OAuth\n- Proxy credentials encrypted separately\n- Kill switch for instant emergency shutdown\n\n**Platforms:**\n- Windows (.exe installer)\n- macOS (.zip archive)\n- Linux (.AppImage)\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/ZTpzVStkgaDSOOyH.exe\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/uJmlkklQAvDEarRD.zip\thttps://files.manuscdn.com/user_upload_by_module/session_file/310519663339631904/mCCEJPnbLuiLuOUV.AppImage\t185\t0\t0\t0\t2026-02-10 10:11:18\t2026-02-10 10:11:18\n",
+  "stderr": "",
+  "execution_time_ms": 1531
+}

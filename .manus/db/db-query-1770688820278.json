@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, userId, plan, status, stripeCustomerId, stripeSubscriptionId FROM subscriptions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT id, userId, plan, status, stripeCustomerId, stripeSubscriptionId FROM subscriptions;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "plan": "pro",
+      "status": "active",
+      "stripeCustomerId": "cus_Tx0DmDdIkvs940",
+      "stripeSubscriptionId": "sub_1Sz6DnL9noJJt9eFR3vXNjGZ"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tplan\tstatus\tstripeCustomerId\tstripeSubscriptionId\n1\t1\tpro\tactive\tcus_Tx0DmDdIkvs940\tsub_1Sz6DnL9noJJt9eFR3vXNjGZ\n",
+  "stderr": "",
+  "execution_time_ms": 1557
+}

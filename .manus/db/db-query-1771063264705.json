@@ -1,0 +1,13 @@
+{
+  "query": "SELECT GROUP_CONCAT(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'releases'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2BuYCT9gQQ4yTNK.ca8f147b4c0c --database F68pUR9acQYwkEa4pLPrRs --execute SELECT GROUP_CONCAT(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'releases'",
+  "rows": [
+    {
+      "GROUP_CONCAT(COLUMN_NAME)": "id,version,title,changelog,downloadUrlWindows,downloadUrlMac,downloadUrlLinux,fileSizeMb,isLatest,isPrerelease,downloadCount,publishedAt,createdAt"
+    }
+  ],
+  "messages": [],
+  "stdout": "GROUP_CONCAT(COLUMN_NAME)\nid,version,title,changelog,downloadUrlWindows,downloadUrlMac,downloadUrlLinux,fileSizeMb,isLatest,isPrerelease,downloadCount,publishedAt,createdAt\n",
+  "stderr": "",
+  "execution_time_ms": 1516
+}
