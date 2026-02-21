@@ -309,6 +309,10 @@ export function AIChatBox({
         onSubmit={handleSubmit}
         className="flex gap-2 p-4 border-t bg-background/50 items-end"
       >
+        <ChatUploadButton onFileUploaded={(url) => {
+          // When a file is uploaded, send its URL as a message
+          onSendMessage(`Uploaded file: ${url}`);
+        }} />
         <Textarea
           ref={textareaRef}
           value={input}
