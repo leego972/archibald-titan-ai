@@ -1,0 +1,6 @@
+ALTER TABLE `marketing_content` MODIFY COLUMN `channel` enum('meta','google_ads','x_twitter','linkedin','snapchat','content_seo','devto','medium','hashnode','discord','mastodon','telegram','whatsapp','pinterest','reddit','tiktok','youtube','quora','skool','indiehackers','hackernews','producthunt','email_outreach','sendgrid','hacker_forum') NOT NULL;--> statement-breakpoint
+ALTER TABLE `marketing_content` MODIFY COLUMN `contentType` enum('social_post','ad_copy','blog_article','email','image_ad','video_script','backlink_outreach','email_nurture','community_engagement','hacker_forum_post','content_queue') NOT NULL;--> statement-breakpoint
+ALTER TABLE `marketing_performance` MODIFY COLUMN `channel` enum('meta','google_ads','x_twitter','linkedin','snapchat','content_seo','devto','medium','hashnode','discord','mastodon','telegram','whatsapp','pinterest','reddit','tiktok','youtube','quora','skool','indiehackers','hackernews','producthunt','email_outreach','sendgrid','hacker_forum') NOT NULL;--> statement-breakpoint
+ALTER TABLE `marketing_content` ADD `platform` varchar(128);--> statement-breakpoint
+ALTER TABLE `marketing_content` ADD `headline` varchar(500);--> statement-breakpoint
+ALTER TABLE `marketing_content` ADD `metadata` json;

@@ -1,0 +1,1 @@
+ALTER TABLE `contact_submissions` MODIFY COLUMN `category` enum('billing','technical','account','general') NOT NULL DEFAULT 'general';

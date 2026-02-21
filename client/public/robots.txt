@@ -1,0 +1,25 @@
+# Archibald Titan - Robots.txt
+# https://www.archibaldtitan.com
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /fetcher/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /desktop-login
+Disallow: /404
+
+# Allow search engines to index public pages
+Allow: /
+Allow: /pricing
+Allow: /terms
+Allow: /privacy
+Allow: /contact
+
+# Sitemap
+Sitemap: https://www.archibaldtitan.com/sitemap.xml

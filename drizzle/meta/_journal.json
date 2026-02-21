@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771290121793,
+      "tag": "0000_zippy_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771380000000,
+      "tag": "0001_marketplace_crowdfunding",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771470000000,
+      "tag": "0002_crypto_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771560000000,
+      "tag": "0003_fix_missing_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771650000000,
+      "tag": "0004_trial_seller_marketing",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1771681500998,
+      "tag": "0005_tan_the_captain",
+      "breakpoints": true
+    }
+  ]
+}

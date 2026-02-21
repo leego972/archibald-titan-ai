@@ -1,0 +1,427 @@
+/**
+ * Sandbox Router — tRPC endpoints for sandbox management and command execution
+ */
+
+import { z } from "zod";
+import { router, protectedProcedure } from "./_core/trpc";
+import {
+  createSandbox,
+  getSandbox,
+  listSandboxes,
+  deleteSandbox,
+  executeCommand,
+  getCommandHistory,
+  listFiles,
+  readFile,
+  writeFile,
+  persistWorkspace,
+  updateEnvVars,
+  installPackage,
+} from "./sandbox-engine";
+import {
+  runPassiveWebScan,
+  runPortScan,
+  checkSSL,
+  analyzeCodeSecurity,
+} from "./security-tools";
+import {
+  fixSingleVulnerability,
+  fixAllVulnerabilities,
+  generateFixReport,
+} from "./auto-fix-engine";
+
+export const sandboxRouter = router({
+  /**
+   * List all sandboxes for the current user
+   */
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return listSandboxes(ctx.user.id);
+  }),
+
+  /**
+   * Get a specific sandbox by ID
+   */
+  get: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
+      if (!sandbox) throw new Error("Sandbox not found");
+      return sandbox;
+    }),
+
+  /**
+   * Create a new sandbox
+   */
+  create: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(128),
+        memoryMb: z.number().int().min(128).max(2048).optional(),
+        diskMb: z.number().int().min(256).max(8192).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return createSandbox(ctx.user.id, input.name, {
+        memoryMb: input.memoryMb,
+        diskMb: input.diskMb,
+      });
+    }),
+
+  /**
+   * Delete a sandbox
+   */
+  delete: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .mutation(async ({ input, ctx }) => {
+      const success = await deleteSandbox(input.sandboxId, ctx.user.id);
+      if (!success) throw new Error("Sandbox not found or delete failed");
+      return { success: true };
+    }),
+
+  /**
+   * Execute a command in a sandbox
+   */
+  exec: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        command: z.string().min(1).max(10_000),
+        timeoutMs: z.number().int().min(1000).max(300_000).optional(),
+        workingDirectory: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return executeCommand(input.sandboxId, ctx.user.id, input.command, {
+        timeoutMs: input.timeoutMs,
+        triggeredBy: "user",
+        workingDirectory: input.workingDirectory,
+      });
+    }),
+
+  /**
+   * Get command history for a sandbox
+   */
+  history: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        limit: z.number().int().min(1).max(200).optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      return getCommandHistory(input.sandboxId, ctx.user.id, input.limit ?? 50);
+    }),
+
+  /**
+   * List files in a sandbox directory
+   */
+  listFiles: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        path: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      return listFiles(input.sandboxId, ctx.user.id, input.path ?? "/home/sandbox");
+    }),
+
+  /**
+   * Read a file from the sandbox
+   */
+  readFile: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        path: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const content = await readFile(input.sandboxId, ctx.user.id, input.path);
+      if (content === null) throw new Error("File not found");
+      return { content };
+    }),
+
+  /**
+   * Write a file to the sandbox
+   */
+  writeFile: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        path: z.string(),
+        content: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const success = await writeFile(input.sandboxId, ctx.user.id, input.path, input.content);
+      if (!success) throw new Error("Failed to write file");
+      return { success: true };
+    }),
+
+  /**
+   * Save sandbox workspace to S3
+   */
+  persist: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .mutation(async ({ input, ctx }) => {
+      const url = await persistWorkspace(input.sandboxId, ctx.user.id) as string | null;
+      if (!url) throw new Error("Failed to persist workspace");
+      return { url };
+    }),
+
+  /**
+   * Update environment variables
+   */
+  updateEnv: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        envVars: z.record(z.string(), z.string()),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const success = await updateEnvVars(input.sandboxId, ctx.user.id, input.envVars);
+      if (!success) throw new Error("Failed to update env vars");
+      return { success: true };
+    }),
+
+  /**
+   * Install a package in the sandbox
+   */
+  installPackage: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        packageManager: z.enum(["apt", "pip", "npm"]),
+        packageName: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return installPackage(
+        input.sandboxId,
+        ctx.user.id,
+        input.packageManager,
+        input.packageName
+      );
+    }),
+
+  /**
+   * Rename a sandbox
+   */
+  rename: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        name: z.string().min(1).max(128),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { getDb } = await import("./db");
+      const { sandboxes } = await import("../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
+      if (!sandbox) throw new Error("Sandbox not found");
+      await db
+        .update(sandboxes)
+        .set({ name: input.name })
+        .where(and(eq(sandboxes.id, input.sandboxId), eq(sandboxes.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  /**
+   * Delete a file from the sandbox
+   */
+  deleteFile: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        path: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await executeCommand(input.sandboxId, ctx.user.id, `rm -rf "${input.path}"`, {
+        triggeredBy: "user",
+      });
+      return { success: result.exitCode === 0 };
+    }),
+
+  /**
+   * Create a directory in the sandbox
+   */
+  createDir: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        path: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await executeCommand(input.sandboxId, ctx.user.id, `mkdir -p "${input.path}"`, {
+        triggeredBy: "user",
+      });
+      return { success: result.exitCode === 0 };
+    }),
+
+  /**
+   * Get environment variables for a sandbox
+   */
+  getEnv: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
+      if (!sandbox) throw new Error("Sandbox not found");
+      return sandbox.envVars || {};
+    }),
+
+  /**
+   * Delete an environment variable
+   */
+  deleteEnv: protectedProcedure
+    .input(
+      z.object({
+        sandboxId: z.number().int(),
+        key: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { getDb } = await import("./db");
+      const { sandboxes } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
+      if (!sandbox) throw new Error("Sandbox not found");
+      const envVars = { ...(sandbox.envVars || {}) };
+      delete envVars[input.key];
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.update(sandboxes).set({ envVars }).where(eq(sandboxes.id, input.sandboxId));
+      return { success: true };
+    }),
+
+  /**
+   * Get installed packages for a sandbox
+   */
+  getPackages: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
+      if (!sandbox) throw new Error("Sandbox not found");
+      return sandbox.installedPackages || [];
+    }),
+
+  // ─── Security Tools ─────────────────────────────────────────────
+
+  /**
+   * Run a passive web scan on a target URL
+   */
+  securityScan: protectedProcedure
+    .input(z.object({ url: z.string().url() }))
+    .mutation(async ({ input }) => {
+      return runPassiveWebScan(input.url);
+    }),
+
+  /**
+   * Run a port scan on a target host
+   */
+  portScan: protectedProcedure
+    .input(z.object({ host: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return runPortScan(input.host);
+    }),
+
+  /**
+   * Check SSL certificate for a domain
+   */
+  sslCheck: protectedProcedure
+    .input(z.object({ domain: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return checkSSL(input.domain);
+    }),
+
+  /**
+   * Analyze code for security vulnerabilities
+   */
+  codeReview: protectedProcedure
+    .input(
+      z.object({
+        code: z.string().min(1),
+        language: z.string().optional(),
+        filename: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return analyzeCodeSecurity([{ filename: input.filename || "code.txt", content: input.code }]);
+    }),
+
+  // ── Auto-Fix Endpoints ──────────────────────────────────────────
+
+  /**
+   * Fix a single vulnerability in code
+   */
+  fixVulnerability: protectedProcedure
+    .input(
+      z.object({
+        filename: z.string(),
+        code: z.string(),
+        issue: z.object({
+          title: z.string(),
+          severity: z.enum(["critical", "high", "medium", "low"]),
+          category: z.enum(["security", "performance", "best-practices", "maintainability"]),
+          description: z.string(),
+          suggestion: z.string(),
+          file: z.string(),
+          line: z.number().optional(),
+        }),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const fix = await fixSingleVulnerability({
+        code: input.code,
+        filename: input.filename,
+        issue: input.issue,
+      });
+      return fix;
+    }),
+
+  /**
+   * Fix all vulnerabilities in a batch
+   */
+  fixAllVulnerabilities: protectedProcedure
+    .input(
+      z.object({
+        files: z.array(
+          z.object({
+            filename: z.string(),
+            content: z.string(),
+          })
+        ),
+        issues: z.array(
+          z.object({
+            title: z.string(),
+            severity: z.enum(["critical", "high", "medium", "low"]),
+            category: z.enum(["security", "performance", "best-practices", "maintainability"]),
+            description: z.string(),
+            suggestion: z.string(),
+            file: z.string(),
+            line: z.number().optional(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const result = await fixAllVulnerabilities({
+        files: input.files,
+        report: {
+          overallScore: 0,
+          issues: input.issues,
+          summary: `Batch fix for ${input.issues.length} vulnerabilities`,
+          strengths: [],
+          recommendations: [],
+        },
+      });
+      const report = generateFixReport(result);
+      return { ...result, report };
+    }),
+});
