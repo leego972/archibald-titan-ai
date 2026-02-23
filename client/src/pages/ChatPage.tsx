@@ -81,6 +81,27 @@ import {
   ExternalLink,
   Key,
   Save,
+  Volume2,
+  VolumeX,
+  Radio,
+  Webhook,
+  BarChart3,
+  ScrollText,
+  Megaphone,
+  Building2,
+  CreditCard,
+  Upload,
+  Clock,
+  History,
+  Briefcase,
+  GitBranch,
+  Bug,
+  TestTube2,
+  ShieldAlert,
+  Database,
+  Gauge,
+  Headphones,
+  HeadphoneOff,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import {
@@ -102,10 +123,43 @@ interface SlashCommand {
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
+  // ── Local commands ──
   { command: '/help', label: 'Help', description: 'Show all capabilities', icon: <HelpCircle className="h-4 w-4" />, action: 'local' },
+  { command: '/new', label: 'New Chat', description: 'Start a new conversation', icon: <FilePlus className="h-4 w-4" />, action: 'local' },
+  { command: '/clear', label: 'Clear', description: 'Clear current chat', icon: <Eraser className="h-4 w-4" />, action: 'local' },
+  { command: '/export', label: 'Export Chat', description: 'Export conversation as markdown', icon: <Download className="h-4 w-4" />, action: 'local' },
+  { command: '/voice', label: 'Voice Mode', description: 'Toggle voice input/output', icon: <Headphones className="h-4 w-4" />, action: 'local' },
+  { command: '/speak', label: 'Read Aloud', description: 'Read last Titan response aloud', icon: <Volume2 className="h-4 w-4" />, action: 'local' },
+  { command: '/stop', label: 'Stop Speaking', description: 'Stop text-to-speech playback', icon: <VolumeX className="h-4 w-4" />, action: 'local' },
+  // ── AI action commands ──
   { command: '/build', label: 'Build', description: 'Build a new feature or page', icon: <Hammer className="h-4 w-4" />, action: 'send', prompt: 'I want to build a new feature. What would you like me to create? Please describe what you need.' },
   { command: '/scan', label: 'Scan', description: 'Scan for leaked credentials', icon: <ScanLine className="h-4 w-4" />, action: 'send', prompt: 'Run a full credential leak scan across all my stored credentials and report any findings.' },
   { command: '/status', label: 'Status', description: 'Check system health', icon: <Activity className="h-4 w-4" />, action: 'send', prompt: 'Run a full system health check — check server status, database connectivity, and all services.' },
+  { command: '/fix', label: 'Fix Errors', description: 'Run type check and auto-fix errors', icon: <Bug className="h-4 w-4" />, action: 'send', prompt: 'Run a TypeScript type check on the entire codebase, identify all errors, and fix them automatically.' },
+  { command: '/test', label: 'Run Tests', description: 'Execute test suite and report', icon: <TestTube2 className="h-4 w-4" />, action: 'send', prompt: 'Run all test suites, report any failures, and suggest fixes for broken tests.' },
+  { command: '/deploy', label: 'Deploy', description: 'Check deployment readiness', icon: <Rocket className="h-4 w-4" />, action: 'send', prompt: 'Run a full deployment readiness check — verify build, type check, tests, environment variables, and database connectivity.' },
+  { command: '/audit', label: 'Security Audit', description: 'Full security audit of the codebase', icon: <ShieldAlert className="h-4 w-4" />, action: 'send', prompt: 'Run a comprehensive security audit — check for vulnerabilities, dependency issues, exposed secrets, and insecure patterns in the codebase.' },
+  { command: '/optimize', label: 'Optimize', description: 'Analyze and optimize performance', icon: <Gauge className="h-4 w-4" />, action: 'send', prompt: 'Analyze the codebase for performance bottlenecks, unused dependencies, dead code, and optimization opportunities. Provide actionable recommendations.' },
+  { command: '/search', label: 'Web Search', description: 'Search the web for information', icon: <Search className="h-4 w-4" />, action: 'send', prompt: 'Search the web for: ' },
+  { command: '/research', label: 'Research', description: 'Deep research a topic', icon: <BookOpen className="h-4 w-4" />, action: 'send', prompt: 'Do deep research on: ' },
+  { command: '/diff', label: 'Git Diff', description: 'Show recent code changes', icon: <GitBranch className="h-4 w-4" />, action: 'send', prompt: 'Show me the git diff of recent changes — what files were modified, added, or deleted.' },
+  { command: '/stats', label: 'Code Stats', description: 'Codebase statistics and metrics', icon: <BarChart3 className="h-4 w-4" />, action: 'send', prompt: 'Give me full codebase statistics — file counts by type, total lines of code, largest files, and dependency count.' },
+  { command: '/deps', label: 'Dependency Audit', description: 'Audit npm dependencies', icon: <Database className="h-4 w-4" />, action: 'send', prompt: 'Run a full dependency audit — check for outdated packages, security vulnerabilities, and unused dependencies.' },
+  { command: '/schema', label: 'DB Schema', description: 'Inspect database schema', icon: <Database className="h-4 w-4" />, action: 'send', prompt: 'Inspect the database schema — list all tables, columns, types, and relationships.' },
+  { command: '/env', label: 'Env Check', description: 'Verify environment variables', icon: <Key className="h-4 w-4" />, action: 'send', prompt: 'Check all required environment variables — verify which are set, which are missing, and flag any potential issues.' },
+  { command: '/rollback', label: 'Rollback', description: 'Roll back recent changes', icon: <RotateCcw className="h-4 w-4" />, action: 'send', prompt: 'Show me available rollback checkpoints and help me roll back to a safe state if needed.' },
+  { command: '/checkpoint', label: 'Checkpoint', description: 'Save a code checkpoint', icon: <Save className="h-4 w-4" />, action: 'send', prompt: 'Save a checkpoint of the current codebase state so I can roll back to it later if needed.' },
+  { command: '/recommend', label: 'Recommendations', description: 'Get AI recommendations', icon: <Sparkles className="h-4 w-4" />, action: 'send', prompt: 'Analyze my account and give me personalized recommendations — security improvements, feature suggestions, and optimization tips.' },
+  { command: '/usage', label: 'Plan Usage', description: 'Check plan usage and limits', icon: <CreditCard className="h-4 w-4" />, action: 'send', prompt: 'Show me my current plan usage — credits remaining, API calls used, storage consumed, and any limits I\'m approaching.' },
+  { command: '/watchdog', label: 'Watchdog', description: 'Check credential watchdog status', icon: <Eye className="h-4 w-4" />, action: 'send', prompt: 'Show me the watchdog monitoring summary — which credentials are being monitored, any alerts, and recent changes detected.' },
+  { command: '/providers', label: 'Providers', description: 'Check provider health', icon: <Radio className="h-4 w-4" />, action: 'send', prompt: 'Check the health and availability of all credential providers — show which are online, degraded, or offline.' },
+  { command: '/keys', label: 'API Keys', description: 'List and manage API keys', icon: <Key className="h-4 w-4" />, action: 'send', prompt: 'List all my API keys with their status, permissions, and last used date.' },
+  { command: '/vault', label: 'Vault', description: 'List vault entries', icon: <Lock className="h-4 w-4" />, action: 'send', prompt: 'List all entries in my secure vault with their names, categories, and last updated dates.' },
+  { command: '/logs', label: 'Audit Logs', description: 'View recent audit logs', icon: <ScrollText className="h-4 w-4" />, action: 'send', prompt: 'Show me the most recent audit logs — who did what, when, and from where.' },
+  { command: '/killswitch', label: 'Kill Switch', description: 'Emergency credential lockdown', icon: <ShieldAlert className="h-4 w-4" />, action: 'send', prompt: 'Show me the kill switch status and options. WARNING: This can disable all credentials immediately.' },
+  { command: '/schedule', label: 'Schedules', description: 'List scheduled jobs', icon: <Clock className="h-4 w-4" />, action: 'send', prompt: 'List all my scheduled jobs with their next run time, frequency, and status.' },
+  { command: '/history', label: 'History', description: 'View credential change history', icon: <History className="h-4 w-4" />, action: 'send', prompt: 'Show me the recent credential change history — what changed, when, and any anomalies detected.' },
+  // ── Navigation commands ──
   { command: '/credentials', label: 'Credentials', description: 'Go to credentials vault', icon: <KeyRound className="h-4 w-4" />, action: 'navigate', path: '/fetcher/credentials' },
   { command: '/settings', label: 'Settings', description: 'Go to account settings', icon: <Settings className="h-4 w-4" />, action: 'navigate', path: '/fetcher/account' },
   { command: '/dashboard', label: 'Dashboard', description: 'Go to main dashboard', icon: <LayoutDashboard className="h-4 w-4" />, action: 'navigate', path: '/dashboard' },
@@ -118,9 +172,26 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/sandbox', label: 'Sandbox', description: 'Open live code sandbox', icon: <Terminal className="h-4 w-4" />, action: 'navigate', path: '/sandbox' },
   { command: '/files', label: 'Project Files', description: 'View all project files', icon: <FolderOpen className="h-4 w-4" />, action: 'navigate', path: '/project-files' },
   { command: '/affiliate', label: 'Affiliate', description: 'View affiliate dashboard', icon: <TrendingUp className="h-4 w-4" />, action: 'navigate', path: '/affiliate' },
-  { command: '/export', label: 'Export Chat', description: 'Export conversation as markdown', icon: <Download className="h-4 w-4" />, action: 'local' },
-  { command: '/new', label: 'New Chat', description: 'Start a new conversation', icon: <FilePlus className="h-4 w-4" />, action: 'local' },
-  { command: '/clear', label: 'Clear', description: 'Clear current chat', icon: <Eraser className="h-4 w-4" />, action: 'local' },
+  { command: '/pricing', label: 'Pricing', description: 'View plans and pricing', icon: <CreditCard className="h-4 w-4" />, action: 'navigate', path: '/pricing' },
+  { command: '/subscription', label: 'Subscription', description: 'Manage your subscription', icon: <Crown className="h-4 w-4" />, action: 'navigate', path: '/dashboard/subscription' },
+  { command: '/credits', label: 'Credits', description: 'View credit balance', icon: <DollarSign className="h-4 w-4" />, action: 'navigate', path: '/dashboard/credits' },
+  { command: '/webhooks', label: 'Webhooks', description: 'Manage webhook endpoints', icon: <Webhook className="h-4 w-4" />, action: 'navigate', path: '/fetcher/webhooks' },
+  { command: '/api', label: 'API Access', description: 'API keys and documentation', icon: <Code2 className="h-4 w-4" />, action: 'navigate', path: '/fetcher/api-access' },
+  { command: '/totp', label: 'TOTP Vault', description: 'Manage 2FA TOTP codes', icon: <Shield className="h-4 w-4" />, action: 'navigate', path: '/fetcher/totp-vault' },
+  { command: '/watchdogpage', label: 'Watchdog Page', description: 'Credential monitoring dashboard', icon: <Eye className="h-4 w-4" />, action: 'navigate', path: '/fetcher/watchdog' },
+  { command: '/health', label: 'Health Trends', description: 'View credential health trends', icon: <Activity className="h-4 w-4" />, action: 'navigate', path: '/fetcher/health-trends' },
+  { command: '/import', label: 'Import', description: 'Import credentials from file', icon: <Upload className="h-4 w-4" />, action: 'navigate', path: '/fetcher/import' },
+  { command: '/bulksync', label: 'Bulk Sync', description: 'Sync all credentials at once', icon: <RefreshCw className="h-4 w-4" />, action: 'navigate', path: '/fetcher/bulk-sync' },
+  { command: '/auditlogs', label: 'Audit Logs', description: 'View full audit trail', icon: <ScrollText className="h-4 w-4" />, action: 'navigate', path: '/fetcher/audit-logs' },
+  { command: '/docs', label: 'Developer Docs', description: 'API documentation', icon: <BookOpen className="h-4 w-4" />, action: 'navigate', path: '/fetcher/developer-docs' },
+  { command: '/companies', label: 'Companies', description: 'Manage company profiles', icon: <Building2 className="h-4 w-4" />, action: 'navigate', path: '/companies' },
+  { command: '/bizplan', label: 'Business Plan', description: 'AI business plan generator', icon: <Briefcase className="h-4 w-4" />, action: 'navigate', path: '/business-plans' },
+  { command: '/crowdfund', label: 'Crowdfunding', description: 'Launch a crowdfunding campaign', icon: <Megaphone className="h-4 w-4" />, action: 'navigate', path: '/crowdfunding' },
+  { command: '/referrals', label: 'Referrals', description: 'Referral program dashboard', icon: <Users className="h-4 w-4" />, action: 'navigate', path: '/referrals' },
+  { command: '/ads', label: 'Advertising', description: 'Manage ad campaigns', icon: <Megaphone className="h-4 w-4" />, action: 'navigate', path: '/advertising' },
+  { command: '/seo', label: 'SEO', description: 'SEO dashboard and tools', icon: <Search className="h-4 w-4" />, action: 'navigate', path: '/seo' },
+  { command: '/blog', label: 'Blog', description: 'Blog admin panel', icon: <FileText className="h-4 w-4" />, action: 'navigate', path: '/blog-admin' },
+  { command: '/marketing', label: 'Marketing', description: 'Marketing tools and campaigns', icon: <Target className="h-4 w-4" />, action: 'navigate', path: '/marketing' },
 ];
 
 // ─── Help Categories ──────────────────────────────────────────────
@@ -200,6 +271,33 @@ const HELP_CATEGORIES = [
       "Configure watchdog monitoring",
     ],
   },
+  {
+    icon: "headphones",
+    title: "Voice & Audio",
+    items: [
+      "Speak to Titan using your microphone — /voice to toggle",
+      "Titan reads responses aloud with text-to-speech",
+      "/speak to read the last response aloud",
+      "/stop to stop playback",
+      "Supports multiple languages and accents",
+    ],
+  },
+  {
+    icon: "rocket",
+    title: "DevOps & Deployment",
+    items: [
+      "/fix — Auto-fix TypeScript errors",
+      "/test — Run test suites",
+      "/deploy — Check deployment readiness",
+      "/audit — Full security audit",
+      "/diff — Show recent git changes",
+      "/stats — Codebase statistics",
+      "/deps — Dependency audit",
+      "/schema — Inspect database schema",
+      "/checkpoint — Save a rollback point",
+      "/rollback — Roll back to a checkpoint",
+    ],
+  },
 ];
 
 const HELP_ICONS: Record<string, React.ReactNode> = {
@@ -210,6 +308,8 @@ const HELP_ICONS: Record<string, React.ReactNode> = {
   navigation: <Navigation className="h-4 w-4" />,
   users: <Users className="h-4 w-4" />,
   calendar: <Calendar className="h-4 w-4" />,
+  headphones: <Headphones className="h-4 w-4" />,
+  rocket: <Rocket className="h-4 w-4" />,
 };
 
 const QUICK_ACTION_ICONS: Record<string, React.ReactNode> = {
@@ -272,6 +372,32 @@ const TOOL_LABELS: Record<string, string> = {
   read_uploaded_file: "Read uploaded file",
   self_search_files: "Searched files",
   self_exec_command: "Executed command",
+  sandbox_exec: "Ran sandbox command",
+  sandbox_write_file: "Wrote sandbox file",
+  sandbox_read_file: "Read sandbox file",
+  sandbox_list_files: "Listed sandbox files",
+  app_clone: "Cloned application",
+  app_research: "Researched application",
+  website_replicate: "Replicated website",
+  code_security_review: "Security review",
+  security_scan: "Security scan",
+  port_scan: "Port scan",
+  ssl_check: "SSL check",
+  auto_fix_vulnerability: "Fixed vulnerability",
+  auto_fix_all_vulnerabilities: "Fixed all vulnerabilities",
+  self_code_stats: "Code statistics",
+  self_dependency_audit: "Dependency audit",
+  self_db_schema_inspect: "DB schema inspection",
+  self_env_check: "Environment check",
+  self_deployment_check: "Deployment check",
+  self_find_dead_code: "Found dead code",
+  self_grep_codebase: "Searched codebase",
+  self_git_diff: "Git diff",
+  self_api_map: "API mapping",
+  self_analyze_file: "Analyzed file",
+  self_save_checkpoint: "Saved checkpoint",
+  self_list_checkpoints: "Listed checkpoints",
+  self_rollback_to_checkpoint: "Rolled back to checkpoint",
 };
 
 interface ExecutedAction {
@@ -839,6 +965,10 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Voice output (TTS) state
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // File Upload State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -968,6 +1098,97 @@ export default function ChatPage() {
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  // ─── Text-to-Speech (TTS) ──────────────────────────────────────────
+  const speakText = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast.error('Text-to-speech is not supported in this browser.');
+      return;
+    }
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+    // Strip markdown formatting for cleaner speech
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, ' code block omitted ') // code blocks
+      .replace(/`([^`]+)`/g, '$1') // inline code
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+      .replace(/\*([^*]+)\*/g, '$1') // italic
+      .replace(/#{1,6}\s/g, '') // headers
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+      .replace(/[\-*+]\s/g, '') // list markers
+      .replace(/\|[^\n]+\|/g, '') // table rows
+      .replace(/---+/g, '') // horizontal rules
+      .replace(/\n{2,}/g, '. ') // double newlines to pauses
+      .replace(/\n/g, ' ') // single newlines
+      .trim();
+    if (!cleanText) {
+      toast.error('No text to speak.');
+      return;
+    }
+    // Split long text into chunks (speechSynthesis has ~5000 char limit in some browsers)
+    const MAX_CHUNK = 4000;
+    const chunks: string[] = [];
+    let remaining = cleanText;
+    while (remaining.length > 0) {
+      if (remaining.length <= MAX_CHUNK) {
+        chunks.push(remaining);
+        break;
+      }
+      // Find a good break point
+      let breakIdx = remaining.lastIndexOf('. ', MAX_CHUNK);
+      if (breakIdx < MAX_CHUNK / 2) breakIdx = remaining.lastIndexOf(' ', MAX_CHUNK);
+      if (breakIdx < MAX_CHUNK / 2) breakIdx = MAX_CHUNK;
+      chunks.push(remaining.slice(0, breakIdx + 1));
+      remaining = remaining.slice(breakIdx + 1);
+    }
+    setIsSpeaking(true);
+    let chunkIdx = 0;
+    const speakNext = () => {
+      if (chunkIdx >= chunks.length) {
+        setIsSpeaking(false);
+        speechUtteranceRef.current = null;
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[chunkIdx]);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      // Try to find a good English voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en'))
+        || voices.find(v => v.name.includes('Samantha'))
+        || voices.find(v => v.lang.startsWith('en') && v.localService)
+        || voices.find(v => v.lang.startsWith('en'));
+      if (preferred) utterance.voice = preferred;
+      utterance.onend = () => {
+        chunkIdx++;
+        speakNext();
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        speechUtteranceRef.current = null;
+      };
+      speechUtteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    };
+    speakNext();
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    speechUtteranceRef.current = null;
+  }, []);
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Load conversation messages
   const { data: convDetail, refetch: refetchConv } =
@@ -1123,6 +1344,49 @@ export default function ChatPage() {
       return;
     }
 
+    if (lowerText === '/voice') {
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      const newMode = !voiceMode;
+      setVoiceMode(newMode);
+      if (!newMode) stopSpeaking();
+      toast.success(newMode
+        ? 'Voice mode ON — Titan will speak responses aloud. Tap mic to talk.'
+        : 'Voice mode OFF — text-only mode restored.'
+      );
+      const voiceMsg: ChatMsg = {
+        id: -Date.now(),
+        role: 'assistant',
+        content: newMode
+          ? '🎙️ **Voice mode activated.** I\'ll read my responses aloud. You can also speak to me using the microphone button. Say /stop to stop playback or /voice again to turn it off.'
+          : '🔇 **Voice mode deactivated.** Returning to text-only mode.',
+        createdAt: Date.now(),
+      };
+      setLocalMessages(prev => [...prev, voiceMsg]);
+      return;
+    }
+
+    if (lowerText === '/speak') {
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      const lastAssistant = [...localMessages].reverse().find(m => m.role === 'assistant');
+      if (!lastAssistant) {
+        toast.error('No Titan response to read aloud.');
+        return;
+      }
+      speakText(lastAssistant.content);
+      toast.success('Reading last response aloud...');
+      return;
+    }
+
+    if (lowerText === '/stop') {
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      stopSpeaking();
+      toast.success('Speech stopped.');
+      return;
+    }
+
     if (slashCmd?.action === 'navigate' && slashCmd.path) {
       setInput('');
       setLocation(slashCmd.path);
@@ -1274,6 +1538,11 @@ export default function ChatPage() {
       };
 
       setLocalMessages((prev) => [...prev, assistantMsg]);
+
+      // Auto-speak response in voice mode
+      if (voiceMode && result.response) {
+        speakText(result.response);
+      }
 
       // Track created files for the project files panel
       if (result.actions && result.actions.length > 0) {
@@ -1643,6 +1912,14 @@ export default function ChatPage() {
                         {msg.role === "assistant" && (
                           <div className="flex items-center gap-1 mt-1 ml-1">
                             <CopyButton text={msg.content} />
+                            <button
+                              onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              title={isSpeaking ? 'Stop speaking' : 'Read aloud'}
+                            >
+                              {isSpeaking ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                              <span className="hidden sm:inline">{isSpeaking ? 'Stop' : 'Speak'}</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1780,6 +2057,27 @@ export default function ChatPage() {
             </div>
           )}
 
+          {/* Speaking indicator */}
+          {isSpeaking && (
+            <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+              <Volume2 className="h-4 w-4 text-blue-400 animate-pulse" />
+              <span className="text-sm text-blue-400 font-medium">Titan is speaking...</span>
+              <div className="flex-1" />
+              <Button onClick={stopSpeaking} size="sm" variant="ghost" className="h-8 px-3 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20">
+                <VolumeX className="h-3.5 w-3.5 mr-1.5" />
+                Stop
+              </Button>
+            </div>
+          )}
+
+          {/* Voice mode active indicator */}
+          {voiceMode && !isRecording && !isSpeaking && !isTranscribing && (
+            <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-xl">
+              <Headphones className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs text-primary/80">Voice mode active — responses will be read aloud</span>
+            </div>
+          )}
+
           {/* Selected files preview */}
           {selectedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted/30 rounded-lg">
@@ -1860,6 +2158,25 @@ export default function ChatPage() {
                   title={isRecording ? 'Stop recording' : 'Voice input'}
                 >
                   {isRecording ? <Square className="h-3.5 w-3.5 fill-current" /> : <Mic className="h-4 w-4" />}
+                </button>
+
+                <button
+                  onClick={() => {
+                    const newMode = !voiceMode;
+                    setVoiceMode(newMode);
+                    if (!newMode) stopSpeaking();
+                    toast.success(newMode ? 'Voice mode ON' : 'Voice mode OFF');
+                  }}
+                  className={`flex items-center justify-center rounded-xl transition-all ${
+                    isMobile ? 'h-9 w-9' : 'h-10 w-10'
+                  } ${
+                    voiceMode
+                      ? 'bg-primary/20 text-primary ring-1 ring-primary/50'
+                      : 'text-muted-foreground hover:text-primary hover:bg-primary/10 border border-border/50 hover:border-primary/50'
+                  }`}
+                  title={voiceMode ? 'Voice mode ON — click to disable' : 'Enable voice mode (auto-speak responses)'}
+                >
+                  {voiceMode ? <Headphones className="h-4 w-4" /> : <HeadphoneOff className="h-4 w-4" />}
                 </button>
 
                 <button
