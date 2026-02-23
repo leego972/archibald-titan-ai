@@ -295,7 +295,54 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [projectGithubPat, setProjectGithubPat] = useState("");
+  const [patValidation, setPatValidation] = useState<{
+    status: 'idle' | 'checking' | 'valid' | 'invalid';
+    username?: string;
+    scopes?: string[];
+    missingScopes?: string[];
+    error?: string;
+  }>({ status: 'idle' });
   const [step, setStep] = useState(1);
+
+  const REQUIRED_SCOPES = ['repo', 'workflow', 'delete_repo', 'admin:repo_hook'];
+
+  const validateGithubPat = async (pat: string) => {
+    if (!pat.trim() || pat.length < 10) {
+      setPatValidation({ status: 'idle' });
+      return;
+    }
+    setPatValidation({ status: 'checking' });
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `token ${pat.trim()}`, Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        setPatValidation({ status: 'invalid', error: res.status === 401 ? 'Invalid token — check that you copied it correctly' : `GitHub API error: ${res.status}` });
+        return;
+      }
+      const user = await res.json();
+      const scopeHeader = res.headers.get('x-oauth-scopes') || '';
+      const scopes = scopeHeader.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const missing = REQUIRED_SCOPES.filter(req => !scopes.some((s: string) => s === req || s.startsWith(req.split(':')[0] + ':')));
+      // Special handling: 'repo' scope includes sub-scopes
+      const hasRepo = scopes.includes('repo');
+      const hasWorkflow = scopes.includes('workflow');
+      const hasDeleteRepo = hasRepo || scopes.includes('delete_repo');
+      const hasAdminHook = scopes.includes('admin:repo_hook') || scopes.some((s: string) => s.startsWith('admin:'));
+      const actualMissing: string[] = [];
+      if (!hasRepo) actualMissing.push('repo');
+      if (!hasWorkflow) actualMissing.push('workflow');
+      if (!hasDeleteRepo) actualMissing.push('delete_repo');
+      if (!hasAdminHook) actualMissing.push('admin:repo_hook');
+      if (actualMissing.length > 0) {
+        setPatValidation({ status: 'invalid', username: user.login, scopes, missingScopes: actualMissing, error: `Missing required scopes: ${actualMissing.join(', ')}` });
+      } else {
+        setPatValidation({ status: 'valid', username: user.login, scopes, missingScopes: [] });
+      }
+    } catch (err: any) {
+      setPatValidation({ status: 'invalid', error: 'Network error — could not reach GitHub API' });
+    }
+  };
 
   const createMutation = trpc.replicate.create.useMutation({
     onSuccess: (data: any) => {
@@ -310,6 +357,14 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
   const handleCreate = () => {
     if (!targetUrl.trim()) {
       toast.error("Please enter a target URL or app name");
+      return;
+    }
+    if (!projectGithubPat.trim()) {
+      toast.error("GitHub PAT is required for every clone project");
+      return;
+    }
+    if (patValidation.status !== 'valid') {
+      toast.error("Please provide a valid GitHub PAT with all required scopes before proceeding");
       return;
     }
 
@@ -523,19 +578,83 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
                 <Label className="text-sm font-semibold text-amber-400">GitHub Personal Access Token</Label>
                 <Badge variant="destructive" className="text-[10px]">Required</Badge>
               </div>
-              <Input
-                placeholder="ghp_... or github_pat_..."
-                value={projectGithubPat}
-                onChange={(e) => setProjectGithubPat(e.target.value)}
-                type="password"
-                className="border-amber-500/30 focus:ring-amber-500/50"
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="ghp_... or github_pat_..."
+                  value={projectGithubPat}
+                  onChange={(e) => {
+                    setProjectGithubPat(e.target.value);
+                    setPatValidation({ status: 'idle' });
+                  }}
+                  onBlur={() => validateGithubPat(projectGithubPat)}
+                  type="password"
+                  className={`border-amber-500/30 focus:ring-amber-500/50 ${patValidation.status === 'valid' ? 'border-green-500/50' : patValidation.status === 'invalid' ? 'border-red-500/50' : ''}`}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => validateGithubPat(projectGithubPat)}
+                  disabled={!projectGithubPat.trim() || patValidation.status === 'checking'}
+                  className="shrink-0"
+                >
+                  {patValidation.status === 'checking' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : patValidation.status === 'valid' ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  ) : (
+                    'Verify'
+                  )}
+                </Button>
+              </div>
+
+              {/* Validation Results */}
+              {patValidation.status === 'valid' && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-green-400">Token verified — {patValidation.username}</p>
+                    <p className="text-[10px] text-green-400/70">All required scopes present: {patValidation.scopes?.join(', ')}</p>
+                  </div>
+                </div>
+              )}
+              {patValidation.status === 'invalid' && (
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                    <p className="text-xs font-medium text-red-400">{patValidation.error}</p>
+                  </div>
+                  {patValidation.missingScopes && patValidation.missingScopes.length > 0 && (
+                    <div className="ml-6 space-y-1">
+                      <p className="text-[10px] text-muted-foreground">Required scopes for clone + deploy:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {REQUIRED_SCOPES.map(scope => (
+                          <Badge
+                            key={scope}
+                            variant="outline"
+                            className={`text-[10px] ${patValidation.missingScopes?.includes(scope) ? 'border-red-500/50 text-red-400' : 'border-green-500/50 text-green-400'}`}
+                          >
+                            {patValidation.missingScopes?.includes(scope) ? <XCircle className="h-2.5 w-2.5 mr-1" /> : <CheckCircle2 className="h-2.5 w-2.5 mr-1" />}
+                            {scope}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {patValidation.status === 'checking' && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <Loader2 className="h-4 w-4 text-blue-400 animate-spin shrink-0" />
+                  <p className="text-xs text-blue-400">Verifying token with GitHub...</p>
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground">
-                Create a new PAT with <strong>repo</strong> scope at{" "}
-                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+                Create a PAT with <strong>all required scopes</strong> at{" "}
+                <a href="https://github.com/settings/tokens/new?scopes=repo,workflow,delete_repo,admin:repo_hook&description=Archibald+Titan+Clone" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
                   github.com/settings/tokens <ExternalLink className="inline h-3 w-3" />
                 </a>
-                . Each clone needs its own PAT for security.
+                . A fresh all-inclusive PAT is required for each clone to prevent deployment errors.
               </p>
             </div>
 
@@ -579,7 +698,7 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
 
             <Button
               onClick={handleCreate}
-              disabled={createMutation.isPending || !targetUrl.trim() || !projectGithubPat.trim()}
+              disabled={createMutation.isPending || !targetUrl.trim() || !projectGithubPat.trim() || patValidation.status !== 'valid'}
               className="bg-purple-600 hover:bg-purple-700"
               size="lg"
             >

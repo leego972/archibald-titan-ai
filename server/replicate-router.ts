@@ -66,9 +66,45 @@ export const replicateRouter = router({
         brandTagline: z.string().optional(),
         stripePublishableKey: z.string().optional(),
         stripeSecretKey: z.string().optional(),
+        githubPat: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // ═══ GITHUB PAT VALIDATION: Require all-inclusive PAT for each clone ═══
+      if (!input.githubPat || input.githubPat.trim().length < 10) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A GitHub Personal Access Token is required for each clone project. Please provide a fresh all-inclusive PAT.",
+        });
+      }
+      // Validate PAT against GitHub API and check required scopes
+      try {
+        const ghRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `token ${input.githubPat.trim()}`, Accept: "application/json", "User-Agent": "ArchibaldTitan" },
+        });
+        if (!ghRes.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid GitHub PAT — the token was rejected by GitHub. Please check it and try again." });
+        }
+        const scopeHeader = ghRes.headers.get("x-oauth-scopes") || "";
+        const scopes = scopeHeader.split(",").map((s: string) => s.trim()).filter(Boolean);
+        const hasRepo = scopes.includes("repo");
+        const hasWorkflow = scopes.includes("workflow");
+        const hasAdminHook = scopes.includes("admin:repo_hook") || scopes.some((s: string) => s.startsWith("admin:"));
+        const missing: string[] = [];
+        if (!hasRepo) missing.push("repo");
+        if (!hasWorkflow) missing.push("workflow");
+        if (!hasAdminHook) missing.push("admin:repo_hook");
+        if (missing.length > 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `GitHub PAT is missing required scopes: ${missing.join(", ")}. Please create a new PAT with all scopes: repo, workflow, delete_repo, admin:repo_hook`,
+          });
+        }
+      } catch (e: any) {
+        if (e instanceof TRPCError) throw e;
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Could not validate GitHub PAT — network error. Please try again." });
+      }
+
       // ═══ TIER GATE: Clone Website is Cyber+ and Titan exclusive ═══
       const hasAccess = await canUseCloneWebsite(ctx.user.id);
       if (!hasAccess) {
