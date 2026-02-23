@@ -28,6 +28,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { CreditBalanceWidget } from "./CreditBalanceWidget";
+import { trpc } from "@/lib/trpc";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Page 1", path: "/" },
@@ -260,15 +261,41 @@ function DashboardLayoutContent({
             </div>
           </div>
           <div className="flex items-center gap-2 pr-2">
-            <div className="relative">
-              <Bell className="h-6 w-6 text-muted-foreground" />
-              {/* Notification badge - placeholder for future notification system */}
-            </div>
+            <NotificationBell />
             <CreditBalanceWidget />
           </div>
         </div>
         <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
     </>
+  );
+}
+
+// ─── Notification Bell with real data ─────────────────────────────
+function NotificationBell() {
+  const [, navigate] = useLocation();
+  const watchdogSummary = trpc.watchdog.summary.useQuery(undefined, {
+    refetchInterval: 60_000, // refresh every minute
+    retry: false,
+  });
+
+  const expiring = watchdogSummary.data?.expiringSoon ?? 0;
+  const expired = watchdogSummary.data?.expired ?? 0;
+  const alertCount = expiring + expired;
+
+  return (
+    <button
+      onClick={() => navigate("/fetcher/watchdog")}
+      className="relative p-1.5 rounded-lg hover:bg-accent transition-colors"
+      aria-label={alertCount > 0 ? `${alertCount} credential alerts` : "No credential alerts"}
+      title={alertCount > 0 ? `${expired} expired, ${expiring} expiring soon` : "All credentials healthy"}
+    >
+      <Bell className={`h-5 w-5 ${alertCount > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
+      {alertCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {alertCount > 99 ? "99+" : alertCount}
+        </span>
+      )}
+    </button>
   );
 }

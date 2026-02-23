@@ -838,6 +838,8 @@ export const chatRouter = router({
               .set({ title })
               .where(eq(chatConversations.id, conversationId!));
           }
+        }).catch((err) => {
+          console.error("[chat] Failed to generate conversation title:", err?.message || err);
         });
       }
 
