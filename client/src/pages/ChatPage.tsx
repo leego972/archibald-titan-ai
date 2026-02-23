@@ -435,7 +435,7 @@ function ConversationSidebar({
     onSuccess: () => { refetch(); setEditingId(null); },
   });
   const deleteMutation = trpc.chat.deleteConversation.useMutation({
-    onSuccess: () => { refetch(); toast.success("Conversation deleted"); },
+    onSuccess: () => { refetch(); toast.success("Conversation deleted"); setConfirmDeleteId(null); },
   });
   const pinMutation = trpc.chat.pinConversation.useMutation({
     onSuccess: () => refetch(),
@@ -687,6 +687,17 @@ function MobileConversationDrawer({
                     <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 text-sm truncate">{conv.title || "New conversation"}</span>
                   </div>
+                  {/* Delete button — always visible on mobile */}
+                  <button
+                    className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                    title="Delete conversation"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(conv.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -720,7 +731,7 @@ function MobileConversationDrawer({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
             <h4 className="text-sm font-semibold mb-2">Delete conversation?</h4>
-            <p className="text-xs text-muted-foreground mb-4">This will permanently delete this conversation and all its messages. This action cannot be undone.</p>
+            <p className="text-xs text-muted-foreground mb-4">This will permanently delete this conversation and all its messages. Your project files, sandbox files, and GitHub repos are <strong>not affected</strong>.</p>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmDeleteId(null)}
@@ -780,6 +791,8 @@ export default function ChatPage() {
   const [localMessages, setLocalMessages] = useState<ChatMsg[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<string>("Thinking...");
+  const [messageQueue, setMessageQueue] = useState<string[]>([]);
+  const isProcessingRef = useRef(false);
 
   // Real-time Streaming State
   interface StreamEvent {
@@ -996,6 +1009,21 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
+  // Process queued messages after current build finishes
+  useEffect(() => {
+    if (!isLoading && messageQueue.length > 0 && !isProcessingRef.current) {
+      isProcessingRef.current = true;
+      const nextMessage = messageQueue[0];
+      setMessageQueue((prev) => prev.slice(1));
+      // Small delay to let the UI update before sending next message
+      const timer = setTimeout(() => {
+        isProcessingRef.current = false;
+        handleSend(nextMessage);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, messageQueue]);
+
   // iOS keyboard handling — adjust viewport when keyboard opens
   useEffect(() => {
     if (!isMobile) return;
@@ -1013,7 +1041,20 @@ export default function ChatPage() {
 
   const handleSend = async (text?: string) => {
     const messageText = text || input.trim();
-    if (!messageText || isLoading) return;
+    if (!messageText) return;
+
+    // Non-blocking chat: if a build is running, queue the message
+    // instead of blocking. The user can keep chatting.
+    if (isLoading) {
+      // Add the user message to the chat immediately (optimistic)
+      const queuedMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
+      setLocalMessages((prev) => [...prev, queuedMsg]);
+      setMessageQueue((prev) => [...prev, messageText]);
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      toast.info('Message queued — will be sent when the current build finishes.');
+      return;
+    }
 
     // Handle slash commands
     const lowerText = messageText.toLowerCase().trim();
@@ -1812,7 +1853,7 @@ export default function ChatPage() {
                   onChange={handleTextareaInput}
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    isLoading ? 'Titan is working... click Stop to cancel'
+                    isLoading ? 'Titan is building... type here to queue a message'
                     : isRecording ? 'Recording... tap Stop when done'
                     : isTranscribing ? 'Transcribing...'
                     : isMobile ? 'Ask Titan anything...'
@@ -1822,14 +1863,14 @@ export default function ChatPage() {
                     isMobile ? 'min-h-[44px] text-[16px] py-2.5' : 'min-h-[56px] text-base py-3'
                   }`}
                   rows={1}
-                  disabled={isLoading || isRecording || isTranscribing}
+                  disabled={isRecording || isTranscribing}
                 />
               </div>
 
               {/* Send button */}
               <Button
                 onClick={() => handleSend()}
-                disabled={!input.trim() || isLoading || isRecording || isTranscribing}
+                disabled={!input.trim() || isRecording || isTranscribing}
                 size="icon"
                 className={`rounded-xl shrink-0 ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
               >
@@ -1837,6 +1878,16 @@ export default function ChatPage() {
               </Button>
             </div>
           </div>
+
+          {/* Queued messages indicator */}
+          {messageQueue.length > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
+              <span className="text-[11px] text-amber-500 font-medium">
+                {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued — will send after current build
+              </span>
+            </div>
+          )}
 
           {/* Footer hint */}
           <p className="text-[10px] text-muted-foreground text-center mt-1.5">

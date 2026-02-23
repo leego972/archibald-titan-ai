@@ -397,6 +397,176 @@ function startServer() {
       }
     });
 
+    // ── Chat stream proxy (SSE for real-time build events) ──
+    app.get("/api/chat/stream/:conversationId", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const remoteRes = await fetch(REMOTE_URL + `/api/chat/stream/${req.params.conversationId}`, {
+          headers: { "Accept": "text/event-stream", "Cookie": `titan_session=${license.licenseKey}` },
+        });
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no",
+        });
+        const reader = remoteRes.body?.getReader();
+        if (!reader) { res.end(); return; }
+        const pump = async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(Buffer.from(value));
+            }
+          } catch { /* connection closed */ }
+          res.end();
+        };
+        pump();
+        req.on("close", () => { try { reader.cancel(); } catch {} });
+      } catch (e) {
+        res.status(503).json({ error: "Failed to connect to remote server" });
+      }
+    });
+
+    // ── Chat abort proxy ──
+    app.post("/api/chat/abort/:conversationId", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const remoteRes = await fetch(REMOTE_URL + `/api/chat/abort/${req.params.conversationId}`, {
+          method: "POST",
+          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+        });
+        const data = await remoteRes.json();
+        res.json(data);
+      } catch (e) {
+        res.status(503).json({ error: "Failed to connect to remote server" });
+      }
+    });
+
+    // ── Build status proxy (for reconnection after disconnect) ──
+    app.get("/api/chat/build-status/:conversationId", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const remoteRes = await fetch(REMOTE_URL + `/api/chat/build-status/${req.params.conversationId}`, {
+          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+        });
+        const data = await remoteRes.json();
+        res.json(data);
+      } catch (e) {
+        res.json({ active: false });
+      }
+    });
+
+    // ── Active builds proxy ──
+    app.get("/api/chat/active-builds", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.json({ builds: [] });
+      try {
+        const remoteRes = await fetch(REMOTE_URL + "/api/chat/active-builds", {
+          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+        });
+        const data = await remoteRes.json();
+        res.json(data);
+      } catch (e) {
+        res.json({ builds: [] });
+      }
+    });
+
+    // ── Chat file upload proxy ──
+    app.post("/api/chat/upload", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        // Forward the raw request body to the remote server
+        const chunks = [];
+        req.on("data", (chunk) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const body = Buffer.concat(chunks);
+            const remoteRes = await fetch(REMOTE_URL + "/api/chat/upload", {
+              method: "POST",
+              headers: {
+                "Content-Type": req.headers["content-type"],
+                "Cookie": `titan_session=${license.licenseKey}`,
+              },
+              body,
+            });
+            const data = await remoteRes.json();
+            res.status(remoteRes.status).json(data);
+          } catch (e) {
+            res.status(503).json({ error: "Upload proxy failed" });
+          }
+        });
+      } catch (e) {
+        res.status(503).json({ error: "Failed to connect to remote server" });
+      }
+    });
+
+    // ── Voice upload proxy ──
+    app.post("/api/voice/upload", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const chunks = [];
+        req.on("data", (chunk) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const body = Buffer.concat(chunks);
+            const remoteRes = await fetch(REMOTE_URL + "/api/voice/upload", {
+              method: "POST",
+              headers: {
+                "Content-Type": req.headers["content-type"],
+                "Cookie": `titan_session=${license.licenseKey}`,
+              },
+              body,
+            });
+            const data = await remoteRes.json();
+            res.status(remoteRes.status).json(data);
+          } catch (e) {
+            res.status(503).json({ error: "Voice upload proxy failed" });
+          }
+        });
+      } catch (e) {
+        res.status(503).json({ error: "Failed to connect to remote server" });
+      }
+    });
+
+    // ── Generic tRPC proxy for all other endpoints ──
+    // This ensures desktop has full parity with the web version
+    // by forwarding any unhandled tRPC calls to the remote server.
+    app.all("/api/trpc/:procedure", async (req, res, next) => {
+      // Skip if already handled above
+      if (["auth.me", "credits.getBalance", "chat.send"].includes(req.params.procedure)) {
+        return next();
+      }
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const url = REMOTE_URL + req.originalUrl;
+        const fetchOpts = {
+          method: req.method,
+          headers: {
+            "Content-Type": "application/json",
+            "Cookie": `titan_session=${license.licenseKey}`,
+          },
+        };
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          fetchOpts.body = JSON.stringify(req.body);
+        }
+        const remoteRes = await fetch(url, fetchOpts);
+        const contentType = remoteRes.headers.get("content-type") || "application/json";
+        res.set("Content-Type", contentType);
+        const data = await remoteRes.text();
+        res.status(remoteRes.status).send(data);
+      } catch (e) {
+        res.status(503).json({ error: "Failed to proxy to remote server: " + e.message });
+      }
+    });
+
     // ── Activity & stats (require auth) ──
     app.get("/api/local/activity", requireAuth, (_, res) => res.json(dbAll("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 100")));
     app.get("/api/local/stats", requireAuth, (_, res) => {

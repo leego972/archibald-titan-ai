@@ -23,7 +23,7 @@ import {
 } from "../drizzle/schema";
 import { PROVIDERS } from "../shared/fetcher";
 import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
-import { emitChatEvent, isAborted, cleanupRequest } from "./chat-stream";
+import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild } from "./chat-stream";
 import { executeToolCall } from "./chat-executor";
 import {
   enableDeferredMode,
@@ -743,6 +743,42 @@ export const chatRouter = router({
     }),
 
   /**
+   * Delete ALL conversations for the current user.
+   * Only deletes chat messages and conversation records — project files,
+   * sandbox files, GitHub repos, and all other data remain untouched.
+   */
+  deleteAllConversations: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const userId = ctx.user.id;
+
+      // Get all conversation IDs for this user
+      const userConversations = await db
+        .select({ id: chatConversations.id })
+        .from(chatConversations)
+        .where(eq(chatConversations.userId, userId));
+
+      if (userConversations.length === 0) {
+        return { success: true, deletedCount: 0 };
+      }
+
+      // Delete all messages for this user
+      await db
+        .delete(chatMessages)
+        .where(eq(chatMessages.userId, userId));
+
+      // Delete all conversations for this user
+      await db
+        .delete(chatConversations)
+        .where(eq(chatConversations.userId, userId));
+
+      console.log(`[Chat] Deleted ${userConversations.length} conversations for user ${userId}`);
+      return { success: true, deletedCount: userConversations.length };
+    }),
+
+  /**
    * Send a message within a conversation and get an AI response.
    * If no conversationId is provided, creates a new conversation.
    */
@@ -801,6 +837,11 @@ export const chatRouter = router({
 
       // Save user message to DB
       await saveMessage(conversationId, userId, "user", input.message);
+
+      // ── Register Background Build ──────────────────────────────
+      // Track this build so it persists even if the user disconnects,
+      // navigates away, or logs out. Only an explicit abort can stop it.
+      registerBuild(conversationId, userId);
 
       // Load conversation context from DB
       const previousMessages = await loadConversationContext(conversationId, userId);
@@ -1447,6 +1488,14 @@ Do NOT attempt any tool calls or builds.`;
           type: "done",
           data: { response: (finalText || '').slice(0, 200), actionCount: executedActions.length },
         });
+
+        // ── Mark Background Build Complete ─────────────────────────
+        // Build result is stored for 5 minutes so the client can retrieve
+        // it even if the user was disconnected during the build.
+        const buildActions = executedActions.length > 0
+          ? executedActions.map(a => ({ tool: a.tool, success: a.success, summary: `${a.success ? 'Executed' : 'Failed'} ${a.tool}` }))
+          : undefined;
+        completeBuild(conversationId!, { response: finalText, actions: buildActions, status: "completed" });
         cleanupRequest(conversationId!);
 
         // ── Post-response credit balance + upsell data ────────────────
@@ -1486,6 +1535,7 @@ Do NOT attempt any tool calls or builds.`;
           type: "error",
           data: { message: err?.message || "Unknown error" },
         });
+        completeBuild(conversationId!, { status: "failed" });
         cleanupRequest(conversationId!);
         try {
           await saveMessage(conversationId, userId, "assistant", errorText);
