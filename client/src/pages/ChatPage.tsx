@@ -79,6 +79,9 @@ import {
   FolderOpen,
   FileText,
   ExternalLink,
+  Key,
+  Plus,
+  Save,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import {
@@ -815,6 +818,10 @@ export default function ChatPage() {
   // File Upload State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showProjectFiles, setShowProjectFiles] = useState(false);
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenValue, setTokenValue] = useState('');
+  const [savedTokens, setSavedTokens] = useState<Array<{name: string; preview: string}>>([]);
   const [createdFiles, setCreatedFiles] = useState<Array<{name: string; url: string; size: number; language: string}>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1389,6 +1396,14 @@ export default function ChatPage() {
                 Files ({createdFiles.length})
               </button>
             )}
+            <button
+              onClick={() => setShowTokenInput(!showTokenInput)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-all ml-2"
+              title="Add API tokens for the builder to use"
+            >
+              <Key className="h-3.5 w-3.5" />
+              Tokens{savedTokens.length > 0 ? ` (${savedTokens.length})` : ''}
+            </button>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {isMobile && (
@@ -1834,6 +1849,106 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
+      {/* Token Input Panel */}
+      {showTokenInput && (
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[360px] border-l border-border'} flex flex-col bg-background`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Key className="h-4 w-4 text-amber-400" />
+              <h3 className="font-semibold text-sm">API Tokens & Keys</h3>
+            </div>
+            <button onClick={() => setShowTokenInput(false)} className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <p className="text-xs text-muted-foreground">Add API tokens here for the builder to use in your projects. These are saved securely and accessible by the AI when building.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Token Name</label>
+                <input
+                  type="text"
+                  value={tokenName}
+                  onChange={(e) => setTokenName(e.target.value)}
+                  placeholder="e.g. OpenAI API Key, Stripe Secret..."
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Token Value</label>
+                <input
+                  type="password"
+                  value={tokenValue}
+                  onChange={(e) => setTokenValue(e.target.value)}
+                  placeholder="sk-... or pk_live_..."
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                />
+              </div>
+              <Button
+                onClick={async () => {
+                  if (!tokenName.trim() || !tokenValue.trim()) {
+                    toast.error('Both name and value are required');
+                    return;
+                  }
+                  try {
+                    // Save directly to encrypted vault via tRPC
+                    await trpc.vault.add.mutate({
+                      name: tokenName.trim(),
+                      credentialType: 'api_token',
+                      value: tokenValue.trim(),
+                      notes: `Manually added via Builder token input`,
+                    });
+                    const preview = tokenValue.length > 10
+                      ? tokenValue.substring(0, 6) + '...' + tokenValue.substring(tokenValue.length - 4)
+                      : '••••••';
+                    setSavedTokens(prev => [...prev, { name: tokenName, preview }]);
+                    setTokenName('');
+                    setTokenValue('');
+                    toast.success(`Token "${tokenName}" saved to vault`);
+                  } catch (err: any) {
+                    if (err?.message?.includes('feature')) {
+                      toast.error('Vault requires a paid plan. Upgrade to save tokens.');
+                    } else {
+                      toast.error('Failed to save token: ' + (err?.message || 'Unknown error'));
+                    }
+                  }
+                }}
+                disabled={!tokenName.trim() || !tokenValue.trim()}
+                size="sm"
+                className="w-full gap-2"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save Token
+              </Button>
+            </div>
+            {savedTokens.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <h4 className="text-xs font-medium text-muted-foreground">Saved Tokens</h4>
+                {savedTokens.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg border border-border/50 bg-card">
+                    <div className="flex items-center gap-2">
+                      <Key className="h-3.5 w-3.5 text-amber-400" />
+                      <div>
+                        <p className="text-sm font-medium">{t.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{t.preview}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSavedTokens(prev => prev.filter((_, idx) => idx !== i))}
+                      className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="pt-2 border-t border-border">
+              <p className="text-[10px] text-muted-foreground">Tokens are encrypted and stored in your secure vault. The builder can access them when building projects that need API integrations. You can also say "use my OpenAI key" in chat and the builder will pull it from your vault.</p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Project Files Panel */}
       {showProjectFiles && createdFiles.length > 0 && (
         <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[360px] border-l border-border'} flex flex-col bg-background`}>

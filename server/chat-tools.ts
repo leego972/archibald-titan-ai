@@ -1741,6 +1741,10 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // GitHub integration
   createGithubRepo,
   pushToGithubRepo,
+  // Credentials — access saved fetcher tokens and user-provided API keys
+  listCredentials,
+  revealCredential,
+  listVaultEntries,
   // Navigation
   navigateToPage,
   // System

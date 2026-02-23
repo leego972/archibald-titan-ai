@@ -33,6 +33,7 @@ import {
   AlertCircle,
   Github,
   Upload,
+  Key,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -293,6 +294,7 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
   const [textColor, setTextColor] = useState("#f8fafc");
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [stripeSecretKey, setStripeSecretKey] = useState("");
+  const [projectGithubPat, setProjectGithubPat] = useState("");
   const [step, setStep] = useState(1);
 
   const createMutation = trpc.replicate.create.useMutation({
@@ -322,6 +324,7 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
         : undefined,
       stripePublishableKey: stripePublishableKey || undefined,
       stripeSecretKey: stripeSecretKey || undefined,
+      githubPat: projectGithubPat || undefined,
     });
   };
 
@@ -498,7 +501,7 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
         </Card>
       )}
 
-      {/* Step 3: Stripe */}
+      {/* Step 3: Project Credentials */}
       {step >= 3 && (
         <Card className="border-border/50 bg-card/50">
           <CardHeader>
@@ -506,45 +509,77 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? "bg-purple-500/20 text-purple-400" : "bg-muted text-muted-foreground"}`}>
                 3
               </div>
-              <CreditCard className="h-5 w-5" />
-              Stripe Payment Integration
-              <Badge variant="outline" className="text-xs">Optional</Badge>
+              <Key className="h-5 w-5" />
+              Project Credentials
+              <Badge variant="outline" className="text-xs">Required</Badge>
             </CardTitle>
-            <CardDescription>Add your Stripe keys to enable payments in the clone</CardDescription>
+            <CardDescription>Provide credentials for this specific clone project. A fresh GitHub PAT is required for each clone.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="stripePk">Publishable Key</Label>
-                <Input
-                  id="stripePk"
-                  placeholder="pk_live_..."
-                  value={stripePublishableKey}
-                  onChange={(e) => setStripePublishableKey(e.target.value)}
-                  type="password"
-                />
+          <CardContent className="space-y-6">
+            {/* GitHub PAT - Required */}
+            <div className="space-y-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <div className="flex items-center gap-2">
+                <Github className="h-4 w-4 text-amber-400" />
+                <Label className="text-sm font-semibold text-amber-400">GitHub Personal Access Token</Label>
+                <Badge variant="destructive" className="text-[10px]">Required</Badge>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="stripeSk">Secret Key</Label>
-                <Input
-                  id="stripeSk"
-                  placeholder="sk_live_..."
-                  value={stripeSecretKey}
-                  onChange={(e) => setStripeSecretKey(e.target.value)}
-                  type="password"
-                />
-              </div>
+              <Input
+                placeholder="ghp_... or github_pat_..."
+                value={projectGithubPat}
+                onChange={(e) => setProjectGithubPat(e.target.value)}
+                type="password"
+                className="border-amber-500/30 focus:ring-amber-500/50"
+              />
+              <p className="text-xs text-muted-foreground">
+                Create a new PAT with <strong>repo</strong> scope at{" "}
+                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+                  github.com/settings/tokens <ExternalLink className="inline h-3 w-3" />
+                </a>
+                . Each clone needs its own PAT for security.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Get your Stripe keys from{" "}
-              <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
-                dashboard.stripe.com/apikeys <ExternalLink className="inline h-3 w-3" />
-              </a>
-            </p>
+
+            {/* Payment System - Stripe */}
+            <div className="space-y-3 p-4 rounded-lg border border-purple-500/30 bg-purple-500/5">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-purple-400" />
+                <Label className="text-sm font-semibold text-purple-400">Stripe Payment Integration</Label>
+                <Badge variant="outline" className="text-xs">Optional</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Your live Stripe keys will be wired into the clone so payments go directly to your account.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stripePk" className="text-xs">Publishable Key</Label>
+                  <Input
+                    id="stripePk"
+                    placeholder="pk_live_..."
+                    value={stripePublishableKey}
+                    onChange={(e) => setStripePublishableKey(e.target.value)}
+                    type="password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stripeSk" className="text-xs">Secret Key</Label>
+                  <Input
+                    id="stripeSk"
+                    placeholder="sk_live_..."
+                    value={stripeSecretKey}
+                    onChange={(e) => setStripeSecretKey(e.target.value)}
+                    type="password"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get your Stripe keys from{" "}
+                <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
+                  dashboard.stripe.com/apikeys <ExternalLink className="inline h-3 w-3" />
+                </a>
+              </p>
+            </div>
 
             <Button
               onClick={handleCreate}
-              disabled={createMutation.isPending || !targetUrl.trim()}
+              disabled={createMutation.isPending || !targetUrl.trim() || !projectGithubPat.trim()}
               className="bg-purple-600 hover:bg-purple-700"
               size="lg"
             >

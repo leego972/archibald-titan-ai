@@ -282,7 +282,8 @@ export function getForceFirstTool(message: string, isSelfBuild: boolean = true):
     return 'web_search';
   }
   // Return the correct tool based on build type
-  return isSelfBuild ? 'self_list_files' : 'sandbox_list_files';
+  // External builds use create_file (sandbox tools aren't in EXTERNAL_BUILD_TOOLS)
+  return isSelfBuild ? 'self_list_files' : 'create_file';
 }
 
 export function isRefusalResponse(text: string): boolean {
