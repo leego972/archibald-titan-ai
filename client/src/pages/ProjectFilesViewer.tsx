@@ -530,9 +530,18 @@ export default function ProjectFilesViewer() {
             </div>
           ) : (
             <div className="flex-1 overflow-auto overscroll-contain -webkit-overflow-scrolling-touch">
-              <pre className="p-3 sm:p-4 text-xs sm:text-sm font-mono leading-relaxed whitespace-pre-wrap break-words">
-                <code>{preview.content}</code>
-              </pre>
+              <div className="flex">
+                {/* Line numbers */}
+                <div className="select-none text-right pr-3 pl-2 sm:pl-3 py-3 sm:py-4 text-[10px] sm:text-xs font-mono leading-relaxed text-muted-foreground/40 border-r border-border/30 sticky left-0 bg-background">
+                  {preview.content.split('\n').map((_, i) => (
+                    <div key={i}>{i + 1}</div>
+                  ))}
+                </div>
+                {/* Code content */}
+                <pre className="p-3 sm:p-4 text-xs sm:text-sm font-mono leading-relaxed whitespace-pre-wrap break-words flex-1 min-w-0">
+                  <code>{preview.content}</code>
+                </pre>
+              </div>
             </div>
           )}
         </div>

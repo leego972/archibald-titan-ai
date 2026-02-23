@@ -112,6 +112,13 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/leaks', label: 'Leak Scanner', description: 'Go to leak scanner', icon: <Shield className="h-4 w-4" />, action: 'navigate', path: '/fetcher/leak-scanner' },
   { command: '/team', label: 'Team', description: 'Go to team management', icon: <Users className="h-4 w-4" />, action: 'navigate', path: '/fetcher/team' },
   { command: '/sync', label: 'Auto-Sync', description: 'Go to auto-sync settings', icon: <RefreshCw className="h-4 w-4" />, action: 'navigate', path: '/fetcher/auto-sync' },
+  { command: '/marketplace', label: 'Marketplace', description: 'Browse the Tech Bazaar', icon: <Banknote className="h-4 w-4" />, action: 'navigate', path: '/marketplace' },
+  { command: '/grants', label: 'Grants', description: 'Find R&D and startup grants', icon: <HandCoins className="h-4 w-4" />, action: 'navigate', path: '/grants' },
+  { command: '/clone', label: 'Clone Site', description: 'Clone and customize a website', icon: <Globe className="h-4 w-4" />, action: 'navigate', path: '/replicate' },
+  { command: '/sandbox', label: 'Sandbox', description: 'Open live code sandbox', icon: <Terminal className="h-4 w-4" />, action: 'navigate', path: '/sandbox' },
+  { command: '/files', label: 'Project Files', description: 'View all project files', icon: <FolderOpen className="h-4 w-4" />, action: 'navigate', path: '/project-files' },
+  { command: '/affiliate', label: 'Affiliate', description: 'View affiliate dashboard', icon: <TrendingUp className="h-4 w-4" />, action: 'navigate', path: '/affiliate' },
+  { command: '/export', label: 'Export Chat', description: 'Export conversation as markdown', icon: <Download className="h-4 w-4" />, action: 'local' },
   { command: '/new', label: 'New Chat', description: 'Start a new conversation', icon: <FilePlus className="h-4 w-4" />, action: 'local' },
   { command: '/clear', label: 'Clear', description: 'Clear current chat', icon: <Eraser className="h-4 w-4" />, action: 'local' },
 ];
@@ -259,6 +266,12 @@ const TOOL_LABELS: Record<string, string> = {
   navigate_to_page: "Navigated to page",
   web_search: "Searched the web",
   web_page_read: "Read web page",
+  create_file: "Created file",
+  create_github_repo: "Created GitHub repo",
+  push_to_github: "Pushed to GitHub",
+  read_uploaded_file: "Read uploaded file",
+  self_search_files: "Searched files",
+  self_exec_command: "Executed command",
 };
 
 interface ExecutedAction {
@@ -338,8 +351,8 @@ function ActionBadges({
               ) : (
                 <XCircle className="h-3 w-3 text-red-400 shrink-0" />
               )}
-              <span className="text-muted-foreground">
-                {TOOL_LABELS[action.tool] || action.tool}
+              <span className={action.success ? "text-muted-foreground" : "text-red-400/80"}>
+                {action.summary || TOOL_LABELS[action.tool] || action.tool.replace(/_/g, ' ')}
               </span>
             </div>
           ))}
@@ -1083,6 +1096,30 @@ export default function ChatPage() {
       setShowHelp(false);
       toast.success('Chat cleared');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    if (lowerText === '/export') {
+      setInput('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      if (localMessages.length === 0) {
+        toast.error('No messages to export');
+        return;
+      }
+      const md = localMessages.map(m => {
+        const role = m.role === 'user' ? '**You**' : '**Titan**';
+        const time = new Date(m.createdAt).toLocaleString();
+        return `### ${role} — ${time}\n\n${m.content}`;
+      }).join('\n\n---\n\n');
+      const header = `# Titan Conversation Export\n\nExported: ${new Date().toLocaleString()}\nMessages: ${localMessages.length}\n\n---\n\n`;
+      const blob = new Blob([header + md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `titan-chat-${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Conversation exported as Markdown');
       return;
     }
 

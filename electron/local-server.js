@@ -538,11 +538,42 @@ function startServer() {
     // ── Generic tRPC proxy for all other endpoints ──
     // This ensures desktop has full parity with the web version
     // by forwarding any unhandled tRPC calls to the remote server.
+    // Supports both single and BATCH tRPC requests (e.g. /api/trpc/auth.me,credits.getBalance?batch=1)
     app.all("/api/trpc/:procedure", async (req, res, next) => {
-      // Skip if already handled above
-      if (["auth.me", "credits.getBalance", "chat.send"].includes(req.params.procedure)) {
+      const procedure = req.params.procedure;
+      const isBatch = procedure.includes(",") || req.query.batch === "1";
+
+      // For single non-batch requests, check if already handled above
+      if (!isBatch && ["auth.me", "credits.getBalance", "chat.send"].includes(procedure)) {
         return next();
       }
+
+      // For batch requests that contain locally-handled procedures,
+      // we need to handle them individually and merge results
+      if (isBatch) {
+        const procedures = procedure.split(",");
+        const localHandlers = {
+          "auth.me": () => {
+            const license = loadLicense();
+            if (!license || !license.user) return { result: { data: { json: null } } };
+            return { result: { data: { json: license.user } } };
+          },
+          "credits.getBalance": () => {
+            const license = loadLicense();
+            return { result: { data: { json: license?.credits || { balance: 0, isUnlimited: false } } } };
+          },
+        };
+
+        // Check if ALL procedures can be handled locally
+        const allLocal = procedures.every(p => localHandlers[p]);
+        if (allLocal) {
+          const results = procedures.map(p => localHandlers[p]());
+          return res.json(results);
+        }
+
+        // Otherwise, proxy the entire batch to remote
+      }
+
       const license = loadLicense();
       if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
       try {
@@ -580,6 +611,160 @@ function startServer() {
         activeCreds: activeCreds?.c || 0,
         recentActivity: recentActivity?.c || 0,
       });
+    });
+
+    // ── Marketplace file proxy ──
+    app.all("/api/marketplace/*", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const url = REMOTE_URL + req.originalUrl;
+        const fetchOpts = {
+          method: req.method,
+          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+        };
+        if (req.headers["content-type"]) fetchOpts.headers["Content-Type"] = req.headers["content-type"];
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          // For file uploads, forward raw body
+          if (req.headers["content-type"]?.includes("multipart")) {
+            const chunks = [];
+            await new Promise((resolve) => {
+              req.on("data", (chunk) => chunks.push(chunk));
+              req.on("end", resolve);
+            });
+            fetchOpts.body = Buffer.concat(chunks);
+          } else {
+            fetchOpts.body = JSON.stringify(req.body);
+          }
+        }
+        const remoteRes = await fetch(url, fetchOpts);
+        const contentType = remoteRes.headers.get("content-type") || "application/octet-stream";
+        res.set("Content-Type", contentType);
+        const body = Buffer.from(await remoteRes.arrayBuffer());
+        res.status(remoteRes.status).send(body);
+      } catch (e) {
+        res.status(503).json({ error: "Marketplace proxy failed: " + e.message });
+      }
+    });
+
+    // ── Download gate proxy ──
+    app.get("/api/download/:token", async (req, res) => {
+      try {
+        const remoteRes = await fetch(REMOTE_URL + req.originalUrl);
+        const contentType = remoteRes.headers.get("content-type") || "application/octet-stream";
+        const contentDisp = remoteRes.headers.get("content-disposition");
+        res.set("Content-Type", contentType);
+        if (contentDisp) res.set("Content-Disposition", contentDisp);
+        const body = Buffer.from(await remoteRes.arrayBuffer());
+        res.status(remoteRes.status).send(body);
+      } catch (e) {
+        res.status(503).json({ error: "Download proxy failed" });
+      }
+    });
+
+    // ── Auth API proxy (register, forgot-password, etc.) ──
+    app.all("/api/auth/*", async (req, res) => {
+      try {
+        const url = REMOTE_URL + req.originalUrl;
+        const fetchOpts = {
+          method: req.method,
+          headers: { "Content-Type": "application/json" },
+        };
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          fetchOpts.body = JSON.stringify(req.body);
+        }
+        const remoteRes = await fetch(url, fetchOpts);
+        // Forward set-cookie headers for session management
+        const setCookies = remoteRes.headers.getSetCookie?.() || [];
+        setCookies.forEach(c => res.append("Set-Cookie", c));
+        const contentType = remoteRes.headers.get("content-type") || "application/json";
+        res.set("Content-Type", contentType);
+        const data = await remoteRes.text();
+        res.status(remoteRes.status).send(data);
+      } catch (e) {
+        res.status(503).json({ error: "Auth proxy failed: " + e.message });
+      }
+    });
+
+    // ── Generic REST API proxy for v1 endpoints ──
+    app.all("/api/v1/*", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const url = REMOTE_URL + req.originalUrl;
+        const fetchOpts = {
+          method: req.method,
+          headers: {
+            "Content-Type": "application/json",
+            "Cookie": `titan_session=${license.licenseKey}`,
+          },
+        };
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          fetchOpts.body = JSON.stringify(req.body);
+        }
+        const remoteRes = await fetch(url, fetchOpts);
+        const contentType = remoteRes.headers.get("content-type") || "application/json";
+        res.set("Content-Type", contentType);
+        const data = await remoteRes.text();
+        res.status(remoteRes.status).send(data);
+      } catch (e) {
+        res.status(503).json({ error: "API proxy failed: " + e.message });
+      }
+    });
+
+    // ── Files API proxy ──
+    app.all("/api/files", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const url = REMOTE_URL + req.originalUrl;
+        const fetchOpts = {
+          method: req.method,
+          headers: {
+            "Content-Type": "application/json",
+            "Cookie": `titan_session=${license.licenseKey}`,
+          },
+        };
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          fetchOpts.body = JSON.stringify(req.body);
+        }
+        const remoteRes = await fetch(url, fetchOpts);
+        const contentType = remoteRes.headers.get("content-type") || "application/json";
+        res.set("Content-Type", contentType);
+        const data = await remoteRes.text();
+        res.status(remoteRes.status).send(data);
+      } catch (e) {
+        res.status(503).json({ error: "Files proxy failed: " + e.message });
+      }
+    });
+
+    // ── Releases upload proxy ──
+    app.post("/api/releases/upload", requireAuth, async (req, res) => {
+      const license = loadLicense();
+      if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
+      try {
+        const chunks = [];
+        req.on("data", (chunk) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const body = Buffer.concat(chunks);
+            const remoteRes = await fetch(REMOTE_URL + "/api/releases/upload", {
+              method: "POST",
+              headers: {
+                "Content-Type": req.headers["content-type"],
+                "Cookie": `titan_session=${license.licenseKey}`,
+              },
+              body,
+            });
+            const data = await remoteRes.json();
+            res.status(remoteRes.status).json(data);
+          } catch (e) {
+            res.status(503).json({ error: "Release upload proxy failed" });
+          }
+        });
+      } catch (e) {
+        res.status(503).json({ error: "Failed to connect to remote server" });
+      }
     });
 
     // ── SPA fallback ──

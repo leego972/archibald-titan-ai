@@ -81,6 +81,7 @@ import { Button } from "./ui/button";
 import OnboardingWizard from "./OnboardingWizard";
 import HelpBotWidget from "./HelpBotWidget";
 import TrialBanner from "./TrialBanner";
+import DesktopStatusBar from "./DesktopStatusBar";
 import { useArchibald } from "@/contexts/ArchibaldContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { LanguageSelector } from "@/i18n";
@@ -113,6 +114,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Sparkles, label: "Smart Fetch AI", path: "/fetcher/smart-fetch" },
       { icon: PlusCircle, label: "New Fetch", path: "/fetcher/new" },
       { icon: ListOrdered, label: "Fetch Jobs", path: "/fetcher/jobs" },
+      { icon: FileText, label: "Project Files", path: "/project-files" },
       { icon: Store, label: "Grand Bazaar", path: "/marketplace", isNew: true },
       { icon: Package2, label: "My Inventory", path: "/marketplace/inventory", isNew: true },
       { icon: ShoppingBag, label: "Sell / Listings", path: "/marketplace/sell", isNew: true },
@@ -548,6 +550,7 @@ function FetcherLayoutContent({
             <LanguageSelector compact />
           </div>
         )}
+        <DesktopStatusBar />
         <TrialBanner />
         <main className="flex-1 p-3 sm:p-4 md:p-6 max-md:[&:has(.chat-page-root)]:p-0 safe-area-bottom">{children}</main>
       </SidebarInset>

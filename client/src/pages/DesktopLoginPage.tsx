@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, Monitor, Globe } from "lucide-react";
 import { FULL_LOGO_DARK_512 } from "@/lib/logos";
+import { isDesktop, getDesktopVersion } from "@/lib/desktop";
 
 /**
  * Desktop Login Page — shown in the Electron app when no license is saved.
@@ -48,8 +49,8 @@ export default function DesktopLoginPage() {
       toast.success(`Welcome, ${data.user?.name || data.user?.email || "User"}!`);
 
       // Navigate to dashboard — use IPC if available (Electron), otherwise window.location
-      if ((window as any).titanDesktop?.navigateTo) {
-        (window as any).titanDesktop.navigateTo("/dashboard");
+      if (window.titanDesktop?.navigateTo) {
+        window.titanDesktop.navigateTo("/dashboard");
       } else {
         window.location.href = "/dashboard";
       }
@@ -64,8 +65,9 @@ export default function DesktopLoginPage() {
 
   const openWebVersion = () => {
     const url = "https://architabot-f68pur9a.manus.space";
-    if ((window as any).titanDesktop?.openExternal) {
-      (window as any).titanDesktop.openExternal(url);
+    if (window.titanDesktop?.navigateTo) {
+      // Use shell.openExternal via the main process
+      window.open(url, "_blank");
     } else {
       window.open(url, "_blank");
     }
@@ -215,7 +217,7 @@ export default function DesktopLoginPage() {
 
         {/* Version info */}
         <p className="text-center text-[10px] text-gray-600 mt-4">
-          Archibald Titan Desktop v7.0.0
+          Archibald Titan Desktop {getDesktopVersion() ? `v${getDesktopVersion()}` : "v7.0.0"}
         </p>
       </div>
     </div>

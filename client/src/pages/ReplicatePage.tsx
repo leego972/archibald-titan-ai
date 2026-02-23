@@ -1026,6 +1026,14 @@ function ProjectDetail({
   const complexity = project.researchData?.estimatedComplexity?.toLowerCase() || "standard";
   const recommendedPlatform = (complexity === "simple" || complexity === "standard") ? "vercel" : "railway";
 
+  // ── Auto-refresh polling during active builds ──
+  React.useEffect(() => {
+    const activeStatuses = ['researching', 'planning', 'building', 'pushing', 'deploying', 'testing'];
+    if (!activeStatuses.includes(project.status)) return;
+    const interval = setInterval(() => onRefresh(), 5000);
+    return () => clearInterval(interval);
+  }, [project.status, project.id]);
+
   // ── Auto-trigger pipeline: research → plan → build ──
   // Automatically advances through each stage without manual button clicks
   const autoTriggeredRef = React.useRef<string>("");
