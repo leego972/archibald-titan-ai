@@ -208,7 +208,65 @@ export const marketplaceRouter = router({
           });
         }
       }
-      // TODO: Stripe payment path for payWithCredits=false (future)
+      // Stripe payment path — redirect to Stripe Checkout for seller registration
+      if (!input.payWithCredits) {
+        // Import Stripe checkout helper from stripe-router
+        const Stripe = (await import("stripe")).default;
+        const stripeKey = process.env.STRIPE_SECRET_KEY;
+        if (!stripeKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+        const stripe = new Stripe(stripeKey, { apiVersion: "2024-04-10" as any });
+
+        // Get or create Stripe customer
+        const { users: usersTable } = await import("../drizzle/schema");
+        const { eq: eqOp2 } = await import("drizzle-orm");
+        const dbInst = await getDb();
+        if (!dbInst) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const userRows = await dbInst.select().from(usersTable).where(eqOp2(usersTable.id, ctx.user.id)).limit(1);
+        let customerId = userRows[0]?.stripeCustomerId;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: ctx.user.email || undefined,
+            name: ctx.user.name || undefined,
+            metadata: { userId: ctx.user.id.toString(), platform: "archibald-titan" },
+          });
+          customerId = customer.id;
+          await dbInst.update(usersTable).set({ stripeCustomerId: customer.id }).where(eqOp2(usersTable.id, ctx.user.id));
+        }
+
+        const origin = (ctx.req as any)?.headers?.origin || "https://www.archibaldtitan.com";
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          client_reference_id: ctx.user.id.toString(),
+          mode: "payment",
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              unit_amount: SELLER_ANNUAL_FEE_USD,
+              product_data: {
+                name: "Bazaar Seller Registration",
+                description: "Annual seller subscription — list and sell items on the Archibald Titan Bazaar for 1 year",
+              },
+            },
+            quantity: 1,
+          }],
+          success_url: `${origin}/marketplace?seller_registered=true`,
+          cancel_url: `${origin}/marketplace?seller_canceled=true`,
+          metadata: {
+            type: "bazaar_seller_registration",
+            user_id: ctx.user.id.toString(),
+            display_name: input.displayName,
+            bio: (input.bio || "").slice(0, 200),
+          },
+        });
+
+        return {
+          success: true,
+          stripeCheckoutUrl: session.url,
+          message: "Redirecting to Stripe for $12 seller registration payment.",
+          expiresAt: "",
+          feePaid: 0,
+        };
+      }
 
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);

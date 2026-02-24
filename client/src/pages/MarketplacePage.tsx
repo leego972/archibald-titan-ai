@@ -436,7 +436,9 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
                         <div className="text-sm font-bold text-amber-400 flex items-center gap-1">
                           <Coins className="w-3.5 h-3.5" /> {item.priceCredits.toLocaleString()}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">credits</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          ${(Math.max(item.priceUsd || item.priceCredits, 50) / 100).toFixed(2)}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -492,6 +494,13 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
       utils.marketplace.getById.invalidate({ id: listingId });
       utils.marketplace.hasPurchased.invalidate({ listingId });
       utils.marketplace.myPurchases.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const stripeCheckoutMutation = trpc.stripe.marketplaceCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
     },
     onError: (err) => toast.error(err.message),
   });
@@ -563,6 +572,11 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                     <Coins className="w-5 h-5" /> {(listing.priceCredits ?? 0).toLocaleString()}
                   </div>
                   <div className="text-xs text-muted-foreground">credits</div>
+                  {listing.priceCredits > 0 && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      ${(Math.max(listing.priceUsd || listing.priceCredits, 50) / 100).toFixed(2)} USD
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -652,6 +666,11 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                   <Coins className="w-7 h-7" /> {(listing.priceCredits ?? 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-muted-foreground">credits</div>
+                {listing.priceCredits > 0 && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    or <span className="font-semibold text-foreground">${(Math.max(listing.priceUsd || listing.priceCredits, 50) / 100).toFixed(2)}</span> USD
+                  </div>
+                )}
               </div>
 
               {hasPurchased ? (
@@ -734,20 +753,23 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
         </div>
       </div>
 
-      {/* Purchase Dialog */}
+      {/* Purchase Dialog — Dual Payment Options */}
       <Dialog open={showPurchaseDialog} onOpenChange={setShowPurchaseDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirm Purchase</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-amber-400" /> Purchase {listing.title}
+            </DialogTitle>
             <DialogDescription>
-              You are about to purchase <strong>{listing.title}</strong> for <strong>{listing.priceCredits.toLocaleString()} credits</strong>.
-              The seller will receive 92% ({Math.floor(listing.priceCredits * 0.92).toLocaleString()} credits) and the platform retains 8% as a fee.
+              Choose your preferred payment method. The seller receives 92% and the platform retains 8% as a commission.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-4">
+
+          {/* Price Summary */}
+          <div className="space-y-2 py-3 border-y border-border/30">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Item Price</span>
-              <span className="font-medium">{listing.priceCredits.toLocaleString()} credits</span>
+              <span className="font-medium">{listing.priceCredits.toLocaleString()} credits <span className="text-muted-foreground">/ ${(Math.max(listing.priceUsd || listing.priceCredits, 50) / 100).toFixed(2)}</span></span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Platform Fee (8%)</span>
@@ -758,22 +780,54 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
               <span className="text-emerald-400">{Math.floor(listing.priceCredits * 0.92).toLocaleString()} credits</span>
             </div>
           </div>
+
+          {/* Payment Options */}
+          <div className="space-y-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment Method</p>
+
+            {/* Option 1: Pay with Credits */}
+            <button
+              className="w-full flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:border-amber-600/60 hover:bg-amber-950/10 transition-all text-left group"
+              onClick={() => purchaseMutation.mutate({ listingId: listing.id })}
+              disabled={purchaseMutation.isPending || stripeCheckoutMutation.isPending}
+            >
+              <div className="w-10 h-10 rounded-full bg-amber-600/20 flex items-center justify-center shrink-0">
+                {purchaseMutation.isPending ? <Loader2 className="w-5 h-5 text-amber-400 animate-spin" /> : <Coins className="w-5 h-5 text-amber-400" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm group-hover:text-amber-400 transition-colors">Pay with Credits</div>
+                <div className="text-xs text-muted-foreground">{listing.priceCredits.toLocaleString()} credits deducted instantly from your balance</div>
+              </div>
+              <Coins className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+            </button>
+
+            {/* Option 2: Pay with Card (Stripe) */}
+            <button
+              className="w-full flex items-center gap-4 p-4 rounded-lg border border-border/50 hover:border-blue-600/60 hover:bg-blue-950/10 transition-all text-left group"
+              onClick={() => stripeCheckoutMutation.mutate({ listingId: listing.id })}
+              disabled={purchaseMutation.isPending || stripeCheckoutMutation.isPending}
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center shrink-0">
+                {stripeCheckoutMutation.isPending ? <Loader2 className="w-5 h-5 text-blue-400 animate-spin" /> : <CreditCard className="w-5 h-5 text-blue-400" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm group-hover:text-blue-400 transition-colors">Pay with Card</div>
+                <div className="text-xs text-muted-foreground">${(Math.max(listing.priceUsd || listing.priceCredits, 50) / 100).toFixed(2)} USD via secure Stripe checkout</div>
+              </div>
+              <CreditCard className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+            </button>
+          </div>
+
+          {/* Anti-resale notice */}
           <div className="p-3 rounded-lg border border-amber-600/30 bg-amber-950/10 text-xs text-muted-foreground">
             <Shield className="w-3.5 h-3.5 inline mr-1 text-amber-400" />
             <strong className="text-amber-400">Anti-resale protection:</strong> Purchased items cannot be re-listed on the marketplace. Only original work is allowed.
           </div>
+
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700"
-              onClick={() => purchaseMutation.mutate({ listingId: listing.id })}
-              disabled={purchaseMutation.isPending}
-            >
-              {purchaseMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShoppingCart className="w-4 h-4 mr-2" />}
-              Confirm Purchase
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -588,6 +588,79 @@ export const stripeRouter = router({
     // No-op — user stays on limited free tier
     return { success: true, message: "You can add a payment method anytime from Settings to unlock your 7-day Pro trial." };
   }),
+
+  // ─── Marketplace Item Purchase via Stripe ────────────────────────
+  marketplaceCheckout: protectedProcedure
+    .input(z.object({
+      listingId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const stripe = getStripe();
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // Import marketplace DB functions
+      const { getListingById, getPurchaseByBuyerAndListing } = await import("./db");
+      const { marketplaceListings } = await import("../drizzle/schema");
+
+      const listing = await getListingById(input.listingId);
+      if (!listing) throw new Error("Listing not found");
+      if (listing.status !== "active") throw new Error("Listing is not available for purchase");
+      if (listing.reviewStatus !== "approved") throw new Error("Listing is pending review");
+      if (listing.sellerId === ctx.user.id) throw new Error("Cannot purchase your own listing");
+
+      // Check if already purchased
+      const existing = await getPurchaseByBuyerAndListing(ctx.user.id, input.listingId);
+      if (existing) throw new Error("You have already purchased this item");
+
+      // Calculate USD price: 1 credit = $0.01, minimum $0.50 for Stripe
+      const CREDIT_TO_CENTS = 1; // 1 credit = 1 cent
+      let priceInCents = listing.priceUsd > 0 ? listing.priceUsd : listing.priceCredits * CREDIT_TO_CENTS;
+      if (priceInCents < 50) priceInCents = 50; // Stripe minimum is $0.50
+
+      const customerId = await getOrCreateCustomer(
+        ctx.user.id,
+        ctx.user.email || "",
+        ctx.user.name
+      );
+
+      const origin = ctx.req.headers.origin || "http://localhost:3000";
+
+      // Create one-time payment checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        client_reference_id: ctx.user.id.toString(),
+        mode: "payment",
+        allow_promotion_codes: true,
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: priceInCents,
+              product_data: {
+                name: listing.title,
+                description: `${listing.category.charAt(0).toUpperCase() + listing.category.slice(1)} — ${listing.description.slice(0, 200)}`,
+                ...(listing.thumbnailUrl ? { images: [listing.thumbnailUrl] } : {}),
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${origin}/marketplace?purchase_success=true&listing=${listing.uid}`,
+        cancel_url: `${origin}/marketplace?purchase_canceled=true`,
+        metadata: {
+          type: "marketplace_purchase",
+          user_id: ctx.user.id.toString(),
+          listing_id: input.listingId.toString(),
+          listing_uid: listing.uid,
+          seller_id: listing.sellerId.toString(),
+          price_credits: listing.priceCredits.toString(),
+          price_cents: priceInCents.toString(),
+        },
+      });
+
+      return { url: session.url };
+    }),
 });
 
 // ─── Webhook Handler (Express route) ────────────────────────────────
@@ -754,6 +827,137 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         paymentIntentId
       );
       console.log(`[Stripe Webhook] Credit pack purchased: user=${userId}, pack=${packId}, credits=${credits}`);
+    }
+    return;
+  }
+
+  // Handle Marketplace item purchases (one-time payment)
+  if (session.metadata?.type === "marketplace_purchase") {
+    const listingId = parseInt(session.metadata.listing_id || "0");
+    const sellerId = parseInt(session.metadata.seller_id || "0");
+    const priceCredits = parseInt(session.metadata.price_credits || "0");
+    const priceCents = parseInt(session.metadata.price_cents || "0");
+    const listingUid = session.metadata.listing_uid || "";
+
+    if (!userId || !listingId) {
+      console.error("[Stripe Webhook] marketplace_purchase missing userId or listingId");
+      return;
+    }
+
+    const { getListingById, getPurchaseByBuyerAndListing, createPurchase, getSellerProfile, updateSellerProfile } = await import("./db");
+    const { creditBalances: creditBalancesTable, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
+    const { eq: eqOp, sql: sqlOp } = await import("drizzle-orm");
+
+    // Idempotency: check if already purchased (webhook might fire twice)
+    const existingPurchase = await getPurchaseByBuyerAndListing(userId, listingId);
+    if (existingPurchase) {
+      console.log(`[Stripe Webhook] marketplace_purchase already fulfilled: user=${userId}, listing=${listingId}`);
+      return;
+    }
+
+    const listing = await getListingById(listingId);
+    if (!listing) {
+      console.error(`[Stripe Webhook] marketplace_purchase listing not found: ${listingId}`);
+      return;
+    }
+
+    const PLATFORM_COMMISSION = 0.08;
+    const sellerShareCredits = Math.floor(priceCredits * (1 - PLATFORM_COMMISSION));
+
+    // Credit the seller in credits (92% of the credit-equivalent price)
+    if (sellerShareCredits > 0 && sellerId) {
+      const sellerBal = await db.select({ credits: creditBalancesTable.credits }).from(creditBalancesTable).where(eqOp(creditBalancesTable.userId, sellerId)).limit(1);
+      if (sellerBal.length === 0) {
+        await db.insert(creditBalancesTable).values({ userId: sellerId, credits: sellerShareCredits, lifetimeCreditsAdded: sellerShareCredits } as any);
+      } else {
+        await db.update(creditBalancesTable).set({
+          credits: sqlOp`${creditBalancesTable.credits} + ${sellerShareCredits}`,
+          lifetimeCreditsAdded: sqlOp`${creditBalancesTable.lifetimeCreditsAdded} + ${sellerShareCredits}`,
+        }).where(eqOp(creditBalancesTable.userId, sellerId));
+      }
+      const sellerUpdated = await db.select({ credits: creditBalancesTable.credits }).from(creditBalancesTable).where(eqOp(creditBalancesTable.userId, sellerId)).limit(1);
+      await db.insert(creditTransactions).values({
+        userId: sellerId,
+        amount: sellerShareCredits,
+        type: "marketplace_sale",
+        description: `Stripe sale of "${listing.title}" (${listingUid}) — 92% of ${priceCredits} credits ($${(priceCents / 100).toFixed(2)} paid via card)`,
+        balanceAfter: sellerUpdated[0]?.credits ?? 0,
+      });
+
+      // Update seller profile stats
+      const sellerProfile = await getSellerProfile(sellerId);
+      if (sellerProfile) {
+        await updateSellerProfile(sellerId, {
+          totalSales: (sellerProfile.totalSales || 0) + 1,
+          totalRevenue: (sellerProfile.totalRevenue || 0) + sellerShareCredits,
+        });
+      }
+    }
+
+    // Create purchase record
+    const { randomUUID } = await import("crypto");
+    const purchaseUid = `PUR-${randomUUID().split("-").slice(0, 2).join("")}`.toUpperCase();
+    const downloadToken = randomUUID();
+
+    await createPurchase({
+      uid: purchaseUid,
+      buyerId: userId,
+      listingId,
+      sellerId,
+      priceCredits,
+      priceUsd: priceCents,
+      downloadToken,
+    });
+
+    // Update listing stats
+    await db.update(marketplaceListings).set({
+      totalSales: sqlOp`${marketplaceListings.totalSales} + 1`,
+      totalRevenue: sqlOp`${marketplaceListings.totalRevenue} + ${sellerShareCredits}`,
+    }).where(eqOp(marketplaceListings.id, listingId));
+
+    const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
+    console.log(`[Stripe Webhook] Marketplace purchase completed: buyer=${userId}, listing=${listingId} (${listingUid}), paid=$${(priceCents / 100).toFixed(2)}, seller_share=${sellerShareCredits} credits, payment_intent=${paymentIntentId}`);
+    return;
+  }
+
+  // Handle Bazaar Seller one-time registration payment (from marketplace-router becomeSeller)
+  if (session.metadata?.type === "bazaar_seller_registration") {
+    const displayName = session.metadata.display_name || "Seller";
+    const bio = session.metadata.bio || null;
+
+    if (userId) {
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      const existingProfile = await db
+        .select()
+        .from(sellerProfiles)
+        .where(eq(sellerProfiles.userId, userId))
+        .limit(1);
+
+      if (existingProfile.length > 0) {
+        await db
+          .update(sellerProfiles)
+          .set({
+            displayName,
+            bio: bio || existingProfile[0].bio,
+            sellerSubscriptionActive: true,
+            sellerSubscriptionExpiresAt: expiresAt,
+            sellerSubscriptionPaidAt: new Date(),
+          })
+          .where(eq(sellerProfiles.userId, userId));
+      } else {
+        await db.insert(sellerProfiles).values({
+          userId,
+          displayName,
+          bio,
+          sellerSubscriptionActive: true,
+          sellerSubscriptionExpiresAt: expiresAt,
+          sellerSubscriptionPaidAt: new Date(),
+        });
+      }
+
+      console.log(`[Stripe Webhook] Bazaar Seller registration (one-time) activated: user=${userId}, expires=${expiresAt.toISOString()}`);
     }
     return;
   }
