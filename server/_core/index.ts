@@ -68,6 +68,32 @@ async function startServer() {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+    // HSTS: enforce HTTPS for 1 year, include subdomains, allow preload submission
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    }
+    // Content-Security-Policy: restrict resource loading to trusted origins
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https: http:",
+      "connect-src 'self' https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com wss: ws:",
+      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+      "upgrade-insecure-requests",
+    ].join('; ');
+    res.setHeader('Content-Security-Policy', csp);
+    // Prevent DNS prefetch to third parties
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+    // Prevent MIME type sniffing for downloads
+    res.setHeader('X-Download-Options', 'noopen');
+    // Prevent cross-origin embedder policy issues
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     next();
   });
 
@@ -105,6 +131,39 @@ async function startServer() {
   });
   app.use('/api/chat/', chatLimiter);
 
+  // Stripe checkout limit: 10 per minute per IP (prevents checkout abuse)
+  const stripeLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many checkout attempts. Please wait a moment.' },
+  });
+  app.use('/api/trpc/stripe.', stripeLimiter);
+
+  // File upload limit: 20 per minute per IP
+  const uploadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many upload attempts. Please wait.' },
+  });
+  app.use('/api/chat/upload', uploadLimiter);
+  app.use('/api/marketplace/upload', uploadLimiter);
+  app.use('/api/releases/upload', uploadLimiter);
+
+  // Download limit: 30 per minute per IP (prevents scraping)
+  const downloadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Download rate limit reached. Please wait.' },
+  });
+  app.use('/api/download/', downloadLimiter);
+  app.use('/api/desktop/bundle', downloadLimiter);
+
   // Stripe webhook MUST be registered BEFORE express.json() for raw body access
   registerStripeWebhook(app);
   // Binance Pay webhook (also before express.json for raw body)
@@ -128,8 +187,35 @@ async function startServer() {
   // Independent GitHub & Google OAuth (no Manus proxy)
   registerSocialAuthRoutes(app);
   // Health check endpoint (for Railway, load balancers, etc.)
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  app.get('/api/health', async (_req, res) => {
+    const health: Record<string, unknown> = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      },
+    };
+    // Check database connectivity
+    try {
+      const { getDb } = await import('../db.js');
+      const db = await getDb();
+      if (db) {
+        const { sql } = await import('drizzle-orm');
+        await db.execute(sql`SELECT 1`);
+        health.database = 'connected';
+      } else {
+        health.database = 'unavailable';
+        health.status = 'degraded';
+      }
+    } catch (dbErr: unknown) {
+      health.database = 'error';
+      health.status = 'degraded';
+      health.dbError = getErrorMessage(dbErr);
+    }
+    const statusCode = health.status === 'ok' ? 200 : 503;
+    res.status(statusCode).json(health);
   });
   // SEO routes (sitemap.xml, robots.txt, security.txt, RSS feed, structured data, redirects)
   registerSeoRoutes(app);
@@ -165,6 +251,17 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+
+  // ── Global Error Handler (must be last middleware) ──
+  // Catches unhandled errors from Express routes and prevents stack trace leakage
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    log.error('Unhandled Express error', { error: err.message, stack: err.stack });
+    const isProd = process.env.NODE_ENV === 'production';
+    res.status(500).json({
+      error: isProd ? 'Internal server error' : err.message,
+      ...(isProd ? {} : { stack: err.stack }),
+    });
+  });
 
   // ─── Auto-migrate database on startup ──────────────────────────
   if (process.env.DATABASE_URL) {
@@ -454,3 +551,45 @@ function scheduleMonthlyRefill() {
 }
 
 startServer().catch((err) => log.error('Server startup failed', { error: String(err) }));
+
+// ─── Graceful Shutdown ──────────────────────────────────────────
+let isShuttingDown = false;
+
+function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  log.info(`Received ${signal}. Starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  // The server reference is inside startServer scope, so we use process.exit
+  // with a timeout to allow in-flight requests to complete
+  const SHUTDOWN_TIMEOUT = 15_000; // 15 seconds max
+
+  const forceExit = setTimeout(() => {
+    log.error('Graceful shutdown timed out. Forcing exit.');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT);
+
+  // Unref so the timer doesn't keep the process alive if everything closes cleanly
+  forceExit.unref();
+
+  // Give in-flight requests time to finish
+  setTimeout(() => {
+    log.info('Graceful shutdown complete.');
+    process.exit(0);
+  }, 3000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch unhandled rejections and uncaught exceptions
+process.on('unhandledRejection', (reason) => {
+  log.error('Unhandled promise rejection', { error: String(reason) });
+});
+
+process.on('uncaughtException', (err) => {
+  log.error('Uncaught exception', { error: err.message, stack: err.stack });
+  // Exit after logging — the process is in an undefined state
+  process.exit(1);
+});

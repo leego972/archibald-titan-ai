@@ -13,7 +13,10 @@ import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 const log = createLogger("StripeRouter");
 
-// ─── Stripe Client ──────────────────────────────────────────────────
+/** In-memory set of processed Stripe webhook event IDs for idempotency */
+const processedWebhookEvents = new Set<string>();
+
+// ─── Stripe Client ───────────────────────────────────────────────────
 
 let stripeInstance: Stripe | null = null;
 
@@ -709,6 +712,25 @@ export function registerStripeWebhook(app: Express) {
       if (event.id.startsWith("evt_test_")) {
         log.info("[Stripe Webhook] Test event detected, returning verification response");
         return res.json({ verified: true });
+      }
+
+      // ── Idempotency: skip duplicate events ──
+      if (processedWebhookEvents.has(event.id)) {
+        log.info(`[Stripe Webhook] Duplicate event skipped: ${event.type} (${event.id})`);
+        return res.json({ received: true, duplicate: true });
+      }
+      processedWebhookEvents.add(event.id);
+      // Evict old entries to prevent memory leak (keep last 5000)
+      if (processedWebhookEvents.size > 5000) {
+        const iter = processedWebhookEvents.values();
+        for (let i = 0; i < 1000; i++) iter.next();
+        const cutoff = iter.next().value;
+        if (cutoff) {
+          for (const id of processedWebhookEvents) {
+            if (id === cutoff) break;
+            processedWebhookEvents.delete(id);
+          }
+        }
       }
 
       log.info(`[Stripe Webhook] Received event: ${event.type} (${event.id})`);
