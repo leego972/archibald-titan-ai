@@ -4,248 +4,223 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FetcherLayout from "./components/FetcherLayout";
-import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { lazy, Suspense } from "react";
+import { ArchibaldProvider } from "./contexts/ArchibaldContext";
 
-// ─── Lazy-loaded pages (code splitting) ──────────────────────────
-// Public pages — loaded eagerly since they're entry points
+// Public pages
 import LandingPage from "./pages/LandingPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import ContactPage from "./pages/ContactPage";
+import PricingPage from "./pages/PricingPage";
+import BlogPage from "./pages/BlogPage";
+
+// Auth pages
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import DesktopLoginPage from "./pages/DesktopLoginPage";
 
-// Auth pages — lazy
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
-const DesktopLoginPage = lazy(() => import("./pages/DesktopLoginPage"));
+// Dashboard / Builder
+import ChatPage from "./pages/ChatPage";
+import FetcherNew from "./pages/FetcherNew";
+import FetcherJobs from "./pages/FetcherJobs";
+import FetcherJobDetail from "./pages/FetcherJobDetail";
+import FetcherCredentials from "./pages/FetcherCredentials";
+import FetcherExport from "./pages/FetcherExport";
+import FetcherSettings from "./pages/FetcherSettings";
+import FetcherKillSwitch from "./pages/FetcherKillSwitch";
 
-// Public pages — lazy
-const TermsPage = lazy(() => import("./pages/TermsPage"));
-const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
-const ContactPage = lazy(() => import("./pages/ContactPage"));
-const PricingPage = lazy(() => import("./pages/PricingPage"));
-const BlogPage = lazy(() => import("./pages/BlogPage"));
+// Developer Tools
+import ReplicatePage from "./pages/ReplicatePage";
+import SandboxPage from "./pages/SandboxPage";
+import SmartFetchPage from "./pages/SmartFetchPage";
+import MarketplacePage from "./pages/MarketplacePage";
 
-// Dashboard / Builder — lazy
-const ChatPage = lazy(() => import("./pages/ChatPage"));
-const FetcherNew = lazy(() => import("./pages/FetcherNew"));
-const FetcherJobs = lazy(() => import("./pages/FetcherJobs"));
-const FetcherJobDetail = lazy(() => import("./pages/FetcherJobDetail"));
-const FetcherCredentials = lazy(() => import("./pages/FetcherCredentials"));
-const FetcherExport = lazy(() => import("./pages/FetcherExport"));
-const FetcherSettings = lazy(() => import("./pages/FetcherSettings"));
-const FetcherKillSwitch = lazy(() => import("./pages/FetcherKillSwitch"));
+// Security
+import WatchdogPage from "./pages/WatchdogPage";
+import ProviderHealthPage from "./pages/ProviderHealthPage";
+import HealthTrendsPage from "./pages/HealthTrendsPage";
+import LeakScannerPage from "./pages/LeakScannerPage";
+import CredentialHealthPage from "./pages/CredentialHealthPage";
+import TotpVaultPage from "./pages/TotpVaultPage";
 
-// Developer Tools — lazy
-const ReplicatePage = lazy(() => import("./pages/ReplicatePage"));
-const SandboxPage = lazy(() => import("./pages/SandboxPage"));
-const SmartFetchPage = lazy(() => import("./pages/SmartFetchPage"));
-const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
+// Business & Funding
+import GrantsPage from "./pages/GrantsPage";
+import GrantDetailPage from "./pages/GrantDetailPage";
+import GrantApplicationsPage from "./pages/GrantApplicationsPage";
+import CompaniesPage from "./pages/CompaniesPage";
+import BusinessPlanPage from "./pages/BusinessPlanPage";
+import CrowdfundingPage from "./pages/CrowdfundingPage";
+import ReferralsPage from "./pages/ReferralsPage";
+import AdvertisingDashboard from "./pages/AdvertisingDashboard";
+import AffiliateDashboard from "./pages/AffiliateDashboard";
+import SeoDashboard from "./pages/SeoDashboard";
+import BlogAdmin from "./pages/BlogAdmin";
+import MarketingPage from "./pages/MarketingPage";
 
-// Security — lazy
-const WatchdogPage = lazy(() => import("./pages/WatchdogPage"));
-const ProviderHealthPage = lazy(() => import("./pages/ProviderHealthPage"));
-const HealthTrendsPage = lazy(() => import("./pages/HealthTrendsPage"));
-const LeakScannerPage = lazy(() => import("./pages/LeakScannerPage"));
-const CredentialHealthPage = lazy(() => import("./pages/CredentialHealthPage"));
-const TotpVaultPage = lazy(() => import("./pages/TotpVaultPage"));
+// Account & Settings
+import AccountSettingsPage from "./pages/AccountSettingsPage";
+import SubscriptionPage from "./pages/SubscriptionPage";
+import CreditsPage from "./pages/CreditsPage";
+import ApiAccessPage from "./pages/ApiAccessPage";
+import TeamManagementPage from "./pages/TeamManagementPage";
+import TeamVaultPage from "./pages/TeamVaultPage";
 
-// Business & Funding — lazy
-const GrantsPage = lazy(() => import("./pages/GrantsPage"));
-const GrantDetailPage = lazy(() => import("./pages/GrantDetailPage"));
-const GrantApplicationsPage = lazy(() => import("./pages/GrantApplicationsPage"));
-const CompaniesPage = lazy(() => import("./pages/CompaniesPage"));
-const BusinessPlanPage = lazy(() => import("./pages/BusinessPlanPage"));
-const CrowdfundingPage = lazy(() => import("./pages/CrowdfundingPage"));
-const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
-const AdvertisingDashboard = lazy(() => import("./pages/AdvertisingDashboard"));
-const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
-const SeoDashboard = lazy(() => import("./pages/SeoDashboard"));
-const BlogAdmin = lazy(() => import("./pages/BlogAdmin"));
-const MarketingPage = lazy(() => import("./pages/MarketingPage"));
+// Automation
+import ImportPage from "./pages/ImportPage";
+import BulkSyncPage from "./pages/BulkSyncPage";
+import AutoSyncPage from "./pages/AutoSyncPage";
+import ProviderOnboardingPage from "./pages/ProviderOnboardingPage";
+import CredentialHistoryPage from "./pages/CredentialHistoryPage";
+import AuditLogsPage from "./pages/AuditLogsPage";
 
-// Account & Settings — lazy
-const AccountSettingsPage = lazy(() => import("./pages/AccountSettingsPage"));
-const SubscriptionPage = lazy(() => import("./pages/SubscriptionPage"));
-const CreditsPage = lazy(() => import("./pages/CreditsPage"));
-const ApiAccessPage = lazy(() => import("./pages/ApiAccessPage"));
-const TeamManagementPage = lazy(() => import("./pages/TeamManagementPage"));
-const TeamVaultPage = lazy(() => import("./pages/TeamVaultPage"));
+// Developer API
+import DeveloperDocsPage from "./pages/DeveloperDocsPage";
+import WebhooksPage from "./pages/WebhooksPage";
+import NotificationChannelsPage from "./pages/NotificationChannelsPage";
+import ApiAnalyticsPage from "./pages/ApiAnalyticsPage";
+import CliToolPage from "./pages/CliToolPage";
 
-// Automation — lazy
-const ImportPage = lazy(() => import("./pages/ImportPage"));
-const BulkSyncPage = lazy(() => import("./pages/BulkSyncPage"));
-const AutoSyncPage = lazy(() => import("./pages/AutoSyncPage"));
-const ProviderOnboardingPage = lazy(() => import("./pages/ProviderOnboardingPage"));
-const CredentialHistoryPage = lazy(() => import("./pages/CredentialHistoryPage"));
-const AuditLogsPage = lazy(() => import("./pages/AuditLogsPage"));
+// Admin
+import ReleaseManagementPage from "./pages/ReleaseManagementPage";
+import AdminPanel from "./pages/AdminPanel";
+import SelfImprovementDashboard from "./pages/SelfImprovementDashboard";
 
-// Developer API — lazy
-const DeveloperDocsPage = lazy(() => import("./pages/DeveloperDocsPage"));
-const WebhooksPage = lazy(() => import("./pages/WebhooksPage"));
-const NotificationChannelsPage = lazy(() => import("./pages/NotificationChannelsPage"));
-const ApiAnalyticsPage = lazy(() => import("./pages/ApiAnalyticsPage"));
-const CliToolPage = lazy(() => import("./pages/CliToolPage"));
-
-// Admin — lazy
-const ReleaseManagementPage = lazy(() => import("./pages/ReleaseManagementPage"));
-const AdminPanel = lazy(() => import("./pages/AdminPanel"));
-const SelfImprovementDashboard = lazy(() => import("./pages/SelfImprovementDashboard"));
-
-// Project Files — lazy
-const ProjectFilesViewer = lazy(() => import("./pages/ProjectFilesViewer"));
-
-// ─── Loading fallback ────────────────────────────────────────────
-function PageLoader() {
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    </div>
-  );
-}
-
-/** Wrap a lazy page in a per-route error boundary */
-function Guarded({ name, children }: { name: string; children: React.ReactNode }) {
-  return <RouteErrorBoundary pageName={name}>{children}</RouteErrorBoundary>;
-}
+// Project Files
+import ProjectFilesViewer from "./pages/ProjectFilesViewer";
 
 function DashboardRouter() {
   return (
     <FetcherLayout>
-      <Suspense fallback={<PageLoader />}>
-        <Switch>
-          {/* Main Dashboard - Builder Chat */}
-          <Route path="/dashboard">{() => <Guarded name="Builder Chat"><ChatPage /></Guarded>}</Route>
+      <Switch>
+        {/* Main Dashboard - Builder Chat */}
+        <Route path="/dashboard" component={ChatPage} />
 
-          {/* Developer Tools */}
-          <Route path="/replicate">{() => <Guarded name="Clone Website"><ReplicatePage /></Guarded>}</Route>
-          <Route path="/sandbox">{() => <Guarded name="Sandbox"><SandboxPage /></Guarded>}</Route>
-          <Route path="/fetcher/smart-fetch">{() => <Guarded name="Smart Fetch"><SmartFetchPage /></Guarded>}</Route>
-          <Route path="/fetcher/new">{() => <Guarded name="New Fetch"><FetcherNew /></Guarded>}</Route>
-          <Route path="/fetcher/jobs">{() => <Guarded name="Jobs"><FetcherJobs /></Guarded>}</Route>
-          <Route path="/fetcher/jobs/:id">{(params) => <Guarded name="Job Detail"><FetcherJobDetail {...(params as any)} /></Guarded>}</Route>
-          <Route path="/marketplace">{() => <Guarded name="Marketplace"><MarketplacePage /></Guarded>}</Route>
-          <Route path="/marketplace/:rest*">{() => <Guarded name="Marketplace"><MarketplacePage /></Guarded>}</Route>
-          <Route path="/project-files">{() => <Guarded name="Project Files"><ProjectFilesViewer /></Guarded>}</Route>
-          <Route path="/project-files/:projectId">{(params) => <Guarded name="Project Files"><ProjectFilesViewer {...(params as any)} /></Guarded>}</Route>
+        {/* Developer Tools */}
+        <Route path="/replicate" component={ReplicatePage} />
+        <Route path="/sandbox" component={SandboxPage} />
+        <Route path="/fetcher/smart-fetch" component={SmartFetchPage} />
+        <Route path="/fetcher/new" component={FetcherNew} />
+        <Route path="/fetcher/jobs" component={FetcherJobs} />
+        <Route path="/fetcher/jobs/:id" component={FetcherJobDetail} />
+        <Route path="/marketplace" component={MarketplacePage} />
+        <Route path="/marketplace/:rest*" component={MarketplacePage} />
+        <Route path="/project-files" component={ProjectFilesViewer} />
+        <Route path="/project-files/:projectId" component={ProjectFilesViewer} />
 
-          {/* Security */}
-          <Route path="/fetcher/totp-vault">{() => <Guarded name="TOTP Vault"><TotpVaultPage /></Guarded>}</Route>
-          <Route path="/fetcher/watchdog">{() => <Guarded name="Watchdog"><WatchdogPage /></Guarded>}</Route>
-          <Route path="/fetcher/provider-health">{() => <Guarded name="Provider Health"><ProviderHealthPage /></Guarded>}</Route>
-          <Route path="/fetcher/health-trends">{() => <Guarded name="Health Trends"><HealthTrendsPage /></Guarded>}</Route>
-          <Route path="/fetcher/leak-scanner">{() => <Guarded name="Leak Scanner"><LeakScannerPage /></Guarded>}</Route>
-          <Route path="/fetcher/credential-health">{() => <Guarded name="Credential Health"><CredentialHealthPage /></Guarded>}</Route>
+        {/* Security */}
+        <Route path="/fetcher/totp-vault" component={TotpVaultPage} />
+        <Route path="/fetcher/watchdog" component={WatchdogPage} />
+        <Route path="/fetcher/provider-health" component={ProviderHealthPage} />
+        <Route path="/fetcher/health-trends" component={HealthTrendsPage} />
+        <Route path="/fetcher/leak-scanner" component={LeakScannerPage} />
+        <Route path="/fetcher/credential-health" component={CredentialHealthPage} />
 
-          {/* Business & Funding */}
-          <Route path="/grants">{() => <Guarded name="Grants"><GrantsPage /></Guarded>}</Route>
-          <Route path="/grants/:id">{(params) => <Guarded name="Grant Detail"><GrantDetailPage {...(params as any)} /></Guarded>}</Route>
-          <Route path="/grant-applications">{() => <Guarded name="Grant Applications"><GrantApplicationsPage /></Guarded>}</Route>
-          <Route path="/companies">{() => <Guarded name="Companies"><CompaniesPage /></Guarded>}</Route>
-          <Route path="/business-plans">{() => <Guarded name="Business Plans"><BusinessPlanPage /></Guarded>}</Route>
-          <Route path="/crowdfunding">{() => <Guarded name="Crowdfunding"><CrowdfundingPage /></Guarded>}</Route>
-          <Route path="/crowdfunding/:rest*">{() => <Guarded name="Crowdfunding"><CrowdfundingPage /></Guarded>}</Route>
-          <Route path="/referrals">{() => <Guarded name="Referrals"><ReferralsPage /></Guarded>}</Route>
-          <Route path="/advertising">{() => <Guarded name="Advertising"><AdvertisingDashboard /></Guarded>}</Route>
-          <Route path="/affiliate">{() => <Guarded name="Affiliate"><AffiliateDashboard /></Guarded>}</Route>
-          <Route path="/seo">{() => <Guarded name="SEO"><SeoDashboard /></Guarded>}</Route>
-          <Route path="/blog-admin">{() => <Guarded name="Blog Admin"><BlogAdmin /></Guarded>}</Route>
-          <Route path="/marketing">{() => <Guarded name="Marketing"><MarketingPage /></Guarded>}</Route>
+        {/* Business & Funding */}
+        <Route path="/grants" component={GrantsPage} />
+        <Route path="/grants/:id" component={GrantDetailPage} />
+        <Route path="/grant-applications" component={GrantApplicationsPage} />
+        <Route path="/companies" component={CompaniesPage} />
+        <Route path="/business-plans" component={BusinessPlanPage} />
+        <Route path="/crowdfunding" component={CrowdfundingPage} />
+        <Route path="/crowdfunding/:rest*" component={CrowdfundingPage} />
+        <Route path="/referrals" component={ReferralsPage} />
+        <Route path="/advertising" component={AdvertisingDashboard} />
+        <Route path="/affiliate" component={AffiliateDashboard} />
+        <Route path="/seo" component={SeoDashboard} />
+        <Route path="/blog-admin" component={BlogAdmin} />
+        <Route path="/marketing" component={MarketingPage} />
 
-          {/* Account & Settings */}
-          <Route path="/dashboard/subscription">{() => <Guarded name="Subscription"><SubscriptionPage /></Guarded>}</Route>
-          <Route path="/dashboard/credits">{() => <Guarded name="Credits"><CreditsPage /></Guarded>}</Route>
-          <Route path="/fetcher/credentials">{() => <Guarded name="Credentials"><FetcherCredentials /></Guarded>}</Route>
-          <Route path="/fetcher/api-access">{() => <Guarded name="API Access"><ApiAccessPage /></Guarded>}</Route>
-          <Route path="/fetcher/team">{() => <Guarded name="Team"><TeamManagementPage /></Guarded>}</Route>
-          <Route path="/fetcher/team-vault">{() => <Guarded name="Team Vault"><TeamVaultPage /></Guarded>}</Route>
-          <Route path="/fetcher/settings">{() => <Guarded name="Settings"><FetcherSettings /></Guarded>}</Route>
-          <Route path="/fetcher/killswitch">{() => <Guarded name="Kill Switch"><FetcherKillSwitch /></Guarded>}</Route>
-          <Route path="/fetcher/account">{() => <Guarded name="Account"><AccountSettingsPage /></Guarded>}</Route>
+        {/* Account & Settings */}
+        <Route path="/dashboard/subscription" component={SubscriptionPage} />
+        <Route path="/dashboard/credits" component={CreditsPage} />
+        <Route path="/fetcher/credentials" component={FetcherCredentials} />
+        <Route path="/fetcher/api-access" component={ApiAccessPage} />
+        <Route path="/fetcher/team" component={TeamManagementPage} />
+        <Route path="/fetcher/team-vault" component={TeamVaultPage} />
+        <Route path="/fetcher/settings" component={FetcherSettings} />
+        <Route path="/fetcher/killswitch" component={FetcherKillSwitch} />
+        <Route path="/fetcher/account" component={AccountSettingsPage} />
 
-          {/* Automation */}
-          <Route path="/fetcher/export">{() => <Guarded name="Export"><FetcherExport /></Guarded>}</Route>
-          <Route path="/fetcher/import">{() => <Guarded name="Import"><ImportPage /></Guarded>}</Route>
-          <Route path="/fetcher/bulk-sync">{() => <Guarded name="Bulk Sync"><BulkSyncPage /></Guarded>}</Route>
-          <Route path="/fetcher/auto-sync">{() => <Guarded name="Auto Sync"><AutoSyncPage /></Guarded>}</Route>
-          <Route path="/fetcher/onboarding">{() => <Guarded name="Onboarding"><ProviderOnboardingPage /></Guarded>}</Route>
-          <Route path="/fetcher/history">{() => <Guarded name="History"><CredentialHistoryPage /></Guarded>}</Route>
-          <Route path="/fetcher/audit-logs">{() => <Guarded name="Audit Logs"><AuditLogsPage /></Guarded>}</Route>
+        {/* Automation */}
+        <Route path="/fetcher/export" component={FetcherExport} />
+        <Route path="/fetcher/import" component={ImportPage} />
+        <Route path="/fetcher/bulk-sync" component={BulkSyncPage} />
+        <Route path="/fetcher/auto-sync" component={AutoSyncPage} />
+        <Route path="/fetcher/onboarding" component={ProviderOnboardingPage} />
+        <Route path="/fetcher/history" component={CredentialHistoryPage} />
+        <Route path="/fetcher/audit-logs" component={AuditLogsPage} />
 
-          {/* Developer API */}
-          <Route path="/fetcher/developer-docs">{() => <Guarded name="Developer Docs"><DeveloperDocsPage /></Guarded>}</Route>
-          <Route path="/fetcher/webhooks">{() => <Guarded name="Webhooks"><WebhooksPage /></Guarded>}</Route>
-          <Route path="/fetcher/notifications">{() => <Guarded name="Notifications"><NotificationChannelsPage /></Guarded>}</Route>
-          <Route path="/fetcher/api-analytics">{() => <Guarded name="API Analytics"><ApiAnalyticsPage /></Guarded>}</Route>
-          <Route path="/fetcher/cli">{() => <Guarded name="CLI Tool"><CliToolPage /></Guarded>}</Route>
+        {/* Developer API */}
+        <Route path="/fetcher/developer-docs" component={DeveloperDocsPage} />
+        <Route path="/fetcher/webhooks" component={WebhooksPage} />
+        <Route path="/fetcher/notifications" component={NotificationChannelsPage} />
+        <Route path="/fetcher/api-analytics" component={ApiAnalyticsPage} />
+        <Route path="/fetcher/cli" component={CliToolPage} />
 
-          {/* Admin */}
-          <Route path="/fetcher/releases">{() => <Guarded name="Releases"><ReleaseManagementPage /></Guarded>}</Route>
-          <Route path="/fetcher/admin">{() => <Guarded name="Admin Panel"><AdminPanel /></Guarded>}</Route>
-          <Route path="/fetcher/self-improvement">{() => <Guarded name="Self Improvement"><SelfImprovementDashboard /></Guarded>}</Route>
+        {/* Admin */}
+        <Route path="/fetcher/releases" component={ReleaseManagementPage} />
+        <Route path="/fetcher/admin" component={AdminPanel} />
+        <Route path="/fetcher/self-improvement" component={SelfImprovementDashboard} />
 
-          <Route component={NotFound} />
-        </Switch>
-      </Suspense>
+        <Route component={NotFound} />
+      </Switch>
     </FetcherLayout>
   );
 }
 
 function Router() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        {/* Public landing page */}
-        <Route path="/" component={LandingPage} />
+    <Switch>
+      {/* Public landing page */}
+      <Route path="/" component={LandingPage} />
 
-        {/* Auth pages */}
-        <Route path="/login" component={LoginPage} />
-        <Route path="/register" component={RegisterPage} />
-        <Route path="/forgot-password" component={ForgotPasswordPage} />
-        <Route path="/reset-password" component={ResetPasswordPage} />
-        <Route path="/verify-email" component={VerifyEmailPage} />
-        <Route path="/desktop-login" component={DesktopLoginPage} />
+      {/* Auth pages */}
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/desktop-login" component={DesktopLoginPage} />
 
-        {/* Public pages */}
-        <Route path="/pricing" component={PricingPage} />
-        <Route path="/terms" component={TermsPage} />
-        <Route path="/privacy" component={PrivacyPage} />
-        <Route path="/contact" component={ContactPage} />
-        <Route path="/blog" component={BlogPage} />
-        <Route path="/blog/:rest*" component={BlogPage} />
+      {/* Public pages */}
+      <Route path="/pricing" component={PricingPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/blog/:rest*" component={BlogPage} />
 
-        {/* Dashboard routes — wrapped in FetcherLayout with sidebar + auth */}
-        <Route path="/dashboard/:rest*" component={DashboardRouter} />
-        <Route path="/dashboard" component={DashboardRouter} />
-        <Route path="/fetcher/:rest*" component={DashboardRouter} />
-        <Route path="/replicate" component={DashboardRouter} />
-        <Route path="/sandbox" component={DashboardRouter} />
-        <Route path="/marketplace/:rest*" component={DashboardRouter} />
-        <Route path="/marketplace" component={DashboardRouter} />
-        <Route path="/project-files/:rest*" component={DashboardRouter} />
-        <Route path="/project-files" component={DashboardRouter} />
-        <Route path="/grants/:rest*" component={DashboardRouter} />
-        <Route path="/grants" component={DashboardRouter} />
-        <Route path="/grant-applications" component={DashboardRouter} />
-        <Route path="/companies" component={DashboardRouter} />
-        <Route path="/business-plans" component={DashboardRouter} />
-        <Route path="/crowdfunding/:rest*" component={DashboardRouter} />
-        <Route path="/crowdfunding" component={DashboardRouter} />
-        <Route path="/referrals" component={DashboardRouter} />
-        <Route path="/advertising" component={DashboardRouter} />
-        <Route path="/affiliate" component={DashboardRouter} />
-        <Route path="/seo" component={DashboardRouter} />
-        <Route path="/blog-admin" component={DashboardRouter} />
-        <Route path="/marketing" component={DashboardRouter} />
+      {/* Dashboard routes — wrapped in FetcherLayout with sidebar + auth */}
+      <Route path="/dashboard/:rest*" component={DashboardRouter} />
+      <Route path="/dashboard" component={DashboardRouter} />
+      <Route path="/fetcher/:rest*" component={DashboardRouter} />
+      <Route path="/replicate" component={DashboardRouter} />
+      <Route path="/sandbox" component={DashboardRouter} />
+      <Route path="/marketplace/:rest*" component={DashboardRouter} />
+      <Route path="/marketplace" component={DashboardRouter} />
+      <Route path="/project-files/:rest*" component={DashboardRouter} />
+      <Route path="/project-files" component={DashboardRouter} />
+      <Route path="/grants/:rest*" component={DashboardRouter} />
+      <Route path="/grants" component={DashboardRouter} />
+      <Route path="/grant-applications" component={DashboardRouter} />
+      <Route path="/companies" component={DashboardRouter} />
+      <Route path="/business-plans" component={DashboardRouter} />
+      <Route path="/crowdfunding/:rest*" component={DashboardRouter} />
+      <Route path="/crowdfunding" component={DashboardRouter} />
+      <Route path="/referrals" component={DashboardRouter} />
+      <Route path="/advertising" component={DashboardRouter} />
+      <Route path="/affiliate" component={DashboardRouter} />
+      <Route path="/seo" component={DashboardRouter} />
+      <Route path="/blog-admin" component={DashboardRouter} />
+      <Route path="/marketing" component={DashboardRouter} />
 
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
+      <Route path="/404" component={NotFound} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
@@ -253,11 +228,12 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[9999] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md">Skip to main content</a>
-          <Toaster aria-live="polite" />
-          <Router />
-        </TooltipProvider>
+        <ArchibaldProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </ArchibaldProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
