@@ -13,7 +13,6 @@ import {
   Send,
   User,
   Trash2,
-  Sparkles,
   Activity,
   Wrench,
   Shield,
@@ -1454,8 +1453,8 @@ export default function ChatPage() {
                 <Menu className="h-5 w-5" />
               </button>
             )}
-            <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0">
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+            <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+              <TitanLogo size="sm" className="!h-7 !w-7 sm:!h-9 sm:!w-9" />
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
@@ -1536,7 +1535,7 @@ export default function ChatPage() {
                           className="flex items-center gap-2 p-3 rounded-xl border border-border/50 bg-card hover:bg-accent/50 transition-all text-left group active:scale-[0.98]"
                         >
                           <div className="text-muted-foreground group-hover:text-primary transition-colors shrink-0">
-                            {QUICK_ACTION_ICONS[action.icon] || <Sparkles className="h-4 w-4" />}
+                            {QUICK_ACTION_ICONS[action.icon] || <TitanLogo size="sm" className="!h-4 !w-4" />}
                           </div>
                           <span className="text-xs font-medium leading-tight">{action.label}</span>
                         </button>
