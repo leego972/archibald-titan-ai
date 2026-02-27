@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash,
+  PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
   HelpCircle,
@@ -830,6 +832,8 @@ export default function ChatPage() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
+  // Access the main navigation sidebar (from FetcherLayout's SidebarProvider)
+  const { toggleSidebar: toggleMainNav } = useSidebar();
 
   // UI state
   const [showHelp, setShowHelp] = useState(false);
@@ -1444,13 +1448,24 @@ export default function ChatPage() {
         {/* Header */}
         <div className={`flex items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-2 py-2 min-h-[48px]' : 'px-4 pb-3 pt-1'}`}>
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
-            {/* Mobile menu button */}
+            {/* Mobile: Main navigation button (opens FetcherLayout sidebar) */}
+            {isMobile && (
+              <button
+                onClick={toggleMainNav}
+                className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-foreground transition-colors shrink-0 touch-target"
+                aria-label="Open navigation menu"
+              >
+                <PanelLeft className="h-5 w-5" />
+              </button>
+            )}
+            {/* Mobile: Conversation list button */}
             {isMobile && (
               <button
                 onClick={() => setMobileDrawerOpen(true)}
                 className="p-2 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors shrink-0 touch-target"
+                aria-label="Open conversations"
               >
-                <Menu className="h-5 w-5" />
+                <MessageSquare className="h-5 w-5" />
               </button>
             )}
             <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
