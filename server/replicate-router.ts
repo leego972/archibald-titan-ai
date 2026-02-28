@@ -12,6 +12,7 @@ import { detectCloneComplexity, getClonePrice, type CloneComplexity } from "../s
 import { searchDomains, getDomainPrice, purchaseDomain, configureDNS } from "./domain-service";
 import { deployProject, getDeploymentStatus, selectPlatform } from "./deploy-service";
 import { getErrorMessage } from "./_core/errors.js";
+import { getUserOpenAIKey, getUserGithubPat } from "./user-secrets-router";
 import {
   createProject,
   getProject,
@@ -71,17 +72,35 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // ═══ GITHUB PAT VALIDATION: Require all-inclusive PAT for each clone ═══
-      if (!input.githubPat || input.githubPat.trim().length < 10) {
+      // ═══ REQUIRED API KEYS: Pull from vault or use per-project input ═══
+      // Users must have their own API keys saved — the platform does not subsidize API costs.
+
+      // 1. OpenAI API Key — required for all LLM calls (research, planning, building)
+      const userOpenAIKey = await getUserOpenAIKey(ctx.user.id);
+      if (!userOpenAIKey) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "A GitHub Personal Access Token is required for each clone project. Please provide a fresh all-inclusive PAT.",
+          message: "An OpenAI API key is required to use Clone Website. Please save your OpenAI API key in Settings → API Keys before cloning.",
         });
       }
-      // Validate PAT against GitHub API and check required scopes
+
+      // 2. GitHub PAT — required for pushing to GitHub
+      // Priority: per-project input > vault saved key
+      let resolvedGithubPat = input.githubPat?.trim() || null;
+      if (!resolvedGithubPat || resolvedGithubPat.length < 10) {
+        resolvedGithubPat = await getUserGithubPat(ctx.user.id);
+      }
+      if (!resolvedGithubPat || resolvedGithubPat.length < 10) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A GitHub Personal Access Token is required for Clone Website. Please save your GitHub PAT in Settings → API Keys, or provide one in the clone form.",
+        });
+      }
+
+      // Validate GitHub PAT against GitHub API and check required scopes
       try {
         const ghRes = await fetch("https://api.github.com/user", {
-          headers: { Authorization: `token ${input.githubPat.trim()}`, Accept: "application/json", "User-Agent": "ArchibaldTitan" },
+          headers: { Authorization: `token ${resolvedGithubPat}`, Accept: "application/json", "User-Agent": "ArchibaldTitan" },
         });
         if (!ghRes.ok) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid GitHub PAT — the token was rejected by GitHub. Please check it and try again." });
@@ -153,7 +172,7 @@ export const replicateRouter = router({
             publishableKey: input.stripePublishableKey,
             secretKey: input.stripeSecretKey,
           },
-          githubPat: input.githubPat,
+          githubPat: resolvedGithubPat,
         });
         return project;
       } catch (e: unknown) {

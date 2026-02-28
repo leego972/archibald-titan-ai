@@ -46,7 +46,7 @@ import {
   encrypt,
   decrypt,
 } from "./fetcher-db";
-import { getUserPlan } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceFetchLimit, enforceProviderAccess, canUseCloneWebsite, isFeatureAllowed } from "./subscription-gate";
 import {
   readFile as selfReadFileImpl,
   listFiles as selfListFilesImpl,
@@ -123,6 +123,23 @@ export async function executeToolCall(
 ,
   conversationId?: number): Promise<ToolExecutionResult> {
   try {
+    // ── Subscription Tier Gating ──────────────────────────────────
+    // Premium tools accessed through AI chat must respect the same
+    // tier restrictions as their direct API counterparts.
+    const plan = await getUserPlan(userId);
+    const planId = plan.planId;
+
+    // Helper: return a friendly gating error instead of throwing
+    const gateResult = (feature: string, label: string): ToolExecutionResult | null => {
+      if (!isFeatureAllowed(planId, feature)) {
+        return {
+          success: false,
+          error: `${label} is not available on the ${plan.tier.name} plan. Upgrade to unlock this feature at /pricing.`,
+        };
+      }
+      return null;
+    };
+
     switch (toolName) {
       // ── Credentials & Fetching ──────────────────────────────────
   
@@ -304,22 +321,37 @@ export async function executeToolCall(
       case "list_providers":
         return execListProviders();
 
-      // ── API Keys ────────────────────────────────────────────────
-      case "list_api_keys":
+      // ── API Keys (Pro+) ──────────────────────────────────────────
+      case "list_api_keys": {
+        const gate = gateResult("api_access", "API Access");
+        if (gate) return gate;
         return await execListApiKeys(userId);
+      }
 
-      case "create_api_key":
+      case "create_api_key": {
+        const gate = gateResult("api_access", "API Access");
+        if (gate) return gate;
         return await execCreateApiKey(userId, args as any, userName, userEmail);
+      }
 
-      case "revoke_api_key":
+      case "revoke_api_key": {
+        const gate = gateResult("api_access", "API Access");
+        if (gate) return gate;
         return await execRevokeApiKey(userId, args.keyId as number, userName, userEmail);
+      }
 
-      // ── Leak Scanner ────────────────────────────────────────────
-      case "start_leak_scan":
+      // ── Leak Scanner (Cyber+) ─────────────────────────────────
+      case "start_leak_scan": {
+        const gate = gateResult("leak_scanner", "Credential Leak Scanner");
+        if (gate) return gate;
         return await execStartLeakScan(userId);
+      }
 
-      case "get_leak_scan_results":
+      case "get_leak_scan_results": {
+        const gate = gateResult("leak_scanner", "Credential Leak Scanner");
+        if (gate) return gate;
         return await execGetLeakScanResults(userId);
+      }
 
       // ── Vault ───────────────────────────────────────────────────
       case "list_vault_entries":
@@ -328,35 +360,62 @@ export async function executeToolCall(
       case "add_vault_entry":
         return await execAddVaultEntry(userId, args as any, userName);
 
-      // ── Bulk Sync ───────────────────────────────────────────────
-      case "trigger_bulk_sync":
+      // ── Bulk Sync (Pro+) ──────────────────────────────────────────
+      case "trigger_bulk_sync": {
+        const gate = gateResult("scheduled_fetches", "Bulk Sync");
+        if (gate) return gate;
         return await execTriggerBulkSync(userId, args.providerIds as string[] | undefined);
+      }
 
-      case "get_bulk_sync_status":
+      case "get_bulk_sync_status": {
+        const gate = gateResult("scheduled_fetches", "Bulk Sync");
+        if (gate) return gate;
         return await execGetBulkSyncStatus(userId);
+      }
 
-      // ── Team ────────────────────────────────────────────────────
-      case "list_team_members":
+      // ── Team (Enterprise+) ──────────────────────────────────────
+      case "list_team_members": {
+        const gate = gateResult("team_management", "Team Management");
+        if (gate) return gate;
         return await execListTeamMembers(userId);
+      }
 
-      case "add_team_member":
+      case "add_team_member": {
+        const gate = gateResult("team_management", "Team Management");
+        if (gate) return gate;
         return await execAddTeamMember(userId, args as any, userName, userEmail);
+      }
 
-      case "remove_team_member":
+      case "remove_team_member": {
+        const gate = gateResult("team_management", "Team Management");
+        if (gate) return gate;
         return await execRemoveTeamMember(userId, args.memberId as number, userName, userEmail);
+      }
 
-      case "update_team_member_role":
+      case "update_team_member_role": {
+        const gate = gateResult("team_management", "Team Management");
+        if (gate) return gate;
         return await execUpdateTeamMemberRole(userId, args as any, userName, userEmail);
+      }
 
-      // ── Scheduler ───────────────────────────────────────────────
-      case "list_schedules":
+      // ── Scheduler (Pro+) ──────────────────────────────────────────
+      case "list_schedules": {
+        const gate = gateResult("scheduled_fetches", "Scheduled Fetches");
+        if (gate) return gate;
         return await execListSchedules(userId);
+      }
 
-      case "create_schedule":
+      case "create_schedule": {
+        const gate = gateResult("scheduled_fetches", "Scheduled Fetches");
+        if (gate) return gate;
         return await execCreateSchedule(userId, args as any);
+      }
 
-      case "delete_schedule":
+      case "delete_schedule": {
+        const gate = gateResult("scheduled_fetches", "Scheduled Fetches");
+        if (gate) return gate;
         return await execDeleteSchedule(userId, args.scheduleId as number);
+      }
 
       // ── Watchdog ────────────────────────────────────────────────
       case "get_watchdog_summary":
@@ -370,13 +429,19 @@ export async function executeToolCall(
       case "get_recommendations":
         return await execGetRecommendations(userId);
 
-      // ── Audit ───────────────────────────────────────────────────
-      case "get_audit_logs":
+      // ── Audit (Enterprise+) ────────────────────────────────────
+      case "get_audit_logs": {
+        const gate = gateResult("audit_logs", "Audit Logs");
+        if (gate) return gate;
         return await execGetAuditLogs(args as any);
+      }
 
-      // ── Kill Switch ─────────────────────────────────────────────
-      case "activate_kill_switch":
+      // ── Kill Switch (Pro+) ──────────────────────────────────────
+      case "activate_kill_switch": {
+        const gate = gateResult("kill_switch", "Kill Switch");
+        if (gate) return gate;
         return await execActivateKillSwitch(userId, args.code as string);
+      }
 
       // ── System ──────────────────────────────────────────────────
       case "get_system_status":
@@ -458,29 +523,55 @@ export async function executeToolCall(
       case "sandbox_list_files":
         return await execSandboxListFiles(userId, args);
 
-      // ── Security Tools ─────────────────────────────────────────
-      case "security_scan":
+      // ── Security Tools (Cyber+) ──────────────────────────────────
+      case "security_scan": {
+        const gate = gateResult("security_tools", "Security Scan");
+        if (gate) return gate;
         return await execSecurityScan(args);
-      case "code_security_review":
+      }
+      case "code_security_review": {
+        const gate = gateResult("security_tools", "Code Security Review");
+        if (gate) return gate;
         return await execCodeSecurityReview(args);
-      case "port_scan":
+      }
+      case "port_scan": {
+        const gate = gateResult("security_tools", "Port Scan");
+        if (gate) return gate;
         return await execPortScan(args);
-      case "ssl_check":
+      }
+      case "ssl_check": {
+        const gate = gateResult("security_tools", "SSL Check");
+        if (gate) return gate;
         return await execSSLCheck(args);
+      }
 
-      // ── Auto-Fix Tools ─────────────────────────────────────────
-      case "auto_fix_vulnerability":
+      // ── Auto-Fix Tools (Cyber+) ─────────────────────────────────
+      case "auto_fix_vulnerability": {
+        const gate = gateResult("security_tools", "Auto-Fix Vulnerability");
+        if (gate) return gate;
         return await execAutoFixVulnerability(args);
-      case "auto_fix_all_vulnerabilities":
+      }
+      case "auto_fix_all_vulnerabilities": {
+        const gate = gateResult("security_tools", "Auto-Fix All Vulnerabilities");
+        if (gate) return gate;
         return await execAutoFixAll(args);
+      }
 
       // ── App Research & Clone ───────────────────────────────────
       case "app_research":
         return await execAppResearch(args, userApiKey || undefined);
       case "app_clone":
         return await execAppClone(userId, args, userApiKey || undefined);
-      case "website_replicate":
+      case "website_replicate": {
+        const hasAccess = await canUseCloneWebsite(userId);
+        if (!hasAccess) {
+          return {
+            success: false,
+            error: "Website Clone is an exclusive feature for Cyber+ and Titan subscribers. Upgrade at /pricing to unlock this capability.",
+          };
+        }
         return await execWebsiteReplicate(userId, args);
+      }
 
       // ── Project Builder Tools ─────────────────────────────────
       case "create_file":
