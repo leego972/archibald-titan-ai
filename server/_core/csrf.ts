@@ -43,6 +43,10 @@ const EXEMPT_PATHS = [
   "/api/oauth/",
   // GitHub release sync webhook
   "/api/releases/",
+  // File upload routes — use multipart form data which can't easily include CSRF headers
+  // These are authenticated via session cookies and only accept file data
+  "/api/chat/upload",
+  "/api/voice/upload",
 ];
 
 /** Check if a path is exempt from CSRF */

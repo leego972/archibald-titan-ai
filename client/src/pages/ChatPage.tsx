@@ -280,11 +280,19 @@ interface ExecutedAction {
   success: boolean;
 }
 
+interface ChatAttachment {
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
+
 interface ChatMsg {
   id: number;
   role: "user" | "assistant";
   content: string;
   createdAt: number;
+  attachments?: ChatAttachment[];
   actionsTaken?: Array<{ tool: string; success: boolean; summary: string }> | null;
   toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: unknown }> | null;
 }
@@ -1139,18 +1147,53 @@ export default function ChatPage() {
 
     setShowHelp(false);
 
-    // Optimistic user message
-    const tempId = -Date.now();
-    const userMsg: ChatMsg = { id: tempId, role: "user", content: messageText, createdAt: Date.now() };
-    setLocalMessages((prev) => [...prev, userMsg]);
+    // Capture files before clearing state
+    const filesToUpload = [...selectedFiles];
     setInput("");
     setSelectedFiles([]);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    // Upload files FIRST so we can show them in the optimistic message
+    const uploadedAttachments: ChatAttachment[] = [];
+    if (filesToUpload.length > 0) {
+      setIsLoading(true);
+      setLoadingPhase("Uploading files...");
+      for (const file of filesToUpload) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const uploadRes = await fetch('/api/chat/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          });
+          if (uploadRes.ok) {
+            const { url, mimeType, size } = await uploadRes.json();
+            uploadedAttachments.push({ url, name: file.name, mimeType: mimeType || file.type, size: size || file.size });
+          } else {
+            toast.error(`Failed to upload ${file.name}`);
+          }
+        } catch (e) {
+          console.error('File upload failed:', e);
+          toast.error(`Failed to upload ${file.name}`);
+        }
+      }
+    }
+
+    // Build the optimistic user message WITH attachment info
+    const tempId = -Date.now();
+    const userMsg: ChatMsg = {
+      id: tempId,
+      role: "user",
+      content: messageText,
+      createdAt: Date.now(),
+      attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+    };
+    setLocalMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setLoadingPhase("Thinking...");
     setStreamEvents([{ type: 'thinking', message: 'Processing your request...', timestamp: Date.now() }]);
     setBuildLog([]);
-
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     // Pre-create conversation if this is a new chat, so we can connect SSE before sending
     let convIdForStream = activeConversationId;
@@ -1199,29 +1242,20 @@ export default function ChatPage() {
     }
 
     try {
-      // Upload files and append their URLs to the message
+      // Build final message with attachment URLs for the AI
       let finalMessage = messageText;
-      if (selectedFiles.length > 0) {
-        const uploadedUrls: string[] = [];
-        for (const file of selectedFiles) {
-          try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const uploadRes = await fetch('/api/chat/upload', {
-              method: 'POST',
-              body: formData,
-              credentials: 'include',
-            });
-            if (uploadRes.ok) {
-              const { url } = await uploadRes.json();
-              uploadedUrls.push(`[Attached file: ${file.name}](${url})`);
-            }
-          } catch (e) {
-            console.error('File upload failed:', e);
+      if (uploadedAttachments.length > 0) {
+        const attachmentLines = uploadedAttachments.map(a => {
+          if (a.mimeType.startsWith('image/')) {
+            return `[Attached image: ${a.name}](${a.url})`;
           }
-        }
-        if (uploadedUrls.length > 0) {
-          finalMessage += '\n\n' + uploadedUrls.join('\n');
+          return `[Attached file: ${a.name}](${a.url})`;
+        });
+        finalMessage += '\n\n' + attachmentLines.join('\n');
+        const hasImages = uploadedAttachments.some(a => a.mimeType.startsWith('image/'));
+        if (hasImages) {
+          finalMessage += '\n\nI have attached image(s) above. Please analyze them using the read_uploaded_file tool.';
+        } else {
           finalMessage += '\n\nPlease read the attached file(s) using the read_uploaded_file tool to see their contents.';
         }
       }
@@ -1661,7 +1695,31 @@ export default function ChatPage() {
                               </div>
                             </>
                           ) : (
-                            <p className="whitespace-pre-wrap break-words overflow-hidden">{msg.content}</p>
+                            <>
+                              {/* Show attached images inline in user message */}
+                              {msg.attachments && msg.attachments.length > 0 && (
+                                <div className="mb-2 space-y-2">
+                                  {msg.attachments.filter(a => a.mimeType.startsWith('image/')).map((att, ai) => (
+                                    <div key={ai} className="rounded-lg overflow-hidden border border-white/10">
+                                      <img
+                                        src={att.url}
+                                        alt={att.name}
+                                        className="max-w-full max-h-[300px] object-contain rounded-lg"
+                                        loading="lazy"
+                                      />
+                                    </div>
+                                  ))}
+                                  {msg.attachments.filter(a => !a.mimeType.startsWith('image/')).map((att, ai) => (
+                                    <div key={ai} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/10 text-xs">
+                                      <Paperclip className="h-3 w-3 shrink-0" />
+                                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="underline truncate">{att.name}</a>
+                                      <span className="text-white/60 shrink-0">({Math.round(att.size / 1024)}KB)</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="whitespace-pre-wrap break-words overflow-hidden">{msg.content}</p>
+                            </>
                           )}
                         </div>
                         {/* Action buttons below assistant messages */}
@@ -1840,15 +1898,33 @@ export default function ChatPage() {
           {selectedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted/30 rounded-lg">
               {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-1 bg-background px-2 py-1 rounded-md border border-border/50">
-                  <Paperclip className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-xs truncate max-w-[100px] sm:max-w-[120px]">{file.name}</span>
-                  <button
-                    onClick={() => setSelectedFiles(selectedFiles.filter((_, i) => i !== index))}
-                    className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                <div key={index} className="relative group">
+                  {file.type.startsWith('image/') ? (
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-border/50 bg-background">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => setSelectedFiles(selectedFiles.filter((_, i) => i !== index))}
+                        className="absolute top-0.5 right-0.5 bg-black/70 rounded-full p-0.5 text-white hover:bg-red-500 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 bg-background px-2 py-1 rounded-md border border-border/50">
+                      <Paperclip className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs truncate max-w-[100px] sm:max-w-[120px]">{file.name}</span>
+                      <button
+                        onClick={() => setSelectedFiles(selectedFiles.filter((_, i) => i !== index))}
+                        className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
