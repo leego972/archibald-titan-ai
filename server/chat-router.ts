@@ -611,6 +611,24 @@ async function loadConversationContext(
   const messages: Message[] = [];
   for (const row of rows) {
     if (row.role === "tool") continue; // tool messages are ephemeral
+    // Convert image URLs in user messages to vision content parts
+    if (row.role === "user" && row.content.includes("[Attached image:")) {
+      const imageRegex = /\[Attached image:[^\]]*\]\((https?:\/\/[^)]+)\)/g;
+      const imageUrls: string[] = [];
+      let m;
+      while ((m = imageRegex.exec(row.content)) !== null) imageUrls.push(m[1]);
+      if (imageUrls.length > 0) {
+        const cleanText = row.content
+          .replace(/\[Attached image:[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '')
+          .replace(/\n*I have attached image\(s\) above\. Please analyze them using the read_uploaded_file tool\.\n?/g, '')
+          .trim();
+        const parts: any[] = [];
+        if (cleanText) parts.push({ type: "text", text: cleanText });
+        for (const url of imageUrls) parts.push({ type: "image_url", image_url: { url, detail: "auto" } });
+        messages.push({ role: "user", content: parts });
+        continue;
+      }
+    }
     messages.push({
       role: row.role as "user" | "assistant" | "system",
       content: row.content,
@@ -1120,10 +1138,37 @@ Do NOT attempt any tool calls or builds.`;
         ...previousMessages,
       ];
 
+      // ── Helper: Convert image URLs in message to vision content parts ──
+      function buildUserContent(text: string): Message["content"] {
+        // Match [Attached image: name](url) patterns
+        const imageRegex = /\[Attached image:[^\]]*\]\((https?:\/\/[^)]+)\)/g;
+        const imageUrls: string[] = [];
+        let match;
+        while ((match = imageRegex.exec(text)) !== null) {
+          imageUrls.push(match[1]);
+        }
+        if (imageUrls.length === 0) return text;
+        // Strip the markdown image links and instruction line from the text
+        let cleanText = text
+          .replace(/\[Attached image:[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '')
+          .replace(/\n*I have attached image\(s\) above\. Please analyze them using the read_uploaded_file tool\.\n?/g, '')
+          .trim();
+        const parts: (import("./_core/llm").TextContent | import("./_core/llm").ImageContent)[] = [];
+        if (cleanText) {
+          parts.push({ type: "text", text: cleanText });
+        } else {
+          parts.push({ type: "text", text: "The user uploaded the following image(s). Describe what you see and respond to any questions about them." });
+        }
+        for (const url of imageUrls) {
+          parts.push({ type: "image_url", image_url: { url, detail: "auto" } });
+        }
+        return parts;
+      }
+
       // Ensure the latest user message is included (it may not be in previousMessages yet due to timing)
       const lastMsg = llmMessages[llmMessages.length - 1];
       if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== input.message) {
-        llmMessages.push({ role: "user", content: input.message });
+        llmMessages.push({ role: "user", content: buildUserContent(input.message) });
       }
 
       // ── LAYER 1: Build Intent Detection ──────────────────────────

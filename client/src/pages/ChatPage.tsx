@@ -1175,7 +1175,9 @@ export default function ChatPage() {
             const { url, mimeType, size } = await uploadRes.json();
             uploadedAttachments.push({ url, name: file.name, mimeType: mimeType || file.type, size: size || file.size });
           } else {
-            toast.error(`Failed to upload ${file.name}`);
+            const errData = await uploadRes.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Upload failed:', uploadRes.status, errData);
+            toast.error(`Upload failed (${uploadRes.status}): ${errData.error || 'Server error'}`);
           }
         } catch (e) {
           console.error('File upload failed:', e);
