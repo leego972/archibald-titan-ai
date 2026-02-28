@@ -25,6 +25,7 @@ import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerChatStreamRoutes } from "../chat-stream";
+import { registerChatUploadRoute } from "../chat-upload";
 import { registerMarketplaceFileRoutes } from "../marketplace-files";
 import { registerBundleSyncRoutes } from "../bundle-sync";
 import rateLimit from "express-rate-limit";
@@ -239,6 +240,8 @@ async function startServer() {
   registerVoiceUploadRoute(app);
   // Marketplace file upload/download endpoints
   registerMarketplaceFileRoutes(app);
+  // Chat file upload endpoint
+  registerChatUploadRoute(app);
   // Chat SSE streaming and abort endpoints
   registerChatStreamRoutes(app);
   // tRPC API
