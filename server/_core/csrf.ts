@@ -28,12 +28,21 @@ const CSRF_COOKIE = "csrf_token";
 const CSRF_HEADER = "x-csrf-token";
 const TOKEN_LENGTH = 32; // 256 bits
 
-/** Paths exempt from CSRF validation (webhooks use their own signature verification) */
+/** Paths exempt from CSRF validation (webhooks use their own signature verification, auth routes use passwords/tokens) */
 const EXEMPT_PATHS = [
+  // Webhooks — use signature verification
   "/api/stripe-webhook",
   "/api/binance-pay/webhook",
   "/api/health",
   "/api/desktop/",
+  // Auth routes — use password/token auth, not cookie-based sessions
+  // These MUST be exempt because the login/register forms can't send CSRF headers
+  // before the user has a session (chicken-and-egg problem)
+  "/api/auth/",
+  // OAuth callback routes
+  "/api/oauth/",
+  // GitHub release sync webhook
+  "/api/releases/",
 ];
 
 /** Check if a path is exempt from CSRF */
