@@ -1301,7 +1301,8 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
         const formData = new FormData();
         formData.append("file", file);
         formData.append("listingId", String(listingId));
-        const res = await fetch("/api/marketplace/upload", { method: "POST", body: formData, credentials: "include" });
+        const csrfTk = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+        const res = await fetch("/api/marketplace/upload", { method: "POST", body: formData, credentials: "include", headers: csrfTk ? { 'x-csrf-token': csrfTk } : {} });
         const data = await res.json();
         if (!res.ok) { toast.error(data.error || "Upload failed"); return; }
         toast.success(`File uploaded! ${data.fileName} (${data.fileSizeMb}MB)`);

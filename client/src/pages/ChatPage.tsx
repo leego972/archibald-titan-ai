@@ -951,7 +951,8 @@ export default function ChatPage() {
         try {
           const formData = new FormData();
           formData.append('audio', audioBlob, `recording.${mimeType.includes('webm') ? 'webm' : 'm4a'}`);
-          const uploadRes = await fetch('/api/voice/upload', { method: 'POST', body: formData, credentials: 'include' });
+          const csrfTk = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+          const uploadRes = await fetch('/api/voice/upload', { method: 'POST', body: formData, credentials: 'include', headers: csrfTk ? { 'x-csrf-token': csrfTk } : {} });
           if (!uploadRes.ok) {
             const err = await uploadRes.json().catch(() => ({ error: 'Upload failed' }));
             throw new Error(err.error || 'Failed to upload audio');
@@ -1162,10 +1163,13 @@ export default function ChatPage() {
         try {
           const formData = new FormData();
           formData.append('file', file);
+          // Read CSRF token from cookie and send as header
+          const csrfToken = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
           const uploadRes = await fetch('/api/chat/upload', {
             method: 'POST',
             body: formData,
             credentials: 'include',
+            headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
           });
           if (uploadRes.ok) {
             const { url, mimeType, size } = await uploadRes.json();
@@ -1826,7 +1830,8 @@ export default function ChatPage() {
                             onClick={async () => {
                               try {
                                 if (activeConversationId) {
-                                  await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST' });
+                                  const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+                                   await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
                                 }
                                 if (eventSourceRef.current) {
                                   eventSourceRef.current.close();
