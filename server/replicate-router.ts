@@ -130,26 +130,40 @@ export const replicateRouter = router({
       // Complexity is initially set to "simple" and re-evaluated after research.
       // The initial credit hold ensures the user has credits for the base cost.
       try {
-        await consumeCredits(ctx.user.id, "clone_action" as any, "Website clone: " + input.targetUrl);
+        const creditResult = await consumeCredits(ctx.user.id, "clone_action", "Website clone: " + input.targetUrl);
+        if (!creditResult.success) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits for clone action. You need 50 credits to clone a website." });
+        }
       } catch (e: unknown) {
+        if (e instanceof TRPCError) throw e;
         throw new TRPCError({ code: "FORBIDDEN", message: getErrorMessage(e) || "Insufficient credits for clone action" });
       }
 
-      const project = await createProject(ctx.user.id, input.targetUrl, input.targetName, {
-        priority: input.priority,
-        branding: {
-          brandName: input.brandName,
-          brandColors: input.brandColors,
-          brandLogo: input.brandLogo,
-          brandTagline: input.brandTagline,
-        },
-        stripe: {
-          publishableKey: input.stripePublishableKey,
-          secretKey: input.stripeSecretKey,
-        },
-        githubPat: input.githubPat,
-      });
-      return project;
+      // ═══ CREATE PROJECT ═══
+      try {
+        const project = await createProject(ctx.user.id, input.targetUrl, input.targetName, {
+          priority: input.priority,
+          branding: {
+            brandName: input.brandName,
+            brandColors: input.brandColors,
+            brandLogo: input.brandLogo,
+            brandTagline: input.brandTagline,
+          },
+          stripe: {
+            publishableKey: input.stripePublishableKey,
+            secretKey: input.stripeSecretKey,
+          },
+          githubPat: input.githubPat,
+        });
+        return project;
+      } catch (e: unknown) {
+        const msg = getErrorMessage(e);
+        console.error("[Clone] createProject failed:", msg, e);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create clone project: ${msg || "Database error. Please try again."}`,
+        });
+      }
     }),
 
   /**

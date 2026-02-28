@@ -13,7 +13,7 @@
  * 6. Integrate: Wire up Stripe payment if keys provided
  */
 
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   replicateProjects,
@@ -103,32 +103,79 @@ export async function createProject(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const [row] = await db
-    .insert(replicateProjects)
-    .values({
-      userId,
-      targetUrl,
-      targetName,
-      status: "researching",
-      priority: options?.priority ?? "mvp",
-      brandName: options?.branding?.brandName,
-      brandColors: options?.branding?.brandColors,
-      brandLogo: options?.branding?.brandLogo,
-      brandTagline: options?.branding?.brandTagline,
-      stripePublishableKey: options?.stripe?.publishableKey,
-      stripeSecretKey: options?.stripe?.secretKey,
-      stripePriceIds: options?.stripe?.priceIds,
-      githubPat: options?.githubPat,
-      buildLog: [],
-    })
-    .$returningId();
+  // Ensure the replicate_projects table exists (auto-create if missing)
+  try {
+    await db.execute(sql`SELECT 1 FROM replicate_projects LIMIT 1`);
+  } catch {
+    console.log("[Clone] replicate_projects table missing, creating...");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS replicate_projects (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId INT NOT NULL,
+        sandboxId INT,
+        targetUrl VARCHAR(2048) NOT NULL,
+        targetName VARCHAR(256) NOT NULL,
+        targetDescription TEXT,
+        researchData JSON,
+        buildPlan JSON,
+        brandName VARCHAR(256),
+        brandColors JSON,
+        brandLogo TEXT,
+        brandTagline VARCHAR(512),
+        stripePublishableKey TEXT,
+        stripeSecretKey TEXT,
+        stripePriceIds JSON,
+        githubPat TEXT,
+        githubRepoUrl TEXT,
+        status ENUM('researching','research_complete','planning','plan_complete','building','build_complete','branded','pushing','pushed','deploying','deployed','testing','complete','error') NOT NULL DEFAULT 'researching',
+        currentStep INT NOT NULL DEFAULT 0,
+        totalSteps INT NOT NULL DEFAULT 0,
+        statusMessage TEXT,
+        errorMessage TEXT,
+        buildLog JSON,
+        outputFiles JSON,
+        previewUrl TEXT,
+        priority ENUM('mvp','full') NOT NULL DEFAULT 'mvp',
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+      )
+    `);
+  }
 
-  const [project] = await db
-    .select()
-    .from(replicateProjects)
-    .where(eq(replicateProjects.id, row.id));
+  try {
+    const result = await db
+      .insert(replicateProjects)
+      .values({
+        userId,
+        targetUrl,
+        targetName,
+        status: "researching",
+        priority: options?.priority ?? "mvp",
+        brandName: options?.branding?.brandName ?? null,
+        brandColors: options?.branding?.brandColors ?? null,
+        brandLogo: options?.branding?.brandLogo ?? null,
+        brandTagline: options?.branding?.brandTagline ?? null,
+        stripePublishableKey: options?.stripe?.publishableKey ?? null,
+        stripeSecretKey: options?.stripe?.secretKey ?? null,
+        stripePriceIds: options?.stripe?.priceIds ?? null,
+        githubPat: options?.githubPat ?? null,
+        buildLog: [],
+      });
 
-  return project;
+    const insertId = result[0].insertId;
+
+    const [project] = await db
+      .select()
+      .from(replicateProjects)
+      .where(eq(replicateProjects.id, insertId));
+
+    if (!project) throw new Error(`Project insert succeeded (id=${insertId}) but SELECT returned nothing`);
+    return project;
+  } catch (e: unknown) {
+    const msg = getErrorMessage(e);
+    console.error("[Clone] createProject DB error:", msg, e);
+    throw new Error(`Database error creating clone project: ${msg}`);
+  }
 }
 
 export async function getProject(
