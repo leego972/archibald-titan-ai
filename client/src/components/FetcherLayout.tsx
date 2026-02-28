@@ -73,6 +73,7 @@ import {
   Sun,
   Moon,
   FolderOpen,
+  Globe,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -136,6 +137,7 @@ const menuGroups: MenuGroup[] = [
       { icon: TrendingUp, label: "Health Trends", path: "/fetcher/health-trends", isCyber: true },
       { icon: ScanSearch, label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
       { icon: ShieldCheck, label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
+      { icon: Globe, label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

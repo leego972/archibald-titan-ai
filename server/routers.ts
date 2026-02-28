@@ -40,6 +40,7 @@ import { blogRouter } from "./blog-router";
 import { advertisingRouter } from "./advertising-router";
 import { userSecretsRouter } from "./user-secrets-router";
 import { marketplaceRouter } from "./marketplace-router";
+import { siteMonitorRouter } from "./site-monitor-router";
 import { filesRouter } from "./api/files";
 
 export const appRouter = router({
@@ -107,6 +108,7 @@ export const appRouter = router({
   advertising: advertisingRouter,
   userSecrets: userSecretsRouter,
   marketplace: marketplaceRouter,
+  siteMonitor: siteMonitorRouter,
 });
 
 export type AppRouter = typeof appRouter;

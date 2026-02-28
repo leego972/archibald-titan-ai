@@ -169,6 +169,7 @@ const HELP_CATEGORIES = [
       "Credentials → /fetcher/credentials",
       "Auto-Sync → /fetcher/auto-sync",
       "Leak Scanner → /fetcher/leak-scanner",
+      "Site Monitor → /site-monitor",
       "Team Management → /fetcher/team",
       "Pricing → /pricing",
     ],
@@ -192,6 +193,17 @@ const HELP_CATEGORIES = [
       "Configure watchdog monitoring",
     ],
   },
+  {
+    icon: "activity",
+    title: "Website Health Monitor",
+    items: [
+      "Monitor website uptime and response times",
+      "Track SSL certificate expiry and errors",
+      "Auto-repair via Railway, Vercel, SSH, and more",
+      "View incidents and repair logs",
+      "Site Monitor → /site-monitor",
+    ],
+  },
 ];
 
 const HELP_ICONS: Record<string, React.ReactNode> = {
@@ -202,6 +214,7 @@ const HELP_ICONS: Record<string, React.ReactNode> = {
   navigation: <Navigation className="h-4 w-4" />,
   users: <Users className="h-4 w-4" />,
   calendar: <Calendar className="h-4 w-4" />,
+  activity: <Activity className="h-4 w-4" />,
 };
 
 const QUICK_ACTION_ICONS: Record<string, React.ReactNode> = {

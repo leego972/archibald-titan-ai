@@ -187,6 +187,8 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
     credential_health: ["cyber", "cyber_plus", "titan"],
     totp_vault: ["cyber", "cyber_plus", "titan"],
     security_tools: ["cyber", "cyber_plus", "titan"],
+    // Site Monitor — Pro and above
+    site_monitor: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     // Cyber+ exclusive features
     zero_click_research: ["cyber_plus", "titan"],
     c2_framework: ["cyber_plus", "titan"],

@@ -339,7 +339,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 mb-8">
             <Sparkles className="h-3.5 w-3.5 text-blue-400" />
             <span className="text-xs font-medium text-blue-300">
-              v{latestRelease?.version ?? "8.0.0"} — Now Available
+              v{latestRelease?.version ?? "9.0.0"} — Now Available
             </span>
           </div>
 
