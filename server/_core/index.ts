@@ -17,7 +17,7 @@ import { registerDownloadRoute } from "../download-gate";
 import { registerApiRoutes } from "../api-access-router";
 import { registerV5ApiRoutes } from "../v5-features-router";
 import { registerEmailAuthRoutes } from "../email-auth-router";
-import { registerReleaseUploadRoute, registerUpdateFeedRoutes } from "../releases-router";
+import { registerReleaseUploadRoute, registerUpdateFeedRoutes, registerGitHubSyncRoute } from "../releases-router";
 import { registerVoiceUploadRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
@@ -231,6 +231,8 @@ async function startServer() {
   registerReleaseUploadRoute(app);
   // Auto-update feed for electron-updater (latest.yml endpoints)
   registerUpdateFeedRoutes(app);
+  // GitHub release sync webhook endpoint
+  registerGitHubSyncRoute(app);
   // Desktop bundle sync — serves latest web client for auto-sync
   registerBundleSyncRoutes(app);
   // Voice audio upload endpoint

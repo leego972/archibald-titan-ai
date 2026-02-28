@@ -167,9 +167,25 @@ export default function LandingPage() {
     }
   }, [user, loading, setLocation]);
 
-  const { data: latestRelease } = trpc.releases.latest.useQuery();
-  const { data: allReleases } = trpc.releases.list.useQuery();
+  const { data: latestRelease, refetch: refetchLatest } = trpc.releases.latest.useQuery();
+  const { data: allReleases, refetch: refetchList } = trpc.releases.list.useQuery();
   const requestDownloadToken = trpc.download.requestToken.useMutation();
+  const syncFromGitHub = trpc.releases.syncFromGitHub.useMutation();
+
+  // Auto-sync releases from GitHub on first load (once per session)
+  useEffect(() => {
+    const SYNC_KEY = "at_releases_synced";
+    const lastSync = sessionStorage.getItem(SYNC_KEY);
+    if (!lastSync) {
+      syncFromGitHub.mutateAsync().then(() => {
+        sessionStorage.setItem(SYNC_KEY, Date.now().toString());
+        // Refetch after sync so badge updates
+        refetchLatest();
+        refetchList();
+      }).catch(() => { /* silent fail — badge fallback handles it */ });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Build health badges are now hardcoded — no need to query builderStats
   const [downloadPending, setDownloadPending] = useState<string | null>(null);
   const [detectedPlatform] = useState(() => detectPlatform());
