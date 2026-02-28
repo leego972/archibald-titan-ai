@@ -591,52 +591,81 @@ export default function LandingPage() {
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/5 rounded-full blur-[120px]" />
         </div>
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">How The Fetcher Works</span>
+            <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">How Archibald Titan Works</span>
             <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
-              Three steps. That's it.
+              Your AI-Powered Command Center
             </h2>
             <p className="mt-3 text-white/40 max-w-2xl mx-auto text-sm">
-              The Fetcher is Titan's built-in credential retrieval assistant. It automates the entire process of collecting your API keys and credentials.
+              Archibald Titan is a full-stack AI platform that combines an intelligent builder, autonomous credential management, cybersecurity tools, a marketplace, and business automation — all in one place.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Step 1-4 flow */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-20">
             {[
               {
                 step: "01",
-                title: "Select Providers",
-                desc: "Open the Fetcher inside Titan and choose from 15+ supported providers. Enter your login credentials — they're encrypted immediately with AES-256-GCM before anything else happens.",
-                icon: Globe,
+                title: "Sign Up & Explore",
+                desc: "Create your free account and land in the Titan dashboard. Access the AI chat, Sandbox, and 60+ tools instantly — no setup required.",
+                icon: LogIn,
               },
               {
                 step: "02",
-                title: "Sit Back & Watch",
-                desc: "The Fetcher launches a stealth browser session, logs into each provider, navigates to the API keys page, and retrieves your credentials — all autonomously within Titan.",
-                icon: RefreshCw,
+                title: "Build with AI",
+                desc: "Use Titan Builder to generate code, websites, business plans, and more through natural conversation. Clone existing sites or start from scratch in the Sandbox.",
+                icon: Wand2,
               },
               {
                 step: "03",
-                title: "Export & Use",
-                desc: "Your keys are stored in the encrypted vault. Export as JSON, CSV, or .env. Copy individual keys or bulk export. Use them wherever you need.",
-                icon: FileJson,
+                title: "Secure & Automate",
+                desc: "The Fetcher retrieves API keys from 15+ providers autonomously. Store them in the AES-256 encrypted vault. Set up auto-sync, expiry watchdog, and health monitoring.",
+                icon: Shield,
+              },
+              {
+                step: "04",
+                title: "Scale & Monetize",
+                desc: "Sell on the Grand Bazaar marketplace, launch crowdfunding campaigns, find grants, manage your business, and grow with built-in SEO, marketing, and affiliate tools.",
+                icon: BarChart3,
               },
             ].map((item, i) => (
               <div key={item.step} className="relative">
-                {i < 2 && (
+                {i < 3 && (
                   <div className="hidden md:block absolute top-12 left-full w-full">
                     <div className="h-px w-full bg-gradient-to-r from-blue-500/30 to-transparent" />
                   </div>
                 )}
                 <div className="text-center">
-                  <div className="inline-flex items-center justify-center h-24 w-24 rounded-2xl border border-white/10 bg-white/[0.03] mb-6">
-                    <item.icon className="h-10 w-10 text-blue-400" />
+                  <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl border border-white/10 bg-white/[0.03] mb-5">
+                    <item.icon className="h-9 w-9 text-blue-400" />
                   </div>
                   <div className="text-xs font-bold text-blue-500 tracking-widest mb-2">STEP {item.step}</div>
-                  <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
                   <p className="text-sm text-white/50 leading-relaxed">{item.desc}</p>
                 </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Platform pillars */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              { icon: Cpu, title: "Titan Builder", desc: "AI-powered code generation, website building, and project scaffolding through natural language." },
+              { icon: KeyRound, title: "Credential Fetcher", desc: "Autonomous retrieval and management of API keys from 15+ providers with stealth browser." },
+              { icon: Lock, title: "Encrypted Vault", desc: "AES-256-GCM encrypted storage for credentials, TOTP secrets, and sensitive data." },
+              { icon: Globe, title: "Grand Bazaar", desc: "Built-in marketplace to buy, sell, and trade digital products and services." },
+              { icon: ShieldAlert, title: "Cyber Security Suite", desc: "Leak scanner, credential health monitor, threat modeling, and red team automation." },
+              { icon: Sparkles, title: "Business Tools", desc: "Grant finder, business plans, crowdfunding, SEO, marketing engine, and affiliate system." },
+            ].map((pillar) => (
+              <div key={pillar.title} className="p-5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-blue-500/20 transition-all duration-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <pillar.icon className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <h4 className="font-semibold text-white">{pillar.title}</h4>
+                </div>
+                <p className="text-sm text-white/50 leading-relaxed">{pillar.desc}</p>
               </div>
             ))}
           </div>
