@@ -443,6 +443,27 @@ function FetcherLayoutContent({
                 </div>
               );
             })}
+            {/* Created by Leego branding */}
+            {!isCollapsed && (
+              <div className="flex justify-center py-3 mt-auto">
+                <img
+                  src="/Madebyleego.png"
+                  alt="Created by Leego"
+                  className="h-14 w-14 object-contain opacity-80 hover:opacity-100 hover:brightness-110 transition-all duration-300 drop-shadow-[0_0_6px_rgba(100,255,100,0.2)]"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            {isCollapsed && (
+              <div className="flex justify-center py-2 mt-auto">
+                <img
+                  src="/Madebyleego.png"
+                  alt="Created by Leego"
+                  className="h-8 w-8 object-contain opacity-70 hover:opacity-100 hover:brightness-110 transition-all duration-300"
+                  loading="lazy"
+                />
+              </div>
+            )}
           </SidebarContent>
 
           <SidebarFooter className="p-3 border-t border-white/5">
