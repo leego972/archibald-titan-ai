@@ -1054,8 +1054,18 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Created by Leego branding */}
+          <div className="mt-10 pt-6 border-t border-white/5 flex flex-col items-center">
+            <img
+              src="/Madebyleego.png"
+              alt="Created by Leego"
+              className="h-24 w-24 object-contain opacity-70 hover:opacity-100 transition-opacity duration-300"
+              loading="lazy"
+            />
+          </div>
+
           {/* Legal bar */}
-          <div className="mt-10 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-6 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-white/20">
               &copy; {new Date().getFullYear()} Archibald Titan. All rights reserved.
             </p>

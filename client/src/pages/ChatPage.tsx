@@ -1977,6 +1977,14 @@ export default function ChatPage() {
             <button onClick={() => handleSend('/help')} className="text-primary hover:underline cursor-pointer">/help</button>
             {' · Conversations saved automatically · Powered by AI'}
           </p>
+          <div className="flex justify-center mt-2">
+            <img
+              src="/Madebyleego.png"
+              alt="Created by Leego"
+              className="h-12 w-12 object-contain opacity-50 hover:opacity-90 transition-opacity duration-300"
+              loading="lazy"
+            />
+          </div>
         </div>
       </div>
       {/* Token Input Panel */}
