@@ -7,7 +7,7 @@
  * - Images/fonts → Cache-first with stale-while-revalidate
  */
 
-const CACHE_VERSION = 'titan-v8.0';
+const CACHE_VERSION = 'titan-v9.0';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
