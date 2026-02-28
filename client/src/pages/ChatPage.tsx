@@ -1994,7 +1994,7 @@ export default function ChatPage() {
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className="h-12 w-12 object-contain opacity-50 hover:opacity-90 transition-opacity duration-300"
+              className="h-16 w-16 object-contain opacity-90 hover:opacity-100 hover:brightness-125 transition-all duration-300 drop-shadow-[0_0_8px_rgba(100,255,100,0.25)]"
               loading="lazy"
             />
           </div>

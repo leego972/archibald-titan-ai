@@ -1059,7 +1059,7 @@ export default function LandingPage() {
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className="h-24 w-24 object-contain opacity-70 hover:opacity-100 transition-opacity duration-300"
+              className="h-32 w-32 object-contain opacity-100 hover:opacity-100 hover:brightness-125 transition-all duration-300 drop-shadow-[0_0_12px_rgba(100,255,100,0.3)]"
               loading="lazy"
             />
           </div>
