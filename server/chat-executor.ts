@@ -47,6 +47,7 @@ import {
   activateKillSwitch as activateKS,
   encrypt,
   decrypt,
+  storeManualCredential,
 } from "./fetcher-db";
 import { getUserPlan, enforceFeature, enforceFetchLimit, enforceProviderAccess, canUseCloneWebsite, isFeatureAllowed } from "./subscription-gate";
 import {
@@ -371,6 +372,10 @@ export async function executeToolCall(
 
       case "add_vault_entry":
         return await execAddVaultEntry(userId, args as any, userName);
+
+      // ── Save Credential (manual input via chat) ─────────────────
+      case "save_credential":
+        return await execSaveCredential(userId, args as any, userName, userEmail);
 
       // ── Bulk Sync (Pro+) ──────────────────────────────────────────
       case "trigger_bulk_sync": {
@@ -990,6 +995,56 @@ async function execAddVaultEntry(
       category: args.category || "other",
     },
   };
+}
+
+async function execSaveCredential(
+  userId: number,
+  args: { providerId: string; providerName: string; keyType: string; value: string; label?: string },
+  userName?: string,
+  userEmail?: string
+): Promise<ToolExecutionResult> {
+  if (!args.value || !args.value.trim()) {
+    return { success: false, error: "Credential value cannot be empty" };
+  }
+  if (!args.providerId || !args.providerName || !args.keyType) {
+    return { success: false, error: "Provider ID, provider name, and key type are required" };
+  }
+
+  try {
+    await storeManualCredential(
+      userId,
+      args.providerId,
+      args.providerName,
+      args.keyType,
+      args.value.trim(),
+      args.label,
+    );
+
+    // Audit log
+    try {
+      await logAudit({
+        userId,
+        action: "credential.manual_save",
+        resource: `${args.providerName} (${args.keyType})`,
+        details: { method: "chat", provider: args.providerName, keyType: args.keyType, label: args.label || null },
+        ipAddress: "chat",
+        userAgent: "Titan Assistant",
+      });
+    } catch { /* audit logging is best-effort */ }
+
+    return {
+      success: true,
+      data: {
+        message: `Credential saved successfully! Your ${args.providerName} ${args.keyType} has been encrypted with AES-256-GCM and stored in your vault.`,
+        provider: args.providerName,
+        keyType: args.keyType,
+        label: args.label || null,
+        tip: "You can view your credentials at /fetcher/credentials or ask me to list them.",
+      },
+    };
+  } catch (err: unknown) {
+    return { success: false, error: `Failed to save credential: ${getErrorMessage(err)}` };
+  }
 }
 
 async function execTriggerBulkSync(userId: number, providerIds?: string[]): Promise<ToolExecutionResult> {

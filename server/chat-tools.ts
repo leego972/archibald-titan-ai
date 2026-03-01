@@ -280,6 +280,45 @@ const addVaultEntry: Tool = {
   },
 };
 
+const saveCredential: Tool = {
+  type: "function",
+  function: {
+    name: "save_credential",
+    description:
+      "Save a credential (API key, token, secret, password, etc.) to the user's encrypted vault. Use this when the user provides a credential and wants to store it. Auto-detect the provider and key type from the value format when possible. Common patterns: 'sk-...' = OpenAI API key, 'AKIA...' = AWS Access Key ID, 'ghp_...' = GitHub Personal Access Token, 'SG....' = SendGrid API key, 'xoxb-...' = Slack Bot Token. If you can't detect the provider, ask the user or use 'custom' as the providerId.",
+    parameters: {
+      type: "object",
+      properties: {
+        providerId: {
+          type: "string",
+          description:
+            "Provider ID (e.g. 'openai', 'aws', 'github', 'stripe', 'anthropic', 'cloudflare', 'sendgrid', 'twilio', 'heroku', 'digitalocean', 'godaddy', 'firebase', 'google_cloud', 'huggingface', 'mailgun', 'meta', 'tiktok', 'google_ads', 'snapchat', 'discord', 'roblox', or 'custom' for unknown providers)",
+        },
+        providerName: {
+          type: "string",
+          description:
+            "Human-readable provider name (e.g. 'OpenAI', 'AWS', 'GitHub'). Use the official name.",
+        },
+        keyType: {
+          type: "string",
+          description:
+            "Type of credential (e.g. 'api_key', 'secret_key', 'access_token', 'personal_access_token', 'bot_token', 'password', 'oauth_client_id', 'oauth_client_secret', 'webhook_url')",
+        },
+        value: {
+          type: "string",
+          description: "The actual credential value to store (will be encrypted with AES-256-GCM)",
+        },
+        label: {
+          type: "string",
+          description:
+            "Optional label to identify this credential (e.g. 'Production key', 'My personal token', 'Staging environment')",
+        },
+      },
+      required: ["providerId", "providerName", "keyType", "value"],
+    },
+  },
+};
+
 // ─── Bulk Sync Tools ─────────────────────────────────────────────────
 
 const triggerBulkSync: Tool = {
@@ -1656,6 +1695,8 @@ export const TITAN_TOOLS: Tool[] = [
   // Vault
   listVaultEntries,
   addVaultEntry,
+  // Save Credential (manual input via chat)
+  saveCredential,
   // Bulk Sync
   triggerBulkSync,
   getBulkSyncStatus,
