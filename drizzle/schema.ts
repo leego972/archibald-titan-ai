@@ -1470,7 +1470,7 @@ export const referralConversions = mysqlTable("referral_conversions", {
   referrerId: int("referrerId").notNull(), // the user who referred
   referredUserId: int("referredUserId").notNull(), // the new user
   status: mysqlEnum("status", ["signed_up", "subscribed", "rewarded"]).default("signed_up").notNull(),
-  rewardType: mysqlEnum("rewardType", ["free_month", "commission", "credit", "tier_upgrade"]).default("free_month"),
+  rewardType: mysqlEnum("rewardType", ["free_month", "commission", "credit", "tier_upgrade", "discount", "high_value_discount"]).default("discount"),
   rewardAmountCents: int("rewardAmountCents").default(0).notNull(),
   rewardGrantedAt: timestamp("rewardGrantedAt"),
   subscriptionId: varchar("subscriptionId", { length: 256 }), // Stripe subscription ID if they paid

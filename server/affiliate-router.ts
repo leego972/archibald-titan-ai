@@ -366,7 +366,9 @@ export const affiliateRouter = router({
   // ─── Public: Config ─────────────────────────────────────────────
   getReferralConfig: publicProcedure.query(() => {
     return {
-      referralsForFreeMonth: REFERRAL_CONFIG.referralsForFreeMonth,
+      referralsForDiscount: REFERRAL_CONFIG.referralsForDiscount,
+      discountPercent: REFERRAL_CONFIG.discountPercent,
+      discountOneTime: REFERRAL_CONFIG.discountOneTime,
       baseCommissionPercent: REFERRAL_CONFIG.baseCommissionPercent,
       commissionDurationMonths: REFERRAL_CONFIG.commissionDurationMonths,
       minPayoutCents: REFERRAL_CONFIG.minPayoutCents,

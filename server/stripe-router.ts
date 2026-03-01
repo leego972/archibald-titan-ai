@@ -7,6 +7,8 @@ import { getDb } from "./db";
 import { subscriptions, users, creditBalances } from "../drizzle/schema";
 import { PRICING_TIERS, CREDIT_PACKS, type PlanId } from "../shared/pricing";
 import { addCredits, processMonthlyRefill, getCreditBalance } from "./credit-service";
+import { referralCodes } from "../drizzle/schema";
+import { REFERRAL_CONFIG } from "./affiliate-engine";
 import { sellerProfiles } from "../drizzle/schema";
 import type { Express, Request, Response } from "express";
 import { createLogger } from "./_core/logger.js";
@@ -200,12 +202,73 @@ export const stripeRouter = router({
 
       const origin = ctx.req.headers.origin || process.env.APP_URL || "https://www.archibaldtitan.com";
 
+      // ─── Check if user has earned the referral discount ───
+      // 5 verified sign-ups = 30% off first month (one-time)
+      let discounts: Array<{ coupon: string }> = [];
+      try {
+        const db = await getDb();
+        if (db) {
+          const [userCode] = await db.select().from(referralCodes)
+            .where(eq(referralCodes.userId, ctx.user.id))
+            .limit(1);
+          if (
+            userCode &&
+            userCode.totalReferrals >= REFERRAL_CONFIG.referralsForDiscount &&
+            userCode.totalRewardsEarned > 0
+          ) {
+            // Check if they haven't already used the discount
+            const existingSubs = await db.select().from(subscriptions)
+              .where(eq(subscriptions.userId, ctx.user.id))
+              .limit(1);
+            const isFirstSubscription = existingSubs.length === 0;
+            if (isFirstSubscription) {
+              // Create or retrieve the Stripe coupon for referral discount
+              const couponId = `REFERRAL_${REFERRAL_CONFIG.discountPercent}PCT_OFF`;
+              try {
+                await stripe.coupons.retrieve(couponId);
+              } catch {
+                await stripe.coupons.create({
+                  id: couponId,
+                  percent_off: REFERRAL_CONFIG.discountPercent,
+                  duration: "once",
+                  name: `Referral Reward: ${REFERRAL_CONFIG.discountPercent}% off first month`,
+                });
+              }
+              discounts = [{ coupon: couponId }];
+              log.info(`[Stripe] Applying ${REFERRAL_CONFIG.discountPercent}% referral discount for user ${ctx.user.id}`);
+            }
+          }
+
+          // ─── Deal 2: High-Value Referral ───
+          // If user earned 50% off Pro annual (referred someone who subscribed to Cyber+)
+          if (
+            discounts.length === 0 &&
+            input.planId === "pro" &&
+            input.interval === "year"
+          ) {
+            const hvrCouponId = `HVR_50PCT_PRO_ANNUAL_USER_${ctx.user.id}`;
+            try {
+              const hvrCoupon = await stripe.coupons.retrieve(hvrCouponId);
+              if (hvrCoupon && hvrCoupon.valid) {
+                discounts = [{ coupon: hvrCouponId }];
+                log.info(`[Stripe] Applying 50% high-value referral discount for user ${ctx.user.id} on Pro annual`);
+              }
+            } catch {
+              // No high-value referral coupon exists for this user — that's fine
+            }
+          }
+        }
+      } catch (e) {
+        log.warn(`[Stripe] Could not check referral discount: ${getErrorMessage(e)}`);
+      }
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         client_reference_id: ctx.user.id.toString(),
         customer_email: undefined, // Already set on customer object
         mode: "subscription",
-        allow_promotion_codes: true,
+        allow_promotion_codes: discounts.length === 0, // Don't allow promo codes if referral discount already applied
+        ...(discounts.length > 0 ? { discounts } : {}),
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: `${origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/pricing?canceled=true`,
@@ -213,6 +276,7 @@ export const stripeRouter = router({
           user_id: ctx.user.id.toString(),
           plan_id: input.planId,
           interval: input.interval,
+          referral_discount: discounts.length > 0 ? "true" : "false",
         },
         subscription_data: {
           metadata: {
@@ -222,7 +286,7 @@ export const stripeRouter = router({
         },
       });
 
-      return { url: session.url };
+      return { url: session.url, referralDiscountApplied: discounts.length > 0 };
     }),
 
   // Purchase a credit top-up pack (one-time payment)
@@ -992,6 +1056,33 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   }
 
   log.info(`[Stripe Webhook] Subscription created (sync): user=${resolvedUserId}, plan=${planId}, sub=${subscription.id}`);
+
+  // ─── HIGH-VALUE REFERRAL CHECK ───
+  // If this user was referred and just subscribed to Cyber+, reward the referrer
+  // with 50% off their second year Pro annual membership
+  try {
+    const { checkHighValueReferralReward } = await import("./affiliate-engine");
+    const result = await checkHighValueReferralReward(resolvedUserId, planId);
+    if (result.rewarded && result.referrerId) {
+      // Create a Stripe coupon for the referrer's next Pro annual renewal
+      const stripe = getStripe();
+      const couponId = `HVR_50PCT_PRO_ANNUAL_USER_${result.referrerId}`;
+      try {
+        await stripe.coupons.retrieve(couponId);
+      } catch {
+        await stripe.coupons.create({
+          id: couponId,
+          percent_off: 50,
+          duration: "once",
+          name: `High-Value Referral: 50% off Pro Annual (2nd year) for user ${result.referrerId}`,
+          max_redemptions: 1,
+        });
+      }
+      log.info(`[Stripe Webhook] Created 50% off Pro annual coupon ${couponId} for referrer ${result.referrerId}`);
+    }
+  } catch (e) {
+    log.warn(`[Stripe Webhook] High-value referral check failed: ${getErrorMessage(e)}`);
+  }
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
