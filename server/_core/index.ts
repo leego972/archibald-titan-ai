@@ -22,7 +22,7 @@ import { registerVoiceUploadRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
-import { seedMarketplace } from "../marketplace-seed";
+import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { startSecuritySweepScheduler } from "../security-hardening";

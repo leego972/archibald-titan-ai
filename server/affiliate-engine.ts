@@ -1041,7 +1041,11 @@ export async function getUserReferralInfo(userId: number): Promise<{
   totalReferrals: number;
   totalRewards: number;
   tier: string;
-  nextRewardAt: number;
+  nextRewardAt?: number;
+  discountEarned: boolean;
+  discountPercent: number;
+  referralsNeeded: number;
+  remaining: number;
   referralLink: string;
 }> {
   const code = await generateReferralCode(userId);

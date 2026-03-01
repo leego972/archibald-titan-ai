@@ -169,7 +169,8 @@ async function generateModuleConcept(
   const existingList = Array.from(existingTitles).slice(0, 80).join("\n- ");
 
   const result = await invokeLLM({
-    systemPrompt: `You are a senior cybersecurity engineer and tool developer working for an underground marketplace called "Grand Bazaar" on the Archibald Titan AI platform. You create professional-grade security tools that include BOTH attack capabilities AND defensive countermeasures.
+    messages: [
+      { role: "system", content: `You are a senior cybersecurity engineer and tool developer working for an underground marketplace called "Grand Bazaar" on the Archibald Titan AI platform. You create professional-grade security tools that include BOTH attack capabilities AND defensive countermeasures.
 
 Your modules are sold to:
 - Red team operators and penetration testers
@@ -190,9 +191,8 @@ RULES:
 EXISTING MODULES (DO NOT DUPLICATE):
 - ${existingList}
 
-Focus areas for this generation: ${focusTopics}`,
-
-    userPrompt: `Generate a completely NEW and UNIQUE cyber security module (attempt #${attemptNumber}). 
+Focus areas for this generation: ${focusTopics}` },
+      { role: "user", content: `Generate a completely NEW and UNIQUE cyber security module (attempt #${attemptNumber}). 
 
 Return a JSON object with these exact fields:
 {
@@ -209,16 +209,17 @@ Return a JSON object with these exact fields:
   "readme": "README.md content with installation, usage, and examples"
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown code blocks. No explanation text.`,
-
-    model: "gpt-4.1-mini",
+IMPORTANT: Return ONLY valid JSON. No markdown code blocks. No explanation text.` },
+    ],
+    model: "strong",
     temperature: 0.9, // High creativity for variety
     maxTokens: 8000,
   });
 
   try {
     // Parse the LLM response — handle potential markdown wrapping
-    let jsonStr = result.text.trim();
+    const rawContent = result.choices?.[0]?.message?.content;
+    let jsonStr = (typeof rawContent === "string" ? rawContent : "").trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
     }
@@ -320,15 +321,18 @@ async function verifyModule(mod: GeneratedModule): Promise<{ valid: boolean; err
   // Run a secondary LLM check for code quality
   try {
     const reviewResult = await invokeLLM({
-      systemPrompt: "You are a code reviewer. Analyze the following code for critical issues. Reply with ONLY 'PASS' if the code is acceptable, or 'FAIL: <reason>' if it has critical problems (syntax errors, empty functions, placeholder code, or non-functional logic).",
-      userPrompt: `Review this ${mod.language} module code:\n\n${mod.code.slice(0, 3000)}`,
-      model: "gpt-4.1-nano",
+      messages: [
+        { role: "system", content: "You are a code reviewer. Analyze the following code for critical issues. Reply with ONLY 'PASS' if the code is acceptable, or 'FAIL: <reason>' if it has critical problems (syntax errors, empty functions, placeholder code, or non-functional logic)." },
+        { role: "user", content: `Review this ${mod.language} module code:\n\n${mod.code.slice(0, 3000)}` },
+      ],
+      model: "fast",
       temperature: 0,
       maxTokens: 200,
     });
-    const reviewText = reviewResult.text.trim().toUpperCase();
+    const reviewRaw = reviewResult.choices?.[0]?.message?.content;
+    const reviewText = (typeof reviewRaw === "string" ? reviewRaw : "").trim().toUpperCase();
     if (reviewText.startsWith("FAIL")) {
-      errors.push(`Code review failed: ${reviewResult.text.trim()}`);
+      errors.push(`Code review failed: ${(typeof reviewRaw === "string" ? reviewRaw : "").trim()}`);
     }
   } catch (err) {
     // Non-blocking — if review fails, still allow listing
@@ -536,7 +540,7 @@ export function startModuleGeneratorScheduler(): void {
         lastGenerationDate = todayStr;
         log.info("[ModuleGenerator] Running weekly module generation cycle...");
         const result = await runModuleGenerationCycle();
-        log.info("[ModuleGenerator] Weekly cycle result:", result);
+        log.info("[ModuleGenerator] Weekly cycle result:", result as unknown as Record<string, unknown>);
       }
     } catch (err) {
       log.error("[ModuleGenerator] Scheduled cycle failed:", { error: getErrorMessage(err) });

@@ -738,7 +738,6 @@ export default function ProjectFilesViewer() {
             );
           })}
         </div>
-      </div>
       {/* Delete Project Confirmation Dialog (project detail view) */}
       <AlertDialog open={!!projectToDelete} onOpenChange={(open) => { if (!open) setProjectToDelete(null); }}>
         <AlertDialogContent className="bg-card border-border">

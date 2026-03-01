@@ -217,8 +217,8 @@ export async function auditCreditBalance(userId: number): Promise<{
       actualBalance: actual,
       discrepancy,
     };
-  } catch (err) {
-    log.error(`Credit audit failed for user=${userId}:`, err);
+  } catch (err: unknown) {
+    log.error(`Credit audit failed for user=${userId}`, { error: String(err) });
     return { consistent: true, expectedBalance: 0, actualBalance: 0, discrepancy: 0 };
   }
 }

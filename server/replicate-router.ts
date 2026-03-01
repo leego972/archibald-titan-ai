@@ -8,7 +8,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { canUseCloneWebsite } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { enforceCloneSafety, checkScrapedContent } from "./clone-safety";
-import { detectCloneComplexity, getClonePrice, type CloneComplexity } from "../shared/pricing";
+import { detectCloneComplexity, type CloneComplexity } from "../shared/pricing";
 import { searchDomains, getDomainPrice, purchaseDomain, configureDNS } from "./domain-service";
 import { deployProject, getDeploymentStatus, selectPlatform } from "./deploy-service";
 import { getErrorMessage } from "./_core/errors.js";
@@ -131,6 +131,7 @@ export const replicateRouter = router({
       }
 
       // ═══ SECURITY: SSRF Prevention & Rate Limiting ═══
+      const isAdmin = ctx.user.role === "admin";
       const urlCheck = validateExternalUrl(input.targetUrl, isAdmin);
       if (!urlCheck.valid) {
         throw new TRPCError({
@@ -156,7 +157,6 @@ export const replicateRouter = router({
       }
 
       // ═══ SAFETY CHECK: Block prohibited websites ═══
-      const isAdmin = ctx.user.role === "admin";
       try {
         enforceCloneSafety(input.targetUrl, input.targetName, isAdmin);
       } catch (e: unknown) {

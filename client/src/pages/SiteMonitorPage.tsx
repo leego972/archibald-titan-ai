@@ -133,7 +133,7 @@ function formatMs(ms: number | null): string {
 export default function SiteMonitorPage() {
   const { user } = useAuth();
   const sub = useSubscription();
-  const canAccess = sub.canAccess("site_monitor");
+  const canAccess = sub.canUse("site_monitor");
 
   const [activeTab, setActiveTab] = useState("sites");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -245,8 +245,7 @@ export default function SiteMonitorPage() {
           </div>
           <UpgradeBanner
             feature="Website Health Monitor"
-            description="Monitor your published websites for crashes, errors, SSL issues, and performance degradation. Auto-repair via Railway, Vercel, Netlify, SSH, and more."
-            requiredPlan="Pro"
+            requiredPlan="pro"
           />
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-zinc-900/50 border-zinc-800">

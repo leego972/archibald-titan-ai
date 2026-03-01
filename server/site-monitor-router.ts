@@ -299,11 +299,11 @@ export const siteMonitorRouter = router({
         autoRepairEnabled: input.autoRepairEnabled ?? true,
       });
 
-      await logAudit(db, {
+      await logAudit({
         userId: ctx.user!.id,
         action: "site_monitor.add",
-        target: input.url,
-        details: `Added site "${input.name}" for monitoring`,
+        resource: input.url,
+        details: { message: `Added site "${input.name}" for monitoring` },
       });
 
       return { id: result.insertId, message: "Site added for monitoring" };
@@ -348,11 +348,11 @@ export const siteMonitorRouter = router({
           .where(and(eq(monitoredSites.id, id), eq(monitoredSites.userId, ctx.user!.id)));
       }
 
-      await logAudit(db, {
+      await logAudit({
         userId: ctx.user!.id,
         action: "site_monitor.update",
-        target: `site:${id}`,
-        details: `Updated site monitoring configuration`,
+        resource: `site:${id}`,
+        details: { message: `Updated site monitoring configuration` },
       });
 
       return { success: true };
@@ -381,11 +381,11 @@ export const siteMonitorRouter = router({
       await db.delete(healthChecks).where(and(eq(healthChecks.siteId, input.id), eq(healthChecks.userId, ctx.user!.id)));
       await db.delete(monitoredSites).where(and(eq(monitoredSites.id, input.id), eq(monitoredSites.userId, ctx.user!.id)));
 
-      await logAudit(db, {
+      await logAudit({
         userId: ctx.user!.id,
         action: "site_monitor.delete",
-        target: existing.url,
-        details: `Deleted site "${existing.name}" from monitoring`,
+        resource: existing.url,
+        details: { message: `Deleted site "${existing.name}" from monitoring` },
       });
 
       return { success: true };
@@ -606,11 +606,11 @@ export const siteMonitorRouter = router({
 
       const repairResult = await executeRepair(site, input.action, input.customCommand ?? null, ctx.user!.id, db);
 
-      await logAudit(db, {
+      await logAudit({
         userId: ctx.user!.id,
         action: "site_monitor.repair",
-        target: site.url,
-        details: `Manual repair: ${input.action} on "${site.name}" — ${repairResult.status}`,
+        resource: site.url,
+        details: { message: `Manual repair: ${input.action} on "${site.name}" — ${repairResult.status}` },
       });
 
       return repairResult;
