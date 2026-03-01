@@ -58,6 +58,10 @@ import {
   logSecurityEvent,
   validateSessionIntegrity,
 } from "./security-hardening";
+import {
+  sanitizeLLMOutput,
+  trackIncident,
+} from "./security-fortress";
 const log = createLogger("ChatRouter");
 
 const MAX_CONTEXT_MESSAGES = 20; // max messages loaded into LLM context (lower = faster + more room for tool results)
@@ -1827,6 +1831,17 @@ Do NOT attempt any tool calls or builds.`;
               result: a.result,
             }))
           : undefined;
+
+        // ── SECURITY: LLM Output Sanitization ──────────────────────
+        // Scan the LLM response for leaked API keys, PII, system prompts,
+        // database URLs, and private keys before sending to the user.
+        if (finalText) {
+          const outputScan = sanitizeLLMOutput(finalText, userId);
+          if (outputScan.redactions.length > 0) {
+            finalText = outputScan.sanitized;
+            log.warn(`[Chat] Redacted ${outputScan.redactions.length} sensitive pattern(s) from LLM response`);
+          }
+        }
 
         await saveMessage(
           conversationId,

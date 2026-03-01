@@ -41,6 +41,7 @@ import { advertisingRouter } from "./advertising-router";
 import { userSecretsRouter } from "./user-secrets-router";
 import { marketplaceRouter } from "./marketplace-router";
 import { siteMonitorRouter } from "./site-monitor-router";
+import { securityDashboardRouter } from "./security-dashboard-router";
 import { filesRouter } from "./api/files";
 
 export const appRouter = router({
@@ -109,6 +110,7 @@ export const appRouter = router({
   userSecrets: userSecretsRouter,
   marketplace: marketplaceRouter,
   siteMonitor: siteMonitorRouter,
+  securityDashboard: securityDashboardRouter,
 });
 
 export type AppRouter = typeof appRouter;

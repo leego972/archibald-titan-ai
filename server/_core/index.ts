@@ -26,6 +26,7 @@ import { seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { startSecuritySweepScheduler } from "../security-hardening";
+import { startFortressSweepScheduler } from "../security-fortress";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerChatStreamRoutes } from "../chat-stream";
@@ -568,6 +569,11 @@ async function startServer() {
     // flushes security event buffer to DB, audits credit balances
     // for active users, and detects anomalous patterns.
     startSecuritySweepScheduler();
+
+    // ─── Security Fortress Sweep Scheduler ───────────────────────
+    // Runs every 30 minutes: checks canary tokens, cleans incident
+    // counters, prunes geo-history, and validates 2FA sessions.
+    startFortressSweepScheduler();
   });
 }
 

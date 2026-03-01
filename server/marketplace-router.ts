@@ -23,6 +23,7 @@ import {
   logSecurityEvent,
   signModuleContent,
 } from "./security-hardening";
+import { auditQueryParam } from "./security-fortress";
 const log = createLogger("MarketplaceRouter");
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -126,6 +127,14 @@ export const marketplaceRouter = router({
       }).optional()
     )
     .query(async ({ input }) => {
+      // ── SECURITY: SQL Injection Audit on search inputs ─────────
+      if (input?.search) {
+        const sqlCheck = await auditQueryParam("search", input.search, 0);
+        if (sqlCheck.blocked) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid search query" });
+        }
+      }
+
       const listings = await db.listMarketplaceListings({
         category: input?.category,
         search: input?.search,
