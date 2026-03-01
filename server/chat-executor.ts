@@ -1655,6 +1655,15 @@ async function execGetSystemStatus(userId: number): Promise<ToolExecutionResult>
     .from(apiKeys)
     .where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)));
 
+  // ─── Autonomous Systems Status ──────────────────────────────────
+  let autonomousStatus = null;
+  try {
+    const { getAutonomousSystemStatus } = await import("./autonomous-sync");
+    autonomousStatus = await getAutonomousSystemStatus();
+  } catch {
+    // Non-critical — module may not be loaded yet
+  }
+
   return {
     success: true,
     data: {
@@ -1664,6 +1673,25 @@ async function execGetSystemStatus(userId: number): Promise<ToolExecutionResult>
       proxies: { total: proxies[0].total, healthy: proxies[0].healthy || 0 },
       watchdogAlerts: watches[0].count,
       activeApiKeys: keys[0].count,
+      autonomousSystems: autonomousStatus ? {
+        summary: autonomousStatus.summary,
+        systems: autonomousStatus.systems.map((s: any) => ({
+          name: s.name,
+          category: s.category,
+          status: s.status,
+          schedule: s.schedule,
+          reason: s.reason,
+        })),
+        channels: autonomousStatus.channels.map((c: any) => ({
+          channel: c.channel,
+          configured: c.configured,
+          impact: c.impact,
+          freeToSetup: c.freeToSetup,
+          envVars: c.envVars,
+          setupUrl: c.setupUrl,
+        })),
+        recommendations: autonomousStatus.recommendations,
+      } : "Autonomous sync module not loaded yet",
     },
   };
 }

@@ -603,7 +603,7 @@ const getSystemStatus: Tool = {
   function: {
     name: "get_system_status",
     description:
-      "Get a comprehensive system status overview: plan info, usage stats, credential count, job count, proxy health, watchdog alerts, and provider health.",
+      "Get a comprehensive system status overview: plan info, usage stats, credential count, job count, proxy health, watchdog alerts, provider health, AND full autonomous systems status (SEO engines, advertising orchestrator, affiliate engines, content generators, marketing channels, connected/disconnected channels with setup instructions, and recommendations for maximizing traffic).",
     parameters: {
       type: "object",
       properties: {},

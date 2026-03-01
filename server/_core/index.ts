@@ -31,6 +31,7 @@ import { startFortressSweepScheduler } from "../security-fortress";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerSeoV4Routes, runGeoOptimization } from "../seo-engine-v4";
+import { runStartupDiagnostic, registerIndexNowRoute, patchIndexNowKey, startPeriodicSync } from "../autonomous-sync";
 import { registerChatStreamRoutes } from "../chat-stream";
 import { registerChatUploadRoute } from "../chat-upload";
 import { registerProjectDownloadRoutes } from "../project-download-router";
@@ -232,6 +233,9 @@ async function startServer() {
   registerSeoRoutes(app);
   // SEO v4 routes (llms.txt, programmatic SEO, enhanced structured data, GEO optimization)
   registerSeoV4Routes(app);
+  // Autonomous sync: IndexNow verification route + auto-generated key
+  patchIndexNowKey();
+  registerIndexNowRoute(app);
   // Affiliate v2 cloaked redirect: /go/{partner-slug}
   app.get('/go/:slug', async (req, res) => {
     try {
@@ -632,6 +636,19 @@ async function startServer() {
     // Runs every 30 minutes: checks canary tokens, cleans incident
     // counters, prunes geo-history, and validates 2FA sessions.
     startFortressSweepScheduler();
+
+    // ─── Autonomous System Sync ──────────────────────────────────
+    // Runs startup diagnostic (logs all system statuses, patches
+    // IndexNow key, auto-enables marketing engine), then starts
+    // periodic sync check every 6 hours.
+    setTimeout(async () => {
+      try {
+        await runStartupDiagnostic();
+        startPeriodicSync();
+      } catch (err: unknown) {
+        log.error('[AutonomousSync] Startup diagnostic failed:', { error: String(err) });
+      }
+    }, 15_000); // 15 seconds after startup — let DB settle
   });
 }
 
