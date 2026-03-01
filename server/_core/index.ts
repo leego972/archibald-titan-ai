@@ -22,6 +22,7 @@ import { registerVoiceUploadRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
+import { runOptimizationCycleV2 } from "../affiliate-engine-v2";
 import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
@@ -29,6 +30,7 @@ import { startSecuritySweepScheduler } from "../security-hardening";
 import { startFortressSweepScheduler } from "../security-fortress";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
+import { registerSeoV4Routes, runGeoOptimization } from "../seo-engine-v4";
 import { registerChatStreamRoutes } from "../chat-stream";
 import { registerChatUploadRoute } from "../chat-upload";
 import { registerProjectDownloadRoutes } from "../project-download-router";
@@ -228,6 +230,26 @@ async function startServer() {
   });
   // SEO routes (sitemap.xml, robots.txt, security.txt, RSS feed, structured data, redirects)
   registerSeoRoutes(app);
+  // SEO v4 routes (llms.txt, programmatic SEO, enhanced structured data, GEO optimization)
+  registerSeoV4Routes(app);
+  // Affiliate v2 cloaked redirect: /go/{partner-slug}
+  app.get('/go/:slug', async (req, res) => {
+    try {
+      const { handleAffiliateRedirect } = await import('../affiliate-engine-v2.js');
+      const result = await handleAffiliateRedirect(req.params.slug, {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        referrer: req.headers['referer'],
+      });
+      if (result) {
+        res.redirect(302, result.redirectUrl);
+      } else {
+        res.redirect(302, 'https://www.archibaldtitan.com');
+      }
+    } catch {
+      res.redirect(302, 'https://www.archibaldtitan.com');
+    }
+  });
   // Token-gated download endpoint
   registerDownloadRoute(app);
   // REST API endpoints for API key access
@@ -543,10 +565,40 @@ async function startServer() {
     // Runs weekly: meta tag analysis, keyword research, health scoring
     startScheduledSeo();
 
+    // ─── GEO Optimization (SEO v4) ──────────────────────────────────
+    // Runs 8 hours after deploy, then weekly: submits programmatic pages
+    // to IndexNow, updates llms.txt cache, refreshes AI citation signals
+    setTimeout(async () => {
+      try {
+        log.info('[SEO v4] Running first GEO optimization...');
+        await runGeoOptimization();
+      } catch (err: unknown) {
+        log.error('[SEO v4] First GEO optimization failed:', { error: String(err) });
+      }
+    }, 8 * 60 * 60 * 1000); // 8 hours after deploy
+    setInterval(async () => {
+      try { await runGeoOptimization(); } catch { /* non-critical */ }
+    }, 7 * 24 * 60 * 60 * 1000); // Weekly
+
     // ─── Autonomous Advertising Orchestrator ──────────────────────
     // Runs daily: blog generation, social media, community engagement,
     // email nurture, backlink outreach, affiliate optimization, SEO
     startAdvertisingScheduler();
+
+    // ─── Affiliate Engine v2 Optimization ─────────────────────────
+    // Runs daily at 4 AM UTC: EPC recalculation, fraud cleanup,
+    // revenue forecasting, milestone checks, seasonal multiplier updates
+    setTimeout(async () => {
+      try {
+        log.info('[Affiliate v2] Running first v2 optimization cycle...');
+        await runOptimizationCycleV2();
+      } catch (err: unknown) {
+        log.error('[Affiliate v2] First optimization failed:', { error: String(err) });
+      }
+    }, 6 * 60 * 60 * 1000); // 6 hours after deploy
+    setInterval(async () => {
+      try { await runOptimizationCycleV2(); } catch { /* non-critical */ }
+    }, 24 * 60 * 60 * 1000); // Daily
 
     // ─── Autonomous Module Generator ─────────────────────────────
     // Runs weekly on Sundays at 3 AM: generates 3-5 fresh cyber
