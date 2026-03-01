@@ -29,6 +29,7 @@ import {
   listFiles,
   readFile,
   persistWorkspace,
+  writeBinaryFile,
 } from "./sandbox-engine";
 import { enforceCloneSafety, checkScrapedContent } from "./clone-safety";
 import { storagePut } from "./storage";
@@ -1257,17 +1258,15 @@ export async function executeBuild(
           const buffer = Buffer.from(await resp.arrayBuffer());
           if (buffer.length < 200) { imagesFailed++; continue; }
 
-          const filePath = `/home/sandbox/${plan.projectName}/public/${imgRef.localPath}`;
-          const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-          await executeCommand(sandboxId, userId, `mkdir -p "${dir}"`, { timeoutMs: 5000, triggeredBy: "system" });
-
-          // Write via base64 — safe for binary content
-          const base64 = buffer.toString("base64");
-          await executeCommand(sandboxId, userId, `echo '${base64}' | base64 -d > "${filePath}"`, {
-            timeoutMs: 15000,
-            triggeredBy: "system",
-          });
-          imagesWritten++;
+          // Write directly via filesystem — avoids shell command length limits for large images
+          const imgPath = `/home/sandbox/${plan.projectName}/public/${imgRef.localPath}`;
+          const written = await writeBinaryFile(sandboxId, userId, imgPath, buffer);
+          if (written) {
+            imagesWritten++;
+          } else {
+            imagesFailed++;
+            continue;
+          }
 
           if (imagesWritten % 25 === 0) {
             appendBuildLog(projectId, {
@@ -1312,16 +1311,14 @@ export async function executeBuild(
           const buffer = Buffer.from(await resp.arrayBuffer());
           if (buffer.length < 200) continue;
 
-          const filePath = `/home/sandbox/${plan.projectName}/public/${imgRef.localPath}`;
-          const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-          await executeCommand(sandboxId, userId, `mkdir -p "${dir}"`, { timeoutMs: 5000, triggeredBy: "system" });
-
-          const base64 = buffer.toString("base64");
-          await executeCommand(sandboxId, userId, `echo '${base64}' | base64 -d > "${filePath}"`, {
-            timeoutMs: 15000,
-            triggeredBy: "system",
-          });
-          catalogImagesWritten++;
+          // Write directly via filesystem — avoids shell command length limits
+          const catImgPath = `/home/sandbox/${plan.projectName}/public/${imgRef.localPath}`;
+          const catWritten = await writeBinaryFile(sandboxId, userId, catImgPath, buffer);
+          if (catWritten) {
+            catalogImagesWritten++;
+          } else {
+            continue;
+          }
 
           if (catalogImagesWritten % 25 === 0) {
             appendBuildLog(projectId, {
