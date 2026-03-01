@@ -14,6 +14,11 @@ import { deployProject, getDeploymentStatus, selectPlatform } from "./deploy-ser
 import { getErrorMessage } from "./_core/errors.js";
 import { getUserOpenAIKey, getUserGithubPat } from "./user-secrets-router";
 import {
+  validateExternalUrl,
+  checkUserRateLimit,
+  logSecurityEvent,
+} from "./security-hardening";
+import {
   createProject,
   getProject,
   listProjects,
@@ -123,6 +128,22 @@ export const replicateRouter = router({
       } catch (e: unknown) {
         if (e instanceof TRPCError) throw e;
         throw new TRPCError({ code: "BAD_REQUEST", message: "Could not validate GitHub PAT — network error. Please try again." });
+      }
+
+      // ═══ SECURITY: SSRF Prevention & Rate Limiting ═══
+      const urlCheck = validateExternalUrl(input.targetUrl, isAdmin);
+      if (!urlCheck.valid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: urlCheck.error || "Invalid target URL — internal/private addresses are blocked.",
+        });
+      }
+      const cloneRateCheck = await checkUserRateLimit(ctx.user.id, "clone:create");
+      if (!cloneRateCheck.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Clone rate limit exceeded. Please wait ${Math.ceil((cloneRateCheck.retryAfterMs || 300000) / 1000)}s.`,
+        });
       }
 
       // ═══ TIER GATE: Clone Website is Cyber+ and Titan exclusive ═══

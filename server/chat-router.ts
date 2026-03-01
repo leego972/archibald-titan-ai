@@ -50,6 +50,14 @@ import { getExpertKnowledge, getDomainSummary } from "./titan-knowledge-base";
 import { createLogger } from "./_core/logger.js";
 import { ANTI_REPLICATION_PROMPT } from "./anti-replication-guard";
 import { getErrorMessage } from "./_core/errors.js";
+import {
+  scanForPromptInjection,
+  sanitizeUserMessage,
+  shouldSuspendChat,
+  checkUserRateLimit,
+  logSecurityEvent,
+  validateSessionIntegrity,
+} from "./security-hardening";
 const log = createLogger("ChatRouter");
 
 const MAX_CONTEXT_MESSAGES = 20; // max messages loaded into LLM context (lower = faster + more room for tool results)
@@ -996,8 +1004,47 @@ export const chatRouter = router({
       const userId = ctx.user.id;
       const userName = ctx.user.name || undefined;
       const userEmail = ctx.user.email || undefined;
+      const isAdmin = ctx.user.role === "admin";
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // ── SECURITY: Per-User Rate Limiting ──────────────────────
+      // Admin bypasses rate limits. Non-admin users are limited to
+      // prevent abuse of expensive LLM calls.
+      const rateCheck = await checkUserRateLimit(userId, "chat:send");
+      if (!rateCheck.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Rate limit exceeded. Please wait ${Math.ceil((rateCheck.retryAfterMs || 60000) / 1000)}s before sending another message.`,
+        });
+      }
+
+      // ── SECURITY: Chat Suspension Check ────────────────────────
+      // If a user has triggered too many prompt injection attempts,
+      // temporarily suspend their chat access (10 min cooldown).
+      if (shouldSuspendChat(userId)) {
+        await logSecurityEvent(userId, "chat_suspended", { reason: "repeated_injection_attempts" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Chat access temporarily suspended due to repeated policy violations. Please wait 10 minutes.",
+        });
+      }
+
+      // ── SECURITY: Prompt Injection Scanning ────────────────────
+      // Scan user message for known prompt injection patterns.
+      // Admin users bypass this check entirely.
+      const injectionResult = await scanForPromptInjection(input.message, userId);
+      if (injectionResult?.blocked) {
+        log.warn(`[Security] Blocked prompt injection from user ${userId}: ${injectionResult.label}`);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Your message was blocked by our security system. Please rephrase your request.",
+        });
+      }
+
+      // ── SECURITY: Sanitize User Message ────────────────────────
+      // Strip known injection markers while preserving legitimate content.
+      const sanitizedMessage = sanitizeUserMessage(input.message, isAdmin);
 
       let conversationId = input.conversationId;
 
@@ -1040,8 +1087,8 @@ export const chatRouter = router({
         log.info(`[Chat] User ${userId} has personal API key — using it for this session`);
       }
 
-      // Save user message to DB
-      await saveMessage(conversationId, userId, "user", input.message);
+      // Save user message to DB (use sanitized version for non-admin)
+      await saveMessage(conversationId, userId, "user", sanitizedMessage);
 
       // ── Register Background Build ──────────────────────────────
       // Track this build so it persists even if the user disconnects,
@@ -1053,8 +1100,6 @@ export const chatRouter = router({
 
       // Build LLM messages array
       const userContext = await buildUserContext(userId);
-      const isAdmin = ctx.user.role === "admin";
-
       // ── Role-Based Content Restrictions ──────────────────────────
       // Admin users get the full unrestricted SYSTEM_PROMPT.
       // Non-admin users get strict safety guardrails injected.

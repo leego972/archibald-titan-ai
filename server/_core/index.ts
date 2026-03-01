@@ -25,6 +25,7 @@ import { startScheduledSignups } from "../affiliate-signup-engine";
 import { seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
+import { startSecuritySweepScheduler } from "../security-hardening";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerChatStreamRoutes } from "../chat-stream";
@@ -333,6 +334,10 @@ async function startServer() {
         // marketplace_listings anti-resale columns
         "ALTER TABLE `marketplace_listings` ADD COLUMN `fileHash` varchar(128) NULL",
         "ALTER TABLE `marketplace_listings` ADD COLUMN `originalListingId` int NULL",
+        // Security hardening: audit_logs category column for security event filtering
+        "ALTER TABLE `audit_logs` ADD COLUMN `category` varchar(64) DEFAULT 'general' NOT NULL",
+        // Security hardening: audit_logs severity column for triage
+        "ALTER TABLE `audit_logs` ADD COLUMN `severity` varchar(16) DEFAULT 'low'",
       ];
       for (const sql of missingColumns) {
         try {
@@ -557,6 +562,12 @@ async function startServer() {
     // Runs weekly: auto-signs up for discovered affiliate programs,
     // generates unique referral links, and tracks conversions.
     startScheduledSignups();
+
+    // ─── Security Hardening Sweep Scheduler ──────────────────────
+    // Runs every 30 minutes: cleans expired rate-limit windows,
+    // flushes security event buffer to DB, audits credit balances
+    // for active users, and detects anomalous patterns.
+    startSecuritySweepScheduler();
   });
 }
 

@@ -33,6 +33,11 @@ import {
 import { storagePut } from "./storage";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import {
+  validateFilePath,
+  checkUserRateLimit,
+  logSecurityEvent,
+} from "./security-hardening";
 const log = createLogger("SandboxEngine");
 
 const execAsync = promisify(exec);
@@ -229,9 +234,24 @@ export async function executeCommand(
   const sandbox = await getSandbox(sandboxId, userId);
   if (!sandbox) throw new Error("Sandbox not found");
 
+  // ── SECURITY: Per-User Sandbox Rate Limiting ──────────────────
+  const rateCheck = await checkUserRateLimit(userId, "sandbox:exec");
+  if (!rateCheck.allowed) {
+    return {
+      output: `Error: Sandbox rate limit exceeded. Please wait ${Math.ceil((rateCheck.retryAfterMs || 60000) / 1000)}s.`,
+      exitCode: 1,
+      durationMs: 0,
+      workingDirectory: sandbox.workingDirectory,
+    };
+  }
+
   // Check for blocked commands
   const blocked = isBlockedCommand(command);
   if (blocked) {
+    await logSecurityEvent(userId, "sandbox_blocked_command", {
+      command: command.substring(0, 200),
+      sandboxId,
+    });
     return {
       output: `Error: ${blocked}`,
       exitCode: 1,
