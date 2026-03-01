@@ -33,6 +33,7 @@ import {
   sandboxFiles,
   marketplaceListings,
   sellerProfiles,
+  userSecrets,
 } from "../drizzle/schema";
 import { eq, and, desc, isNull, sql, gte, like, or } from "drizzle-orm";
 import { safeSqlIdentifier } from "./_core/sql-sanitize.js";
@@ -1010,23 +1011,125 @@ async function execSaveCredential(
     return { success: false, error: "Provider ID, provider name, and key type are required" };
   }
 
-  try {
-    await storeManualCredential(
-      userId,
-      args.providerId,
-      args.providerName,
-      args.keyType,
-      args.value.trim(),
-      args.label,
-    );
+  const trimmedValue = args.value.trim();
+  const db = await getDb();
+  if (!db) return { success: false, error: "Database unavailable" };
 
-    // Audit log
+  try {
+    // ── Map provider IDs to userSecrets secretType ──────────────────
+    // This ensures every token is stored in userSecrets so ALL systems
+    // (Builder, Deploy, Replicate, etc.) can find them.
+    const secretTypeMap: Record<string, string> = {
+      github: "github_pat",
+      openai: "openai_api_key",
+      anthropic: "anthropic_api_key",
+      stripe: "stripe_secret_key",
+      sendgrid: "sendgrid_api_key",
+      twilio: "twilio_auth_token",
+      aws: "aws_access_key",
+      cloudflare: "cloudflare_api_token",
+      heroku: "heroku_api_key",
+      digitalocean: "digitalocean_api_token",
+      firebase: "firebase_api_key",
+      google_cloud: "google_cloud_api_key",
+      huggingface: "huggingface_api_token",
+      discord: "discord_bot_token",
+      slack: "slack_bot_token",
+      vercel: "vercel_api_token",
+      netlify: "netlify_api_token",
+      railway: "railway_api_token",
+      supabase: "supabase_api_key",
+      replicate: "replicate_api_token",
+    };
+
+    let validationMessage = "";
+    let maskedValue = trimmedValue.length > 8
+      ? `${trimmedValue.slice(0, 4)}...${trimmedValue.slice(-4)}`
+      : "****";
+
+    // ── Special handling: GitHub PAT validation ─────────────────────
+    if (args.providerId === "github" || trimmedValue.startsWith("ghp_") || trimmedValue.startsWith("github_pat_")) {
+      try {
+        const testResp = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `token ${trimmedValue}`, "User-Agent": "ArchibaldTitan" },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (testResp.ok) {
+          const userData = await testResp.json() as any;
+          const ghUsername = userData.login || "unknown";
+          maskedValue = `ghp_...${trimmedValue.slice(-4)} (${ghUsername})`;
+          validationMessage = ` Validated against GitHub API — connected as @${ghUsername}.`;
+        } else {
+          validationMessage = ` Warning: GitHub returned ${testResp.status} — token may be invalid or expired. Saved anyway.`;
+        }
+      } catch {
+        validationMessage = " Could not validate against GitHub API — saved anyway.";
+      }
+      // Force correct provider ID for GitHub tokens
+      args.providerId = "github";
+      args.providerName = "GitHub";
+      args.keyType = "personal_access_token";
+    }
+
+    // ── Special handling: OpenAI key validation ─────────────────────
+    if (args.providerId === "openai" || trimmedValue.startsWith("sk-")) {
+      validationMessage = validationMessage || " OpenAI key detected.";
+      args.providerId = args.providerId || "openai";
+      args.providerName = args.providerName || "OpenAI";
+      args.keyType = args.keyType || "api_key";
+    }
+
+    // ── 1. Save to userSecrets (primary vault — used by Builder, Deploy, etc.) ──
+    const secretType = secretTypeMap[args.providerId] || `${args.providerId}_${args.keyType}`;
+    const encryptedValue = encrypt(trimmedValue);
+    const label = args.label || `${args.providerName} ${args.keyType} (via chat)`;
+
+    const existing = await db
+      .select({ id: userSecrets.id })
+      .from(userSecrets)
+      .where(
+        and(
+          eq(userSecrets.userId, userId),
+          eq(userSecrets.secretType, secretType)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(userSecrets)
+        .set({ encryptedValue, label: maskedValue || label, updatedAt: new Date() })
+        .where(eq(userSecrets.id, existing[0].id));
+    } else {
+      await db.insert(userSecrets).values({
+        userId,
+        secretType,
+        encryptedValue,
+        label: maskedValue || label,
+      });
+    }
+
+    // ── 2. Also save to fetcher credentials (for the Fetcher system) ──
+    try {
+      await storeManualCredential(
+        userId,
+        args.providerId,
+        args.providerName,
+        args.keyType,
+        trimmedValue,
+        args.label,
+      );
+    } catch {
+      // Fetcher credential storage is best-effort — userSecrets is the primary store
+    }
+
+    // ── Audit log ──────────────────────────────────────────────────
     try {
       await logAudit({
         userId,
         action: "credential.manual_save",
         resource: `${args.providerName} (${args.keyType})`,
-        details: { method: "chat", provider: args.providerName, keyType: args.keyType, label: args.label || null },
+        details: { method: "chat", provider: args.providerName, keyType: args.keyType, secretType, label: label },
         ipAddress: "chat",
         userAgent: "Titan Assistant",
       });
@@ -1035,11 +1138,13 @@ async function execSaveCredential(
     return {
       success: true,
       data: {
-        message: `Credential saved successfully! Your ${args.providerName} ${args.keyType} has been encrypted with AES-256-GCM and stored in your vault.`,
+        message: `Credential saved successfully! Your ${args.providerName} ${args.keyType} has been encrypted with AES-256-GCM and stored in your vault.${validationMessage}`,
         provider: args.providerName,
         keyType: args.keyType,
-        label: args.label || null,
-        tip: "You can view your credentials at /fetcher/credentials or ask me to list them.",
+        secretType,
+        label: maskedValue || label,
+        storedIn: ["userSecrets (Builder/Deploy/System)", "fetcherCredentials (Fetcher)"],
+        tip: "I can now access this token for any operation that needs it — Builder, Deploy, Fetcher, etc. You can also view your credentials at /fetcher/credentials or /account.",
       },
     };
   } catch (err: unknown) {
@@ -3636,8 +3741,6 @@ async function getUserGithubToken(userId: number): Promise<string | null> {
   try {
     const db = await getDb();
     if (!db) return null;
-    const { userSecrets } = await import("../drizzle/schema");
-    const { decrypt } = await import("./fetcher-db");
     const secrets = await db
       .select()
       .from(userSecrets)
