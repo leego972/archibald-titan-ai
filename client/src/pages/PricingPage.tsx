@@ -118,7 +118,7 @@ function TierCard({
   const isCurrentPlan = currentPlan === tier.id;
   const isFree = tier.id === "free";
   const isHighlighted = tier.highlighted;
-  const isContactSales = tier.id === "enterprise" || tier.id === "titan";
+  const isContactSales = tier.id === "titan";
   const tierLogo = TIER_LOGOS[tier.id];
 
   // Show max 8 features on card, rest visible in comparison table
@@ -496,9 +496,9 @@ export default function PricingPage() {
     });
   };
 
-  // Split tiers into main (first 3) and advanced (last 3) for layout
-  const mainTiers = PRICING_TIERS.slice(0, 3);
-  const advancedTiers = PRICING_TIERS.slice(3);
+  // Split tiers: Free, Pro, Cyber as main (above fold); Enterprise, Cyber+, Titan as advanced
+  const mainTiers = PRICING_TIERS.filter((t) => ["free", "pro", "cyber"].includes(t.id));
+  const advancedTiers = PRICING_TIERS.filter((t) => ["enterprise", "cyber_plus", "titan"].includes(t.id));
 
   return (
     <div className="min-h-screen bg-[#0a0a14] text-white">
@@ -545,7 +545,7 @@ export default function PricingPage() {
             </span>
           </h1>
           <p className="text-lg text-white/40 max-w-2xl mx-auto mb-4">
-            Start free and scale as you grow. All plans include military-grade encryption, AI-powered tools, and zero cloud dependency.
+            Start free and scale as you grow. All plans include AES-256 encryption and AI-powered tools. Upgrade to <span className="text-cyan-400 font-medium">Cyber</span> for the full security suite.
           </p>
           {isAuthenticated && currentPlan !== "free" && (
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
@@ -571,13 +571,31 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Trust signals */}
+      <section className="px-6 pb-8">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 text-center">
+          <div className="flex items-center gap-2 text-sm text-white/50">
+            <Check className="w-4 h-4 text-green-400" />
+            <span>30-day money-back guarantee</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-white/50">
+            <Check className="w-4 h-4 text-green-400" />
+            <span>Cancel anytime, no questions asked</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-white/50">
+            <Check className="w-4 h-4 text-green-400" />
+            <span>Save 17% with annual billing</span>
+          </div>
+        </div>
+      </section>
+
       {/* Advanced Tier Cards (Cyber, Cyber+, Titan) */}
       {advancedTiers.length > 0 && (
         <section className="px-6 pb-16">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Advanced Security & Enterprise Tiers</h2>
-              <p className="text-white/40 text-sm">For cybersecurity professionals, agencies, and large-scale operations</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Enterprise, Cyber+, & Titan Tiers</h2>
+              <p className="text-white/40 text-sm">Team management, offensive security tools, and dedicated infrastructure for organizations at scale</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {advancedTiers.map((tier) => (

@@ -91,7 +91,7 @@ export const PRICING_TIERS: PricingTier[] = [
     tagline: "For power users and professionals",
     monthlyPrice: 29,
     yearlyPrice: 290,
-    highlighted: true,
+    highlighted: false,
     cta: "Upgrade to Pro",
     features: [
       "5,000 credits/month (~165 builder tasks)",
@@ -143,7 +143,7 @@ export const PRICING_TIERS: PricingTier[] = [
     monthlyPrice: 99,
     yearlyPrice: 990,
     highlighted: false,
-    cta: "Contact Sales",
+    cta: "Upgrade to Enterprise",
     features: [
       "25,000 credits/month (~830 builder tasks)",
       "Everything in Pro, plus:",
@@ -189,7 +189,7 @@ export const PRICING_TIERS: PricingTier[] = [
     tagline: "Elite cybersecurity arsenal for professionals",
     monthlyPrice: 199,
     yearlyPrice: 1990,
-    highlighted: false,
+    highlighted: true,
     cta: "Unlock Cyber",
     features: [
       "75,000 credits/month",

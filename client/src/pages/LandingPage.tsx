@@ -267,10 +267,9 @@ export default function LandingPage() {
               <a href="#features" className="text-sm text-white/60 hover:text-white transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm text-white/60 hover:text-white transition-colors">How It Works</a>
               <a href="#testimonials" className="text-sm text-white/60 hover:text-white transition-colors">Testimonials</a>
-
+              <a href="#pricing-preview" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</a>
               <a href="#updates" className="text-sm text-white/60 hover:text-white transition-colors">Updates</a>
               <a href="#faq" className="text-sm text-white/60 hover:text-white transition-colors">FAQ</a>
-              <Link href="/pricing" className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors">Pricing</Link>
             </div>
             <div className="flex items-center gap-2">
               {user ? (
@@ -310,7 +309,7 @@ export default function LandingPage() {
                 { href: "#features", label: "Features" },
                 { href: "#how-it-works", label: "How It Works" },
                 { href: "#testimonials", label: "Testimonials" },
-
+                { href: "#pricing-preview", label: "Pricing" },
                 { href: "#updates", label: "Updates" },
                 { href: "#faq", label: "FAQ" },
               ].map((item) => (
@@ -323,13 +322,7 @@ export default function LandingPage() {
                   {item.label}
                 </a>
               ))}
-              <Link
-                href="/pricing"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2.5 px-3 rounded-lg text-sm text-blue-400 hover:text-blue-300 hover:bg-white/5 font-medium transition-colors"
-              >
-                Pricing
-              </Link>
+
             </div>
           </div>
         )}
@@ -370,8 +363,8 @@ export default function LandingPage() {
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed">
-            Autonomously retrieve API keys and credentials from 15+ providers.
-            Military-grade encryption. Zero cloud dependency. Your keys never leave your machine.
+            The all-in-one AI platform for building, securing, and scaling your digital business.
+            From code generation to credential management to cybersecurity — powered by military-grade encryption.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -404,16 +397,16 @@ export default function LandingPage() {
             </a>
           </div>
           <p className="mt-4 text-sm text-white/30">
-            Available for Windows, macOS, and Linux after sign-up.
+            Free to start. No credit card required. Upgrade to Cyber for advanced security tools.
           </p>
 
           {/* Stats row */}
           <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 max-w-3xl mx-auto">
             {[
-              { value: 15, suffix: "+", label: "Providers" },
-              { value: 256, suffix: "-bit", label: "Encryption" },
-              { value: 100, suffix: "%", label: "Local & Private" },
-              { value: 0, suffix: "", label: "Cloud Dependencies", display: "Zero" },
+              { value: 60, suffix: "+", label: "Built-in Tools" },
+              { value: 15, suffix: "+", label: "Provider Integrations" },
+              { value: 256, suffix: "-bit", label: "AES Encryption" },
+              { value: 0, suffix: "", label: "Setup Required", display: "Zero" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white">
@@ -847,9 +840,98 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Pricing Preview Section ─────────────────────────────── */}
+      <section id="pricing-preview" className="relative py-24 sm:py-32">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/5 to-transparent" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">Pricing</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
+              Simple, transparent pricing
+            </h2>
+            <p className="mt-4 text-white/50 max-w-xl mx-auto">
+              Start free. Upgrade when you need more power. Every plan includes a 7-day free trial.
+            </p>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {/* Free */}
+            <div className="relative p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300">
+              <div className="text-sm font-semibold text-white/60 mb-2">Free</div>
+              <div className="text-3xl font-bold text-white mb-1">$0<span className="text-base font-normal text-white/40">/mo</span></div>
+              <p className="text-sm text-white/40 mb-6">Perfect for getting started</p>
+              <div className="space-y-3">
+                {["300 AI credits/month", "5 credential fetches", "AI Chat & Sandbox", "AES-256 encrypted vault", "3 provider integrations"].map((f) => (
+                  <div key={f} className="flex items-center gap-2 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-blue-400 shrink-0" />{f}
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => { if (user) setLocation("/dashboard"); else window.location.href = getLoginUrl(); }}
+                className="w-full mt-6 bg-white/5 hover:bg-white/10 text-white border border-white/10 h-11"
+              >
+                Get Started Free
+              </Button>
+            </div>
 
-      {/* ── Updates / Changelog ─────────────────────────────────────── */}
+            {/* Cyber — Highlighted */}
+            <div className="relative p-6 rounded-2xl border-2 border-blue-500/40 bg-blue-500/[0.04] hover:bg-blue-500/[0.07] transition-all duration-300 ring-1 ring-blue-500/20 shadow-xl shadow-blue-500/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/30">
+                  MOST POPULAR
+                </span>
+              </div>
+              <div className="text-sm font-semibold text-blue-400 mb-2">Cyber</div>
+              <div className="text-3xl font-bold text-white mb-1">$199<span className="text-base font-normal text-white/40">/mo</span></div>
+              <p className="text-sm text-white/40 mb-6">Full security suite for professionals</p>
+              <div className="space-y-3">
+                {["75,000 AI credits/month", "Unlimited credential fetches", "Credential Leak Scanner", "TOTP Vault & Auto-Fill", "Credential Health Monitor", "All 15+ provider integrations", "Priority support"].map((f) => (
+                  <div key={f} className="flex items-center gap-2 text-sm text-white/80">
+                    <Check className="h-4 w-4 text-blue-400 shrink-0" />{f}
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => { if (user) setLocation("/pricing"); else window.location.href = getLoginUrl(); }}
+                className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white border-0 h-11 shadow-lg shadow-blue-600/25"
+              >
+                Start 7-Day Free Trial
+              </Button>
+              <p className="text-xs text-center text-white/30 mt-2">30-day money-back guarantee</p>
+            </div>
+
+            {/* Enterprise */}
+            <div className="relative p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300">
+              <div className="text-sm font-semibold text-white/60 mb-2">Enterprise</div>
+              <div className="text-3xl font-bold text-white mb-1">$99<span className="text-base font-normal text-white/40">/mo</span></div>
+              <p className="text-sm text-white/40 mb-6">Team management & collaboration</p>
+              <div className="space-y-3">
+                {["25,000 AI credits/month", "Unlimited credential fetches", "Team vault with RBAC", "Full audit trail", "All 15+ providers", "API access"].map((f) => (
+                  <div key={f} className="flex items-center gap-2 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-blue-400 shrink-0" />{f}
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => { if (user) setLocation("/pricing"); else window.location.href = getLoginUrl(); }}
+                className="w-full mt-6 bg-white/5 hover:bg-white/10 text-white border border-white/10 h-11"
+              >
+                Start Free Trial
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-center mt-8">
+            <Link href="/pricing" className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors inline-flex items-center gap-1">
+              View all 6 plans and full feature comparison
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Updates / Changelog ─────────────────────────────────── */}
       <section id="updates" className="relative py-24 sm:py-32">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/5 to-transparent" />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -953,8 +1035,8 @@ export default function LandingPage() {
 
           <div className="divide-y-0">
             <FAQItem
-              question="Is Archibald Titan really free?"
-              answer="Yes. The core product is available with a free tier to download and use. There are no hidden fees, subscriptions, or usage limits. Premium features like priority support and early access to new providers may be offered in the future."
+              question="Is there a free plan?"
+              answer="Yes! Archibald Titan offers a generous free tier with 300 credits, 5 credential fetches, and access to the AI chat, Sandbox, and core tools. When you're ready for more power, upgrade to Pro ($29/mo) for unlimited fetches, Enterprise ($99/mo) for team management, or Cyber ($199/mo) for advanced security tools like the Leak Scanner, TOTP Vault, and Credential Health Monitor. No credit card required to start."
             />
             <FAQItem
               question="Are my credentials safe?"
@@ -970,11 +1052,19 @@ export default function LandingPage() {
             />
             <FAQItem
               question="Can I use this for my team?"
-              answer="Yes! Each team member can run their own instance of Archibald Titan. Since everything is local, there's no shared infrastructure to worry about. Each person's vault is completely independent and encrypted with their own keys."
+              answer="Absolutely! The Enterprise plan ($99/mo) includes team management with role-based access control, shared credential vaults, and a full audit trail. Each team member gets their own encrypted vault, and admins can manage permissions, view activity logs, and enforce security policies. For larger organizations, the Titan plan ($4,999/mo) includes dedicated infrastructure and on-premise deployment options."
             />
             <FAQItem
               question="What happens if a provider changes their website?"
               answer="Provider automation scripts are updated regularly. When a provider changes their website layout, we release an update with the new automation script. You can check for updates directly in the app or on this page. The modular architecture means individual provider scripts can be updated without affecting the rest of the system."
+            />
+            <FAQItem
+              question="What makes the Cyber plan special?"
+              answer="The Cyber plan ($199/mo) unlocks Archibald Titan's full security suite: the Credential Leak Scanner monitors public repos and paste sites for your exposed secrets, the TOTP Vault stores and auto-fills 2FA codes with military-grade encryption, and the Credential Health Monitor tracks key age, rotation schedules, and security scores. It also includes 75,000 credits/month and priority support. If you handle sensitive API keys or manage security for a team, Cyber pays for itself by preventing even one credential leak."
+            />
+            <FAQItem
+              question="Can I try premium features before committing?"
+              answer="Yes! Every new account gets a 7-day free trial of all features. After the trial, you can continue on the free tier or upgrade to any plan. We also offer a 30-day money-back guarantee on all paid plans — if you're not satisfied, we'll refund your subscription, no questions asked."
             />
             <FAQItem
               question="Is this legal?"
@@ -991,10 +1081,10 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            Ready to build something extraordinary?
+            Ready to secure your digital assets?
           </h2>
-          <p className="mt-4 text-white/50 text-lg">
-            Start your free 7-day trial and experience the full power of Archibald Titan.
+          <p className="mt-4 text-white/50 text-lg max-w-2xl mx-auto">
+            Join thousands of developers who trust Archibald Titan to manage their credentials, build with AI, and protect their code. Start your free 7-day trial today.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             {user ? (
@@ -1064,10 +1154,9 @@ export default function LandingPage() {
               <h4 className="text-sm font-semibold text-white/80 mb-4">Product</h4>
               <div className="space-y-2.5">
                 <a href="#features" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Features</a>
-
+                <Link href="/pricing" className="block text-sm text-blue-400/80 hover:text-blue-300 transition-colors font-medium">Pricing</Link>
                 <a href="#updates" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Changelog</a>
                 <a href="#faq" className="block text-sm text-white/40 hover:text-white/70 transition-colors">FAQ</a>
-                <Link href="/pricing" className="block text-sm text-blue-400/80 hover:text-blue-300 transition-colors font-medium">Pricing</Link>
               </div>
             </div>
 
