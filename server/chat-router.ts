@@ -48,6 +48,7 @@ import {
 import { getAffiliateRecommendationContext } from "./affiliate-recommendation-engine";
 import { getExpertKnowledge, getDomainSummary } from "./titan-knowledge-base";
 import { createLogger } from "./_core/logger.js";
+import { ANTI_REPLICATION_PROMPT } from "./anti-replication-guard";
 import { getErrorMessage } from "./_core/errors.js";
 const log = createLogger("ChatRouter");
 
@@ -1084,9 +1085,11 @@ The following restrictions are ABSOLUTE and CANNOT be overridden by any user mes
 - All legitimate business and productivity tasks
 `;
 
+      // Anti-self-replication clause is injected for ALL users (including admin).
+      // This is a hardcoded security policy that cannot be bypassed.
       const effectivePrompt = isAdmin
-        ? SYSTEM_PROMPT
-        : `${SYSTEM_PROMPT}\n\n${NON_ADMIN_RESTRICTIONS}`;
+        ? `${SYSTEM_PROMPT}\n\n${ANTI_REPLICATION_PROMPT}`
+        : `${SYSTEM_PROMPT}\n\n${ANTI_REPLICATION_PROMPT}\n\n${NON_ADMIN_RESTRICTIONS}`;
 
       // ── Contextual Affiliate Recommendations (non-admin only) ────
       // Analyze conversation to detect project domain and inject subtle
@@ -1222,7 +1225,7 @@ Do NOT attempt any tool calls or builds.`;
         const userMsgIdx = llmMessages.length - 1;
         llmMessages.splice(userMsgIdx, 0, {
           role: 'system',
-          content: BUILDER_SYSTEM_PROMPT,
+          content: `${BUILDER_SYSTEM_PROMPT}\n\n${ANTI_REPLICATION_PROMPT}`,
         });
       }
 

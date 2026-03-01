@@ -103,6 +103,7 @@ import { invokeLLM } from "./_core/llm";
 import { sandboxes } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { validateToolCallNotSelfReplication } from "./anti-replication-guard";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -141,6 +142,15 @@ export async function executeToolCall(
       }
       return null;
     };
+
+    // ── Anti-Self-Replication Guard ────────────────────────────
+    // Block any tool call that attempts to clone, copy, or export
+    // the Titan platform itself. Enforced at runtime.
+    const replicationBlock = validateToolCallNotSelfReplication(toolName, args);
+    if (replicationBlock) {
+      log.warn(`SELF-REPLICATION BLOCKED: user=${userId} tool=${toolName}`, { args });
+      return { success: false, error: replicationBlock };
+    }
 
     switch (toolName) {
       // ── Credentials & Fetching ──────────────────────────────────

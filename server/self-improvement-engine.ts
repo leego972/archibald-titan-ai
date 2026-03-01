@@ -70,6 +70,8 @@ const PROTECTED_PATHS: string[] = [
   // Stripe/payment — financial operations are critical
   "server/stripe-router.ts",
   "server/subscription-gate.ts",
+  // Anti-self-replication — MUST NEVER be modified or disabled
+  "server/anti-replication-guard.ts",
 ];
 
 /**

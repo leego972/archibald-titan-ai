@@ -36,6 +36,7 @@ import { storagePut } from "./storage";
 import { scrapeProductCatalog, type CatalogResult, type ScrapedProduct, type SiteType } from "./product-scraper";
 import { getErrorMessage } from "./_core/errors.js";
 import { getUserOpenAIKey, getUserGithubPat } from "./user-secrets-router";
+import { isBlockedCloneTarget } from "./anti-replication-guard";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -104,6 +105,11 @@ export async function createProject(
 ): Promise<ReplicateProject> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  // ─── Anti-Self-Replication Guard ─────────────────────────────
+  if (isBlockedCloneTarget(targetUrl)) {
+    throw new Error("BLOCKED: Cannot clone the Titan platform itself. This action violates the anti-self-replication security policy.");
+  }
 
   // Ensure the replicate_projects table exists (auto-create if missing)
   try {
