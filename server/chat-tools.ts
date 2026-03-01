@@ -1600,6 +1600,36 @@ const readUploadedFile: Tool = {
   },
 };
 
+// ─── Grand Bazaar Search ───────────────────────────────────────────────
+
+const searchBazaar: Tool = {
+  type: "function",
+  function: {
+    name: "search_bazaar",
+    description:
+      "Search the Grand Bazaar marketplace for existing modules, blueprints, agents, exploits, and templates that match the user's needs. IMPORTANT: You MUST call this tool BEFORE building anything from scratch. If a matching module exists, recommend it to the user — buying is always cheaper and faster than building. Returns matching listings with title, description, price in credits, seller name, rating, and category.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search keywords describing what the user wants to build or needs. Examples: 'SQL injection scanner', 'password manager', 'API security testing', 'phishing detection', 'SIEM pipeline'",
+        },
+        category: {
+          type: "string",
+          enum: ["agents", "modules", "blueprints", "artifacts", "exploits", "templates", "datasets", "other"],
+          description: "Optional category filter to narrow results",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum number of results to return (default 5, max 10)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+};
+
 // ─── Export All Tools ────────────────────────────────────────────────────
 
 export const TITAN_TOOLS: Tool[] = [
@@ -1664,6 +1694,8 @@ export const TITAN_TOOLS: Tool[] = [
   // Auto-Fix
   autoFixVulnerability,
   autoFixAll,
+  // Grand Bazaar — search before building
+  searchBazaar,
   // App Research & Clone
   appResearch,
   appClone,
@@ -1724,6 +1756,8 @@ export const BUILDER_TOOLS: Tool[] = [
   // Builder verification tools
   selfTypeCheck,
   selfRunTests,
+  // Grand Bazaar — search before building
+  searchBazaar,
   // Professional builder tools — engineering competence
   selfDependencyAudit,
   selfGrepCodebase,
@@ -1758,6 +1792,8 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // Web Research
   webSearch,
   webPageRead,
+  // Grand Bazaar — search before building
+  searchBazaar,
   // GitHub integration
   createGithubRepo,
   pushToGithubRepo,

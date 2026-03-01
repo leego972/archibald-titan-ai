@@ -184,7 +184,7 @@ RULES:
 4. All attack tools must have an "educational" disclaimer
 5. Include unit tests that verify core functionality
 6. The module must be NOVEL — not a duplicate of existing modules
-7. Price between 200-5000 credits based on complexity
+7. Price between 55-1500 credits based on complexity. PRICING RULE: The module price must be 40-60% of what it would cost a user to build the same thing from scratch using Titan chat. Simple utilities: 55-120 credits. Medium tools: 120-350 credits. Complex frameworks: 350-800 credits. Enterprise suites: 800-1500 credits.
 8. Include a detailed README with usage examples
 
 EXISTING MODULES (DO NOT DUPLICATE):
@@ -201,7 +201,7 @@ Return a JSON object with these exact fields:
   "longDescription": "Full Markdown description with ## sections for Attack, Defense, and Usage",
   "category": "one of: modules, exploits, blueprints, agents, artifacts, templates",
   "riskCategory": "one of: safe, low_risk, medium_risk, high_risk",
-  "priceCredits": number between 200-5000,
+  "priceCredits": number between 55-1500 (40-60% of estimated build-from-scratch cost),
   "tags": ["array", "of", "relevant", "tags"],
   "language": "TypeScript or Python",
   "code": "The FULL source code of the module (at least 100 lines, production quality)",
@@ -248,12 +248,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown code blocks. No explanation text.
       parsed.riskCategory = "medium_risk";
     }
 
-    // Validate price range
-    if (typeof parsed.priceCredits !== "number" || parsed.priceCredits < 200) {
-      parsed.priceCredits = 500;
+    // Validate price range — must be cheaper than building from scratch
+    // Simple: 55-120, Medium: 120-350, Complex: 350-800, Enterprise: 800-1500
+    if (typeof parsed.priceCredits !== "number" || parsed.priceCredits < 55) {
+      parsed.priceCredits = 200;
     }
-    if (parsed.priceCredits > 5000) {
-      parsed.priceCredits = 5000;
+    if (parsed.priceCredits > 1500) {
+      parsed.priceCredits = 1500;
     }
 
     return parsed as GeneratedModule;

@@ -31,8 +31,10 @@ import {
   auditLogs,
   builderActivityLog,
   sandboxFiles,
+  marketplaceListings,
+  sellerProfiles,
 } from "../drizzle/schema";
-import { eq, and, desc, isNull, sql, gte } from "drizzle-orm";
+import { eq, and, desc, isNull, sql, gte, like, or } from "drizzle-orm";
 import { safeSqlIdentifier } from "./_core/sql-sanitize.js";
 import { PROVIDERS } from "../shared/fetcher";
 import {
@@ -582,6 +584,8 @@ export async function executeToolCall(
         return await execPushToGithub(userId, args, conversationId);
       case "read_uploaded_file":
         return await execReadUploadedFile(args);
+      case "search_bazaar":
+        return await execSearchBazaar(args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -3714,4 +3718,151 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+
+// ─── Grand Bazaar Search ─────────────────────────────────────────────
+// Searches the marketplace for existing modules matching the user's needs.
+// Returns matching listings so Titan can recommend buying instead of building.
+
+async function execSearchBazaar(args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  const query = String(args.query || "").trim();
+  if (!query) {
+    return { success: false, error: "Search query is required" };
+  }
+
+  const maxResults = Math.min(Number(args.maxResults) || 5, 10);
+  const category = args.category ? String(args.category) : undefined;
+
+  try {
+    const dbInst = await getDb();
+    if (!dbInst) {
+      return { success: false, error: "Database not available" };
+    }
+
+    // Build search conditions: only active, approved listings
+    const conditions: any[] = [
+      eq(marketplaceListings.status, "active"),
+      eq(marketplaceListings.reviewStatus, "approved"),
+    ];
+
+    // Add category filter if specified
+    if (category) {
+      conditions.push(eq(marketplaceListings.category, category as any));
+    }
+
+    // Split query into keywords for broader matching
+    const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 2);
+
+    // Search across title, description, tags, and longDescription
+    if (keywords.length > 0) {
+      const keywordConditions = keywords.map(kw =>
+        or(
+          like(marketplaceListings.title, `%${kw}%`),
+          like(marketplaceListings.description, `%${kw}%`),
+          like(marketplaceListings.tags, `%${kw}%`),
+        )
+      );
+      // At least one keyword must match
+      conditions.push(or(...keywordConditions));
+    }
+
+    // Query with seller profile join for seller name
+    const results = await dbInst
+      .select({
+        id: marketplaceListings.id,
+        title: marketplaceListings.title,
+        slug: marketplaceListings.slug,
+        description: marketplaceListings.description,
+        category: marketplaceListings.category,
+        riskCategory: marketplaceListings.riskCategory,
+        priceCredits: marketplaceListings.priceCredits,
+        language: marketplaceListings.language,
+        tags: marketplaceListings.tags,
+        avgRating: marketplaceListings.avgRating,
+        totalSales: marketplaceListings.totalSales,
+        version: marketplaceListings.version,
+        sellerId: marketplaceListings.sellerId,
+      })
+      .from(marketplaceListings)
+      .where(and(...conditions))
+      .orderBy(desc(marketplaceListings.totalSales))
+      .limit(maxResults);
+
+    if (results.length === 0) {
+      return {
+        success: true,
+        data: {
+          query,
+          matchCount: 0,
+          listings: [],
+          message: "No matching modules found in the Grand Bazaar. You can proceed to build this from scratch.",
+        },
+      };
+    }
+
+    // Get seller names for the results
+    const sellerIds = [...new Set(results.map(r => r.sellerId))];
+    const sellerRows = await dbInst
+      .select({
+        userId: sellerProfiles.userId,
+        displayName: sellerProfiles.displayName,
+        verified: sellerProfiles.verified,
+      })
+      .from(sellerProfiles)
+      .where(or(...sellerIds.map(id => eq(sellerProfiles.userId, id))));
+
+    const sellerMap = new Map(sellerRows.map(s => [s.userId, s]));
+
+    // Calculate estimated build cost for comparison
+    // Simple: ~100cr, Medium: ~200cr, Complex: ~400cr, Enterprise: ~800cr
+    const estimateBuildCost = (price: number): number => {
+      if (price <= 100) return Math.round(price * 2.2);
+      if (price <= 300) return Math.round(price * 2.0);
+      if (price <= 1000) return Math.round(price * 1.8);
+      return Math.round(price * 1.6);
+    };
+
+    const listings = results.map(r => {
+      const seller = sellerMap.get(r.sellerId);
+      const buildCost = estimateBuildCost(r.priceCredits);
+      const savings = buildCost - r.priceCredits;
+      const savingsPercent = Math.round((savings / buildCost) * 100);
+
+      return {
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        riskCategory: r.riskCategory,
+        priceCredits: r.priceCredits,
+        language: r.language,
+        tags: r.tags ? JSON.parse(r.tags) : [],
+        rating: r.avgRating ? `${(r.avgRating / 10).toFixed(1)}/5.0` : "No ratings yet",
+        totalSales: r.totalSales,
+        version: r.version,
+        seller: seller?.displayName || "Unknown",
+        sellerVerified: seller?.verified || false,
+        estimatedBuildCost: buildCost,
+        savingsVsBuild: `${savings} credits (${savingsPercent}% cheaper than building)`,
+        bazaarLink: `/marketplace/${r.slug}`,
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        query,
+        matchCount: listings.length,
+        listings,
+        recommendation: listings.length > 0
+          ? `Found ${listings.length} existing module(s) in the Grand Bazaar that match your needs. Buying a pre-built module is significantly cheaper and faster than building from scratch. I recommend checking these out before we build anything custom.`
+          : "No exact matches found.",
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Bazaar search failed: ${getErrorMessage(err)}`,
+    };
+  }
 }
