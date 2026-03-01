@@ -22,6 +22,7 @@ import { registerVoiceUploadRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
+import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerChatStreamRoutes } from "../chat-stream";
@@ -532,6 +533,13 @@ async function startServer() {
     // Runs daily: blog generation, social media, community engagement,
     // email nurture, backlink outreach, affiliate optimization, SEO
     startAdvertisingScheduler();
+
+    // ─── Autonomous Module Generator ─────────────────────────────
+    // Runs weekly on Sundays at 3 AM: generates 3-5 fresh cyber
+    // security modules, verifies code quality, and lists them on
+    // Grand Bazaar through seller bots (CyberForge, GhostNet,
+    // VaultKeeper, dEciever000). Deduplicates against existing titles.
+    startModuleGeneratorScheduler();
   });
 }
 

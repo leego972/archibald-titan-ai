@@ -101,6 +101,16 @@ const MERCHANT_BOTS = [
     avgRating: 49,
     ratingCount: 567,
   },
+  {
+    openId: "bot_deceiver_009",
+    name: "dEciever000",
+    email: "deceiver@darkstack.io",
+    bio: "Attack is the best defense. Former black-hat turned grey-hat building weaponized security tools for red teams, CTF players, and penetration testers. Every module ships with both the sword and the shield — attack vectors paired with detection signatures and mitigation code. If you can't break it, you can't secure it.",
+    verified: true,
+    totalSales: 89,
+    avgRating: 49,
+    ratingCount: 42,
+  },
 ];
 
 // ─── Module Catalog ─────────────────────────────────────────────────
@@ -1087,6 +1097,136 @@ const MODULE_CATALOG: ModuleDef[] = [
     totalSales: 12,
     viewCount: 4500,
   },
+
+  // ── dEciever000 (8) — Hacker Attack & Defense ──
+  {
+    merchantIndex: 8,
+    title: "SQL Injection Arsenal — Attack & Defense Kit",
+    description: "Complete SQL injection toolkit with 40+ attack payloads across 6 DBMS engines, plus WAF evasion techniques. Paired with parameterized query migration scripts, input sanitization middleware, and real-time SQLi detection signatures for IDS/IPS systems.",
+    longDescription: `# SQL Injection Arsenal — Attack & Defense Kit\n\n## Attack Side\n- **40+ SQLi payloads**: Union-based, blind boolean, time-based, error-based, stacked queries, out-of-band\n- **DBMS-specific vectors**: MySQL, PostgreSQL, MSSQL, Oracle, SQLite, MongoDB NoSQLi\n- **WAF evasion**: Encoding tricks, comment injection, case manipulation, chunked transfer\n- **Automated scanner**: Crawls forms and API endpoints, tests each parameter\n- **Data exfiltration**: Column enumeration, table dumping, file read/write via SQLi\n\n## Defense Side\n- **Parameterized query migration tool**: Scans your codebase for string-concatenated queries and auto-converts to prepared statements\n- **Input sanitization middleware**: Express/Fastify/Koa compatible, blocks malicious payloads\n- **IDS signatures**: 200+ Snort/Suricata rules for detecting SQLi attempts\n- **Honeypot endpoints**: Fake vulnerable endpoints that alert on exploitation attempts\n- **Audit report generator**: Scans your app and produces a SQLi vulnerability report\n\n## Includes\n- Full TypeScript source code\n- Docker lab environment for safe testing\n- 15 vulnerable practice apps (DVWA-style)\n- Video walkthrough links`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 800,
+    tags: ["sqli", "injection", "database", "attack", "defense", "waf", "ids"],
+    language: "TypeScript",
+    license: "Educational",
+    featured: true,
+    version: "2.1.0",
+    totalSales: 67,
+    viewCount: 3200,
+  },
+  {
+    merchantIndex: 8,
+    title: "XSS Hunter Pro — Cross-Site Scripting Lab",
+    description: "Advanced XSS exploitation framework with 80+ polyglot payloads, DOM clobbering techniques, and CSP bypass methods. Includes a defensive toolkit with CSP policy generator, DOM sanitizer library, and automated XSS scanner for CI/CD pipelines.",
+    longDescription: `# XSS Hunter Pro — Cross-Site Scripting Lab\n\n## Attack Vectors\n- **80+ polyglot XSS payloads**: Works across HTML, SVG, MathML, XML contexts\n- **DOM-based XSS**: Source-to-sink tracing, DOM clobbering, prototype pollution chains\n- **CSP bypasses**: JSONP callbacks, Angular template injection, base tag hijacking\n- **Stored XSS persistence**: Cookie theft, session hijacking, keylogger injection\n- **Blind XSS callback server**: Hosted payload that phones home with stolen data\n\n## Defense Toolkit\n- **CSP Policy Generator**: Analyzes your app and generates strict Content-Security-Policy headers\n- **DOMPurify integration module**: Pre-configured sanitizer with custom allow-lists\n- **Automated XSS scanner**: GitHub Actions / GitLab CI integration, scans every PR\n- **Security headers middleware**: Adds X-XSS-Protection, X-Content-Type-Options, etc.\n- **Input encoding library**: Context-aware output encoding (HTML, JS, URL, CSS)\n\n## Lab Environment\n- 10 progressively harder XSS challenges\n- Real-world scenario simulations\n- Scoring system with hints`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 650,
+    tags: ["xss", "cross-site-scripting", "dom", "csp", "sanitization", "attack", "defense"],
+    language: "TypeScript",
+    license: "Educational",
+    featured: true,
+    version: "1.8.0",
+    totalSales: 84,
+    viewCount: 4100,
+  },
+  {
+    merchantIndex: 8,
+    title: "Privilege Escalation Playbook — Linux & Windows",
+    description: "Comprehensive privilege escalation toolkit covering 50+ techniques for Linux and Windows. Includes kernel exploit checks, SUID/SGID abuse, service misconfigurations, and token impersonation. Defense side includes hardening scripts and detection rules.",
+    longDescription: `# Privilege Escalation Playbook\n\n## Linux Escalation\n- **Kernel exploits**: DirtyPipe, DirtyCow, overlayfs, and 20+ more with auto-detection\n- **SUID/SGID abuse**: Automated scanner with GTFOBins integration\n- **Cron job hijacking**: Writable script detection, PATH injection\n- **Capabilities abuse**: Dangerous capability enumeration and exploitation\n- **Container escapes**: Docker socket, privileged mode, mount namespace\n\n## Windows Escalation\n- **Token impersonation**: SeImpersonate, SeAssignPrimaryToken, Potato attacks\n- **Service misconfigs**: Unquoted paths, weak permissions, DLL hijacking\n- **Registry abuse**: AlwaysInstallElevated, autoruns, credential harvesting\n- **UAC bypasses**: 15+ techniques with auto-detection of Windows version\n- **Active Directory**: Kerberoasting, AS-REP roasting, delegation abuse\n\n## Defense & Hardening\n- **Linux hardening script**: Fixes common misconfigs, sets proper permissions\n- **Windows GPO templates**: Security baselines for workstations and servers\n- **Detection rules**: Sigma rules for SIEM integration\n- **Audit checklist**: 100-point security audit for both platforms`,
+    category: "blueprints",
+    riskCategory: "high_risk",
+    priceCredits: 1200,
+    tags: ["privesc", "privilege-escalation", "linux", "windows", "kernel", "hardening"],
+    language: "Python",
+    license: "Educational",
+    featured: false,
+    version: "3.0.0",
+    totalSales: 45,
+    viewCount: 2800,
+  },
+  {
+    merchantIndex: 8,
+    title: "Network Sniffing & MITM Toolkit",
+    description: "Man-in-the-middle attack framework with ARP spoofing, DNS poisoning, SSL stripping, and packet injection. Defense side includes ARP monitoring, certificate pinning library, and network anomaly detection engine.",
+    longDescription: `# Network Sniffing & MITM Toolkit\n\n## Attack Capabilities\n- **ARP spoofing engine**: Bidirectional MITM with automatic gateway detection\n- **DNS poisoning**: Redirect any domain to attacker-controlled servers\n- **SSL stripping**: Downgrade HTTPS to HTTP transparently\n- **Packet injection**: Inject JavaScript, modify HTTP responses in real-time\n- **Credential harvesting**: Auto-extract passwords from HTTP, FTP, SMTP, POP3\n- **Session hijacking**: Cookie theft and replay across protocols\n\n## Defense Suite\n- **ARP watch daemon**: Detects ARP spoofing and alerts in real-time\n- **Certificate pinning library**: Node.js/Python library for HPKP-style pinning\n- **Network anomaly detector**: ML-based traffic analysis for MITM detection\n- **Encrypted DNS client**: DoH/DoT implementation to prevent DNS poisoning\n- **mTLS setup scripts**: Mutual TLS configuration for zero-trust networks\n\n## Lab\n- Docker Compose lab with victim, attacker, and gateway containers\n- Step-by-step attack scenarios\n- Wireshark capture files for analysis practice`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 950,
+    tags: ["mitm", "arp-spoofing", "dns-poisoning", "ssl-strip", "packet-sniffing", "network"],
+    language: "Python",
+    license: "Educational",
+    featured: false,
+    version: "2.0.0",
+    totalSales: 38,
+    viewCount: 2100,
+  },
+  {
+    merchantIndex: 8,
+    title: "Payload Obfuscation & AV Evasion Engine",
+    description: "Advanced payload obfuscation framework that generates undetectable executables. Supports polymorphic encoding, process hollowing, reflective DLL injection, and syscall-direct execution. Includes AV/EDR detection signatures for blue team.",
+    longDescription: `# Payload Obfuscation & AV Evasion Engine\n\n## Evasion Techniques\n- **Polymorphic encoder**: Generates unique payloads every execution — no two are alike\n- **Process hollowing**: Inject code into legitimate Windows processes\n- **Reflective DLL injection**: Load DLLs from memory without touching disk\n- **Direct syscalls**: Bypass EDR hooks by calling NT syscalls directly\n- **AMSI bypass**: 10+ techniques to disable Windows Antimalware Scan Interface\n- **ETW patching**: Blind Event Tracing for Windows to evade behavioral detection\n\n## Blue Team Defense\n- **YARA rules**: 150+ signatures for detecting obfuscated payloads\n- **Memory forensics scripts**: Volatility plugins for detecting injection techniques\n- **EDR telemetry analyzer**: Parse CrowdStrike/SentinelOne/Defender logs for IOCs\n- **Behavioral detection rules**: Sigma rules for process hollowing, DLL injection\n- **Honeypot DLLs**: Canary libraries that alert when loaded by malicious processes\n\n## Testing\n- VirusTotal API integration for detection rate testing\n- Automated regression against top 10 AV engines\n- Safe sandbox environment included`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 2500,
+    tags: ["obfuscation", "evasion", "antivirus", "edr", "payload", "malware", "yara"],
+    language: "C/C++",
+    license: "Educational",
+    featured: true,
+    version: "1.5.0",
+    totalSales: 29,
+    viewCount: 5200,
+  },
+  {
+    merchantIndex: 8,
+    title: "Phishing Infrastructure Builder",
+    description: "Automated phishing campaign infrastructure with GoPhish integration, email template engine, credential harvesting pages, and evasion techniques. Defense side includes phishing simulation platform for employee training and email gateway rules.",
+    longDescription: `# Phishing Infrastructure Builder\n\n## Attack Infrastructure\n- **Domain setup automation**: Registers lookalike domains, configures DNS, SSL certs\n- **Email template engine**: 50+ pre-built templates (Office365, Google, banking, shipping)\n- **Credential harvesting**: Pixel-perfect login clones with real-time forwarding\n- **Evasion**: Randomized headers, IP rotation, domain fronting, URL shortener integration\n- **Campaign analytics**: Open rates, click rates, credential capture rates, geo-tracking\n- **GoPhish integration**: Full API wrapper for campaign management\n\n## Defense & Training\n- **Phishing simulation platform**: Run internal phishing tests against your employees\n- **Email gateway rules**: Proofpoint/Mimecast/Exchange rules for blocking phishing indicators\n- **URL reputation checker**: Real-time domain age, WHOIS, SSL cert analysis\n- **Browser extension**: Warns users about suspicious login pages\n- **Reporting dashboard**: Track employee susceptibility over time\n- **Training modules**: 10 interactive lessons on identifying phishing\n\n## Compliance\n- Meets requirements for SOC2 security awareness training\n- Generates audit-ready reports`,
+    category: "blueprints",
+    riskCategory: "high_risk",
+    priceCredits: 1800,
+    tags: ["phishing", "social-engineering", "email", "credential-harvesting", "training"],
+    language: "TypeScript",
+    license: "Educational",
+    featured: false,
+    version: "2.2.0",
+    totalSales: 52,
+    viewCount: 3800,
+  },
+  {
+    merchantIndex: 8,
+    title: "Buffer Overflow Exploitation Lab",
+    description: "Hands-on buffer overflow exploitation framework covering stack-based, heap-based, format string, and ROP chain attacks. Includes 25 vulnerable binaries, automated exploit generator, and defensive ASLR/DEP/Stack Canary analysis tools.",
+    longDescription: `# Buffer Overflow Exploitation Lab\n\n## Attack Modules\n- **Stack overflow exploits**: Return address overwrite, shellcode injection, NOP sleds\n- **Heap exploitation**: Use-after-free, double-free, heap spraying, tcache poisoning\n- **Format string attacks**: Arbitrary read/write via printf vulnerabilities\n- **ROP chain builder**: Automated gadget finder and chain generator for x86/x64/ARM\n- **Shellcode generator**: Custom shellcode for Linux/Windows, encoder to avoid bad chars\n- **ASLR/PIE bypass**: Info leak techniques, partial overwrite, brute force\n\n## Defense Analysis\n- **Binary hardening checker**: Detects ASLR, DEP, Stack Canaries, RELRO, PIE status\n- **Compiler flag recommendations**: GCC/Clang flags for maximum protection\n- **AddressSanitizer integration**: Runtime memory error detection\n- **Fuzzing harness**: AFL++ and libFuzzer templates for finding overflows\n- **Safe coding patterns**: Replacement functions for dangerous libc calls\n\n## Lab\n- 25 vulnerable binaries (easy → expert difficulty)\n- GDB/pwndbg cheat sheets\n- Automated solution checker`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 1400,
+    tags: ["buffer-overflow", "rop", "shellcode", "heap", "binary-exploitation", "memory"],
+    language: "C/C++",
+    license: "Educational",
+    featured: false,
+    version: "1.3.0",
+    totalSales: 33,
+    viewCount: 2600,
+  },
+  {
+    merchantIndex: 8,
+    title: "Cryptographic Attack Suite",
+    description: "Cryptanalysis toolkit with padding oracle attacks, hash collision generators, weak RNG exploiters, and side-channel timing attacks. Defense includes crypto implementation auditor and secure random number generator library.",
+    longDescription: `# Cryptographic Attack Suite\n\n## Attack Tools\n- **Padding oracle attack**: Automated CBC decryption without the key\n- **Hash collision generator**: MD5 and SHA-1 chosen-prefix collisions\n- **Weak RNG exploiter**: Detects and exploits predictable random number generators\n- **Timing side-channel**: Measures response times to extract secret key bits\n- **RSA attacks**: Wiener's attack, Hastad's broadcast, Bleichenbacher's e=3\n- **Password hash cracker**: Rainbow tables, dictionary attacks, rule-based mutations\n\n## Defense Toolkit\n- **Crypto implementation auditor**: Scans code for weak algorithms (MD5, SHA1, DES, RC4)\n- **Secure RNG library**: CSPRNG wrapper with entropy health monitoring\n- **Key management module**: Secure key generation, rotation, and storage\n- **Constant-time comparison**: Library functions immune to timing attacks\n- **Certificate validator**: Checks for weak keys, expired certs, improper chains\n\n## Educational\n- Interactive Jupyter notebooks explaining each attack\n- Mathematical proofs and visualizations\n- CTF-style challenges for practice`,
+    category: "modules",
+    riskCategory: "medium_risk",
+    priceCredits: 1100,
+    tags: ["cryptography", "padding-oracle", "hash-collision", "rng", "side-channel", "rsa"],
+    language: "Python",
+    license: "Educational",
+    featured: false,
+    version: "1.7.0",
+    totalSales: 41,
+    viewCount: 2400,
+  },
 ];
 
 // ─── Seed Function ──────────────────────────────────────────────────
@@ -1128,6 +1268,10 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
 
       // Create or update seller profile
       const existingProfile = await db.select().from(sellerProfiles).where(eq(sellerProfiles.userId, userId)).limit(1);
+      // Bot merchants get permanent seller subscriptions (expires 100 years from now)
+      const botSubscriptionExpiry = new Date();
+      botSubscriptionExpiry.setFullYear(botSubscriptionExpiry.getFullYear() + 100);
+
       if (existingProfile[0]) {
         await db.update(sellerProfiles).set({
           displayName: bot.name,
@@ -1136,6 +1280,9 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
           avgRating: bot.avgRating,
           ratingCount: bot.ratingCount,
           verified: bot.verified,
+          sellerSubscriptionActive: true,
+          sellerSubscriptionExpiresAt: botSubscriptionExpiry,
+          sellerSubscriptionPaidAt: new Date(),
         }).where(eq(sellerProfiles.userId, userId));
       } else {
         await db.insert(sellerProfiles).values({
@@ -1146,6 +1293,9 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
           avgRating: bot.avgRating,
           ratingCount: bot.ratingCount,
           verified: bot.verified,
+          sellerSubscriptionActive: true,
+          sellerSubscriptionExpiresAt: botSubscriptionExpiry,
+          sellerSubscriptionPaidAt: new Date(),
         });
       }
     } catch (e: unknown) {
