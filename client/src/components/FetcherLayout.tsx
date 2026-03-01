@@ -449,7 +449,8 @@ function FetcherLayoutContent({
                 <img
                   src="/Madebyleego.png"
                   alt="Created by Leego"
-                  className="h-14 w-14 object-contain opacity-80 hover:opacity-100 hover:brightness-110 transition-all duration-300 drop-shadow-[0_0_6px_rgba(100,255,100,0.2)]"
+                  className="h-14 w-14 object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse"
+                  style={{ filter: 'drop-shadow(0 0 10px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 20px rgba(0, 255, 50, 0.4)) drop-shadow(0 0 40px rgba(0, 255, 50, 0.2))' }}
                   loading="lazy"
                 />
               </div>
@@ -459,7 +460,8 @@ function FetcherLayoutContent({
                 <img
                   src="/Madebyleego.png"
                   alt="Created by Leego"
-                  className="h-8 w-8 object-contain opacity-70 hover:opacity-100 hover:brightness-110 transition-all duration-300"
+                  className="h-8 w-8 object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_10px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_18px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse"
+                  style={{ filter: 'drop-shadow(0 0 8px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 16px rgba(0, 255, 50, 0.4))' }}
                   loading="lazy"
                 />
               </div>

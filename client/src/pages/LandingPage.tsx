@@ -1104,7 +1104,8 @@ export default function LandingPage() {
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className="h-32 w-32 object-contain opacity-100 hover:opacity-100 hover:brightness-125 transition-all duration-300 drop-shadow-[0_0_12px_rgba(100,255,100,0.3)]"
+              className="h-32 w-32 object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_18px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_28px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse"
+              style={{ filter: 'drop-shadow(0 0 14px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 28px rgba(0, 255, 50, 0.4)) drop-shadow(0 0 50px rgba(0, 255, 50, 0.2))' }}
               loading="lazy"
             />
           </div>
