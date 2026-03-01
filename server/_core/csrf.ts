@@ -98,8 +98,10 @@ export function csrfValidationMiddleware(req: Request, res: Response, next: Next
     return next();
   }
 
-  // Skip exempt paths (webhooks)
-  if (isExempt(req.path)) {
+  // Skip exempt paths (webhooks, auth routes)
+  // Use req.originalUrl because when mounted via app.use('/api/', ...),
+  // req.path is relative to the mount point (e.g., /auth/login instead of /api/auth/login)
+  if (isExempt(req.originalUrl || req.path)) {
     return next();
   }
 
