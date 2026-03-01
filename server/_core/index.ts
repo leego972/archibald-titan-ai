@@ -21,6 +21,8 @@ import { registerReleaseUploadRoute, registerUpdateFeedRoutes, registerGitHubSyn
 import { registerVoiceUploadRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
+import { startScheduledSignups } from "../affiliate-signup-engine";
+import { seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
@@ -540,6 +542,21 @@ async function startServer() {
     // Grand Bazaar through seller bots (CyberForge, GhostNet,
     // VaultKeeper, dEciever000). Deduplicates against existing titles.
     startModuleGeneratorScheduler();
+    // ─── Marketplace Seeding ──────────────────────────────────────
+    // Seeds seller bot accounts and their module listings on first run.
+    // Idempotent — skips if bots already exist.
+    setTimeout(async () => {
+      try {
+        await seedMarketplace();
+        log.info('Marketplace seeded successfully');
+      } catch (err) {
+        log.error('Marketplace seed failed', { error: String(err) });
+      }
+    }, 12000);
+    // ─── Autonomous Affiliate Signup Engine ───────────────────────
+    // Runs weekly: auto-signs up for discovered affiliate programs,
+    // generates unique referral links, and tracks conversions.
+    startScheduledSignups();
   });
 }
 
