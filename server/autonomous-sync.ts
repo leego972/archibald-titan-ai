@@ -20,6 +20,7 @@ import { ENV } from "./_core/env";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { notifyOwner } from "./_core/notification";
+import { runVaultBridge, getVaultBridgeStatus, seedKnownTokens } from "./vault-bridge";
 import crypto from "crypto";
 import type { Express, Request, Response } from "express";
 
@@ -535,6 +536,30 @@ export function patchIndexNowKey(): void {
 export async function runStartupDiagnostic(): Promise<void> {
   log.info("[AutonomousSync] Running startup diagnostic...");
 
+  // 0a. Seed known API tokens into vault (first-run setup)
+  try {
+    const seedResult = await seedKnownTokens();
+    if (seedResult.seeded.length > 0) {
+      log.info(`[AutonomousSync] Seeded ${seedResult.seeded.length} token(s) into vault: ${seedResult.seeded.join(", ")}`);
+    }
+  } catch (err) {
+    log.warn("[AutonomousSync] Token seeding failed (non-critical):", { error: String(err) });
+  }
+
+  // 0b. Run vault-to-ENV bridge (load owner's API tokens from vault into ENV)
+  try {
+    const bridgeResult = await runVaultBridge();
+    if (bridgeResult.patched.length > 0) {
+      log.info(`[AutonomousSync] Vault Bridge: Loaded ${bridgeResult.patched.length} tokens from vault → ENV: ${bridgeResult.patched.join(", ")}`);
+    } else if (bridgeResult.totalSecrets === 0) {
+      log.info(`[AutonomousSync] Vault Bridge: No secrets in owner vault yet`);
+    } else {
+      log.info(`[AutonomousSync] Vault Bridge: ${bridgeResult.totalSecrets} secrets found, ${bridgeResult.skipped.length} already set via env vars`);
+    }
+  } catch (err) {
+    log.warn("[AutonomousSync] Vault Bridge failed (non-critical):", { error: String(err) });
+  }
+
   // 1. Patch IndexNow key
   patchIndexNowKey();
 
@@ -646,10 +671,15 @@ export function startPeriodicSync(): void {
       // 1. Auto-approve queued content
       await autoApproveQueuedContent();
 
-      // 2. Ensure marketing is still enabled
+      // 2. Refresh vault bridge (pick up any new tokens saved since last sync)
+      try {
+        await runVaultBridge();
+      } catch { /* non-critical */ }
+
+      // 3. Ensure marketing is still enabled
       await ensureMarketingEnabled();
 
-      // 3. Log current status
+      // 4. Log current status
       const status = await getAutonomousSystemStatus();
       log.info(`[AutonomousSync] Periodic check: ${status.summary.active} systems active, ${status.summary.contentInQueue} in queue, ${status.summary.recentActivity} recent actions`);
 

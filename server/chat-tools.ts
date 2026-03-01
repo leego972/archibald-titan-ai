@@ -1669,6 +1669,69 @@ const searchBazaar: Tool = {
   },
 };
 
+// ─── Autonomous System Management Tools ─────────────────────────────────
+
+const getAutonomousStatus: Tool = {
+  type: "function",
+  function: {
+    name: "get_autonomous_status",
+    description:
+      "Get the full status of all autonomous systems (SEO, advertising, affiliate, content generation, security sweeps, marketplace). Shows which systems are active, degraded, or blocked, which marketing channels are connected, content queue size, and recommendations. Use this when the user asks about system health, what's running, or channel status.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+const getChannelStatus: Tool = {
+  type: "function",
+  function: {
+    name: "get_channel_status",
+    description:
+      "Get the connection status of all marketing/advertising channels. Shows which channels have API tokens configured and which are missing. Includes setup URLs for easy configuration. Use when the user asks which channels are active or what tokens are needed.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+const refreshVaultBridge: Tool = {
+  type: "function",
+  function: {
+    name: "refresh_vault_bridge",
+    description:
+      "Refresh the vault-to-ENV bridge. This re-reads all API tokens from the owner's encrypted vault and patches them into the runtime environment so marketing channels can use them. Call this after saving a new credential to make it immediately available to all autonomous systems.",
+    parameters: {
+      type: "object",
+      properties: {
+        force: {
+          type: "boolean",
+          description: "If true, overwrite existing ENV values with vault values. Default false (only fills empty values).",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+const getVaultBridgeInfo: Tool = {
+  type: "function",
+  function: {
+    name: "get_vault_bridge_info",
+    description:
+      "Get information about the vault-to-ENV bridge — shows which channels are unlocked via vault tokens, which are still missing, and when the bridge last ran. Use this to diagnose why a channel isn't working or to check if a newly saved token has been picked up.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 // ─── Export All Tools ────────────────────────────────────────────────────
 
 export const TITAN_TOOLS: Tool[] = [
@@ -1759,6 +1822,11 @@ export const TITAN_TOOLS: Tool[] = [
   selfTypeCheck,
   selfRunTests,
   selfMultiFileModify,
+  // Autonomous System Management
+  getAutonomousStatus,
+  getChannelStatus,
+  refreshVaultBridge,
+  getVaultBridgeInfo,
   // Advanced Builder Tools
   selfDependencyAudit,
   selfGrepCodebase,

@@ -106,6 +106,8 @@ import { sandboxes } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { validateToolCallNotSelfReplication } from "./anti-replication-guard";
+import { runVaultBridge, getVaultBridgeStatus } from "./vault-bridge";
+import { getAutonomousSystemStatus } from "./autonomous-sync";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -602,6 +604,15 @@ export async function executeToolCall(
         return await execReadUploadedFile(args);
       case "search_bazaar":
         return await execSearchBazaar(args);
+      // ── Autonomous System Management ────────────────────────────────
+      case "get_autonomous_status":
+        return await execGetAutonomousStatus();
+      case "get_channel_status":
+        return await execGetChannelStatus();
+      case "refresh_vault_bridge":
+        return await execRefreshVaultBridge(args.force as boolean | undefined);
+      case "get_vault_bridge_info":
+        return await execGetVaultBridgeInfo();
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -1040,6 +1051,25 @@ async function execSaveCredential(
       railway: "railway_api_token",
       supabase: "supabase_api_key",
       replicate: "replicate_api_token",
+      // Marketing channels (vault-bridge compatible)
+      devto: "devto_api_key",
+      hashnode: "hashnode_api_key",
+      medium: "medium_access_token",
+      telegram: "telegram_bot_token",
+      mastodon: "mastodon_access_token",
+      tiktok: "tiktok_access_token",
+      pinterest: "pinterest_access_token",
+      meta: "meta_access_token",
+      google_ads: "google_ads_dev_token",
+      whatsapp: "whatsapp_access_token",
+      youtube: "youtube_api_key",
+      skool: "skool_api_key",
+      reddit: "reddit_client_id",
+      linkedin: "linkedin_access_token",
+      x: "x_api_key",
+      twitter: "x_api_key",
+      snapchat: "snapchat_access_token",
+      indiehackers: "indiehackers_username",
     };
 
     let validationMessage = "";
@@ -1165,6 +1195,16 @@ async function execSaveCredential(
     if (savedToUserSecrets) storedIn.push("System Vault (Builder/Deploy/System)");
     if (savedToFetcher) storedIn.push("Fetcher Vault");
 
+    // ── 3. Refresh vault bridge so marketing channels pick up the new token immediately ──
+    let vaultBridgeRefreshed = false;
+    try {
+      const bridgeResult = await runVaultBridge(true); // force=true to pick up the new token
+      vaultBridgeRefreshed = bridgeResult.patched.length > 0;
+      if (vaultBridgeRefreshed) {
+        storedIn.push(`Vault Bridge (patched ${bridgeResult.patched.join(", ")} into ENV)`);
+      }
+    } catch { /* vault bridge is best-effort */ }
+
     return {
       success: true,
       data: {
@@ -1175,6 +1215,7 @@ async function execSaveCredential(
         label: displayLabel,
         storedIn,
         tip: "I can now access this token for any operation that needs it — Builder, Deploy, Fetcher, etc. You can also view your credentials at /fetcher/credentials or /account.",
+        vaultBridgeRefreshed,
       },
     };
   } catch (err: unknown) {
@@ -4090,5 +4131,124 @@ async function execSearchBazaar(args: Record<string, unknown>): Promise<ToolExec
       success: false,
       error: `Bazaar search failed: ${getErrorMessage(err)}`,
     };
+  }
+}
+
+// ─── Autonomous System Management Executors ──────────────────────────
+
+async function execGetAutonomousStatus(): Promise<ToolExecutionResult> {
+  try {
+    const status = await getAutonomousSystemStatus();
+    return {
+      success: true,
+      data: {
+        summary: status.summary,
+        systems: status.systems.map(s => ({
+          name: s.name,
+          category: s.category,
+          status: s.status,
+          schedule: s.schedule,
+          reason: s.reason,
+          nextAction: s.nextAction,
+        })),
+        connectedChannels: status.channels.filter(c => c.configured).map(c => c.channel),
+        disconnectedChannels: status.channels.filter(c => !c.configured).map(c => ({
+          channel: c.channel,
+          impact: c.impact,
+          freeToSetup: c.freeToSetup,
+          setupUrl: c.setupUrl,
+          envVars: c.envVars,
+        })),
+        recommendations: status.recommendations,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to get autonomous status: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execGetChannelStatus(): Promise<ToolExecutionResult> {
+  try {
+    const status = await getAutonomousSystemStatus();
+    const channels = status.channels.map(c => ({
+      channel: c.channel,
+      connected: c.configured,
+      impact: c.impact,
+      freeToSetup: c.freeToSetup,
+      description: c.description,
+      setupUrl: c.setupUrl,
+      requiredEnvVars: c.envVars,
+    }));
+
+    const connected = channels.filter(c => c.connected);
+    const disconnected = channels.filter(c => !c.connected);
+    const freeToSetup = disconnected.filter(c => c.freeToSetup);
+    const highImpactMissing = disconnected.filter(c => c.impact === "high");
+
+    return {
+      success: true,
+      data: {
+        totalChannels: channels.length,
+        connectedCount: connected.length,
+        disconnectedCount: disconnected.length,
+        connected: connected.map(c => c.channel),
+        disconnected,
+        freeToSetup: freeToSetup.map(c => ({
+          channel: c.channel,
+          setupUrl: c.setupUrl,
+          impact: c.impact,
+        })),
+        highImpactMissing: highImpactMissing.map(c => c.channel),
+        tip: disconnected.length > 0
+          ? `To connect a channel, paste the API token in chat and I'll save it to your vault. The vault bridge will automatically make it available to all marketing systems.`
+          : "All channels are connected! Your marketing engine is running at full capacity.",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to get channel status: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execRefreshVaultBridge(force?: boolean): Promise<ToolExecutionResult> {
+  try {
+    const result = await runVaultBridge(force ?? false);
+    return {
+      success: true,
+      data: {
+        ownerUserId: result.ownerUserId,
+        totalSecrets: result.totalSecrets,
+        patched: result.patched,
+        skipped: result.skipped,
+        failed: result.failed,
+        unmapped: result.unmapped,
+        message: result.patched.length > 0
+          ? `Vault bridge refreshed! Patched ${result.patched.length} token(s) into ENV: ${result.patched.join(", ")}. These channels are now active.`
+          : result.totalSecrets === 0
+            ? "No secrets found in the vault. Save API tokens via chat and I'll bridge them to the marketing systems."
+            : `Vault bridge refreshed. ${result.skipped.length} token(s) already set via env vars, ${result.unmapped.length} unmapped.`,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to refresh vault bridge: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execGetVaultBridgeInfo(): Promise<ToolExecutionResult> {
+  try {
+    const status = getVaultBridgeStatus();
+    return {
+      success: true,
+      data: {
+        lastRun: status.lastRun?.toISOString() || "Never (bridge hasn't run yet)",
+        ownerUserId: status.ownerUserId,
+        totalMappings: status.totalMappings,
+        activeSecrets: status.activeSecrets,
+        channelsUnlocked: status.channelsUnlocked,
+        channelsStillMissing: status.channelsStillMissing,
+        howItWorks: "The vault bridge reads encrypted API tokens from the owner's userSecrets table and patches them into the runtime ENV object. This allows all marketing channels to access tokens stored via chat without needing Railway env vars.",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to get vault bridge info: ${getErrorMessage(err)}` };
   }
 }
