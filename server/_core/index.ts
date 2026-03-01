@@ -326,6 +326,9 @@ async function startServer() {
         "ALTER TABLE `users` ADD COLUMN `trialConvertedAt` datetime NULL",
         "ALTER TABLE `users` ADD COLUMN `hasPaymentMethod` boolean NOT NULL DEFAULT false",
         "ALTER TABLE `users` ADD COLUMN `stripeCustomerId` varchar(128) NULL",
+        // Titan Referral Unlock columns
+        "ALTER TABLE `users` ADD COLUMN `titanUnlockExpiry` datetime NULL",
+        "ALTER TABLE `users` ADD COLUMN `titanUnlockGrantedBy` int NULL",
         // seller_profiles subscription columns
         "ALTER TABLE `seller_profiles` ADD COLUMN `sellerSubscriptionActive` boolean NOT NULL DEFAULT false",
         "ALTER TABLE `seller_profiles` ADD COLUMN `sellerSubscriptionExpiresAt` datetime NULL",
