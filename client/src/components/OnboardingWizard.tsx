@@ -105,8 +105,8 @@ export default function OnboardingWizard() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 pb-[env(safe-area-inset-bottom,16px)]" style={{ height: '100dvh' }}>
+      <div className="w-full max-w-xl max-h-[85dvh] max-h-[85vh] flex flex-col">
         {/* Close button */}
         <div className="flex justify-end mb-2 shrink-0">
           <button
@@ -219,7 +219,7 @@ export default function OnboardingWizard() {
           </CardContent>
 
           {/* Navigation — fixed at bottom */}
-          <div className="flex items-center justify-between px-6 py-3 border-t border-border/30 shrink-0">
+          <div className="flex items-center justify-between px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/30 shrink-0">
             <Button
               variant="ghost"
               size="sm"
