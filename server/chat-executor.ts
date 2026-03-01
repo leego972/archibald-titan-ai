@@ -1083,33 +1083,53 @@ async function execSaveCredential(
     const secretType = secretTypeMap[args.providerId] || `${args.providerId}_${args.keyType}`;
     const encryptedValue = encrypt(trimmedValue);
     const label = args.label || `${args.providerName} ${args.keyType} (via chat)`;
+    const displayLabel = maskedValue || label;
+    let savedToUserSecrets = false;
 
-    const existing = await db
-      .select({ id: userSecrets.id })
-      .from(userSecrets)
-      .where(
-        and(
-          eq(userSecrets.userId, userId),
-          eq(userSecrets.secretType, secretType)
+    try {
+      const existing = await db
+        .select({ id: userSecrets.id })
+        .from(userSecrets)
+        .where(
+          and(
+            eq(userSecrets.userId, userId),
+            eq(userSecrets.secretType, secretType)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existing.length > 0) {
-      await db
-        .update(userSecrets)
-        .set({ encryptedValue, label: maskedValue || label, updatedAt: new Date() })
-        .where(eq(userSecrets.id, existing[0].id));
-    } else {
-      await db.insert(userSecrets).values({
-        userId,
-        secretType,
-        encryptedValue,
-        label: maskedValue || label,
-      });
+      if (existing.length > 0) {
+        // Don't set updatedAt — MySQL ON UPDATE CURRENT_TIMESTAMP handles it
+        await db
+          .update(userSecrets)
+          .set({ encryptedValue, label: displayLabel })
+          .where(eq(userSecrets.id, existing[0].id));
+      } else {
+        await db.insert(userSecrets).values({
+          userId,
+          secretType,
+          encryptedValue,
+          label: displayLabel,
+        });
+      }
+      savedToUserSecrets = true;
+    } catch (secretErr: unknown) {
+      // If drizzle ORM fails, try raw SQL as fallback
+      try {
+        await db.execute(
+          sql`INSERT INTO user_secrets (userId, secretType, encryptedValue, label)
+              VALUES (${userId}, ${secretType}, ${encryptedValue}, ${displayLabel})
+              ON DUPLICATE KEY UPDATE encryptedValue = VALUES(encryptedValue), label = VALUES(label)`
+        );
+        savedToUserSecrets = true;
+      } catch {
+        // Log but don't fail — we'll try fetcher credentials next
+        console.error("[save_credential] userSecrets save failed:", getErrorMessage(secretErr));
+      }
     }
 
     // ── 2. Also save to fetcher credentials (for the Fetcher system) ──
+    let savedToFetcher = false;
     try {
       await storeManualCredential(
         userId,
@@ -1119,8 +1139,14 @@ async function execSaveCredential(
         trimmedValue,
         args.label,
       );
+      savedToFetcher = true;
     } catch {
-      // Fetcher credential storage is best-effort — userSecrets is the primary store
+      // Fetcher credential storage is best-effort
+    }
+
+    // At least one vault must succeed
+    if (!savedToUserSecrets && !savedToFetcher) {
+      return { success: false, error: "Failed to save credential to any vault. Please try again or save manually at /fetcher/credentials." };
     }
 
     // ── Audit log ──────────────────────────────────────────────────
@@ -1129,21 +1155,25 @@ async function execSaveCredential(
         userId,
         action: "credential.manual_save",
         resource: `${args.providerName} (${args.keyType})`,
-        details: { method: "chat", provider: args.providerName, keyType: args.keyType, secretType, label: label },
+        details: { method: "chat", provider: args.providerName, keyType: args.keyType, secretType, label: label, savedToUserSecrets, savedToFetcher },
         ipAddress: "chat",
         userAgent: "Titan Assistant",
       });
     } catch { /* audit logging is best-effort */ }
 
+    const storedIn: string[] = [];
+    if (savedToUserSecrets) storedIn.push("System Vault (Builder/Deploy/System)");
+    if (savedToFetcher) storedIn.push("Fetcher Vault");
+
     return {
       success: true,
       data: {
-        message: `Credential saved successfully! Your ${args.providerName} ${args.keyType} has been encrypted with AES-256-GCM and stored in your vault.${validationMessage}`,
+        message: `Credential saved successfully! Your ${args.providerName} ${args.keyType} has been encrypted with AES-256-GCM and stored securely.${validationMessage}`,
         provider: args.providerName,
         keyType: args.keyType,
         secretType,
-        label: maskedValue || label,
-        storedIn: ["userSecrets (Builder/Deploy/System)", "fetcherCredentials (Fetcher)"],
+        label: displayLabel,
+        storedIn,
         tip: "I can now access this token for any operation that needs it — Builder, Deploy, Fetcher, etc. You can also view your credentials at /fetcher/credentials or /account.",
       },
     };
