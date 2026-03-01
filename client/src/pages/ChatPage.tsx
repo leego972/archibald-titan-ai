@@ -2242,25 +2242,36 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {file.url && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(file.url);
-                            if (res.ok) {
-                              const blob = await res.blob();
-                              saveAs(blob, file.name);
-                            } else {
-                              toast.error('Download failed');
-                            }
-                          } catch {
-                            toast.error('Download failed');
-                          }
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
-                        title="Download"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
+              <button
+                onClick={async () => {
+                  try {
+                    // Create a blob with correct MIME type and force correct filename
+                    const blob = new Blob([file.url ? '' : ''], { type: 'application/octet-stream' });
+                    // Try fetching from S3 directly first
+                    const s3Res = await fetch(file.url, { mode: 'cors' }).catch(() => null);
+                    if (s3Res && s3Res.ok) {
+                      const fileBlob = await s3Res.blob();
+                      saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), file.name);
+                    } else {
+                      // S3 CORS blocked — use server-side zip endpoint for this file
+                      const zipRes = await fetch('/api/project-files/download-zip?all=true', { credentials: 'include' });
+                      if (zipRes.ok) {
+                        const zipBlob = await zipRes.blob();
+                        saveAs(zipBlob, 'project-files.zip');
+                        toast.info('Downloaded all files as zip');
+                      } else {
+                        toast.error('Download failed');
+                      }
+                    }
+                  } catch {
+                    toast.error('Download failed');
+                  }
+                }}
+                className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+                title="Download"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
                     )}
                     {file.url && (
                       <a
@@ -2282,47 +2293,21 @@ export default function ChatPage() {
             <Button
               onClick={async () => {
                 try {
-                  if (createdFiles.length === 1 && createdFiles[0].url) {
-                    // Single file — download directly
-                    const res = await fetch(createdFiles[0].url);
-                    if (res.ok) {
-                      const blob = await res.blob();
-                      saveAs(blob, createdFiles[0].name);
-                      toast.success('Downloaded ' + createdFiles[0].name);
-                    } else {
-                      toast.error('Download failed');
-                    }
-                    return;
-                  }
-                  // Multiple files — create ZIP
                   toast.info('Preparing zip file...');
-                  const zip = new JSZip();
-                  let addedCount = 0;
-                  for (const f of createdFiles) {
-                    if (f.url) {
-                      try {
-                        const res = await fetch(f.url);
-                        if (res.ok) {
-                          const content = await res.text();
-                          zip.file(f.name, content);
-                          addedCount++;
-                        }
-                      } catch {}
-                    }
-                  }
-                  if (addedCount === 0) {
-                    toast.error('No files could be downloaded');
-                    return;
-                  }
-                  const zipBlob = await zip.generateAsync({
-                    type: 'blob',
-                    compression: 'DEFLATE',
-                    compressionOptions: { level: 6 },
+                  // Use server-side zip endpoint — avoids CORS, preserves filenames
+                  const res = await fetch('/api/project-files/download-zip?all=true', {
+                    credentials: 'include',
                   });
-                  saveAs(zipBlob, 'project-files.zip');
-                  toast.success(`Downloaded ${addedCount} files as project-files.zip`);
+                  if (res.ok) {
+                    const blob = await res.blob();
+                    saveAs(blob, 'project-files.zip');
+                    toast.success(`Downloaded ${createdFiles.length} files as project-files.zip`);
+                  } else {
+                    const err = await res.json().catch(() => ({ error: 'Download failed' }));
+                    toast.error(err.error || 'Download failed');
+                  }
                 } catch (err) {
-                  toast.error('Download failed');
+                  toast.error('Download failed — please try again');
                 }
               }}
               variant="outline"

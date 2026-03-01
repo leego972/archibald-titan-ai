@@ -3376,7 +3376,7 @@ async function execCreateFile(
     const contentType = getContentType(fileName);
     let url = "";
     try {
-      const result = await storagePut(s3Key, content, contentType);
+      const result = await storagePut(s3Key, content, contentType, safeFileName);
       url = result.url;
     } catch (s3Err: unknown) {
       log.warn("[CreateFile] S3 upload failed (non-fatal):", { error: getErrorMessage(s3Err) });

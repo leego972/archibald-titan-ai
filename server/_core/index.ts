@@ -31,6 +31,7 @@ import { registerBinancePayWebhook } from "../binance-pay-webhook";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerChatStreamRoutes } from "../chat-stream";
 import { registerChatUploadRoute } from "../chat-upload";
+import { registerProjectDownloadRoutes } from "../project-download-router";
 import { registerMarketplaceFileRoutes } from "../marketplace-files";
 import { registerBundleSyncRoutes } from "../bundle-sync";
 import rateLimit from "express-rate-limit";
@@ -247,6 +248,8 @@ async function startServer() {
   registerMarketplaceFileRoutes(app);
   // Chat file upload endpoint
   registerChatUploadRoute(app);
+  // Project file download (single + ZIP batch)
+  registerProjectDownloadRoutes(app);
   // Chat SSE streaming and abort endpoints
   registerChatStreamRoutes(app);
   // tRPC API

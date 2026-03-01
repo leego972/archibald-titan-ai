@@ -244,28 +244,26 @@ export default function ProjectFilesViewer() {
   /** Fetch a single file's content from the server */
   const fetchFileContent = useCallback(async (file: ProjectFile): Promise<{ name: string; content: string } | null> => {
     const fileName = file.path.split("/").pop() || "file";
-    // Try S3 signed URL first
+    // Always try DB content first (same-origin, no CORS issues)
+    try {
+      const res = await fetch(`/api/trpc/sandbox.projectFileContent?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
+      const data = await res.json();
+      const content = data?.result?.data?.json?.content;
+      if (content) return { name: fileName, content };
+    } catch {}
+    // Fallback: try S3 signed URL (may fail due to CORS)
     if (file.s3Key) {
       try {
         const res = await fetch(`/api/trpc/sandbox.projectFileDownloadUrl?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
         const data = await res.json();
         const url = data?.result?.data?.json?.url;
         if (url) {
-          const fileRes = await fetch(url);
-          if (fileRes.ok) {
+          const fileRes = await fetch(url).catch(() => null);
+          if (fileRes && fileRes.ok) {
             const content = await fileRes.text();
             return { name: fileName, content };
           }
         }
-      } catch {}
-    }
-    // Fallback: fetch content from DB
-    if (file.hasContent) {
-      try {
-        const res = await fetch(`/api/trpc/sandbox.projectFileContent?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
-        const data = await res.json();
-        const content = data?.result?.data?.json?.content;
-        if (content) return { name: fileName, content };
       } catch {}
     }
     return null;
