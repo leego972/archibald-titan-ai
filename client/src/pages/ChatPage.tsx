@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { TitanLogo } from "@/components/TitanLogo";
 import AffiliateRecommendations from "@/components/AffiliateRecommendations";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import {
   Send,
   User,
@@ -2240,14 +2242,25 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {file.url && (
-                      <a
-                        href={file.url}
-                        download={file.name}
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(file.url);
+                            if (res.ok) {
+                              const blob = await res.blob();
+                              saveAs(blob, file.name);
+                            } else {
+                              toast.error('Download failed');
+                            }
+                          } catch {
+                            toast.error('Download failed');
+                          }
+                        }}
                         className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
                         title="Download"
                       >
                         <Download className="h-3.5 w-3.5" />
-                      </a>
+                      </button>
                     )}
                     {file.url && (
                       <a
@@ -2267,16 +2280,50 @@ export default function ChatPage() {
           </div>
           <div className="border-t border-border p-3 space-y-2">
             <Button
-              onClick={() => {
-                createdFiles.forEach(f => {
-                  if (f.url) {
-                    const a = document.createElement('a');
-                    a.href = f.url;
-                    a.download = f.name;
-                    a.click();
+              onClick={async () => {
+                try {
+                  if (createdFiles.length === 1 && createdFiles[0].url) {
+                    // Single file — download directly
+                    const res = await fetch(createdFiles[0].url);
+                    if (res.ok) {
+                      const blob = await res.blob();
+                      saveAs(blob, createdFiles[0].name);
+                      toast.success('Downloaded ' + createdFiles[0].name);
+                    } else {
+                      toast.error('Download failed');
+                    }
+                    return;
                   }
-                });
-                toast.success('Downloading all files...');
+                  // Multiple files — create ZIP
+                  toast.info('Preparing zip file...');
+                  const zip = new JSZip();
+                  let addedCount = 0;
+                  for (const f of createdFiles) {
+                    if (f.url) {
+                      try {
+                        const res = await fetch(f.url);
+                        if (res.ok) {
+                          const content = await res.text();
+                          zip.file(f.name, content);
+                          addedCount++;
+                        }
+                      } catch {}
+                    }
+                  }
+                  if (addedCount === 0) {
+                    toast.error('No files could be downloaded');
+                    return;
+                  }
+                  const zipBlob = await zip.generateAsync({
+                    type: 'blob',
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 6 },
+                  });
+                  saveAs(zipBlob, 'project-files.zip');
+                  toast.success(`Downloaded ${addedCount} files as project-files.zip`);
+                } catch (err) {
+                  toast.error('Download failed');
+                }
               }}
               variant="outline"
               size="sm"

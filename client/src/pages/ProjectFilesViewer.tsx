@@ -46,6 +46,8 @@ import {
   AlertTriangle,
   FolderX,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function getFileIcon(path: string) {
@@ -239,90 +241,98 @@ export default function ProjectFilesViewer() {
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
 
-  const handleDownloadFile = useCallback(async (file: ProjectFile) => {
-    try {
-      // Try S3 URL via the download endpoint first
-      if (file.s3Key) {
+  /** Fetch a single file's content from the server */
+  const fetchFileContent = useCallback(async (file: ProjectFile): Promise<{ name: string; content: string } | null> => {
+    const fileName = file.path.split("/").pop() || "file";
+    // Try S3 signed URL first
+    if (file.s3Key) {
+      try {
         const res = await fetch(`/api/trpc/sandbox.projectFileDownloadUrl?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
         const data = await res.json();
         const url = data?.result?.data?.json?.url;
         if (url) {
-          window.open(url, "_blank");
-          return;
+          const fileRes = await fetch(url);
+          if (fileRes.ok) {
+            const content = await fileRes.text();
+            return { name: fileName, content };
+          }
         }
-      }
-      // Fallback: fetch content and download as text
-      if (file.hasContent) {
+      } catch {}
+    }
+    // Fallback: fetch content from DB
+    if (file.hasContent) {
+      try {
         const res = await fetch(`/api/trpc/sandbox.projectFileContent?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
         const data = await res.json();
         const content = data?.result?.data?.json?.content;
-        if (content) {
-          const blob = new Blob([content], { type: "text/plain" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = file.path.split("/").pop() || "file";
-          a.click();
-          URL.revokeObjectURL(url);
-          return;
-        }
+        if (content) return { name: fileName, content };
+      } catch {}
+    }
+    return null;
+  }, []);
+
+  /** Download a single file */
+  const handleDownloadFile = useCallback(async (file: ProjectFile) => {
+    try {
+      const result = await fetchFileContent(file);
+      if (result) {
+        const blob = new Blob([result.content], { type: "application/octet-stream" });
+        saveAs(blob, result.name);
+        return;
       }
       toast.error("Download not available for this file");
     } catch (err) {
       toast.error("Download failed");
     }
-  }, []);
+  }, [fetchFileContent]);
 
+  /** Batch download all selected files as a ZIP */
   const handleBatchDownload = useCallback(async (files: ProjectFile[]) => {
     setDownloadingZip(true);
     try {
-      // Fetch all file contents and create a ZIP using JSZip (loaded from CDN if needed)
-      // For simplicity, download files individually if < 5, otherwise create a combined text file
-      if (files.length <= 3) {
-        for (const file of files) {
-          await handleDownloadFile(file);
-        }
+      // Single file — just download directly
+      if (files.length === 1) {
+        await handleDownloadFile(files[0]);
         setDownloadingZip(false);
         return;
       }
 
-      // Fetch all contents and create a combined download
-      const contents: { path: string; content: string }[] = [];
+      // Multiple files — create a proper ZIP
+      const zip = new JSZip();
+      let addedCount = 0;
+
       for (const file of files) {
         try {
-          const res = await fetch(`/api/trpc/sandbox.projectFileContent?input=${encodeURIComponent(JSON.stringify({ json: { fileId: file.id } }))}`);
-          const data = await res.json();
-          const content = data?.result?.data?.json?.content;
-          if (content) {
-            contents.push({ path: file.path, content });
+          const result = await fetchFileContent(file);
+          if (result) {
+            // Preserve folder structure from file path
+            const filePath = file.path.startsWith("/") ? file.path.slice(1) : file.path;
+            zip.file(filePath, result.content);
+            addedCount++;
           }
         } catch {}
       }
 
-      if (contents.length === 0) {
+      if (addedCount === 0) {
         toast.error("No downloadable files found");
         setDownloadingZip(false);
         return;
       }
 
-      // Create a combined text file with all contents (simple approach without JSZip dependency)
-      const combined = contents.map((c) =>
-        `${"=".repeat(60)}\n// FILE: ${c.path}\n${"=".repeat(60)}\n${c.content}\n`
-      ).join("\n\n");
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 },
+      });
 
-      const blob = new Blob([combined], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${selectedProject || "project"}-files.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Downloaded ${contents.length} files`);
+      const zipName = `${selectedProject || "project"}-files.zip`;
+      saveAs(zipBlob, zipName);
+      toast.success(`Downloaded ${addedCount} files as ${zipName}`);
     } catch (err) {
       toast.error("Batch download failed");
     }
     setDownloadingZip(false);
-  }, [handleDownloadFile, selectedProject]);
+  }, [handleDownloadFile, fetchFileContent, selectedProject]);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
