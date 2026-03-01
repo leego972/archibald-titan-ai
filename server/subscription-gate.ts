@@ -54,6 +54,21 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
     return { planId: "titan", tier: titanTier, status: "active", isActive: true };
   }
 
+  // ─── Referral Titan Unlock: temporary Titan access override ───
+  const [userRecord] = await db
+    .select({ titanUnlockExpiry: users.titanUnlockExpiry })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (
+    userRecord?.titanUnlockExpiry &&
+    new Date(userRecord.titanUnlockExpiry) > new Date()
+  ) {
+    // User has an active Titan unlock from referral reward
+    return { planId: "titan", tier: titanTier, status: "active", isActive: true };
+  }
+
   const sub = await db
     .select()
     .from(subscriptions)

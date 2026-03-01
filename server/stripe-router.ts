@@ -1083,6 +1083,22 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   } catch (e) {
     log.warn(`[Stripe Webhook] High-value referral check failed: ${getErrorMessage(e)}`);
   }
+
+  // ─── TITAN REFERRAL UNLOCK CHECK ───
+  // If this user was referred and just subscribed to Titan,
+  // the referrer gets 3 months of unlocked Titan features
+  try {
+    const { checkTitanReferralReward } = await import("./affiliate-engine");
+    const titanResult = await checkTitanReferralReward(resolvedUserId, planId);
+    if (titanResult.rewarded && titanResult.referrerId) {
+      log.info(
+        `[Stripe Webhook] Titan referral unlock granted to user ${titanResult.referrerId} ` +
+        `(3 months of Titan features) because user ${resolvedUserId} subscribed to ${planId}`
+      );
+    }
+  } catch (e) {
+    log.warn(`[Stripe Webhook] Titan referral check failed: ${getErrorMessage(e)}`);
+  }
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {

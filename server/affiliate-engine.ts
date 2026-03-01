@@ -106,6 +106,15 @@ export const REFERRAL_CONFIG = {
     rewardAppliesTo: "second_year" as const,                     // applies to their 2nd year renewal
     oneTimeOnly: true,                                           // cannot stack or repeat
   },
+  // ─── Deal 3: Titan Referral Reward ───
+  // Refer a user who subscribes to Titan tier → referrer gets 3 months of Titan features unlocked
+  titanReferral: {
+    qualifyingPlans: ["titan"] as const,       // referred user must subscribe to Titan specifically
+    rewardDurationMonths: 3,                   // 3 months of Titan features
+    rewardType: "titan_unlock" as const,       // temporary Titan tier access
+    oneTimeOnly: true,                         // one-time reward per referrer
+    requiresPayment: true,                     // referred user must have actually paid (not just signed up)
+  },
   // ─── Recurring Commission Model ───
   // Affiliates earn a % of every payment their referrals make for 12 months
   baseCommissionPercent: 10,
@@ -396,6 +405,82 @@ export async function checkHighValueReferralReward(
     rewarded: true,
     referrerId: conversion.referrerId,
     message: `Referrer ${conversion.referrerId} earned ${hvr.rewardDiscountPercent}% off Pro annual for their second year!`,
+  };
+}
+
+/**
+ * Check if a referred user just subscribed to Titan and award the referrer
+ * 3 months of unlocked Titan features (temporary tier override).
+ * Called from the Stripe webhook when a new subscription is created.
+ */
+export async function checkTitanReferralReward(
+  subscribedUserId: number,
+  planId: string
+): Promise<{ rewarded: boolean; referrerId?: number; message: string }> {
+  const db = await getDb();
+  if (!db) return { rewarded: false, message: "Database not available" };
+
+  const tr = REFERRAL_CONFIG.titanReferral;
+
+  // Only trigger for Titan plan subscriptions
+  if (!(tr.qualifyingPlans as readonly string[]).includes(planId)) {
+    return { rewarded: false, message: "Plan does not qualify for Titan referral reward" };
+  }
+
+  // Find if this user was referred by someone
+  const [conversion] = await db.select().from(referralConversions)
+    .where(eq(referralConversions.referredUserId, subscribedUserId))
+    .limit(1);
+
+  if (!conversion) {
+    return { rewarded: false, message: "User was not referred" };
+  }
+
+  // Check if the referrer already received this reward (one-time only)
+  const existingReward = await db.select().from(referralConversions)
+    .where(
+      and(
+        eq(referralConversions.referrerId, conversion.referrerId),
+        eq(referralConversions.rewardType, "tier_upgrade")
+      )
+    )
+    .limit(1);
+
+  if (existingReward.length > 0) {
+    return { rewarded: false, message: "Referrer already received Titan unlock reward" };
+  }
+
+  // Calculate expiry: 3 months from now
+  const expiryDate = new Date();
+  expiryDate.setMonth(expiryDate.getMonth() + tr.rewardDurationMonths);
+
+  // Set the Titan unlock on the referrer's user record
+  await db.update(users)
+    .set({
+      titanUnlockExpiry: expiryDate,
+      titanUnlockGrantedBy: subscribedUserId,
+    })
+    .where(eq(users.id, conversion.referrerId));
+
+  // Record the reward in the conversion table
+  await db.update(referralConversions)
+    .set({
+      status: "rewarded",
+      rewardType: "tier_upgrade",
+      rewardGrantedAt: new Date(),
+    })
+    .where(eq(referralConversions.id, conversion.id));
+
+  log.info(
+    `[AffiliateEngine] TITAN REFERRAL UNLOCK: User ${conversion.referrerId} earned ` +
+    `${tr.rewardDurationMonths} months of Titan features (expires ${expiryDate.toISOString()}) ` +
+    `because referred user ${subscribedUserId} subscribed to ${planId}`
+  );
+
+  return {
+    rewarded: true,
+    referrerId: conversion.referrerId,
+    message: `Referrer ${conversion.referrerId} earned ${tr.rewardDurationMonths} months of Titan features!`,
   };
 }
 

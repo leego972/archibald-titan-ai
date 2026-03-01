@@ -314,6 +314,17 @@ export default function ReferralsPage() {
                 Refer a friend who subscribes to <span className="text-cyan-400 font-medium">Cyber</span> tier or above, and you'll get <span className="text-amber-400 font-medium">50% off your second year of Pro</span> (annual billing, one-time reward).
               </p>
             </div>
+
+            {/* Deal 3: Titan referral = 3 months Titan features */}
+            <div className="p-3 bg-gradient-to-r from-purple-600/15 to-cyan-500/15 rounded-lg border border-purple-500/30">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-purple-400 text-sm font-bold">Titan Referral Unlock</span>
+                <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded-full font-medium">EXCLUSIVE</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Refer a friend who subscribes to <span className="text-purple-400 font-medium">Titan</span> tier and pays — you'll get <span className="text-cyan-400 font-medium">3 months of full Titan features unlocked</span> for free. All tools, unlimited access, zero cost. One-time reward.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

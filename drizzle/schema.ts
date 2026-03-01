@@ -26,6 +26,9 @@ export const users = mysqlTable("users", {
   hasPaymentMethod: boolean("hasPaymentMethod").default(false).notNull(), // Stripe payment method on file
   stripeCustomerId: varchar("stripeCustomerId", { length: 128 }), // Stripe customer ID for this user
   trialConvertedAt: timestamp("trialConvertedAt"), // when trial auto-converted to paid
+  // ── Referral Titan Unlock ──
+  titanUnlockExpiry: timestamp("titanUnlockExpiry"), // if set and in the future, user gets Titan features
+  titanUnlockGrantedBy: int("titanUnlockGrantedBy"), // userId of the referred user who triggered the unlock
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
