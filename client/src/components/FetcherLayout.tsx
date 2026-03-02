@@ -79,6 +79,7 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { TitanLogo } from "./TitanLogo";
+import { featureIcon } from "./FeatureIcon";
 import { Button } from "./ui/button";
 import OnboardingWizard from "./OnboardingWizard";
 import HelpBotWidget from "./HelpBotWidget";
@@ -112,16 +113,16 @@ const menuGroups: MenuGroup[] = [
     title: "Developer Tools",
     items: [
       { icon: () => <TitanLogo size="sm" />, label: "Titan Builder", path: "/dashboard" },
-      { icon: Copy, label: "Clone Website", path: "/replicate", isNew: true, premiumOnly: true },
-      { icon: Terminal, label: "Sandbox", path: "/sandbox", isNew: true },
-      { icon: FolderOpen, label: "My Projects", path: "/project-files", isNew: true },
-      { icon: Sparkles, label: "Smart Fetch AI", path: "/fetcher/smart-fetch" },
-      { icon: PlusCircle, label: "New Fetch", path: "/fetcher/new" },
-      { icon: ListOrdered, label: "Fetch Jobs", path: "/fetcher/jobs" },
-      { icon: Store, label: "Grand Bazaar", path: "/marketplace", isNew: true },
-      { icon: Package2, label: "My Inventory", path: "/marketplace/inventory", isNew: true },
-      { icon: ShoppingBag, label: "Sell / Listings", path: "/marketplace/sell", isNew: true },
-      { icon: LayoutDashboard, label: "Seller Dashboard", path: "/marketplace/seller", isNew: true },
+      { icon: featureIcon("icon_02_r1c2"), label: "Clone Website", path: "/replicate", isNew: true, premiumOnly: true },
+      { icon: featureIcon("icon_41_r6c1"), label: "Sandbox", path: "/sandbox", isNew: true },
+      { icon: featureIcon("icon_04_r1c4"), label: "My Projects", path: "/project-files", isNew: true },
+      { icon: featureIcon("icon_05_r1c5"), label: "Smart Fetch AI", path: "/fetcher/smart-fetch" },
+      { icon: featureIcon("icon_06_r1c6"), label: "New Fetch", path: "/fetcher/new" },
+      { icon: featureIcon("icon_08_r1c8"), label: "Fetch Jobs", path: "/fetcher/jobs" },
+      { icon: featureIcon("icon_09_r2c1"), label: "Grand Bazaar", path: "/marketplace", isNew: true },
+      { icon: featureIcon("icon_10_r2c2"), label: "My Inventory", path: "/marketplace/inventory", isNew: true },
+      { icon: featureIcon("icon_07_r1c7"), label: "Sell / Listings", path: "/marketplace/sell", isNew: true },
+      { icon: featureIcon("icon_45_r6c5"), label: "Seller Dashboard", path: "/marketplace/seller", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -130,13 +131,13 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Security",
     items: [
-      { icon: Clock, label: "TOTP Vault", path: "/fetcher/totp-vault", isCyber: true },
-      { icon: Timer, label: "Expiry Watchdog", path: "/fetcher/watchdog" },
-      { icon: Activity, label: "Provider Health", path: "/fetcher/provider-health" },
-      { icon: TrendingUp, label: "Health Trends", path: "/fetcher/health-trends", isCyber: true },
-      { icon: ScanSearch, label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
-      { icon: ShieldCheck, label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
-      { icon: Globe, label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
+      { icon: featureIcon("icon_14_r2c6"), label: "TOTP Vault", path: "/fetcher/totp-vault", isCyber: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "Expiry Watchdog", path: "/fetcher/watchdog" },
+      { icon: featureIcon("icon_16_r2c8"), label: "Provider Health", path: "/fetcher/provider-health" },
+      { icon: featureIcon("icon_37_r5c5"), label: "Health Trends", path: "/fetcher/health-trends", isCyber: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
+      { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
+      { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -145,18 +146,18 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Business & Funding",
     items: [
-      { icon: Search, label: "Browse Grants", path: "/grants", isNew: true },
-      { icon: FileText, label: "Grant Applications", path: "/grant-applications", isNew: true },
-      { icon: Building2, label: "Companies", path: "/companies", isNew: true },
-      { icon: FileText, label: "Business Plans", path: "/business-plans", isNew: true },
-      { icon: Rocket, label: "Crowdfunding", path: "/crowdfunding", isNew: true },
-      { icon: FileText, label: "My Campaigns", path: "/crowdfunding/my-campaigns", isNew: true },
-      { icon: Megaphone, label: "Advertising", path: "/advertising", adminOnly: true, isNew: true },
-      { icon: DollarSign, label: "Affiliate Dashboard", path: "/affiliate", adminOnly: true, isNew: true },
-      { icon: Gift, label: "My Referrals", path: "/referrals", isNew: true },
-      { icon: Search, label: "SEO Command Center", path: "/seo", adminOnly: true, isNew: true },
-      { icon: FileText, label: "Blog Engine", path: "/blog-admin", adminOnly: true, isNew: true },
-      { icon: Megaphone, label: "Marketing Engine", path: "/marketing", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_29_r4c5"), label: "Browse Grants", path: "/grants", isNew: true },
+      { icon: featureIcon("icon_21_r3c5"), label: "Grant Applications", path: "/grant-applications", isNew: true },
+      { icon: featureIcon("icon_23_r3c7"), label: "Companies", path: "/companies", isNew: true },
+      { icon: featureIcon("icon_01_r1c1"), label: "Business Plans", path: "/business-plans", isNew: true },
+      { icon: featureIcon("icon_39_r5c7"), label: "Crowdfunding", path: "/crowdfunding", isNew: true },
+      { icon: featureIcon("icon_20_r3c4"), label: "My Campaigns", path: "/crowdfunding/my-campaigns", isNew: true },
+      { icon: featureIcon("icon_12_r2c4"), label: "Advertising", path: "/advertising", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_43_r6c3"), label: "Affiliate Dashboard", path: "/affiliate", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_35_r5c3"), label: "My Referrals", path: "/referrals", isNew: true },
+      { icon: featureIcon("icon_13_r2c5"), label: "SEO Command Center", path: "/seo", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_33_r5c1"), label: "Blog Engine", path: "/blog-admin", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_31_r4c7"), label: "Marketing Engine", path: "/marketing", adminOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -165,13 +166,13 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Account & Settings",
     items: [
-      { icon: CreditCard, label: "Subscription", path: "/dashboard/subscription" },
-      { icon: KeyRound, label: "Credentials", path: "/fetcher/credentials" },
-      { icon: Key, label: "API Access", path: "/fetcher/api-access" },
-      { icon: Users, label: "Team Management", path: "/fetcher/team" },
-      { icon: Vault, label: "Team Vault", path: "/fetcher/team-vault", isNew: true },
-      { icon: Settings, label: "Settings", path: "/fetcher/settings" },
-      { icon: ShieldAlert, label: "Kill Switch", path: "/fetcher/killswitch" },
+      { icon: featureIcon("icon_11_r2c3"), label: "Subscription", path: "/dashboard/subscription" },
+      { icon: featureIcon("icon_26_r4c2"), label: "Credentials", path: "/fetcher/credentials" },
+      { icon: featureIcon("icon_19_r3c3"), label: "API Access", path: "/fetcher/api-access" },
+      { icon: featureIcon("icon_36_r5c4"), label: "Team Management", path: "/fetcher/team" },
+      { icon: featureIcon("icon_22_r3c6"), label: "Team Vault", path: "/fetcher/team-vault", isNew: true },
+      { icon: featureIcon("icon_44_r6c4"), label: "Settings", path: "/fetcher/settings" },
+      { icon: featureIcon("icon_26_r4c2"), label: "Kill Switch", path: "/fetcher/killswitch" },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -180,13 +181,13 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Automation",
     items: [
-      { icon: Download, label: "CSV Export", path: "/fetcher/export" },
-      { icon: Upload, label: "Import", path: "/fetcher/import", isNew: true },
-      { icon: RefreshCw, label: "Bulk Sync", path: "/fetcher/bulk-sync" },
-      { icon: CalendarClock, label: "Auto-Sync", path: "/fetcher/auto-sync" },
-      { icon: Wand2, label: "Provider Onboarding", path: "/fetcher/onboarding", isNew: true },
-      { icon: History, label: "Credential History", path: "/fetcher/history" },
-      { icon: ScrollText, label: "Audit Logs", path: "/fetcher/audit-logs" },
+      { icon: featureIcon("icon_40_r5c8"), label: "CSV Export", path: "/fetcher/export" },
+      { icon: featureIcon("icon_42_r6c2"), label: "Import", path: "/fetcher/import", isNew: true },
+      { icon: featureIcon("icon_32_r4c8"), label: "Bulk Sync", path: "/fetcher/bulk-sync" },
+      { icon: featureIcon("icon_34_r5c2"), label: "Auto-Sync", path: "/fetcher/auto-sync" },
+      { icon: featureIcon("icon_03_r1c3"), label: "Provider Onboarding", path: "/fetcher/onboarding", isNew: true },
+      { icon: featureIcon("icon_08_r1c8"), label: "Credential History", path: "/fetcher/history" },
+      { icon: featureIcon("icon_08_r1c8"), label: "Audit Logs", path: "/fetcher/audit-logs" },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -195,19 +196,19 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Developer API",
     items: [
-      { icon: Book, label: "API Docs", path: "/fetcher/developer-docs", isNew: true },
-      { icon: Webhook, label: "Webhooks", path: "/fetcher/webhooks", isNew: true },
-      { icon: Bell, label: "Notifications", path: "/fetcher/notifications", isNew: true },
-      { icon: BarChart3, label: "API Analytics", path: "/fetcher/api-analytics", isNew: true },
-      { icon: Terminal, label: "CLI Tool", path: "/fetcher/cli", isNew: true },
+      { icon: featureIcon("icon_33_r5c1"), label: "API Docs", path: "/fetcher/developer-docs", isNew: true },
+      { icon: featureIcon("icon_27_r4c3"), label: "Webhooks", path: "/fetcher/webhooks", isNew: true },
+      { icon: featureIcon("icon_28_r4c4"), label: "Notifications", path: "/fetcher/notifications", isNew: true },
+      { icon: featureIcon("icon_30_r4c6"), label: "API Analytics", path: "/fetcher/api-analytics", isNew: true },
+      { icon: featureIcon("icon_41_r6c1"), label: "CLI Tool", path: "/fetcher/cli", isNew: true },
     ],
   },
   {
     title: "Admin",
     items: [
-      { icon: Package, label: "Releases", path: "/fetcher/releases", adminOnly: true },
-      { icon: UserCog, label: "User Management", path: "/fetcher/admin", adminOnly: true, isNew: true },
-      { icon: Zap, label: "Self-Improvement", path: "/fetcher/self-improvement", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_10_r2c2"), label: "Releases", path: "/fetcher/releases", adminOnly: true },
+      { icon: featureIcon("icon_44_r6c4"), label: "User Management", path: "/fetcher/admin", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_06_r1c6"), label: "Self-Improvement", path: "/fetcher/self-improvement", adminOnly: true, isNew: true },
     ],
   },
 ];
