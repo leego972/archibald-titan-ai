@@ -243,6 +243,73 @@ async function startServer() {
     const statusCode = health.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(health);
   });
+  // ── Deep Diagnostic Endpoint ─────────────────────────────────
+  // Tests database, LLM API, key pool, and environment config
+  app.get('/api/diagnose', async (_req, res) => {
+    const diag: Record<string, unknown> = {
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      nodeEnv: process.env.NODE_ENV || 'not set',
+    };
+
+    // 1. Check environment variables
+    const envVars = [
+      'DATABASE_URL', 'OPENAI_API_KEY', 'OPENAI_API_KEY_1', 'OPENAI_API_KEY_2',
+      'OPENAI_API_KEY_3', 'OPENAI_API_KEY_4', 'OPENAI_API_KEY_5',
+      'BUILT_IN_FORGE_API_URL', 'BUILT_IN_FORGE_API_KEY',
+    ];
+    diag.envVars = {};
+    for (const v of envVars) {
+      const val = process.env[v];
+      (diag.envVars as Record<string, string>)[v] = val
+        ? `set (${val.length} chars, ends: ...${val.slice(-4)})`
+        : 'NOT SET';
+    }
+
+    // 2. Check database
+    try {
+      const { getDb } = await import('../db.js');
+      const db = await getDb();
+      if (db) {
+        const { sql } = await import('drizzle-orm');
+        await db.execute(sql`SELECT 1`);
+        diag.database = 'connected';
+      } else {
+        diag.database = 'getDb returned null';
+      }
+    } catch (dbErr: unknown) {
+      diag.database = `error: ${getErrorMessage(dbErr)}`;
+    }
+
+    // 3. Check LLM key pool
+    try {
+      const { initKeyPool, getKeyPoolStatus, hasKeys } = await import('./key-pool.js');
+      initKeyPool();
+      diag.llmHasKeys = hasKeys();
+      diag.keyPoolStatus = getKeyPoolStatus();
+    } catch (kpErr: unknown) {
+      diag.keyPool = `error: ${getErrorMessage(kpErr)}`;
+    }
+
+    // 4. Test actual LLM call with a tiny request
+    try {
+      const { invokeLLM } = await import('./llm.js');
+      const testResult = await invokeLLM({
+        priority: 'chat',
+        model: 'fast',
+        messages: [{ role: 'user', content: 'Say OK' }],
+        max_tokens: 5,
+        temperature: 0,
+      });
+      const reply = testResult.choices?.[0]?.message?.content || 'no content';
+      diag.llmTest = { status: 'success', reply: typeof reply === 'string' ? reply.slice(0, 50) : 'non-string', model: testResult.model };
+    } catch (llmErr: unknown) {
+      diag.llmTest = { status: 'error', error: getErrorMessage(llmErr) };
+    }
+
+    res.json(diag);
+  });
+
   // SEO routes (sitemap.xml, robots.txt, security.txt, RSS feed, structured data, redirects)
   registerSeoRoutes(app);
   // SEO v4 routes (llms.txt, programmatic SEO, enhanced structured data, GEO optimization)
