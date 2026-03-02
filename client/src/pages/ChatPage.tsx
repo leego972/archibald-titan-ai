@@ -1632,15 +1632,25 @@ export default function ChatPage() {
       utils.chat.listConversations.invalidate();
     } catch (err: any) {
       const serverMessage = err?.message || err?.data?.message || "";
+      let userFacingError = "Something went wrong. Please try again.";
       if (serverMessage.toLowerCase().includes("credit")) {
-        toast.error(serverMessage);
+        userFacingError = serverMessage;
       } else if (serverMessage.toLowerCase().includes("unauthorized") || serverMessage.toLowerCase().includes("session")) {
-        toast.error("Session expired. Please refresh the page and try again.");
-      } else {
-        toast.error(serverMessage || "Failed to get response. Please try again.");
+        userFacingError = "Session expired. Please refresh the page and try again.";
+      } else if (serverMessage) {
+        userFacingError = serverMessage;
       }
-      optimisticIdsRef.current.delete(tempId);
-      setLocalMessages((prev) => prev.filter((m) => m.id !== tempId));
+      toast.error(userFacingError);
+      // KEEP the user message visible — don't delete it on error.
+      // Instead, add an error assistant message so the user can see what happened.
+      const errorAssistantMsg: ChatMsg = {
+        id: -Date.now() - 2,
+        role: "assistant",
+        content: `⚠️ ${userFacingError}`,
+        createdAt: Date.now(),
+      };
+      optimisticIdsRef.current.add(errorAssistantMsg.id);
+      setLocalMessages((prev) => [...prev, errorAssistantMsg]);
     } finally {
       setStreamEvents([]);
       if (eventSourceRef.current) {

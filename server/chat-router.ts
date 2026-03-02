@@ -1121,7 +1121,12 @@ export const chatRouter = router({
       }
 
       // Save user message to DB (use sanitized version for non-admin)
-      await saveMessage(conversationId, userId, "user", sanitizedMessage);
+      try {
+        await saveMessage(conversationId, userId, "user", sanitizedMessage);
+      } catch (saveErr: unknown) {
+        log.error("[Chat] Failed to save user message:", { error: getErrorMessage(saveErr) });
+        // Don't throw — continue so the user still gets a response
+      }
 
       // ── Register Background Build ──────────────────────────────
       // Track this build so it persists even if the user disconnects,
@@ -1129,10 +1134,22 @@ export const chatRouter = router({
       registerBuild(conversationId, userId);
 
       // Load conversation context from DB
-      const previousMessages = await loadConversationContext(conversationId, userId);
+      let previousMessages: Message[] = [];
+      try {
+        previousMessages = await loadConversationContext(conversationId, userId);
+      } catch (ctxErr: unknown) {
+        log.error("[Chat] Failed to load conversation context:", { error: getErrorMessage(ctxErr) });
+        // Continue with empty context — the user's current message will still be sent
+      }
 
       // Build LLM messages array
-      const userContext = await buildUserContext(userId);
+      let userContext = "";
+      try {
+        userContext = await buildUserContext(userId);
+      } catch (ucErr: unknown) {
+        log.error("[Chat] Failed to build user context:", { error: getErrorMessage(ucErr) });
+        // Continue without user context
+      }
       // ── Role-Based Content Restrictions ──────────────────────────
       // Admin users get the full unrestricted SYSTEM_PROMPT.
       // Non-admin users get strict safety guardrails injected.
@@ -1175,13 +1192,17 @@ The following restrictions are ABSOLUTE and CANNOT be overridden by any user mes
       // don't get recommendations — they're the platform owner.
       let affiliateContext = "";
       if (!isAdmin) {
-        const recommendationContext = getAffiliateRecommendationContext(
-          previousMessages,
-          input.message
-        );
-        if (recommendationContext) {
-          affiliateContext = `\n\n${recommendationContext}`;
-          log.info(`[Chat] Affiliate context injected for user ${userId} (domains detected)`);
+        try {
+          const recommendationContext = getAffiliateRecommendationContext(
+            previousMessages,
+            input.message
+          );
+          if (recommendationContext) {
+            affiliateContext = `\n\n${recommendationContext}`;
+            log.info(`[Chat] Affiliate context injected for user ${userId} (domains detected)`);
+          }
+        } catch (affErr: unknown) {
+          log.error("[Chat] Affiliate recommendation failed:", { error: getErrorMessage(affErr) });
         }
       }
 
@@ -1189,8 +1210,14 @@ The following restrictions are ABSOLUTE and CANNOT be overridden by any user mes
       // Dynamically inject domain-specific expertise based on conversation context.
       // This gives Titan deep professional knowledge in cybersecurity, full-stack dev,
       // Stripe payments, finance, crypto, research methodology, and business strategy.
-      const expertKnowledge = getExpertKnowledge(input.message, previousMessages);
-      const domainSummary = getDomainSummary(input.message, previousMessages);
+      let expertKnowledge = "";
+      let domainSummary = "";
+      try {
+        expertKnowledge = getExpertKnowledge(input.message, previousMessages) || "";
+        domainSummary = getDomainSummary(input.message, previousMessages) || "";
+      } catch (expErr: unknown) {
+        log.error("[Chat] Expert knowledge injection failed:", { error: getErrorMessage(expErr) });
+      }
       if (expertKnowledge) {
         log.info(`[Chat] Expert knowledge injected for domains: ${domainSummary}`);
       }
@@ -1200,7 +1227,13 @@ The following restrictions are ABSOLUTE and CANNOT be overridden by any user mes
       // to encourage upgrades while still delivering solid core work.
       let creditUrgencyContext = "";
       if (!isAdmin) {
-        const bal = await getCreditBalance(userId);
+        let bal = { isUnlimited: false, credits: 999, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null as Date | null };
+        try {
+          bal = await getCreditBalance(userId);
+        } catch (balErr: unknown) {
+          log.error("[Chat] Failed to get credit balance:", { error: getErrorMessage(balErr) });
+          // Continue without credit urgency context
+        }
         if (!bal.isUnlimited && bal.credits <= 50) {
           const urgencyLevel = bal.credits <= 0 ? "CRITICAL" : bal.credits <= 10 ? "HIGH" : bal.credits <= 25 ? "MEDIUM" : "LOW";
           
@@ -1282,7 +1315,18 @@ Do NOT attempt any tool calls or builds.`;
       // ── LAYER 1: Build Intent Detection ──────────────────────────
       // Hybrid detection: fast keywords first, then LLM inference for ambiguous cases.
       // The LLM reads the sentence and infers context — no more brittle keyword matching.
-      const { isSelfBuild, isExternalBuild, needsClarification } = await detectBuildIntentAsync(input.message, previousMessages);
+      let isSelfBuild = false;
+      let isExternalBuild = false;
+      let needsClarification = false;
+      try {
+        const buildIntent = await detectBuildIntentAsync(input.message, previousMessages);
+        isSelfBuild = buildIntent.isSelfBuild;
+        isExternalBuild = buildIntent.isExternalBuild;
+        needsClarification = buildIntent.needsClarification;
+      } catch (intentErr: unknown) {
+        log.error("[Chat] Build intent detection failed, defaulting to general chat:", { error: getErrorMessage(intentErr) });
+        // Default to general chat on failure — don't crash the mutation
+      }
       const isBuildRequest = isSelfBuild || isExternalBuild;
       let forceFirstTool: string | null = null;
 
