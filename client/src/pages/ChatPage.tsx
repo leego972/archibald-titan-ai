@@ -1198,15 +1198,20 @@ export default function ChatPage() {
   const { data: quickActions } = trpc.chat.quickActions.useQuery(undefined, { refetchOnWindowFocus: false });
   const sendMutation = trpc.chat.send.useMutation();
   const utils = trpc.useUtils();
-  // Track whether a send is in-flight to prevent stale DB sync from wiping optimistic messages
-  const sendInFlightRef = useRef(false);
+  // Track optimistic (unsaved) message IDs so the DB sync never wipes them
+  const optimisticIdsRef = useRef<Set<number>>(new Set());
+  // Track the conversation ID that was last synced to detect conversation switches
+  const lastSyncedConvIdRef = useRef<number | null>(null);
 
-  // Sync DB messages into local state
-  // Guard: skip sync while a send is in-flight to avoid wiping optimistic messages.
-  // We check both isLoading AND sendInFlightRef to cover the gap between
-  // React state batching and the actual refetch completing.
+  // Sync DB messages into local state.
+  // MERGE strategy: DB messages replace their counterparts, but optimistic
+  // messages (negative IDs tracked in optimisticIdsRef) are preserved until
+  // the DB catches up. This prevents the "flicker and disappear" bug.
   useEffect(() => {
-    if (convDetail?.messages && !isLoading && !sendInFlightRef.current) {
+    if (!convDetail?.messages) return;
+    // If we switched conversations, do a full replace (no optimistic msgs to keep)
+    if (lastSyncedConvIdRef.current !== activeConversationId) {
+      lastSyncedConvIdRef.current = activeConversationId;
       setLocalMessages(
         convDetail.messages.map((m) => ({
           id: m.id,
@@ -1217,12 +1222,48 @@ export default function ChatPage() {
           toolCalls: m.toolCalls,
         }))
       );
+      return;
     }
-  }, [convDetail, isLoading]);
+    // Merge: keep optimistic messages that aren't in the DB yet
+    setLocalMessages((prev) => {
+      const dbMessages: ChatMsg[] = convDetail.messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+        actionsTaken: m.actionsTaken,
+        toolCalls: m.toolCalls,
+      }));
+      // Collect optimistic messages still pending (negative IDs not yet in DB)
+      const pendingOptimistic = prev.filter(
+        (m) => optimisticIdsRef.current.has(m.id)
+      );
+      // Check if DB now contains messages that match our optimistic ones
+      // (match by role + content since DB IDs differ from temp IDs)
+      const stillPending = pendingOptimistic.filter((opt) => {
+        const found = dbMessages.some(
+          (db) => db.role === opt.role && db.content === opt.content
+        );
+        if (found) {
+          // DB caught up — remove from optimistic tracking
+          optimisticIdsRef.current.delete(opt.id);
+        }
+        return !found;
+      });
+      // Final list: DB messages + any still-pending optimistic messages appended
+      if (stillPending.length === 0) {
+        return dbMessages;
+      }
+      return [...dbMessages, ...stillPending];
+    });
+  }, [convDetail, activeConversationId]);
 
   // Clear local messages when switching to new conversation
   useEffect(() => {
-    if (!activeConversationId) setLocalMessages([]);
+    if (!activeConversationId) {
+      setLocalMessages([]);
+      optimisticIdsRef.current.clear();
+    }
   }, [activeConversationId]);
 
   // Auto-scroll to bottom — use double-rAF to ensure layout is settled
@@ -1305,6 +1346,7 @@ export default function ChatPage() {
     if (isLoading) {
       // Add the user message to the chat immediately (optimistic)
       const queuedMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
+      optimisticIdsRef.current.add(queuedMsg.id);
       setLocalMessages((prev) => [...prev, queuedMsg]);
       setMessageQueue((prev) => [...prev, messageText]);
       setInput('');
@@ -1322,6 +1364,7 @@ export default function ChatPage() {
       setInput('');
       setShowHelp(true);
       const helpUserMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
+      optimisticIdsRef.current.add(helpUserMsg.id);
       setLocalMessages((prev) => [...prev, helpUserMsg]);
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
       return;
@@ -1338,6 +1381,7 @@ export default function ChatPage() {
     if (lowerText === '/clear') {
       setInput('');
       setLocalMessages([]);
+      optimisticIdsRef.current.clear();
       setShowHelp(false);
       toast.success('Chat cleared');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -1399,9 +1443,6 @@ export default function ChatPage() {
       }
     }
 
-    // Mark send as in-flight to prevent stale DB sync from wiping optimistic messages
-    sendInFlightRef.current = true;
-
     // Build the optimistic user message WITH attachment info
     const tempId = -Date.now();
     const userMsg: ChatMsg = {
@@ -1411,6 +1452,8 @@ export default function ChatPage() {
       createdAt: Date.now(),
       attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
     };
+    // Register as optimistic so the DB sync effect won't wipe it
+    optimisticIdsRef.current.add(tempId);
     setLocalMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setLoadingPhase("Thinking...");
@@ -1549,6 +1592,8 @@ export default function ChatPage() {
           : null,
       };
 
+      // Register assistant message as optimistic so DB sync won't wipe it
+      optimisticIdsRef.current.add(assistantMsg.id);
       setLocalMessages((prev) => [...prev, assistantMsg]);
 
       // Voice Mode: speak the response aloud
@@ -1594,6 +1639,7 @@ export default function ChatPage() {
       } else {
         toast.error(serverMessage || "Failed to get response. Please try again.");
       }
+      optimisticIdsRef.current.delete(tempId);
       setLocalMessages((prev) => prev.filter((m) => m.id !== tempId));
     } finally {
       setStreamEvents([]);
@@ -1601,9 +1647,8 @@ export default function ChatPage() {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      // Refetch conversation BEFORE setting isLoading to false.
-      // This ensures convDetail is fresh when the sync useEffect fires,
-      // preventing stale data from overwriting the optimistic messages.
+      // Refetch conversation so the DB sync effect can reconcile optimistic messages.
+      // Even if this fails, optimistic messages remain visible until the next successful sync.
       if (activeConversationId || convIdForStream) {
         try {
           await refetchConv();
@@ -1611,8 +1656,6 @@ export default function ChatPage() {
           // Refetch failed — optimistic messages will remain until next sync
         }
       }
-      // Clear the in-flight guard AFTER refetch so the sync effect sees fresh data
-      sendInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -1620,6 +1663,7 @@ export default function ChatPage() {
   const handleNewConversation = () => {
     setActiveConversationId(null);
     setLocalMessages([]);
+    optimisticIdsRef.current.clear();
     setShowHelp(false);
   };
 
