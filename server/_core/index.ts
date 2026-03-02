@@ -73,6 +73,19 @@ async function startServer() {
   app.set("trust proxy", 1);
   const server = createServer(app);
 
+  // ── Non-WWW to WWW Redirect ────────────────────────────────────
+  // MUST be first middleware: archibaldtitan.com → www.archibaldtitan.com
+  // Prevents OAuth cookie domain mismatches and ensures consistent URLs
+  app.use((req, res, next) => {
+    const host = req.hostname || req.headers.host || '';
+    // Only redirect in production, and only for the bare domain (no www)
+    if (process.env.NODE_ENV === 'production' && host === 'archibaldtitan.com') {
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      return res.redirect(301, `${proto}://www.archibaldtitan.com${req.originalUrl}`);
+    }
+    next();
+  });
+
   // ── Security Headers ──────────────────────────────────────────
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');

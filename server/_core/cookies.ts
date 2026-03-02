@@ -21,25 +21,32 @@ function isSecureRequest(req: Request) {
   return protoList.some(proto => proto.trim().toLowerCase() === "https");
 }
 
+/**
+ * Extract the root domain for cookie sharing.
+ * e.g. "www.archibaldtitan.com" → ".archibaldtitan.com"
+ * This ensures cookies work on both www and non-www subdomains.
+ */
+function getCookieDomain(hostname: string): string | undefined {
+  if (!hostname) return undefined;
+  if (LOCAL_HOSTS.has(hostname)) return undefined;
+  if (isIpAddress(hostname)) return undefined;
+
+  // For archibaldtitan.com or www.archibaldtitan.com → .archibaldtitan.com
+  if (hostname === "archibaldtitan.com" || hostname.endsWith(".archibaldtitan.com")) {
+    return ".archibaldtitan.com";
+  }
+
+  // For other domains (e.g. Railway preview URLs), don't set domain
+  return undefined;
+}
+
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
-
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
-
+  const hostname = req.hostname;
   const secure = isSecureRequest(req);
+  const domain = getCookieDomain(hostname);
+
   return {
     httpOnly: true,
     path: "/",
@@ -48,5 +55,6 @@ export function getSessionCookieOptions(
     // and is more compatible across browsers than "none".
     sameSite: "lax",
     secure,
+    ...(domain ? { domain } : {}),
   };
 }

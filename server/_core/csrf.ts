@@ -77,12 +77,16 @@ export function csrfCookieMiddleware(req: Request, res: Response, next: NextFunc
   // If no CSRF cookie exists, generate one
   if (!req.cookies?.[CSRF_COOKIE]) {
     const token = generateToken();
+    const hostname = req.hostname || '';
+    const cookieDomain = (hostname === 'archibaldtitan.com' || hostname.endsWith('.archibaldtitan.com'))
+      ? '.archibaldtitan.com' : undefined;
     res.cookie(CSRF_COOKIE, token, {
       httpOnly: false, // Client JS must be able to read this
       secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
       sameSite: "lax",
       path: "/",
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
   }
   next();

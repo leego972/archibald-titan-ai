@@ -338,7 +338,8 @@ async function issueSessionAndRedirect(
   log.info(`[Auth] publicOrigin=${publicOrigin}, callbackOrigin=${callbackOrigin}, isCrossDomain=${isCrossDomain}`);
 
   // Clear the OAuth state cookie now that login is complete
-  res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true });
+  res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: '.archibaldtitan.com' });
+  res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true }); // Also clear non-domain-scoped cookie
 
   if (isCrossDomain) {
     const oneTimeToken = crypto.randomBytes(32).toString("hex");
@@ -403,12 +404,17 @@ export function registerSocialAuthRoutes(app: Express) {
 
     // Layer 2: Store in signed httpOnly cookie (survives server restarts)
     const cookieVal = buildStateCookie({ state, provider: "github", returnPath, mode, expiresAt });
+    const isSecure = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
+    const hostname = req.hostname || '';
+    const cookieDomain = (hostname === 'archibaldtitan.com' || hostname.endsWith('.archibaldtitan.com'))
+      ? '.archibaldtitan.com' : undefined;
     res.cookie(STATE_COOKIE_NAME, cookieVal, {
       httpOnly: true,
       path: "/",
       sameSite: "lax",
-      secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
+      secure: isSecure,
       maxAge: STATE_TTL_MS,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
 
     const callbackOrigin = getOAuthCallbackOrigin();
@@ -437,7 +443,8 @@ export function registerSocialAuthRoutes(app: Express) {
     }
 
     // Clear the state cookie
-    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true });
+    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: '.archibaldtitan.com' });
+    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true }); // Also clear non-domain-scoped cookie
 
     try {
       const callbackOrigin = getOAuthCallbackOrigin();
@@ -469,12 +476,17 @@ export function registerSocialAuthRoutes(app: Express) {
 
     // Layer 2: Store in signed httpOnly cookie (survives server restarts)
     const cookieVal = buildStateCookie({ state, provider: "google", returnPath, mode, expiresAt });
+    const isSecure = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
+    const hostname = req.hostname || '';
+    const cookieDomain = (hostname === 'archibaldtitan.com' || hostname.endsWith('.archibaldtitan.com'))
+      ? '.archibaldtitan.com' : undefined;
     res.cookie(STATE_COOKIE_NAME, cookieVal, {
       httpOnly: true,
       path: "/",
       sameSite: "lax",
-      secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
+      secure: isSecure,
       maxAge: STATE_TTL_MS,
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
 
     const callbackOrigin = getOAuthCallbackOrigin();
@@ -506,7 +518,8 @@ export function registerSocialAuthRoutes(app: Express) {
     }
 
     // Clear the state cookie
-    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true });
+    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: '.archibaldtitan.com' });
+    res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true }); // Also clear non-domain-scoped cookie
 
     try {
       const callbackOrigin = getOAuthCallbackOrigin();
