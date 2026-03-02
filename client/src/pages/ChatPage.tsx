@@ -377,7 +377,7 @@ function HelpPanel({ onTryCommand }: { onTryCommand: (cmd: string) => void }) {
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center gap-2 mb-3">
         <HelpCircle className="h-5 w-5 text-primary" />
-        <h3 className="text-base font-semibold">Titan Assistant — What I Can Do</h3>
+        <h3 className="text-base font-semibold">Welcome to Titan — What I Can Do</h3>
       </div>
       <p className="text-sm text-muted-foreground">
         I'm your AI-powered builder and operations assistant. Here's everything I can help with:
@@ -1035,11 +1035,16 @@ export default function ChatPage() {
     if (!activeConversationId) setLocalMessages([]);
   }, [activeConversationId]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom — use double-rAF to ensure layout is settled
   useEffect(() => {
     if (scrollRef.current) {
       const el = scrollRef.current;
-      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+      // Double requestAnimationFrame ensures the DOM has painted before scrolling
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+        });
+      });
     }
   }, [localMessages, isLoading]);
 
@@ -1074,15 +1079,31 @@ export default function ChatPage() {
   useEffect(() => {
     if (!isMobile) return;
     const handleResize = () => {
-      // Use visualViewport to handle iOS keyboard
       if (window.visualViewport) {
         const viewport = window.visualViewport;
         const offset = window.innerHeight - viewport.height;
         document.documentElement.style.setProperty('--keyboard-offset', `${offset}px`);
+        // After keyboard resize, scroll to bottom so user sees latest messages
+        if (scrollRef.current) {
+          requestAnimationFrame(() => {
+            scrollRef.current!.scrollTop = scrollRef.current!.scrollHeight;
+          });
+        }
+      }
+    };
+    const handleScroll = () => {
+      // On iOS, visualViewport scroll events fire when the viewport shifts
+      // due to keyboard. We need to keep the chat pinned.
+      if (window.visualViewport && window.visualViewport.offsetTop > 0) {
+        window.scrollTo(0, 0);
       }
     };
     window.visualViewport?.addEventListener('resize', handleResize);
-    return () => window.visualViewport?.removeEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('scroll', handleScroll);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleScroll);
+    };
   }, [isMobile]);
 
   const handleSend = async (text?: string) => {
@@ -1522,7 +1543,7 @@ export default function ChatPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
-                  Titan Assistant
+                  Welcome to Titan
                 </h1>
                 {!isMobile && (
                   <p className="text-[11px] text-muted-foreground">
@@ -1575,7 +1596,8 @@ export default function ChatPage() {
           <div
             ref={scrollRef}
             onClick={handleChatClick}
-            className={`absolute inset-0 overflow-y-auto scroll-smooth ${isMobile ? 'px-3 py-3' : 'px-4 py-4'}`}
+            data-chat-scroll
+            className={`absolute inset-0 overflow-y-auto ${isMobile ? 'px-3 py-3' : 'px-4 py-4 scroll-smooth'}`}
           >
             <div className="max-w-3xl mx-auto space-y-4">
               {showEmptyState ? (
@@ -1584,7 +1606,7 @@ export default function ChatPage() {
                     <TitanLogo size="xl" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold mb-2">Welcome, I am Titan.</h2>
+                    <h2 className="text-lg font-semibold mb-2">Welcome to Titan</h2>
                     <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
                       How can I help you today? Ask me anything — I can build, research, analyse, and assist with your projects.
                     </p>
@@ -1680,7 +1702,7 @@ export default function ChatPage() {
                           <TitanLogo size="sm" />
                         </div>
                       )}
-                      <div className="flex flex-col max-w-[85%] sm:max-w-[80%] min-w-0 overflow-hidden">
+                      <div className="flex flex-col max-w-[85%] sm:max-w-[80%] min-w-0 overflow-hidden" style={{ overflowWrap: 'anywhere' }}>
                         <div
                           className={`rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-sm leading-relaxed ${
                             msg.role === "user"
@@ -1734,7 +1756,7 @@ export default function ChatPage() {
                                   ))}
                                 </div>
                               )}
-                              <p className="whitespace-pre-wrap break-words overflow-hidden">{msg.content}</p>
+                              <p className="whitespace-pre-wrap break-words overflow-hidden" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.content}</p>
                             </>
                           )}
                         </div>
@@ -1802,7 +1824,7 @@ export default function ChatPage() {
                       <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0">
                         <TitanLogo size="sm" />
                       </div>
-                      <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-[240px] sm:min-w-[280px] max-w-[90%]">
+                      <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-0 sm:min-w-[280px] max-w-[85%] sm:max-w-[90%]">
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -1889,7 +1911,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input area */}
-        <div className={`border-t border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-3 pt-2' : 'px-4 pt-3 pb-2'}`} style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
+        <div className={`chat-input-area border-t border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-3 pt-2' : 'px-4 pt-3 pb-2'}`} style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
           {/* Recording indicator */}
           {isRecording && (
             <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-xl">
@@ -2074,20 +2096,22 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Footer hint */}
-          <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-            <button onClick={isRecording ? stopRecording : startRecording} className="text-primary hover:underline cursor-pointer">
-              <Mic className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice
-            </button>
-            {' · '}
-            <button onClick={() => handleSend('/help')} className="text-primary hover:underline cursor-pointer">/help</button>
-            {' · Conversations saved automatically · Powered by AI'}
-          </p>
-          <div className="flex justify-center mt-2">
+          {/* Footer hint — hidden on mobile to save space */}
+          {!isMobile && (
+            <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+              <button onClick={isRecording ? stopRecording : startRecording} className="text-primary hover:underline cursor-pointer">
+                <Mic className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice
+              </button>
+              {' · '}
+              <button onClick={() => handleSend('/help')} className="text-primary hover:underline cursor-pointer">/help</button>
+              {' · Conversations saved automatically · Powered by AI'}
+            </p>
+          )}
+          <div className={`flex justify-center ${isMobile ? 'mt-1' : 'mt-2'}`}>
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className="h-16 w-16 object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse"
+              className={`object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse ${isMobile ? 'h-8 w-8' : 'h-16 w-16'}`}
               style={{ filter: 'drop-shadow(0 0 10px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 20px rgba(0, 255, 50, 0.4)) drop-shadow(0 0 40px rgba(0, 255, 50, 0.2))' }}
               loading="lazy"
             />
