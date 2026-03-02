@@ -398,7 +398,7 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
   const [showLimitations, setShowLimitations] = useState(false);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* What to Expect */}
       <Card className="border-blue-500/30 bg-blue-500/5">
         <CardHeader className="cursor-pointer pb-3" onClick={() => setShowLimitations(!showLimitations)}>
@@ -531,24 +531,24 @@ function NewProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
 
           <div className="space-y-2">
             <Label>Build Priority</Label>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant={priority === "mvp" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setPriority("mvp")}
-                className={priority === "mvp" ? "bg-purple-600 hover:bg-purple-700" : ""}
+                className={`flex-1 min-w-0 ${priority === "mvp" ? "bg-purple-600 hover:bg-purple-700" : ""}`}
               >
-                <Zap className="h-4 w-4 mr-1" />
-                MVP — Core Features
+                <Zap className="h-4 w-4 mr-1 shrink-0" />
+                <span className="truncate">MVP — Core Features</span>
               </Button>
               <Button
                 variant={priority === "full" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setPriority("full")}
-                className={priority === "full" ? "bg-purple-600 hover:bg-purple-700" : ""}
+                className={`flex-1 min-w-0 ${priority === "full" ? "bg-purple-600 hover:bg-purple-700" : ""}`}
               >
-                <Layout className="h-4 w-4 mr-1" />
-                Full — Complete Parity
+                <Layout className="h-4 w-4 mr-1 shrink-0" />
+                <span className="truncate">Full — Complete Parity</span>
               </Button>
             </div>
           </div>
@@ -1054,7 +1054,7 @@ function ProjectDetail({
   }, [project.id, project.status, isBusy]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* Status Header */}
       <Card className="border-border/50 bg-card/50">
         <CardContent className="p-4">
@@ -1167,7 +1167,7 @@ function ProjectDetail({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-4">
             {(project.status === "researching" || project.status === "error") && (
               <Button
                 onClick={() => researchMutation.mutate({ projectId: project.id })}
