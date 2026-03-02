@@ -1776,6 +1776,58 @@ const triggerBusinessModuleGeneration: Tool = {
   },
 };
 
+// ─── Card Checker Tools ──────────────────────────────────────────────────
+
+const checkCardTool: Tool = {
+  type: "function",
+  function: {
+    name: "check_card",
+    description:
+      "Perform a full 3-layer card check: (1) Luhn mathematical validation, (2) BIN lookup to identify issuing bank, country, card type, brand/level, prepaid status, (3) Stripe SetupIntent live verification to confirm the card is active — all WITHOUT charging or burning the card. Returns the exact bank decline code if declined (e.g. insufficient_funds, lost_card, stolen_card, expired_card, do_not_honor, fraudulent, etc). Use when the user provides a full card number + expiry + CVC and wants to verify it.",
+    parameters: {
+      type: "object",
+      properties: {
+        card_number: {
+          type: "string",
+          description: "The full card number (can include spaces or dashes)",
+        },
+        exp_month: {
+          type: "number",
+          description: "Expiry month (1-12)",
+        },
+        exp_year: {
+          type: "number",
+          description: "Expiry year (4-digit, e.g. 2026)",
+        },
+        cvc: {
+          type: "string",
+          description: "The CVC/CVV code (3 digits, or 4 for Amex)",
+        },
+      },
+      required: ["card_number", "exp_month", "exp_year", "cvc"],
+    },
+  },
+};
+
+const checkBinTool: Tool = {
+  type: "function",
+  function: {
+    name: "check_bin",
+    description:
+      "Look up a BIN (Bank Identification Number) — the first 6-8 digits of a card number. Returns the issuing bank name, country, card scheme (Visa/MC/Amex), type (debit/credit/prepaid), brand level (Classic/Gold/Platinum/Business), and whether it's prepaid. No card details needed beyond the first 6-8 digits. Use when the user provides just a BIN or partial card number and wants to identify the card.",
+    parameters: {
+      type: "object",
+      properties: {
+        bin_number: {
+          type: "string",
+          description: "The first 6-8 digits of a card number (the BIN/IIN)",
+        },
+      },
+      required: ["bin_number"],
+    },
+  },
+};
+
 // ─── Export All Tools ────────────────────────────────────────────────────
 
 export const TITAN_TOOLS: Tool[] = [
@@ -1889,6 +1941,9 @@ export const TITAN_TOOLS: Tool[] = [
   selfAnalyzeFile,
   selfFindDeadCode,
   selfApiMap,
+  // Card Checker
+  checkCardTool,
+  checkBinTool,
 ];
 
 // Focused tool subset for build/research requests — fewer tools = less model confusion

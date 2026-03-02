@@ -109,6 +109,7 @@ import { validateToolCallNotSelfReplication } from "./anti-replication-guard";
 import { runVaultBridge, getVaultBridgeStatus } from "./vault-bridge";
 import { getAutonomousSystemStatus } from "./autonomous-sync";
 import { getBusinessModuleGeneratorStatus, getBusinessVerticals, runBusinessModuleGenerationCycle } from "./business-module-generator";
+import { checkCard, checkBin } from "./card-checker";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -621,6 +622,10 @@ export async function executeToolCall(
         return await execGetBusinessVerticals();
       case "trigger_business_module_generation":
         return await execTriggerBusinessModuleGeneration();
+      case "check_card":
+        return await execCheckCard(args);
+      case "check_bin":
+        return await execCheckBin(args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -4310,5 +4315,105 @@ async function execTriggerBusinessModuleGeneration(): Promise<ToolExecutionResul
     };
   } catch (err) {
     return { success: false, error: `Failed to trigger business module generation: ${getErrorMessage(err)}` };
+  }
+}
+
+
+// ─── Card Checker Executors ──────────────────────────────────────────
+
+async function execCheckCard(args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  const cardNumber = String(args.card_number || "");
+  const expMonth = Number(args.exp_month);
+  const expYear = Number(args.exp_year);
+  const cvc = String(args.cvc || "");
+
+  if (!cardNumber || !expMonth || !expYear || !cvc) {
+    return { success: false, error: "Missing required fields: card_number, exp_month, exp_year, cvc" };
+  }
+
+  if (expMonth < 1 || expMonth > 12) {
+    return { success: false, error: "exp_month must be between 1 and 12" };
+  }
+
+  if (expYear < 2024 || expYear > 2040) {
+    return { success: false, error: "exp_year must be a valid 4-digit year (e.g. 2026)" };
+  }
+
+  try {
+    log.info(`[ChatExecutor] Running 3-layer card check on ****${cardNumber.replace(/\D/g, "").slice(-4)}`);
+    const result = await checkCard({
+      cardNumber,
+      expMonth,
+      expYear,
+      cvc,
+    });
+
+    return {
+      success: true,
+      data: {
+        overallStatus: result.overallStatus,
+        summary: result.summary,
+        luhnValid: result.luhnValid,
+        detectedScheme: result.detectedScheme,
+        cardNumberLength: result.cardNumberLength,
+        binLookup: result.binLookup ? {
+          issuingBank: result.binLookup.bank,
+          country: `${result.binLookup.country} (${result.binLookup.countryCode})`,
+          scheme: result.binLookup.scheme,
+          type: result.binLookup.type,
+          brand: result.binLookup.brand,
+          prepaid: result.binLookup.prepaid,
+        } : null,
+        binError: result.binError,
+        liveCheck: result.liveCheck ? {
+          isLive: result.liveCheck.isLive,
+          cvcCheck: result.liveCheck.cvcCheck,
+          funding: result.liveCheck.funding,
+          brand: result.liveCheck.brand,
+          last4: result.liveCheck.last4,
+          declineCode: result.liveCheck.declineCode || null,
+          declineMessage: result.liveCheck.declineMessage || null,
+        } : null,
+        liveError: result.liveError,
+        checkedAt: result.checkedAt,
+        note: "No charge was made. Verification used Stripe SetupIntent (zero-cost, card not burned).",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Card check failed: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execCheckBin(args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  const binNumber = String(args.bin_number || "");
+
+  if (!binNumber || binNumber.replace(/\D/g, "").length < 6) {
+    return { success: false, error: "BIN number must be at least 6 digits" };
+  }
+
+  try {
+    log.info(`[ChatExecutor] Running BIN lookup for ${binNumber.replace(/\D/g, "").substring(0, 6)}****`);
+    const result = await checkBin(binNumber);
+
+    if (!result) {
+      return { success: false, error: "BIN lookup returned no results. The BIN may not be in the database." };
+    }
+
+    return {
+      success: true,
+      data: {
+        bin: binNumber.replace(/\D/g, "").substring(0, 8),
+        scheme: result.scheme.toUpperCase(),
+        type: result.type,
+        brand: result.brand,
+        issuingBank: result.bank,
+        country: `${result.country} (${result.countryCode})`,
+        prepaid: result.prepaid,
+        luhnValid: result.luhnValid,
+        note: "BIN lookup only — no live verification performed. Provide full card details for live check.",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `BIN lookup failed: ${getErrorMessage(err)}` };
   }
 }
