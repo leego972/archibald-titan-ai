@@ -1,14 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "./LanguageContext";
 
 /**
  * Compact language selector dropdown.
  * Shows current language flag + code, expands to show all 12 languages.
+ * On mobile, always opens downward to prevent flags going off-screen.
  */
 export function LanguageSelector({ compact = false }: { compact?: boolean }) {
   const { language, languageMeta, setLanguage, supportedLanguages, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [dropDirection, setDropDirection] = useState<"down" | "up">("down");
 
   // Close on outside click
   useEffect(() => {
@@ -21,10 +23,45 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Determine whether to open up or down based on available space
+  const calculateDirection = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const dropdownHeight = 320; // max-h-80 = 20rem = 320px
+
+    // On small screens (mobile), always open downward
+    if (window.innerWidth < 768) {
+      setDropDirection("down");
+      return;
+    }
+
+    // On desktop, choose direction based on available space
+    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+      setDropDirection("down");
+    } else {
+      setDropDirection("up");
+    }
+  }, []);
+
+  const handleToggle = () => {
+    if (!open) {
+      calculateDirection();
+    }
+    setOpen(!open);
+  };
+
+  // Dropdown position classes
+  const dropdownPositionClass = dropDirection === "down"
+    ? "top-full mt-1"
+    : "bottom-full mb-1";
+
   return (
     <div ref={ref} className="relative inline-block text-left">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         className="flex items-center gap-1.5 px-2 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
         title={t("common.language")}
         aria-label={t("common.language")}
@@ -47,9 +84,10 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
 
       {open && (
         <div
-          className="absolute bottom-full mb-1 left-0 z-50 w-56 max-h-80 overflow-y-auto rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1"
+          className={`absolute ${dropdownPositionClass} right-0 z-[100] w-56 max-h-[min(320px,50vh)] overflow-y-auto rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1 overscroll-contain`}
           role="listbox"
           aria-label={t("common.language")}
+          style={{ WebkitOverflowScrolling: "touch" }}
         >
           {supportedLanguages.map((lang) => (
             <button
