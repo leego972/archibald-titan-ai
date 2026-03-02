@@ -1200,8 +1200,9 @@ export default function ChatPage() {
   const utils = trpc.useUtils();
 
   // Sync DB messages into local state
+  // Guard: skip sync while a send is in-flight to avoid wiping optimistic messages
   useEffect(() => {
-    if (convDetail?.messages) {
+    if (convDetail?.messages && !isLoading) {
       setLocalMessages(
         convDetail.messages.map((m) => ({
           id: m.id,
@@ -1213,7 +1214,7 @@ export default function ChatPage() {
         }))
       );
     }
-  }, [convDetail]);
+  }, [convDetail, isLoading]);
 
   // Clear local messages when switching to new conversation
   useEffect(() => {
@@ -1593,6 +1594,10 @@ export default function ChatPage() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      // Refetch conversation to sync DB messages now that send is complete
+      if (activeConversationId || convIdForStream) {
+        refetchConv();
       }
     }
   };
