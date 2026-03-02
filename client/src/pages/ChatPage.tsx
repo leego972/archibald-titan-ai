@@ -1204,27 +1204,16 @@ export default function ChatPage() {
   const lastSyncedConvIdRef = useRef<number | null>(null);
 
   // Sync DB messages into local state.
-  // MERGE strategy: DB messages replace their counterparts, but optimistic
+  // ALWAYS merges: DB messages are the source of truth, but optimistic
   // messages (negative IDs tracked in optimisticIdsRef) are preserved until
   // the DB catches up. This prevents the "flicker and disappear" bug.
   useEffect(() => {
     if (!convDetail?.messages) return;
-    // If we switched conversations, do a full replace (no optimistic msgs to keep)
-    if (lastSyncedConvIdRef.current !== activeConversationId) {
-      lastSyncedConvIdRef.current = activeConversationId;
-      setLocalMessages(
-        convDetail.messages.map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          createdAt: m.createdAt,
-          actionsTaken: m.actionsTaken,
-          toolCalls: m.toolCalls,
-        }))
-      );
-      return;
-    }
-    // Merge: keep optimistic messages that aren't in the DB yet
+    // Update the last synced conversation ID (for tracking purposes only)
+    lastSyncedConvIdRef.current = activeConversationId;
+    // Always use merge strategy — even on conversation switch, because
+    // when we pre-create a conversation and then the query fires with
+    // empty messages, we must NOT wipe optimistic messages.
     setLocalMessages((prev) => {
       const dbMessages: ChatMsg[] = convDetail.messages.map((m) => ({
         id: m.id,
@@ -1678,6 +1667,11 @@ export default function ChatPage() {
   };
 
   const handleSelectConversation = (id: number) => {
+    // When user manually selects a different conversation, clear optimistic state
+    if (id !== activeConversationId) {
+      optimisticIdsRef.current.clear();
+      setLocalMessages([]);
+    }
     setActiveConversationId(id);
   };
 
