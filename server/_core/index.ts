@@ -26,6 +26,7 @@ import { runOptimizationCycleV2 } from "../affiliate-engine-v2";
 import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
+import { startBusinessModuleGeneratorScheduler } from "../business-module-generator";
 import { startSecuritySweepScheduler } from "../security-hardening";
 import { startFortressSweepScheduler } from "../security-fortress";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
@@ -610,6 +611,14 @@ async function startServer() {
     // Grand Bazaar through seller bots (CyberForge, GhostNet,
     // VaultKeeper, dEciever000). Deduplicates against existing titles.
     startModuleGeneratorScheduler();
+
+    // ─── Autonomous Business Module Generator ────────────────
+    // Runs weekly on Wednesdays at 2 AM: generates 2-3 business
+    // modules targeting a rotating vertical (SaaS, e-commerce,
+    // healthcare, finance, marketing, etc.). 15 verticals rotate
+    // weekly. Modules are designed to be expandable across industries.
+    startBusinessModuleGeneratorScheduler();
+
     // ─── Marketplace Seeding ──────────────────────────────────────
     // Seeds seller bot accounts and their module listings on first run.
     // Idempotent — skips if bots already exist.

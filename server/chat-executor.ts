@@ -108,6 +108,7 @@ import { getErrorMessage } from "./_core/errors.js";
 import { validateToolCallNotSelfReplication } from "./anti-replication-guard";
 import { runVaultBridge, getVaultBridgeStatus } from "./vault-bridge";
 import { getAutonomousSystemStatus } from "./autonomous-sync";
+import { getBusinessModuleGeneratorStatus, getBusinessVerticals, runBusinessModuleGenerationCycle } from "./business-module-generator";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -613,6 +614,13 @@ export async function executeToolCall(
         return await execRefreshVaultBridge(args.force as boolean | undefined);
       case "get_vault_bridge_info":
         return await execGetVaultBridgeInfo();
+      // ── Business Module Generator ────────────────────────────────────
+      case "get_business_module_status":
+        return await execGetBusinessModuleStatus();
+      case "get_business_verticals":
+        return await execGetBusinessVerticals();
+      case "trigger_business_module_generation":
+        return await execTriggerBusinessModuleGeneration();
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -4250,5 +4258,57 @@ async function execGetVaultBridgeInfo(): Promise<ToolExecutionResult> {
     };
   } catch (err) {
     return { success: false, error: `Failed to get vault bridge info: ${getErrorMessage(err)}` };
+  }
+}
+
+
+// ─── Business Module Generator Executors ───────────────────────────
+
+async function execGetBusinessModuleStatus(): Promise<ToolExecutionResult> {
+  try {
+    const status = getBusinessModuleGeneratorStatus();
+    return {
+      success: true,
+      data: {
+        ...status,
+        description: "Generates 2-3 business foundation modules every Wednesday. Each module is priced 30% below what it would cost to build from scratch, includes security hardening, and is designed for Titan to expand further.",
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to get business module status: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execGetBusinessVerticals(): Promise<ToolExecutionResult> {
+  try {
+    const verticals = getBusinessVerticals();
+    return {
+      success: true,
+      data: {
+        totalVerticals: verticals.length,
+        rotationCycle: `${verticals.length} weeks to complete full rotation`,
+        verticals,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to get business verticals: ${getErrorMessage(err)}` };
+  }
+}
+
+async function execTriggerBusinessModuleGeneration(): Promise<ToolExecutionResult> {
+  try {
+    log.info("[ChatExecutor] Manually triggering business module generation cycle...");
+    const result = await runBusinessModuleGenerationCycle();
+    return {
+      success: true,
+      data: {
+        ...result,
+        message: result.modulesListed > 0
+          ? `Generated ${result.modulesListed} new business module(s) for ${result.vertical}: ${result.titles.join(", ")}`
+          : `Generation cycle ran but no modules were listed. Errors: ${result.errors.join("; ")}`,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to trigger business module generation: ${getErrorMessage(err)}` };
   }
 }

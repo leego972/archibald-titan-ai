@@ -249,11 +249,19 @@ export async function getAutonomousSystemStatus(): Promise<{
   // ─── Marketplace Systems ──────────────────────────────────────
 
   systems.push({
-    name: "Autonomous Module Generator",
+    name: "Autonomous Module Generator (Cyber)",
     category: "marketplace",
     status: "active",
     schedule: "Weekly (Sundays at 3 AM)",
-    nextAction: "Generates 3-5 fresh cyber security modules for Grand Bazaar",
+    nextAction: "Generates 3 fresh cyber security modules for Grand Bazaar",
+  });
+
+  systems.push({
+    name: "Business Module Generator",
+    category: "marketplace",
+    status: "active",
+    schedule: "Weekly (Wednesdays at 2 AM)",
+    nextAction: "Generates 2-3 business modules — rotates through 15 industry verticals weekly",
   });
 
   // ─── Channel Token Status ──────────────────────────────────────

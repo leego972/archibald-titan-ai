@@ -48,6 +48,7 @@ const SELF_REPLICATION_SIGNATURES = [
   "chat-executor.ts",
   "advertising-orchestrator",
   "module-generator-engine",
+  "business-module-generator",
   "affiliate-discovery-engine",
   "marketplace-seed.ts",
   "stripe-router.ts",

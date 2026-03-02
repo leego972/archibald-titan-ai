@@ -1732,6 +1732,50 @@ const getVaultBridgeInfo: Tool = {
   },
 };
 
+// ─── Business Module Generator Tools ───────────────────────────────────────
+
+const getBusinessModuleStatus: Tool = {
+  type: "function",
+  function: {
+    name: "get_business_module_status",
+    description:
+      "Get the status of the Business Module Generator — shows which industry vertical is active this week, next week's vertical, pricing model (30% below build cost), price examples for small/medium/large modules, and when it last ran. Use this when the user asks about marketplace content generation or business modules.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+const getBusinessVerticalsList: Tool = {
+  type: "function",
+  function: {
+    name: "get_business_verticals",
+    description:
+      "Get the full list of 15 business verticals that the Business Module Generator rotates through weekly. Each vertical includes the business focus areas and security considerations. Use this when the user asks what industries are covered or what modules will be generated.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+const triggerBusinessModuleGeneration: Tool = {
+  type: "function",
+  function: {
+    name: "trigger_business_module_generation",
+    description:
+      "Manually trigger a business module generation cycle for the current week's vertical. This generates 2-3 new marketplace modules immediately instead of waiting for the Wednesday schedule. Use when the owner wants fresh modules now. Each module is priced 30% below build-from-scratch cost.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 // ─── Export All Tools ────────────────────────────────────────────────────
 
 export const TITAN_TOOLS: Tool[] = [
@@ -1827,6 +1871,10 @@ export const TITAN_TOOLS: Tool[] = [
   getChannelStatus,
   refreshVaultBridge,
   getVaultBridgeInfo,
+  // Business Module Generator
+  getBusinessModuleStatus,
+  getBusinessVerticalsList,
+  triggerBusinessModuleGeneration,
   // Advanced Builder Tools
   selfDependencyAudit,
   selfGrepCodebase,
