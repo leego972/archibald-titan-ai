@@ -82,6 +82,9 @@ import {
   ExternalLink,
   Key,
   Save,
+  Monitor,
+  Apple,
+  Smartphone,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import {
@@ -854,6 +857,44 @@ export default function ChatPage() {
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
 
+  // ─── Download App State ───────────────────────────────────────────
+  const { data: latestRelease } = trpc.releases.latest.useQuery();
+  const requestDownloadToken = trpc.download.requestToken.useMutation();
+  const [downloadPending, setDownloadPending] = useState<string | null>(null);
+  const [detectedPlatform] = useState<"windows" | "mac" | "linux">(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes("mac")) return "mac";
+    if (ua.includes("linux") || ua.includes("ubuntu") || ua.includes("debian") || ua.includes("fedora")) return "linux";
+    return "windows";
+  });
+
+  const handleDownloadApp = async (platform: "windows" | "mac" | "linux") => {
+    if (!latestRelease) {
+      toast.error("No release available yet. Check back soon!");
+      return;
+    }
+    const hasDownload =
+      platform === "windows" ? latestRelease.hasWindows :
+      platform === "mac" ? latestRelease.hasMac :
+      latestRelease.hasLinux;
+    if (!hasDownload) {
+      toast.info(`${platform === "mac" ? "macOS" : platform === "windows" ? "Windows" : "Linux"} build coming soon!`);
+      return;
+    }
+    try {
+      setDownloadPending(platform);
+      const { token } = await requestDownloadToken.mutateAsync({
+        releaseId: latestRelease.id,
+        platform,
+      });
+      window.open(`/api/download/${token}`, "_blank");
+      toast.success(`Downloading Titan for ${platform === "mac" ? "macOS" : platform === "windows" ? "Windows" : "Linux"}...`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Download failed. Please try again.");
+    } finally {
+      setDownloadPending(null);
+    }
+  };
 
   // UI state
   const [showHelp, setShowHelp] = useState(false);
@@ -1629,6 +1670,57 @@ export default function ChatPage() {
                       ))}
                     </div>
                   )}
+
+                  {/* ─── Download App ─── */}
+                  <div className="max-w-lg w-full mt-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Download App</h3>
+                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-10 w-10 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0">
+                          <Download className="h-5 w-5 text-cyan-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">Titan Desktop</p>
+                          <p className="text-xs text-muted-foreground">Same features as the web — plus offline mode{latestRelease ? ` • v${latestRelease.version}` : ''}</p>
+                        </div>
+                      </div>
+                      {/* Recommended platform button */}
+                      <button
+                        onClick={() => handleDownloadApp(detectedPlatform)}
+                        disabled={!!downloadPending}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-semibold transition-all mb-2"
+                      >
+                        {downloadPending === detectedPlatform ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          detectedPlatform === 'windows' ? <Monitor className="h-4 w-4" /> :
+                          detectedPlatform === 'mac' ? <Apple className="h-4 w-4" /> :
+                          <Terminal className="h-4 w-4" />
+                        )}
+                        Download for {detectedPlatform === 'mac' ? 'macOS' : detectedPlatform === 'windows' ? 'Windows' : 'Linux'}
+                      </button>
+                      {/* Other platforms */}
+                      <div className="flex items-center justify-center gap-4 mt-1">
+                        {(['windows', 'mac', 'linux'] as const).filter(p => p !== detectedPlatform).map(platform => (
+                          <button
+                            key={platform}
+                            onClick={() => handleDownloadApp(platform)}
+                            disabled={!!downloadPending}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-cyan-400 disabled:opacity-50 transition-colors"
+                          >
+                            {downloadPending === platform ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              platform === 'windows' ? <Monitor className="h-3 w-3" /> :
+                              platform === 'mac' ? <Apple className="h-3 w-3" /> :
+                              <Terminal className="h-3 w-3" />
+                            )}
+                            {platform === 'mac' ? 'macOS' : platform === 'windows' ? 'Windows' : 'Linux'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
 
                   {/* ─── Funding Features Showcase ─── */}
                   <div className="max-w-lg w-full mt-4">
