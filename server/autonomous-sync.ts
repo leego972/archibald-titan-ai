@@ -14,7 +14,8 @@
  */
 
 import { getDb } from "./db";
-import { marketingSettings, marketingContent, marketingActivityLog, blogPosts } from "../drizzle/schema";
+import { marketingSettings, marketingContent, marketingActivityLog, blogPosts, users, subscriptions } from "../drizzle/schema";
+import { addCredits } from "./credit-service";
 import { eq, desc, sql, gte, count } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { createLogger } from "./_core/logger.js";
@@ -568,6 +569,13 @@ export async function runStartupDiagnostic(): Promise<void> {
     log.warn("[AutonomousSync] Vault Bridge failed (non-critical):", { error: String(err) });
   }
 
+  // 0c. One-time beta tester grants (runs once, skips if already granted)
+  try {
+    await grantBetaTesters();
+  } catch (err) {
+    log.warn("[AutonomousSync] Beta tester grant failed (non-critical):", { error: String(err) });
+  }
+
   // 1. Patch IndexNow key
   patchIndexNowKey();
 
@@ -695,6 +703,76 @@ export function startPeriodicSync(): void {
       log.error("[AutonomousSync] Periodic sync failed:", { error: String(getErrorMessage(err)) });
     }
   }, 6 * 60 * 60 * 1000); // Every 6 hours
+}
+
+// ─── One-Time Beta Tester Grants ─────────────────────────────────────
+// Add emails here for one-time comp'd access. The function is idempotent —
+// it skips users who already have an active subscription.
+
+const BETA_TESTERS: Array<{ email: string; plan: "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan"; months: number; reason: string }> = [
+  { email: "yewzernaymgone@gmail.com", plan: "pro", months: 12, reason: "Beta tester — 1 year Pro comp" },
+];
+
+async function grantBetaTesters(): Promise<void> {
+  if (BETA_TESTERS.length === 0) return;
+  const db = await getDb();
+  if (!db) return;
+
+  for (const tester of BETA_TESTERS) {
+    try {
+      // Find user by email (case-insensitive)
+      const [user] = await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${tester.email})`)
+        .limit(1);
+
+      if (!user) {
+        log.info(`[BetaGrant] User ${tester.email} not signed up yet — will retry next boot`);
+        continue;
+      }
+
+      // Check if they already have an active subscription
+      const [existing] = await db
+        .select({ plan: subscriptions.plan, status: subscriptions.status })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, user.id))
+        .limit(1);
+
+      if (existing && existing.status === "active" && existing.plan !== "free") {
+        log.info(`[BetaGrant] ${tester.email} already has ${existing.plan} — skipping`);
+        continue;
+      }
+
+      // Grant the subscription
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + tester.months);
+
+      if (existing) {
+        await db.update(subscriptions)
+          .set({ plan: tester.plan, status: "active", currentPeriodEnd: periodEnd })
+          .where(eq(subscriptions.userId, user.id));
+      } else {
+        await db.insert(subscriptions).values({
+          userId: user.id,
+          stripeCustomerId: `beta_comp_${user.id}`,
+          stripeSubscriptionId: `beta_grant_${Date.now()}`,
+          plan: tester.plan,
+          status: "active",
+          currentPeriodEnd: periodEnd,
+        });
+      }
+
+      // Grant Pro credits (5,000)
+      const creditAmounts: Record<string, number> = { pro: 5000, enterprise: 25000, cyber: 100000, cyber_plus: 500000 };
+      const credits = creditAmounts[tester.plan] || 5000;
+      await addCredits(user.id, credits, "admin_adjustment", `Beta tester grant: ${tester.reason}`);
+
+      log.info(`[BetaGrant] ✅ Granted ${tester.plan} to ${tester.email} (userId=${user.id}) until ${periodEnd.toISOString().slice(0, 10)} + ${credits} credits`);
+    } catch (err) {
+      log.warn(`[BetaGrant] Failed to grant ${tester.email}:`, { error: String(err) });
+    }
+  }
 }
 
 export function stopPeriodicSync(): void {
