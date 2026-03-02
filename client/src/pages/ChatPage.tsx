@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { TitanLogo } from "@/components/TitanLogo";
+import { AT_ICON_FULL } from "@/lib/logos";
 import AffiliateRecommendations from "@/components/AffiliateRecommendations";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -85,6 +86,10 @@ import {
   Monitor,
   Apple,
   Smartphone,
+  Volume2,
+  VolumeX,
+  AudioLines,
+  PhoneOff,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import {
@@ -914,6 +919,140 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Voice Mode State (full-screen voice assistant)
+  const [voiceModeActive, setVoiceModeActive] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceModeRef = useRef(false); // non-reactive ref for use in async callbacks
+
+  // Keep voiceModeRef in sync
+  useEffect(() => { voiceModeRef.current = voiceModeActive; }, [voiceModeActive]);
+
+  // Strip markdown for TTS (remove links, bold, code blocks, etc.)
+  const stripMarkdown = (text: string): string => {
+    return text
+      .replace(/```[\s\S]*?```/g, '') // code blocks
+      .replace(/`[^`]+`/g, '') // inline code
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links/images
+      .replace(/#{1,6}\s/g, '') // headers
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+      .replace(/\*([^*]+)\*/g, '$1') // italic
+      .replace(/~~([^~]+)~~/g, '$1') // strikethrough
+      .replace(/^[\s]*[-*+]\s/gm, '') // list markers
+      .replace(/^[\s]*\d+\.\s/gm, '') // numbered lists
+      .replace(/^>\s?/gm, '') // blockquotes
+      .replace(/\|[^\n]+\|/g, '') // tables
+      .replace(/---+/g, '') // horizontal rules
+      .replace(/\n{3,}/g, '\n\n') // excessive newlines
+      .trim();
+  };
+
+  // TTS: speak text aloud
+  const speakText = async (text: string) => {
+    if (!text.trim()) return;
+    const cleanText = stripMarkdown(text).slice(0, 4096);
+    if (!cleanText) return;
+
+    // Stop any currently playing audio
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+    }
+
+    setIsSpeaking(true);
+    setVoiceStatus('speaking');
+
+    try {
+      const csrfTk = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+      const res = await fetch('/api/voice/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfTk ? { 'x-csrf-token': csrfTk } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ text: cleanText, voice: 'nova', speed: 1.0 }),
+      });
+
+      if (!res.ok) {
+        throw new Error('TTS request failed');
+      }
+
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      ttsAudioRef.current = audio;
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        ttsAudioRef.current = null;
+        // Auto-listen after speaking if voice mode is still active
+        if (voiceModeRef.current) {
+          setVoiceStatus('idle');
+          // Small delay before auto-listening
+          setTimeout(() => {
+            if (voiceModeRef.current) {
+              startRecording();
+              setVoiceStatus('listening');
+            }
+          }, 600);
+        }
+      };
+
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        ttsAudioRef.current = null;
+        if (voiceModeRef.current) setVoiceStatus('idle');
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error('[TTS] Error:', err);
+      setIsSpeaking(false);
+      if (voiceModeRef.current) setVoiceStatus('idle');
+    }
+  };
+
+  // Enter voice mode
+  const enterVoiceMode = () => {
+    setVoiceModeActive(true);
+    setVoiceStatus('idle');
+    // Start listening immediately
+    setTimeout(() => {
+      startRecording();
+      setVoiceStatus('listening');
+    }, 300);
+  };
+
+  // Exit voice mode
+  const exitVoiceMode = () => {
+    setVoiceModeActive(false);
+    setVoiceStatus('idle');
+    // Stop any recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    // Stop any TTS playback
+    if (ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+      setIsSpeaking(false);
+    }
+  };
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current = null;
+      }
+    };
+  }, []);
+
   // File Upload State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showProjectFiles, setShowProjectFiles] = useState(false);
@@ -991,6 +1130,7 @@ export default function ChatPage() {
 
         setIsRecording(false);
         setIsTranscribing(true);
+        if (voiceModeRef.current) setVoiceStatus('thinking');
         try {
           const formData = new FormData();
           formData.append('audio', audioBlob, `recording.${mimeType.includes('webm') ? 'webm' : 'm4a'}`);
@@ -1003,13 +1143,16 @@ export default function ChatPage() {
           const { url: audioUrl } = await uploadRes.json();
           const result = await transcribeMutation.mutateAsync({ audioUrl });
           if (result.text && result.text.trim()) {
+            if (voiceModeRef.current) setVoiceStatus('thinking');
             handleSend(result.text.trim());
           } else {
             toast.error('Could not understand the audio. Please try again.');
+            if (voiceModeRef.current) setVoiceStatus('idle');
           }
         } catch (err: any) {
           console.error('[Voice] Transcription error:', err);
           toast.error(err.message || 'Voice transcription failed. Please try again.');
+          if (voiceModeRef.current) setVoiceStatus('idle');
         } finally {
           setIsTranscribing(false);
         }
@@ -1021,7 +1164,8 @@ export default function ChatPage() {
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-      toast.success('Recording started. Tap stop when done.');
+      if (!voiceModeRef.current) toast.success('Recording started. Tap stop when done.');
+      if (voiceModeRef.current) setVoiceStatus('listening');
     } catch (err: any) {
       console.error('[Voice] Microphone access error:', err);
       if (err.name === 'NotAllowedError') {
@@ -1398,6 +1542,11 @@ export default function ChatPage() {
       };
 
       setLocalMessages((prev) => [...prev, assistantMsg]);
+
+      // Voice Mode: speak the response aloud
+      if (voiceModeRef.current && result.response) {
+        speakText(result.response);
+      }
 
       // Track created files for the project files panel
       if (result.actions && result.actions.length > 0) {
@@ -2142,6 +2291,16 @@ export default function ChatPage() {
                   accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.json,.xml,.zip"
                   className="hidden"
                 />
+
+                <button
+                  onClick={enterVoiceMode}
+                  className={`flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all touch-target ${
+                    isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'
+                  }`}
+                  title="Voice Mode — talk to Titan"
+                >
+                  <AudioLines className="h-4 w-4" />
+                </button>
               </div>
 
               {/* Textarea */}
@@ -2193,6 +2352,10 @@ export default function ChatPage() {
             <p className="text-[10px] text-muted-foreground text-center mt-1.5">
               <button onClick={isRecording ? stopRecording : startRecording} className="text-primary hover:underline cursor-pointer">
                 <Mic className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice
+              </button>
+              {' · '}
+              <button onClick={enterVoiceMode} className="text-purple-400 hover:underline cursor-pointer">
+                <AudioLines className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice Mode
               </button>
               {' · '}
               <button onClick={() => handleSend('/help')} className="text-primary hover:underline cursor-pointer">/help</button>
@@ -2450,6 +2613,160 @@ export default function ChatPage() {
               <ExternalLink className="h-3.5 w-3.5" />
               Push to GitHub
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Voice Mode Overlay */}
+      {voiceModeActive && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-background via-background/98 to-background"
+          style={{ backdropFilter: 'blur(20px)' }}
+        >
+          {/* Close button */}
+          <button
+            onClick={exitVoiceMode}
+            className="absolute top-6 right-6 p-3 rounded-full bg-muted/50 hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all"
+          >
+            <PhoneOff className="h-6 w-6" />
+          </button>
+
+          {/* Status text top */}
+          <div className="absolute top-8 left-0 right-0 text-center">
+            <span className="text-sm font-medium text-muted-foreground tracking-wider uppercase">
+              Voice Mode
+            </span>
+          </div>
+
+          {/* Large Titan Logo with pulse animation */}
+          <div className={`relative mb-8 ${
+            voiceStatus === 'listening' ? 'animate-pulse' : ''
+          }`}>
+            {/* Outer glow rings */}
+            <div className={`absolute inset-0 rounded-full transition-all duration-700 ${
+              voiceStatus === 'listening'
+                ? 'bg-cyan-500/20 scale-150 animate-ping'
+                : voiceStatus === 'speaking'
+                ? 'bg-purple-500/20 scale-150 animate-pulse'
+                : voiceStatus === 'thinking'
+                ? 'bg-amber-500/20 scale-125 animate-pulse'
+                : 'bg-transparent scale-100'
+            }`} />
+            <div className={`absolute inset-0 rounded-full transition-all duration-500 ${
+              voiceStatus === 'listening'
+                ? 'bg-cyan-500/10 scale-125'
+                : voiceStatus === 'speaking'
+                ? 'bg-purple-500/10 scale-125'
+                : voiceStatus === 'thinking'
+                ? 'bg-amber-500/10 scale-110'
+                : 'bg-transparent scale-100'
+            }`} />
+
+            {/* Logo container */}
+            <div className={`relative h-48 w-48 sm:h-56 sm:w-56 rounded-full flex items-center justify-center transition-all duration-500 ${
+              voiceStatus === 'listening'
+                ? 'ring-4 ring-cyan-500/60 shadow-[0_0_60px_rgba(0,200,255,0.3)]'
+                : voiceStatus === 'speaking'
+                ? 'ring-4 ring-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.3)]'
+                : voiceStatus === 'thinking'
+                ? 'ring-4 ring-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.3)]'
+                : 'ring-2 ring-border/50'
+            }`}>
+              <img
+                src={AT_ICON_FULL}
+                alt="Titan"
+                className="h-40 w-40 sm:h-48 sm:w-48 object-contain drop-shadow-2xl"
+                draggable={false}
+              />
+            </div>
+          </div>
+
+          {/* Status indicator */}
+          <div className="flex items-center gap-3 mb-6">
+            {voiceStatus === 'listening' && (
+              <>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-cyan-500 rounded-full animate-pulse"
+                      style={{
+                        height: `${12 + Math.random() * 20}px`,
+                        animationDelay: `${i * 0.15}s`,
+                        animationDuration: '0.6s',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-lg font-medium text-cyan-400">Listening...</span>
+              </>
+            )}
+            {voiceStatus === 'thinking' && (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                <span className="text-lg font-medium text-amber-400">Thinking...</span>
+              </>
+            )}
+            {voiceStatus === 'speaking' && (
+              <>
+                <Volume2 className="h-5 w-5 text-purple-400 animate-pulse" />
+                <span className="text-lg font-medium text-purple-400">Speaking...</span>
+              </>
+            )}
+            {voiceStatus === 'idle' && (
+              <span className="text-lg font-medium text-muted-foreground">Tap the logo to speak</span>
+            )}
+          </div>
+
+          {/* Tap-to-talk / Stop buttons */}
+          <div className="flex gap-4">
+            {voiceStatus === 'idle' && (
+              <button
+                onClick={() => { startRecording(); setVoiceStatus('listening'); }}
+                className="px-8 py-4 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 transition-all text-lg font-medium flex items-center gap-3"
+              >
+                <Mic className="h-6 w-6" />
+                Start Talking
+              </button>
+            )}
+            {voiceStatus === 'listening' && (
+              <button
+                onClick={stopRecording}
+                className="px-8 py-4 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 transition-all text-lg font-medium flex items-center gap-3 animate-pulse"
+              >
+                <Square className="h-5 w-5 fill-current" />
+                Stop
+              </button>
+            )}
+            {voiceStatus === 'speaking' && (
+              <button
+                onClick={() => {
+                  if (ttsAudioRef.current) {
+                    ttsAudioRef.current.pause();
+                    ttsAudioRef.current = null;
+                  }
+                  setIsSpeaking(false);
+                  setVoiceStatus('idle');
+                }}
+                className="px-8 py-4 rounded-2xl bg-muted/50 border border-border/50 text-muted-foreground hover:bg-muted transition-all text-lg font-medium flex items-center gap-3"
+              >
+                <VolumeX className="h-6 w-6" />
+                Stop Speaking
+              </button>
+            )}
+          </div>
+
+          {/* Recording duration */}
+          {voiceStatus === 'listening' && recordingDuration > 0 && (
+            <div className="mt-4 text-sm text-muted-foreground">
+              {formatDuration(recordingDuration)}
+            </div>
+          )}
+
+          {/* Bottom hint */}
+          <div className="absolute bottom-8 left-0 right-0 text-center">
+            <p className="text-xs text-muted-foreground">
+              Voice conversations are saved to your chat history
+            </p>
           </div>
         </div>
       )}

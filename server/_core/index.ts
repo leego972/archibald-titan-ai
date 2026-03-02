@@ -18,7 +18,7 @@ import { registerApiRoutes } from "../api-access-router";
 import { registerV5ApiRoutes } from "../v5-features-router";
 import { registerEmailAuthRoutes } from "../email-auth-router";
 import { registerReleaseUploadRoute, registerUpdateFeedRoutes, registerGitHubSyncRoute } from "../releases-router";
-import { registerVoiceUploadRoute } from "../voice-router";
+import { registerVoiceUploadRoute, registerVoiceTTSRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
@@ -284,6 +284,8 @@ async function startServer() {
   registerBundleSyncRoutes(app);
   // Voice audio upload endpoint
   registerVoiceUploadRoute(app);
+  // Voice text-to-speech endpoint
+  registerVoiceTTSRoute(app);
   // Marketplace file upload/download endpoints
   registerMarketplaceFileRoutes(app);
   // Chat file upload endpoint

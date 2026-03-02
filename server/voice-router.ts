@@ -166,6 +166,85 @@ export function registerVoiceUploadRoute(app: Express) {
   });
 }
 
+/**
+ * Express route for text-to-speech
+ * POST /api/voice/tts
+ * Accepts JSON { text, voice?, speed? }, returns audio/mpeg stream
+ */
+export function registerVoiceTTSRoute(app: Express) {
+  app.post("/api/voice/tts", async (req: Request, res: Response) => {
+    try {
+      // Auth check
+      const ctx = await createContext({ req, res, info: {} } as CreateExpressContextOptions);
+      if (!ctx.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Parse JSON body
+      const { text, voice, speed } = req.body || {};
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        return res.status(400).json({ error: "Missing 'text' field" });
+      }
+
+      // Limit text length to prevent abuse (4096 chars max for TTS)
+      const trimmedText = text.slice(0, 4096);
+
+      const apiKey = process.env.OPENAI_API_KEY || "";
+      if (!apiKey) {
+        return res.status(503).json({ error: "TTS not configured" });
+      }
+
+      const ttsVoice = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"].includes(voice) ? voice : "nova";
+      const ttsSpeed = typeof speed === "number" && speed >= 0.25 && speed <= 4.0 ? speed : 1.0;
+
+      const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "tts-1",
+          input: trimmedText,
+          voice: ttsVoice,
+          speed: ttsSpeed,
+          response_format: "mp3",
+        }),
+      });
+
+      if (!ttsRes.ok) {
+        const errText = await ttsRes.text().catch(() => "");
+        log.error("[TTS] OpenAI error:", { status: ttsRes.status, error: errText });
+        return res.status(502).json({ error: "TTS generation failed" });
+      }
+
+      // Stream the audio back to the client
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "no-cache");
+
+      const reader = ttsRes.body?.getReader();
+      if (!reader) {
+        return res.status(502).json({ error: "No audio stream" });
+      }
+
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+        res.end();
+      };
+      await pump();
+    } catch (err) {
+      log.error("[TTS] Error:", { error: String(err) });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+}
+
 function getExtFromMime(mime: string): string {
   const map: Record<string, string> = {
     "audio/webm": "webm",

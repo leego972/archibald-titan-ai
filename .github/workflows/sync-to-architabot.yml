@@ -1,0 +1,25 @@
+name: Sync to Architabot
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: sync-architabot
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Mirror to architabot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to architabot mirror
+        run: |
+          git remote add mirror https://x-access-token:${{ secrets.ARCHITABOT_SYNC_TOKEN }}@github.com/leego972/architabot.git || true
+          git push mirror main --force
+        env:
+          GIT_TERMINAL_PROMPT: 0
