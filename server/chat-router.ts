@@ -387,8 +387,9 @@ Complete app navigation map:
 - Proxy pool supports residential, datacenter, mobile, and ISP proxies
 - Two-Factor Authentication (2FA): TOTP-based, set up from Account Settings with any authenticator app. Includes QR code setup and 8 backup codes.
 - Plans: Free (100 credits/mo), Pro ($29/mo — 5,000 credits/mo), Enterprise ($99/mo — 25,000 credits/mo), Cyber ($199/mo — 100,000 credits/mo), Cyber+ ($499/mo — 500,000 credits/mo), Titan ($4,999/mo — 1,000,000 credits/mo)
-- Credit costs: Chat message = 1 credit, Builder action = 3 credits, Fetch = 1 credit, Voice = 2 credits
-- Top-up packs: 500 ($4.99), 2,500 ($14.99), 5,000 ($29.99), 10,000 ($49.99) — upgrading is always better value than top-ups
+- Credit costs: Chat message = 1 credit, Builder action = 3 credits, Fetch = 1 credit, Voice = 3 credits, Image generation = 15 credits
+- Top-up packs: 500 ($4.99), 2,500 ($17.99), 5,000 ($29.99), 10,000 ($59.99) — upgrading is always better value than top-ups
+- Free users earn 5 bonus credits per day just for logging in (capped at 150/month) — mention this to encourage daily engagement
 - **IMPORTANT:** NEVER mention credits, pricing, or plans to the platform owner/admin. This info is for answering non-admin user questions ONLY.
 - V4.0: Leak Scanner, Provider Onboarding, Team Vault
 - V5.0: Developer REST API, Webhooks, API Analytics, Email/Password Auth

@@ -234,7 +234,7 @@ export async function consumeCredits(
 export async function addCredits(
   userId: number,
   amount: number,
-  type: "monthly_refill" | "pack_purchase" | "admin_adjustment" | "referral_bonus" | "signup_bonus",
+  type: "monthly_refill" | "pack_purchase" | "admin_adjustment" | "referral_bonus" | "signup_bonus" | "daily_login_bonus",
   description: string,
   stripePaymentIntentId?: string
 ): Promise<{ success: boolean; balanceAfter: number }> {
@@ -333,6 +333,111 @@ export async function processMonthlyRefill(userId: number): Promise<boolean> {
   );
 
   return true;
+}
+
+// ─── Daily Login Bonus (Free Tier Engagement) ────────────────────────
+//
+// DAILY LOGIN BONUS PHILOSOPHY:
+// - Free users get 5 credits per day just for logging in / using the platform.
+// - Capped at 150 credits per month (30 days × 5) to prevent abuse.
+// - This costs nothing (credits are virtual) but dramatically increases:
+//   1. Daily active users (DAU) — users come back every day to claim bonus
+//   2. Retention — users feel progress even on the free tier
+//   3. Conversion — users who engage daily are more likely to upgrade
+// - Only applies to free tier users. Paid users already get generous allocations.
+// - The bonus resets each calendar month along with loginBonusThisMonth counter.
+
+const DAILY_LOGIN_BONUS_AMOUNT = 5;
+const MONTHLY_LOGIN_BONUS_CAP = 150;
+
+export async function processDailyLoginBonus(userId: number): Promise<{ awarded: boolean; amount: number; monthlyTotal: number }> {
+  const db = await getDb();
+  if (!db) return { awarded: false, amount: 0, monthlyTotal: 0 };
+
+  await ensureBalance(userId);
+
+  // Only award to non-unlimited (non-admin) users
+  const bal = await db
+    .select({
+      isUnlimited: creditBalances.isUnlimited,
+      lastLoginBonusAt: creditBalances.lastLoginBonusAt,
+      loginBonusThisMonth: creditBalances.loginBonusThisMonth,
+    })
+    .from(creditBalances)
+    .where(eq(creditBalances.userId, userId))
+    .limit(1);
+
+  if (bal.length === 0 || bal[0].isUnlimited) {
+    return { awarded: false, amount: 0, monthlyTotal: 0 };
+  }
+
+  // Only award to free tier users
+  const plan = await getUserPlan(userId);
+  if (plan.planId !== "free") {
+    return { awarded: false, amount: 0, monthlyTotal: bal[0].loginBonusThisMonth };
+  }
+
+  const now = new Date();
+  const lastBonus = bal[0].lastLoginBonusAt;
+  let monthlyTotal = bal[0].loginBonusThisMonth;
+
+  // Reset monthly counter if we're in a new month
+  if (lastBonus) {
+    const differentMonth =
+      lastBonus.getUTCFullYear() !== now.getUTCFullYear() ||
+      lastBonus.getUTCMonth() !== now.getUTCMonth();
+    if (differentMonth) {
+      monthlyTotal = 0;
+    }
+  }
+
+  // Check if already claimed today
+  if (lastBonus) {
+    const sameDay =
+      lastBonus.getUTCFullYear() === now.getUTCFullYear() &&
+      lastBonus.getUTCMonth() === now.getUTCMonth() &&
+      lastBonus.getUTCDate() === now.getUTCDate();
+    if (sameDay) {
+      return { awarded: false, amount: 0, monthlyTotal };
+    }
+  }
+
+  // Check monthly cap
+  if (monthlyTotal >= MONTHLY_LOGIN_BONUS_CAP) {
+    return { awarded: false, amount: 0, monthlyTotal };
+  }
+
+  // Calculate amount (might be less than 5 if near cap)
+  const remaining = MONTHLY_LOGIN_BONUS_CAP - monthlyTotal;
+  const awardAmount = Math.min(DAILY_LOGIN_BONUS_AMOUNT, remaining);
+
+  if (awardAmount <= 0) {
+    return { awarded: false, amount: 0, monthlyTotal };
+  }
+
+  // Award the bonus
+  const newMonthlyTotal = monthlyTotal + awardAmount;
+
+  await db
+    .update(creditBalances)
+    .set({
+      lastLoginBonusAt: now,
+      loginBonusThisMonth: newMonthlyTotal,
+    })
+    .where(eq(creditBalances.userId, userId));
+
+  const result = await addCredits(
+    userId,
+    awardAmount,
+    "daily_login_bonus",
+    `Daily login bonus: +${awardAmount} credits (${newMonthlyTotal}/${MONTHLY_LOGIN_BONUS_CAP} this month)`
+  );
+
+  if (result.success) {
+    return { awarded: true, amount: awardAmount, monthlyTotal: newMonthlyTotal };
+  }
+
+  return { awarded: false, amount: 0, monthlyTotal };
 }
 
 // ─── Get Transaction History ───────────────────────────────────────

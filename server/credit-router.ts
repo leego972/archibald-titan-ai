@@ -13,6 +13,7 @@ import {
   adminAdjustCredits,
   setUnlimited,
   processMonthlyRefill,
+  processDailyLoginBonus,
 } from "./credit-service";
 import { CREDIT_COSTS, CREDIT_PACKS } from "../shared/pricing";
 import { ENV } from "./_core/env";
@@ -41,6 +42,8 @@ export const creditRouter = router({
   getBalance: protectedProcedure.query(async ({ ctx }) => {
     // Attempt monthly refill on every balance check
     await processMonthlyRefill(ctx.user.id);
+    // Award daily login bonus (free tier only, 5 credits/day, 150/month cap)
+    await processDailyLoginBonus(ctx.user.id);
     return getCreditBalance(ctx.user.id);
   }),
 

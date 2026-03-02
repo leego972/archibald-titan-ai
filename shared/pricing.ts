@@ -17,7 +17,7 @@
  * UPGRADE INCENTIVE MATH:
  * - Top-up 5,000 credits = $29.99 (same price as Pro monthly!)
  * - Pro gives 5,000 credits/mo for $29/mo — clearly better value than buying a top-up
- * - Top-up 10,000 credits = $49.99 — Enterprise gives 25,000 for $99/mo (2.5x more for 2x price)
+ * - Top-up 10,000 credits = $59.99 — Enterprise gives 25,000 for $99/mo (4x more credits)
  * - This pricing structure naturally pushes heavy users toward upgrading.
  */
 
@@ -313,11 +313,11 @@ export const PRICING_TIERS: PricingTier[] = [
 export const CREDIT_COSTS = {
   chat_message: 1,        // 1 credit per chat message — feels free
   builder_action: 3,      // 3 credits per builder tool action
-  voice_action: 2,        // 2 credits per voice transcription
+  voice_action: 3,        // 3 credits per voice transcription (covers Whisper API cost at all tiers)
   fetch_action: 1,        // 1 credit per credential fetch — fetches should feel cheap
   clone_action: 50,       // 50 credits per website clone — premium feature (Cyber+/Titan only)
   github_action: 5,       // 5 credits per GitHub repo create or push
-  image_generation: 10,   // 10 credits per AI image generation (DALL-E is expensive)
+  image_generation: 15,   // 15 credits per AI image generation (DALL-E ~$0.04/image — 15cr ensures profitability at all tiers)
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;
@@ -331,8 +331,10 @@ export type CreditActionType = keyof typeof CREDIT_COSTS;
 //   upgrading would have been cheaper. This drives plan upgrades.
 // - Small packs (5,000) are priced at the same cost as Pro monthly ($29.99) to make
 //   the comparison obvious: "Why buy 5K credits once when Pro gives 5K every month?"
-// - Large packs (10,000) are priced at half of Enterprise monthly ($49.99) but give
-//   less than half the credits — again making Enterprise the better deal.
+// - Boost packs ($17.99) are priced at $0.0072/credit — 24% more expensive than Pro's
+//   $0.0058/credit — creating a clear upgrade nudge.
+// - Large packs (10,000) are priced above Pro's per-credit rate ($59.99 = $0.006/credit)
+//   to prevent subscription bypass. Enterprise is still the better deal.
 
 export interface CreditPack {
   id: string;
@@ -355,9 +357,9 @@ export const CREDIT_PACKS: CreditPack[] = [
     id: "pack_2500",
     name: "Boost Pack",
     credits: 2500,
-    price: 14.99,
+    price: 17.99,
     popular: true,
-    upgradeNudge: "Pro gives 5,000 credits/mo for just $29 — 2x the credits!",
+    upgradeNudge: "Pro gives 5,000 credits/mo for just $29 — 2x the credits at 24% less per credit!",
   },
   {
     id: "pack_5000",
@@ -370,8 +372,8 @@ export const CREDIT_PACKS: CreditPack[] = [
     id: "pack_10000",
     name: "Mega Top-Up",
     credits: 10000,
-    price: 49.99,
-    upgradeNudge: "Enterprise gives 25,000 credits/mo for $99 — 2.5x more credits for 2x the price!",
+    price: 59.99,
+    upgradeNudge: "Enterprise gives 25,000 credits/mo for $99 — 4x more credits! Upgrading saves you money.",
   },
 ];
 

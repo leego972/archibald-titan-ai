@@ -69,9 +69,9 @@ Every action costs credits. Your plan gives you monthly credits that refill auto
 
 **Top-Up Packs** (if you run out mid-month):
 • Quick Top-Up: 500 credits for $4.99
-• Boost Pack: 2,500 credits for $14.99
+• Boost Pack: 2,500 credits for $17.99
 • Power Top-Up: 5,000 credits for $29.99
-• Mega Top-Up: 10,000 credits for $49.99
+• Mega Top-Up: 10,000 credits for $59.99
 
 Go to **Subscription** in the sidebar to manage your plan.`,
 

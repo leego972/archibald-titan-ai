@@ -770,6 +770,8 @@ export const creditBalances = mysqlTable("credit_balances", {
   lifetimeCreditsAdded: int("lifetimeCreditsAdded").notNull().default(0),
   isUnlimited: boolean("isUnlimited").notNull().default(false), // admin bypass
   lastRefillAt: timestamp("lastRefillAt"),
+  lastLoginBonusAt: timestamp("lastLoginBonusAt"), // last daily login bonus claim
+  loginBonusThisMonth: int("loginBonusThisMonth").notNull().default(0), // cumulative login bonus credits this month (cap: 150)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -801,6 +803,7 @@ export const creditTransactions = mysqlTable("credit_transactions", {
     "marketplace_feature",
     "marketplace_boost",
     "marketplace_verification",
+    "daily_login_bonus",
   ]).notNull(),
   description: text("description"),
   balanceAfter: int("balanceAfter").notNull(),
