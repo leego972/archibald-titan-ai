@@ -2111,7 +2111,7 @@ export default function ChatPage() {
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className={`object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse ${isMobile ? 'h-8 w-8' : 'h-16 w-16'}`}
+              className={`object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse ${isMobile ? 'h-14 w-14' : 'h-24 w-24'}`}
               style={{ filter: 'drop-shadow(0 0 10px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 20px rgba(0, 255, 50, 0.4)) drop-shadow(0 0 40px rgba(0, 255, 50, 0.2))' }}
               loading="lazy"
             />
