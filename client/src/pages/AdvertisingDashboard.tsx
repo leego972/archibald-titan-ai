@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Megaphone,
@@ -33,6 +37,13 @@ import {
   Image,
   Send,
   Music,
+  Smartphone,
+  Monitor,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -191,6 +202,7 @@ export default function AdvertisingDashboard() {
           <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
           <TabsTrigger value="tiktok">TikTok</TabsTrigger>
+          <TabsTrigger value="preview">Ad Preview</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -540,6 +552,11 @@ export default function AdvertisingDashboard() {
         <TabsContent value="tiktok" className="space-y-4">
           <TikTokContentTab />
         </TabsContent>
+
+        {/* Ad Preview Tab */}
+        <TabsContent value="preview" className="space-y-4">
+          <AdPreviewTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -761,6 +778,629 @@ function TikTokContentTab() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ============================================
+// AD PREVIEW TAB
+// ============================================
+
+// Platform display configuration for preview rendering
+const PLATFORM_CONFIG: Record<string, {
+  label: string;
+  color: string;
+  bgColor: string;
+  maxChars?: number;
+  aspectRatio?: string;
+}> = {
+  x_twitter: { label: "X / Twitter", color: "text-sky-400", bgColor: "bg-black", maxChars: 280 },
+  linkedin: { label: "LinkedIn", color: "text-blue-600", bgColor: "bg-white", maxChars: 3000 },
+  meta: { label: "Meta (Facebook/Instagram)", color: "text-blue-500", bgColor: "bg-white" },
+  reddit: { label: "Reddit", color: "text-orange-500", bgColor: "bg-zinc-900" },
+  tiktok: { label: "TikTok", color: "text-pink-500", bgColor: "bg-black", aspectRatio: "9:16" },
+  youtube: { label: "YouTube", color: "text-red-500", bgColor: "bg-zinc-900" },
+  google_ads: { label: "Google Ads", color: "text-green-600", bgColor: "bg-white" },
+  snapchat: { label: "Snapchat", color: "text-yellow-400", bgColor: "bg-black" },
+  pinterest: { label: "Pinterest", color: "text-red-600", bgColor: "bg-white" },
+  discord: { label: "Discord", color: "text-indigo-400", bgColor: "bg-[#36393f]" },
+  mastodon: { label: "Mastodon", color: "text-purple-500", bgColor: "bg-[#282c37]" },
+  telegram: { label: "Telegram", color: "text-blue-400", bgColor: "bg-[#17212b]" },
+  devto: { label: "DEV.to", color: "text-gray-200", bgColor: "bg-[#0a0a0a]" },
+  medium: { label: "Medium", color: "text-green-600", bgColor: "bg-white" },
+  hashnode: { label: "Hashnode", color: "text-blue-500", bgColor: "bg-white" },
+  content_seo: { label: "Blog / SEO", color: "text-emerald-500", bgColor: "bg-white" },
+  email_outreach: { label: "Email", color: "text-amber-500", bgColor: "bg-white" },
+  sendgrid: { label: "Email (SendGrid)", color: "text-blue-400", bgColor: "bg-white" },
+  hacker_forum: { label: "Hacker Forum", color: "text-lime-400", bgColor: "bg-zinc-900" },
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  social_post: "Social Post",
+  ad_copy: "Ad Copy",
+  blog_article: "Blog Article",
+  email: "Email",
+  image_ad: "Image Ad",
+  video_script: "Video Script",
+  backlink_outreach: "Outreach Email",
+  email_nurture: "Nurture Email",
+  community_engagement: "Community Post",
+  hacker_forum_post: "Forum Post",
+  content_queue: "Queued Content",
+};
+
+/** Detect if a URL points to a video file */
+function isVideoUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov")
+    || lower.endsWith(".avi") || lower.endsWith(".mkv") || lower.includes("/video")
+    || lower.includes("video_gen") || lower.includes("pollinations.ai/video");
+}
+
+/** Detect if a URL points to an image file */
+function isImageUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+    || lower.endsWith(".gif") || lower.endsWith(".webp") || lower.endsWith(".svg")
+    || lower.includes("/image") || lower.includes("pollinations.ai") || lower.includes("s3.amazonaws.com");
+}
+
+/** Extract all media URLs from a content item (mediaUrl, metadata.imageUrls, body if URL) */
+function extractMediaUrls(item: any): { images: string[]; videos: string[] } {
+  const images: string[] = [];
+  const videos: string[] = [];
+
+  // Primary mediaUrl
+  if (item.mediaUrl) {
+    if (isVideoUrl(item.mediaUrl)) {
+      videos.push(item.mediaUrl);
+    } else if (isImageUrl(item.mediaUrl)) {
+      images.push(item.mediaUrl);
+    }
+  }
+
+  // Metadata imageUrls (TikTok carousel, etc.)
+  if (item.metadata?.imageUrls && Array.isArray(item.metadata.imageUrls)) {
+    for (const url of item.metadata.imageUrls) {
+      if (typeof url === "string" && url.startsWith("http")) {
+        if (isVideoUrl(url)) videos.push(url);
+        else images.push(url);
+      }
+    }
+  }
+
+  // Body might be a direct URL (video content stores URL in body)
+  if (item.body && item.body.startsWith("http") && item.body.length < 500) {
+    const bodyUrl = item.body.trim();
+    if (isVideoUrl(bodyUrl) && !videos.includes(bodyUrl)) {
+      videos.push(bodyUrl);
+    } else if (isImageUrl(bodyUrl) && !images.includes(bodyUrl)) {
+      images.push(bodyUrl);
+    }
+  }
+
+  // Metadata may also have video URLs
+  if (item.metadata?.videoUrl) {
+    videos.push(item.metadata.videoUrl);
+  }
+  if (item.metadata?.publishResult?.videoUrl) {
+    videos.push(item.metadata.publishResult.videoUrl);
+  }
+
+  return { images, videos };
+}
+
+/** Platform-specific post preview mockup */
+function PlatformPreview({ item, viewMode }: { item: any; viewMode: "desktop" | "mobile" }) {
+  const platform = item.channel || item.platform || "content_seo";
+  const config = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.content_seo;
+  const { images, videos } = extractMediaUrls(item);
+  const hashtags: string[] = item.hashtags || item.metadata?.plan?.hashtags || [];
+  const isMobileView = viewMode === "mobile";
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${isMobileView ? "max-w-[375px] mx-auto" : "w-full"}`}>
+      {/* Platform Header Bar */}
+      <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${config.bgColor === "bg-white" ? "bg-gray-50" : config.bgColor}`}>
+        <div className={`w-2 h-2 rounded-full ${config.color.replace("text-", "bg-")}`} />
+        <span className={`text-sm font-semibold ${config.bgColor === "bg-white" || config.bgColor === "bg-gray-50" ? "text-gray-800" : "text-white"}`}>
+          {config.label}
+        </span>
+        <Badge variant="outline" className="ml-auto text-xs">
+          {CONTENT_TYPE_LABELS[item.contentType] || item.contentType}
+        </Badge>
+      </div>
+
+      {/* Post Content Area */}
+      <div className={`${config.bgColor === "bg-white" ? "bg-white" : "bg-zinc-950"} p-0`}>
+        {/* Author / Profile Mock */}
+        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${config.color.replace("text-", "bg-")}`}>
+            AT
+          </div>
+          <div>
+            <div className={`font-semibold text-sm ${config.bgColor === "bg-white" ? "text-gray-900" : "text-white"}`}>
+              Archibald Titan
+            </div>
+            <div className="text-xs text-muted-foreground">
+              @archibaldtitan · {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "Draft"}
+            </div>
+          </div>
+        </div>
+
+        {/* Headline */}
+        {(item.headline || item.title) && (
+          <div className={`px-4 pb-1 font-semibold ${config.bgColor === "bg-white" ? "text-gray-900" : "text-white"} ${platform === "blog_article" || item.contentType === "blog_article" ? "text-xl" : "text-sm"}`}>
+            {item.headline || item.title}
+          </div>
+        )}
+
+        {/* Body Text */}
+        <div className={`px-4 py-2 text-sm whitespace-pre-wrap break-words ${config.bgColor === "bg-white" ? "text-gray-700" : "text-gray-200"}`}>
+          {(() => {
+            const body = item.body || "";
+            // Don't render body if it's just a URL (already handled as media)
+            if (body.startsWith("http") && body.length < 500) return null;
+            // Try to parse JSON body (email nurture stores JSON)
+            try {
+              const parsed = JSON.parse(body);
+              if (parsed.subject && parsed.body) {
+                return (
+                  <div className="space-y-2">
+                    <div className="font-semibold">Subject: {parsed.subject}</div>
+                    <div>{parsed.body}</div>
+                  </div>
+                );
+              }
+            } catch {
+              // Not JSON, render as-is
+            }
+            // Truncate for social platforms
+            const maxChars = config.maxChars;
+            if (maxChars && body.length > maxChars) {
+              return body.substring(0, maxChars) + "...";
+            }
+            return body;
+          })()}
+        </div>
+
+        {/* Hashtags */}
+        {hashtags.length > 0 && (
+          <div className="px-4 pb-2 flex flex-wrap gap-1">
+            {hashtags.map((tag: string, i: number) => (
+              <span key={i} className={`text-xs ${config.color}`}>
+                #{tag.replace(/^#/, "")}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Media: Images */}
+        {images.length > 0 && (
+          <div className={`px-4 pb-3 ${images.length > 1 ? "grid grid-cols-2 gap-2" : ""}`}>
+            {images.map((url, i) => (
+              <div key={i} className="relative group rounded-lg overflow-hidden border border-border/50">
+                <img
+                  loading="lazy"
+                  src={url}
+                  alt={`Ad creative ${i + 1}`}
+                  className={`w-full object-cover ${images.length === 1 ? "max-h-[400px]" : "h-48"} ${isMobileView ? "max-h-[250px]" : ""}`}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-black/60 text-white hover:bg-black/80">
+                    <Maximize2 className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Media: Videos */}
+        {videos.length > 0 && (
+          <div className="px-4 pb-3 space-y-3">
+            {videos.map((url, i) => (
+              <div key={i} className="rounded-lg overflow-hidden border border-border/50">
+                <video
+                  src={url}
+                  controls
+                  preload="metadata"
+                  className={`w-full ${isMobileView ? "max-h-[300px]" : "max-h-[400px]"} bg-black`}
+                  poster=""
+                >
+                  <source src={url} />
+                  Your browser does not support video playback.
+                </video>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 text-xs text-muted-foreground">
+                  <Video className="w-3 h-3" />
+                  <span>Video {i + 1}</span>
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="ml-auto flex items-center gap-1 hover:text-foreground">
+                    <ExternalLink className="w-3 h-3" /> Open
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Engagement Mock Footer */}
+        <div className={`flex items-center gap-6 px-4 py-3 border-t ${config.bgColor === "bg-white" ? "border-gray-200" : "border-zinc-800"}`}>
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+            <Eye className="w-3.5 h-3.5" />
+            <span>{item.impressions || 0}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+            <MousePointerClick className="w-3.5 h-3.5" />
+            <span>{item.clicks || 0}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+            <Users className="w-3.5 h-3.5" />
+            <span>{item.engagements || 0}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Full-screen preview dialog for a single content item */
+function PreviewDialog({
+  item,
+  open,
+  onClose,
+}: {
+  item: any;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+  const { images, videos } = extractMediaUrls(item);
+  const platform = item.channel || item.platform || "content_seo";
+  const config = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.content_seo;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5" />
+                Ad Preview
+              </DialogTitle>
+              <DialogDescription>
+                Preview how this content will appear on {config.label}
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "desktop" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("desktop")}
+              >
+                <Monitor className="w-4 h-4 mr-1" /> Desktop
+              </Button>
+              <Button
+                variant={viewMode === "mobile" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("mobile")}
+              >
+                <Smartphone className="w-4 h-4 mr-1" /> Mobile
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-6 pb-4">
+            {/* Platform Preview */}
+            <PlatformPreview item={item} viewMode={viewMode} />
+
+            {/* Media Gallery (if multiple images/videos) */}
+            {(images.length > 1 || videos.length > 0) && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Image className="w-4 h-4" /> Media Assets ({images.length} image{images.length !== 1 ? "s" : ""}, {videos.length} video{videos.length !== 1 ? "s" : ""})
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {images.map((url, i) => (
+                      <a key={`img-${i}`} href={url} target="_blank" rel="noopener noreferrer" className="group relative rounded-lg overflow-hidden border hover:border-primary transition-colors">
+                        <img loading="lazy" src={url} alt={`Asset ${i + 1}`} className="w-full h-32 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                          <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </a>
+                    ))}
+                    {videos.map((url, i) => (
+                      <div key={`vid-${i}`} className="rounded-lg overflow-hidden border">
+                        <video src={url} controls preload="metadata" className="w-full h-32 object-cover bg-black" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Content Details */}
+            <Separator />
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Platform</span>
+                <div className="font-medium">{config.label}</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Content Type</span>
+                <div className="font-medium">{CONTENT_TYPE_LABELS[item.contentType] || item.contentType}</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Status</span>
+                <div>
+                  <Badge
+                    variant="outline"
+                    className={
+                      item.status === "published" ? "bg-green-500/10 text-green-500" :
+                      item.status === "approved" ? "bg-blue-500/10 text-blue-500" :
+                      item.status === "failed" ? "bg-red-500/10 text-red-500" :
+                      "bg-yellow-500/10 text-yellow-500"
+                    }
+                  >
+                    {item.status}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Created</span>
+                <div className="font-medium">
+                  {item.createdAt ? new Date(item.createdAt).toLocaleString() : "Unknown"}
+                </div>
+              </div>
+              {item.publishedAt && (
+                <div>
+                  <span className="text-muted-foreground">Published</span>
+                  <div className="font-medium">{new Date(item.publishedAt).toLocaleString()}</div>
+                </div>
+              )}
+              {item.aiPrompt && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">AI Prompt Used</span>
+                  <div className="mt-1 text-xs bg-muted/50 rounded-lg p-3 max-h-24 overflow-y-auto">
+                    {item.aiPrompt}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AdPreviewTab() {
+  const [channelFilter, setChannelFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+
+  const contentQueue = trpc.advertising.getContentQueue.useQuery({ limit: 100 });
+
+  // Filter content
+  const filteredContent = useMemo(() => {
+    if (!contentQueue.data) return [];
+    return contentQueue.data.filter((item: any) => {
+      if (channelFilter !== "all" && item.channel !== channelFilter) return false;
+      if (typeFilter !== "all" && item.contentType !== typeFilter) return false;
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      return true;
+    });
+  }, [contentQueue.data, channelFilter, typeFilter, statusFilter]);
+
+  // Get unique channels and types for filter dropdowns
+  const uniqueChannels = useMemo(() => {
+    if (!contentQueue.data) return [];
+    return [...new Set(contentQueue.data.map((item: any) => item.channel))].sort();
+  }, [contentQueue.data]);
+
+  const uniqueTypes = useMemo(() => {
+    if (!contentQueue.data) return [];
+    return [...new Set(contentQueue.data.map((item: any) => item.contentType))].sort();
+  }, [contentQueue.data]);
+
+  // Count items with media
+  const mediaStats = useMemo(() => {
+    if (!contentQueue.data) return { withImages: 0, withVideos: 0, total: 0 };
+    let withImages = 0;
+    let withVideos = 0;
+    for (const item of contentQueue.data) {
+      const { images, videos } = extractMediaUrls(item);
+      if (images.length > 0) withImages++;
+      if (videos.length > 0) withVideos++;
+    }
+    return { withImages, withVideos, total: contentQueue.data.length };
+  }, [contentQueue.data]);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Eye className="w-5 h-5" /> Ad Preview
+              </CardTitle>
+              <CardDescription>
+                Preview your ads, social posts, and content before they go live.
+                View images, videos, and text exactly as they will appear on each platform.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "desktop" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("desktop")}
+              >
+                <Monitor className="w-4 h-4 mr-1" /> Desktop
+              </Button>
+              <Button
+                variant={viewMode === "mobile" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("mobile")}
+              >
+                <Smartphone className="w-4 h-4 mr-1" /> Mobile
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => contentQueue.refetch()}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+              <FileText className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <div className="text-lg font-bold">{mediaStats.total}</div>
+                <div className="text-xs text-muted-foreground">Total Items</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+              <Image className="w-4 h-4 text-blue-500" />
+              <div>
+                <div className="text-lg font-bold">{mediaStats.withImages}</div>
+                <div className="text-xs text-muted-foreground">With Images</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+              <Video className="w-4 h-4 text-pink-500" />
+              <div>
+                <div className="text-lg font-bold">{mediaStats.withVideos}</div>
+                <div className="text-xs text-muted-foreground">With Videos</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+              <Target className="w-4 h-4 text-green-500" />
+              <div>
+                <div className="text-lg font-bold">{filteredContent.length}</div>
+                <div className="text-xs text-muted-foreground">Showing</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Channels" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Channels</SelectItem>
+                {uniqueChannels.map((ch: string) => (
+                  <SelectItem key={ch} value={ch}>
+                    {PLATFORM_CONFIG[ch]?.label || ch}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {uniqueTypes.map((t: string) => (
+                  <SelectItem key={t} value={t}>
+                    {CONTENT_TYPE_LABELS[t] || t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Content Preview Grid */}
+      {contentQueue.isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : filteredContent.length === 0 ? (
+        <Card>
+          <CardContent className="py-16">
+            <div className="text-center text-muted-foreground">
+              <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">No content to preview</p>
+              <p className="text-sm mt-1">
+                {contentQueue.data?.length === 0
+                  ? "Run an advertising cycle to generate content, then come back here to preview it."
+                  : "No content matches your current filters. Try adjusting them."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className={`grid gap-6 ${viewMode === "mobile" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 lg:grid-cols-2"}`}>
+          {filteredContent.map((item: any) => {
+            const { images, videos } = extractMediaUrls(item);
+            const hasMedia = images.length > 0 || videos.length > 0;
+            return (
+              <div key={item.id} className="relative group">
+                <PlatformPreview item={item} viewMode={viewMode} />
+                {/* Overlay action buttons */}
+                <div className="absolute top-12 right-3 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="shadow-lg"
+                    onClick={() => setSelectedItem(item)}
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 mr-1" /> Expand
+                  </Button>
+                  {hasMedia && (
+                    <Badge variant="secondary" className="text-xs justify-center shadow-lg">
+                      {images.length > 0 && <><Image className="w-3 h-3 mr-1" />{images.length}</>}
+                      {images.length > 0 && videos.length > 0 && " · "}
+                      {videos.length > 0 && <><Video className="w-3 h-3 mr-1" />{videos.length}</>}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Full Preview Dialog */}
+      {selectedItem && (
+        <PreviewDialog
+          item={selectedItem}
+          open={!!selectedItem}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
     </div>
   );
 }

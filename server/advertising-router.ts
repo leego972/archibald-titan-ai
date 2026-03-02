@@ -137,6 +137,50 @@ export const advertisingRouter = router({
     }),
 
   /**
+   * Get a single content item by ID — used for ad preview
+   */
+  getContentById: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [item] = await db
+        .select()
+        .from(marketingContent)
+        .where(eq(marketingContent.id, input.id))
+        .limit(1);
+
+      if (!item) throw new Error("Content not found");
+      return item;
+    }),
+
+  /**
+   * Get all previewable content — content in draft or approved status
+   */
+  getPreviewableContent: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+
+      const content = await db
+        .select()
+        .from(marketingContent)
+        .where(
+          sql`${marketingContent.status} IN ('draft', 'approved')`
+        )
+        .orderBy(desc(marketingContent.createdAt))
+        .limit(input?.limit ?? 50);
+
+      return content;
+    }),
+
+  /**
    * Get a summary dashboard with key metrics
    */
   getDashboard: adminProcedure.query(async () => {

@@ -1198,11 +1198,15 @@ export default function ChatPage() {
   const { data: quickActions } = trpc.chat.quickActions.useQuery(undefined, { refetchOnWindowFocus: false });
   const sendMutation = trpc.chat.send.useMutation();
   const utils = trpc.useUtils();
+  // Track whether a send is in-flight to prevent stale DB sync from wiping optimistic messages
+  const sendInFlightRef = useRef(false);
 
   // Sync DB messages into local state
-  // Guard: skip sync while a send is in-flight to avoid wiping optimistic messages
+  // Guard: skip sync while a send is in-flight to avoid wiping optimistic messages.
+  // We check both isLoading AND sendInFlightRef to cover the gap between
+  // React state batching and the actual refetch completing.
   useEffect(() => {
-    if (convDetail?.messages && !isLoading) {
+    if (convDetail?.messages && !isLoading && !sendInFlightRef.current) {
       setLocalMessages(
         convDetail.messages.map((m) => ({
           id: m.id,
@@ -1394,6 +1398,9 @@ export default function ChatPage() {
         }
       }
     }
+
+    // Mark send as in-flight to prevent stale DB sync from wiping optimistic messages
+    sendInFlightRef.current = true;
 
     // Build the optimistic user message WITH attachment info
     const tempId = -Date.now();
@@ -1589,16 +1596,24 @@ export default function ChatPage() {
       }
       setLocalMessages((prev) => prev.filter((m) => m.id !== tempId));
     } finally {
-      setIsLoading(false);
       setStreamEvents([]);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      // Refetch conversation to sync DB messages now that send is complete
+      // Refetch conversation BEFORE setting isLoading to false.
+      // This ensures convDetail is fresh when the sync useEffect fires,
+      // preventing stale data from overwriting the optimistic messages.
       if (activeConversationId || convIdForStream) {
-        refetchConv();
+        try {
+          await refetchConv();
+        } catch {
+          // Refetch failed — optimistic messages will remain until next sync
+        }
       }
+      // Clear the in-flight guard AFTER refetch so the sync effect sees fresh data
+      sendInFlightRef.current = false;
+      setIsLoading(false);
     }
   };
 
