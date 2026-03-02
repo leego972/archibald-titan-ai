@@ -16,12 +16,15 @@ import {
   fetcherJobs,
   identityProviders,
   subscriptions,
+  creditBalances,
+  creditTransactions,
   teamMembers,
   apiKeys,
   selfModificationLog,
   systemSnapshots,
 } from "../drizzle/schema";
 import { logAudit } from "./audit-log-db";
+import { addCredits } from "./credit-service";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -432,5 +435,122 @@ export const adminRouter = router({
           .orderBy(desc(users.lastSignedIn));
         return { emails: results.map(r => ({ ...r, loginCount: 0, marketingConsent: true })), total: results.length };
       }
+    }),
+
+  // ─── Grant Subscription (Admin Comp) ─────────────────────────────────
+  /**
+   * Grant a subscription plan to a user without requiring Stripe payment.
+   * Used for comp'd accounts, beta testers, partners, etc.
+   */
+  grantSubscription: adminProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        plan: z.enum(["pro", "enterprise", "cyber", "cyber_plus", "titan"]),
+        durationMonths: z.number().min(1).max(120).default(12),
+        reason: z.string().min(1),
+        grantCredits: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+
+      // Find user by email
+      const [user] = await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.email, input.email))
+        .limit(1);
+
+      if (!user) {
+        throw new Error(`No user found with email: ${input.email}. They must sign up first.`);
+      }
+
+      // Calculate period end
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + input.durationMonths);
+
+      // Check for existing subscription
+      const existing = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, user.id))
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing subscription
+        await db
+          .update(subscriptions)
+          .set({
+            plan: input.plan,
+            status: "active",
+            currentPeriodEnd: periodEnd,
+            stripeCustomerId: existing[0].stripeCustomerId || `admin_comp_${user.id}`,
+          })
+          .where(eq(subscriptions.userId, user.id));
+      } else {
+        // Create new subscription record
+        await db.insert(subscriptions).values({
+          userId: user.id,
+          stripeCustomerId: `admin_comp_${user.id}`,
+          stripeSubscriptionId: `admin_grant_${Date.now()}`,
+          plan: input.plan,
+          status: "active",
+          currentPeriodEnd: periodEnd,
+        });
+      }
+
+      // Grant credits based on plan tier
+      if (input.grantCredits) {
+        const creditAmounts: Record<string, number> = {
+          pro: 5000,
+          enterprise: 25000,
+          cyber: 100000,
+          cyber_plus: 500000,
+          titan: -1, // unlimited
+        };
+        const amount = creditAmounts[input.plan] || 5000;
+
+        if (amount === -1) {
+          // Set unlimited for Titan tier
+          const { setUnlimited } = await import("./credit-service");
+          await setUnlimited(user.id, true);
+        } else {
+          await addCredits(
+            user.id,
+            amount,
+            "admin_adjustment",
+            `Admin grant: ${input.plan} plan comp'd by ${ctx.user.name || "admin"} — ${input.reason}`
+          );
+        }
+      }
+
+      await logAudit({
+        userId: ctx.user.id,
+        userName: ctx.user.name || "Admin",
+        action: "admin.grant_subscription",
+        resource: "user",
+        resourceId: String(user.id),
+        details: {
+          email: input.email,
+          plan: input.plan,
+          durationMonths: input.durationMonths,
+          reason: input.reason,
+          grantCredits: input.grantCredits,
+          periodEnd: periodEnd.toISOString(),
+        },
+        ipAddress: ctx.req.ip || "unknown",
+      });
+
+      return {
+        success: true,
+        userId: user.id,
+        userName: user.name,
+        email: user.email,
+        plan: input.plan,
+        periodEnd: periodEnd.toISOString(),
+        creditsGranted: input.grantCredits,
+      };
     }),
 });

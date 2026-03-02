@@ -173,7 +173,14 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setLocation("/")}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && setLocation("/")}
+                  title="Go to home"
+                >
                   <TitanLogo size="sm" />
                   <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-400 to-blue-200 bg-clip-text text-transparent">
                     Archibald Titan

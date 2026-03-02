@@ -370,7 +370,14 @@ function FetcherLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setLocation("/")}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && setLocation("/")}
+                  title="Go to home"
+                >
                   <TitanLogo size="sm" />
                   <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-400 to-blue-200 bg-clip-text text-transparent">
                     Archibald Titan
@@ -568,7 +575,13 @@ function FetcherLayoutContent({
           <div className="flex border-b border-white/10 h-14 items-center justify-between bg-background px-3 sticky top-0 z-50 safe-area-top" id="mobile-nav-header">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="h-10 w-10 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-foreground [&_svg]:!h-5 [&_svg]:!w-5" />
-              <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setLocation("/")}
+                role="button"
+                tabIndex={0}
+                title="Go to home"
+              >
                 <TitanLogo size="sm" />
                 <span className="tracking-tight text-foreground font-semibold text-sm">
                   {activeMenuItem?.label ?? "Archibald Titan"}

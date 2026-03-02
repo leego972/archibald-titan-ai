@@ -1510,18 +1510,26 @@ export default function ChatPage() {
                 <Menu className="h-5 w-5" />
               </button>
             )}
-            <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-              <TitanLogo size="sm" className="!h-7 !w-7 sm:!h-9 sm:!w-9" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
-                Titan Assistant
-              </h1>
-              {!isMobile && (
-                <p className="text-[11px] text-muted-foreground">
-                  Executes real actions on your behalf
-                </p>
-              )}
+            <div
+              className="flex items-center gap-1.5 sm:gap-3 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setLocation("/")}
+              role="button"
+              tabIndex={0}
+              title="Go to home"
+            >
+              <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                <TitanLogo size="sm" className="!h-7 !w-7 sm:!h-9 sm:!w-9" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
+                  Titan Assistant
+                </h1>
+                {!isMobile && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Executes real actions on your behalf
+                  </p>
+                )}
+              </div>
             </div>
             {!isMobile && (
               <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400 ml-1 shrink-0">
