@@ -1034,6 +1034,7 @@ export const chatRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+     try {
       const userId = ctx.user.id;
       const userName = ctx.user.name || undefined;
       const userEmail = ctx.user.email || undefined;
@@ -2059,6 +2060,17 @@ Do NOT attempt any tool calls or builds.`;
           actions: undefined,
         };
       }
+     } catch (outerErr: unknown) {
+       // Re-throw known tRPC errors (rate limit, forbidden, etc.) as-is
+       if (outerErr instanceof TRPCError) throw outerErr;
+       // For any unknown error, surface the REAL message instead of letting tRPC mask it
+       const realMessage = outerErr instanceof Error ? outerErr.message : String(outerErr);
+       log.error("[Chat] Unhandled outer error in send mutation:", { error: realMessage, stack: outerErr instanceof Error ? outerErr.stack : undefined });
+       throw new TRPCError({
+         code: "BAD_REQUEST",
+         message: `Chat error: ${realMessage}`,
+       });
+     }
     }),
 
   /**
