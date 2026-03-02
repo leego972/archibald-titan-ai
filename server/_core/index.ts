@@ -417,6 +417,7 @@ async function startServer() {
         `CREATE TABLE IF NOT EXISTS \`seller_profiles\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`displayName\` varchar(128) NOT NULL, \`bio\` text, \`avatarUrl\` text, \`totalSales\` int NOT NULL DEFAULT 0, \`totalRevenue\` int NOT NULL DEFAULT 0, \`avgRating\` int NOT NULL DEFAULT 0, \`ratingCount\` int NOT NULL DEFAULT 0, \`verified\` boolean NOT NULL DEFAULT false, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`seller_profiles_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`seller_profiles_userId_unique\` UNIQUE(\`userId\`))`,
         `CREATE TABLE IF NOT EXISTS \`crypto_payments\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int, \`campaignId\` int NOT NULL, \`contributionId\` int, \`merchantTradeNo\` varchar(64) NOT NULL, \`binancePrepayId\` varchar(128), \`status\` varchar(32) NOT NULL DEFAULT 'pending', \`fiatAmount\` varchar(32) NOT NULL, \`fiatCurrency\` varchar(8) NOT NULL DEFAULT 'USD', \`cryptoCurrency\` varchar(16), \`cryptoAmount\` varchar(64), \`platformFee\` varchar(32) NOT NULL DEFAULT '0', \`creatorAmount\` varchar(32) NOT NULL DEFAULT '0', \`checkoutUrl\` text, \`qrcodeLink\` text, \`donorName\` varchar(128), \`donorEmail\` varchar(256), \`donorMessage\` text, \`webhookData\` text, \`paidAt\` timestamp, \`expiresAt\` timestamp, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`crypto_payments_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`crypto_payments_merchantTradeNo_unique\` UNIQUE(\`merchantTradeNo\`))`,
         `CREATE TABLE IF NOT EXISTS \`seller_payout_methods\` (\`id\` int AUTO_INCREMENT NOT NULL, \`sellerId\` int NOT NULL, \`userId\` int NOT NULL, \`methodType\` enum('bank_transfer','paypal','stripe_connect') NOT NULL, \`isDefault\` boolean NOT NULL DEFAULT false, \`bankBsb\` varchar(16), \`bankAccountNumber\` varchar(32), \`bankAccountName\` varchar(128), \`bankName\` varchar(128), \`bankCountry\` varchar(64), \`bankSwiftBic\` varchar(16), \`paypalEmail\` varchar(320), \`stripeConnectAccountId\` varchar(128), \`stripeConnectOnboarded\` boolean NOT NULL DEFAULT false, \`verified\` boolean NOT NULL DEFAULT false, \`status\` enum('active','pending_verification','disabled') NOT NULL DEFAULT 'pending_verification', \`label\` varchar(128), \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`seller_payout_methods_id\` PRIMARY KEY(\`id\`))`,
+        `CREATE TABLE IF NOT EXISTS \`user_secrets\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`secretType\` varchar(64) NOT NULL, \`encryptedValue\` text NOT NULL, \`label\` varchar(128), \`lastUsedAt\` timestamp, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`user_secrets_id\` PRIMARY KEY(\`id\`))`,
         `CREATE TABLE IF NOT EXISTS \`platform_revenue\` (\`id\` int AUTO_INCREMENT NOT NULL, \`source\` varchar(64) NOT NULL, \`sourceId\` varchar(128), \`type\` varchar(64) NOT NULL, \`amount\` varchar(32) NOT NULL, \`currency\` varchar(8) NOT NULL DEFAULT 'USD', \`description\` text, \`metadata\` text, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`platform_revenue_id\` PRIMARY KEY(\`id\`))`,
       ];
       for (const ddl of createTables) {
@@ -425,6 +426,12 @@ async function startServer() {
         } catch (e: unknown) {
           log.warn('Table creation warning', { error: getErrorMessage(e)?.substring(0, 100) });
         }
+      }
+      // Create indexes for user_secrets
+      try {
+        await pool.promise().query('CREATE INDEX `idx_user_secrets_userId_type` ON `user_secrets` (`userId`, `secretType`)');
+      } catch (e: unknown) {
+        // Index already exists - ignore
       }
       log.info('All tables ensured');
     } catch (err: unknown) {
