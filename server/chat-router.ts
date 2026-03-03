@@ -1105,12 +1105,21 @@ export const chatRouter = router({
       }
 
       // ── Credit Check ─────────────────────────────────────────
-      const creditCheck = await checkCredits(userId, "chat_message");
-      if (!creditCheck.allowed) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: creditCheck.message || "Insufficient credits. Purchase more credits or upgrade your plan.",
-        });
+      try {
+        const creditCheck = await checkCredits(userId, "chat_message");
+        if (!creditCheck.allowed) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: creditCheck.message || "Insufficient credits. Purchase more credits or upgrade your plan.",
+          });
+        }
+      } catch (creditErr: unknown) {
+        // If this is a deliberate FORBIDDEN from insufficient credits, re-throw it
+        if (creditErr instanceof TRPCError && creditErr.code === "FORBIDDEN") {
+          throw creditErr;
+        }
+        // Otherwise (e.g. table missing), log and allow the message through
+        log.error("[Chat] Credit check failed (allowing message):", { error: getErrorMessage(creditErr) });
       }
 
       // ── Load user's personal API key (if set) ──────────────────
@@ -1928,11 +1937,15 @@ Do NOT attempt any tool calls or builds.`;
 
         // ── Consume Credits ───────────────────────────────────────
         // 1 credit for the chat message + 5 per builder action executed
-        await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
-        for (const action of executedActions) {
-          if (action.success) {
-            await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+        try {
+          await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
+          for (const action of executedActions) {
+            if (action.success) {
+              await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+            }
           }
+        } catch (consumeErr: unknown) {
+          log.error("[Chat] Credit consumption failed (non-fatal):", { error: getErrorMessage(consumeErr) });
         }
 
         // ── Flush staged changes to disk ──────────────────────
@@ -2011,7 +2024,12 @@ Do NOT attempt any tool calls or builds.`;
         cleanupRequest(conversationId!);
 
         // ── Post-response credit balance + upsell data ────────────────
-        const postBalance = await getCreditBalance(userId);
+        let postBalance = { credits: 999, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null as Date | null };
+        try {
+          postBalance = await getCreditBalance(userId);
+        } catch (postBalErr: unknown) {
+          log.error("[Chat] Post-response credit balance failed (non-fatal):", { error: getErrorMessage(postBalErr) });
+        }
         const creditsUsed = 1 + executedActions.filter(a => a.success).length * 5;
         const upsell = !postBalance.isUnlimited && postBalance.credits <= 50 ? {
           show: true,
