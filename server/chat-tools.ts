@@ -1620,6 +1620,24 @@ const pushToGithubRepo: Tool = {
     },
   },
 };
+const provideProjectZip: Tool = {
+  type: "function",
+  function: {
+    name: "provide_project_zip",
+    description:
+      "Generate a ZIP download link for the user's project files. Use this when the user asks for a ZIP file, wants to download all files, or says 'give me the zip' / 'provide zip' / 'download as zip'. Returns a direct download URL that the user can click to download immediately.",
+    parameters: {
+      type: "object",
+      properties: {
+        projectName: {
+          type: "string",
+          description: "Optional project/folder name to filter files. If not provided, all project files are included.",
+        },
+      },
+      required: [],
+    },
+  },
+};
 const readUploadedFile: Tool = {
   type: "function",
   function: {
@@ -1905,6 +1923,7 @@ export const TITAN_TOOLS: Tool[] = [
   createGithubRepo,
   pushToGithubRepo,
   readUploadedFile,
+  provideProjectZip,
   // Self-Improvement
   selfReadFile,
   selfListFiles,
@@ -1996,6 +2015,7 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // Core builder tools — create real files
   createProjectFile,
   readUploadedFile,
+  provideProjectZip,
   // Sandbox tools — execute code, read/write/list files in the sandbox
   sandboxExec,
   sandboxWriteFile,

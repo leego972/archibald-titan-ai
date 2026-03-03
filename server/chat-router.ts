@@ -578,6 +578,7 @@ function getToolDescription(toolName: string, args: Record<string, unknown>): st
     case 'get_leak_scan_results': return 'Getting leak scan results...';
     case 'auto_fix_vulnerability': return 'Auto-fixing vulnerability...';
     case 'auto_fix_all_vulnerabilities': return 'Auto-fixing all vulnerabilities...';
+    case 'provide_project_zip': return 'Preparing ZIP download...';
     default: return `${toolName.replace(/_/g, ' ')}...`;
   }
 }
@@ -626,6 +627,8 @@ function getToolResultSummary(toolName: string, args: Record<string, unknown>, r
       return `Checkpoint saved: ${d.name || args.name}`;
     case 'security_scan':
       return `${d.vulnerabilities?.length || 0} vulnerabilities found`;
+    case 'provide_project_zip':
+      return d.downloadUrl ? `ZIP ready (${d.fileCount || 0} files)` : 'ZIP prepared';
     default:
       return typeof d === 'string' ? d.slice(0, 80) : 'Done';
   }

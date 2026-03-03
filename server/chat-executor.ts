@@ -604,6 +604,8 @@ export async function executeToolCall(
         return await execPushToGithub(userId, args, conversationId);
       case "read_uploaded_file":
         return await execReadUploadedFile(args);
+      case "provide_project_zip":
+        return await execProvideProjectZip(userId, args);
       case "search_bazaar":
         return await execSearchBazaar(args);
       // ── Autonomous System Management ────────────────────────────────
@@ -4415,5 +4417,70 @@ async function execCheckBin(args: Record<string, unknown>): Promise<ToolExecutio
     };
   } catch (err) {
     return { success: false, error: `BIN lookup failed: ${getErrorMessage(err)}` };
+  }
+}
+
+
+// ─── Provide Project ZIP ─────────────────────────────────────────────
+
+async function execProvideProjectZip(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  try {
+    const projectName = args.projectName as string | undefined;
+
+    // Get the user's sandbox
+    const { listSandboxes } = await import("./sandbox-engine");
+    const sandboxes = await listSandboxes(userId);
+    if (sandboxes.length === 0) {
+      return { success: false, error: "No project files found. Build something first!" };
+    }
+    const sandboxId = sandboxes[0].id;
+
+    // Query project files
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+
+    let files = await db
+      .select({ id: sandboxFiles.id, filePath: sandboxFiles.filePath })
+      .from(sandboxFiles)
+      .where(and(eq(sandboxFiles.sandboxId, sandboxId), eq(sandboxFiles.isDirectory, 0)));
+
+    // Filter by project name if provided
+    if (projectName) {
+      files = files.filter(f => {
+        const parts = f.filePath.split("/");
+        const topDir = parts.length > 1 ? parts[0] : "general";
+        return topDir.toLowerCase() === projectName.toLowerCase();
+      });
+    }
+
+    if (files.length === 0) {
+      return {
+        success: false,
+        error: projectName
+          ? `No files found for project "${projectName}". Check the project name and try again.`
+          : "No project files found. Build something first!",
+      };
+    }
+
+    // Build the download URL
+    const baseUrl = process.env.PUBLIC_URL || `https://${process.env.RAILWAY_PUBLIC_DOMAIN || "www.archibaldtitan.com"}`;
+    const downloadUrl = projectName
+      ? `${baseUrl}/api/project-files/download-zip?project=${encodeURIComponent(projectName)}`
+      : `${baseUrl}/api/project-files/download-zip?all=true`;
+
+    return {
+      success: true,
+      data: {
+        downloadUrl,
+        fileCount: files.length,
+        projectName: projectName || "all",
+        message: `ZIP download ready with ${files.length} file(s). Click the link to download.`,
+      },
+    };
+  } catch (err: unknown) {
+    return { success: false, error: `Failed to prepare ZIP: ${getErrorMessage(err)}` };
   }
 }
