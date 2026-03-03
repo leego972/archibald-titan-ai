@@ -1605,13 +1605,13 @@ const provideProjectZip: Tool = {
   function: {
     name: "provide_project_zip",
     description:
-      "Generate a ZIP download link for the user's project files. Use this when the user asks for a ZIP file, wants to download all files, or says 'give me the zip' / 'provide zip' / 'download as zip'. Returns a direct download URL that the user can click to download immediately.",
+      "Generate a ZIP download link for the user's project files. Use this when the user asks for a ZIP file, wants to download all files, or says 'give me the zip' / 'provide zip' / 'download as zip'. Returns a direct download URL that the user can click to download immediately. IMPORTANT: Always specify the projectName to scope the ZIP to the current project — otherwise ALL files from ALL previous builds will be included, which is almost never what the user wants.",
     parameters: {
       type: "object",
       properties: {
         projectName: {
           type: "string",
-          description: "Optional project/folder name to filter files. If not provided, all project files are included.",
+          description: "The project/folder name to include in the ZIP. Use the top-level directory name of the files you created (e.g., if you created 'calculator/main.py', use 'calculator'). STRONGLY RECOMMENDED to always provide this to avoid including files from other projects.",
         },
       },
       required: [],

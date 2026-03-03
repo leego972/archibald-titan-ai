@@ -1058,7 +1058,10 @@ export default function ChatPage() {
   const [tokenName, setTokenName] = useState('');
   const [tokenValue, setTokenValue] = useState('');
   const [savedTokens, setSavedTokens] = useState<Array<{name: string; preview: string}>>([]);
-  const [createdFiles, setCreatedFiles] = useState<Array<{name: string; url: string; size: number; language: string}>>([]);
+  const [createdFiles, setCreatedFiles] = useState<Array<{name: string; url: string; size: number; language: string; content?: string}>>([]);
+  const [expandedFileIdx, setExpandedFileIdx] = useState<number | null>(null);
+  const [filePreviewContent, setFilePreviewContent] = useState<Record<number, string>>({});
+  const [loadingPreview, setLoadingPreview] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUploadClick = () => { fileInputRef.current?.click(); };
@@ -1624,6 +1627,10 @@ export default function ChatPage() {
         userFacingError = serverMessage;
       } else if (serverMessage.toLowerCase().includes("unauthorized") || serverMessage.toLowerCase().includes("session")) {
         userFacingError = "Session expired. Please refresh the page and try again.";
+      } else if (serverMessage.toLowerCase().includes("rate limit") || serverMessage.toLowerCase().includes("too many")) {
+        userFacingError = "Rate limit reached. Please wait a moment and try again.";
+      } else if (serverMessage.toLowerCase().includes("timeout") || serverMessage.toLowerCase().includes("timed out")) {
+        userFacingError = "The request timed out. This can happen with complex builds. Try again or break the request into smaller parts.";
       } else if (serverMessage) {
         userFacingError = serverMessage;
       }
@@ -1638,6 +1645,10 @@ export default function ChatPage() {
       };
       optimisticIdsRef.current.add(errorAssistantMsg.id);
       setLocalMessages((prev) => [...prev, errorAssistantMsg]);
+      // Preserve the build log so the user can see what was done before the error
+      if (streamEvents.length > 0) {
+        setBuildLog([...streamEvents]);
+      }
     } finally {
       setStreamEvents([]);
       if (eventSourceRef.current) {
@@ -1773,7 +1784,7 @@ export default function ChatPage() {
       )}
 
       {/* Main chat area */}
-      <div className={`flex-1 flex flex-col min-w-0 ${showProjectFiles && !isMobile ? 'mr-[360px]' : ''}`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${showProjectFiles && !isMobile ? 'mr-[420px]' : ''}`}>
         {/* Header */}
         <div className={`flex items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-2 py-2 min-h-[48px]' : 'px-4 pb-3 pt-1'}`}>
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
@@ -2551,9 +2562,9 @@ export default function ChatPage() {
           </div>
         </div>
       )}
-      {/* Project Files Panel */}
+      {/* Project Files Panel with Preview */}
       {showProjectFiles && createdFiles.length > 0 && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[360px] border-l border-border'} flex flex-col bg-background`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[420px] border-l border-border'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4 text-emerald-400" />
@@ -2573,7 +2584,7 @@ export default function ChatPage() {
                 <Copy className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setShowProjectFiles(false)}
+                onClick={() => { setShowProjectFiles(false); setExpandedFileIdx(null); }}
                 className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -2582,10 +2593,40 @@ export default function ChatPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {createdFiles.map((file, idx) => (
-              <div key={idx} className="rounded-xl border border-border/50 bg-card hover:bg-accent/30 transition-all">
-                <div className="flex items-center justify-between px-3 py-2.5">
+              <div key={idx} className={`rounded-xl border transition-all ${expandedFileIdx === idx ? 'border-primary/50 bg-card' : 'border-border/50 bg-card hover:bg-accent/30'}`}>
+                <div
+                  className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
+                  onClick={async () => {
+                    if (expandedFileIdx === idx) {
+                      setExpandedFileIdx(null);
+                      return;
+                    }
+                    setExpandedFileIdx(idx);
+                    // Fetch content if not already loaded
+                    if (!filePreviewContent[idx] && !file.content) {
+                      setLoadingPreview(idx);
+                      try {
+                        if (file.url) {
+                          const res = await fetch(file.url, { mode: 'cors' }).catch(() => null);
+                          if (res && res.ok) {
+                            const text = await res.text();
+                            setFilePreviewContent(prev => ({ ...prev, [idx]: text }));
+                          } else {
+                            setFilePreviewContent(prev => ({ ...prev, [idx]: '// Content preview unavailable — download the file to view it.' }));
+                          }
+                        } else {
+                          setFilePreviewContent(prev => ({ ...prev, [idx]: '// No URL available for preview.' }));
+                        }
+                      } catch {
+                        setFilePreviewContent(prev => ({ ...prev, [idx]: '// Failed to load preview.' }));
+                      } finally {
+                        setLoadingPreview(null);
+                      }
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="h-4 w-4 text-blue-400 shrink-0" />
+                    <FileCode className="h-4 w-4 text-blue-400 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{file.name}</p>
                       <p className="text-[10px] text-muted-foreground">
@@ -2594,51 +2635,74 @@ export default function ChatPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedFileIdx(expandedFileIdx === idx ? null : idx); }}
+                      className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+                      title="Preview file"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
                     {file.url && (
-              <button
-                onClick={async () => {
-                  try {
-                    // Create a blob with correct MIME type and force correct filename
-                    const blob = new Blob([file.url ? '' : ''], { type: 'application/octet-stream' });
-                    // Try fetching from S3 directly first
-                    const s3Res = await fetch(file.url, { mode: 'cors' }).catch(() => null);
-                    if (s3Res && s3Res.ok) {
-                      const fileBlob = await s3Res.blob();
-                      saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), file.name);
-                    } else {
-                      // S3 CORS blocked — use server-side zip endpoint for this file
-                      const zipRes = await fetch('/api/project-files/download-zip?all=true', { credentials: 'include' });
-                      if (zipRes.ok) {
-                        const zipBlob = await zipRes.blob();
-                        saveAs(zipBlob, 'project-files.zip');
-                        toast.info('Downloaded all files as zip');
-                      } else {
-                        toast.error('Download failed');
-                      }
-                    }
-                  } catch {
-                    toast.error('Download failed');
-                  }
-                }}
-                className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
-                title="Download"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </button>
-                    )}
-                    {file.url && (
-                      <a
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const s3Res = await fetch(file.url, { mode: 'cors' }).catch(() => null);
+                            if (s3Res && s3Res.ok) {
+                              const fileBlob = await s3Res.blob();
+                              saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), file.name);
+                            } else {
+                              const zipRes = await fetch('/api/project-files/download-zip?all=true', { credentials: 'include' });
+                              if (zipRes.ok) {
+                                const zipBlob = await zipRes.blob();
+                                saveAs(zipBlob, 'project-files.zip');
+                                toast.info('Downloaded all files as zip');
+                              } else {
+                                toast.error('Download failed');
+                              }
+                            }
+                          } catch {
+                            toast.error('Download failed');
+                          }
+                        }}
                         className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
-                        title="Open in new tab"
+                        title="Download"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
                 </div>
+                {/* Expandable file content preview */}
+                {expandedFileIdx === idx && (
+                  <div className="border-t border-border/30">
+                    {loadingPreview === idx ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span className="ml-2 text-xs text-muted-foreground">Loading preview...</span>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="absolute top-2 right-2 z-10 flex gap-1">
+                          <button
+                            onClick={() => {
+                              const content = file.content || filePreviewContent[idx] || '';
+                              navigator.clipboard.writeText(content);
+                              toast.success('File content copied');
+                            }}
+                            className="p-1 rounded bg-background/80 border border-border/50 hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy content"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <pre className="p-3 text-xs font-mono overflow-x-auto max-h-[400px] overflow-y-auto scrollbar-thin bg-muted/30 rounded-b-xl">
+                          <code>{file.content || filePreviewContent[idx] || '// No content available'}</code>
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -2647,7 +2711,6 @@ export default function ChatPage() {
               onClick={async () => {
                 try {
                   toast.info('Preparing zip file...');
-                  // Use server-side zip endpoint — avoids CORS, preserves filenames
                   const res = await fetch('/api/project-files/download-zip?all=true', {
                     credentials: 'include',
                   });

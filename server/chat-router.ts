@@ -549,10 +549,10 @@ function getToolDescription(toolName: string, args: Record<string, unknown>): st
     case 'self_restart': return 'Restarting server...';
     case 'self_rollback': return 'Rolling back changes...';
     case 'sandbox_exec': return `Executing: ${(args.command as string)?.slice(0, 60) || 'command'}...`;
-    case 'sandbox_write_file': return `Writing ${args.filePath || 'file'}...`;
-    case 'sandbox_read_file': return `Reading ${args.filePath || 'file'}...`;
+    case 'sandbox_write_file': return `Writing ${args.path || args.filePath || 'file'}...`;
+    case 'sandbox_read_file': return `Reading ${args.path || args.filePath || 'file'}...`;
     case 'sandbox_list_files': return `Listing ${args.dirPath || '/'}...`;
-    case 'create_file': return `Creating ${args.filePath || 'file'}...`;
+    case 'create_file': return `Creating ${args.fileName || args.filePath || 'file'}...`;
     case 'create_github_repo': return `Creating GitHub repo: ${args.repoName || ''}...`;
     case 'push_to_github': return `Pushing to GitHub...`;
     case 'web_search': return `Searching: "${(args.query as string)?.slice(0, 50) || ''}"...`;
@@ -602,12 +602,14 @@ function getToolResultSummary(toolName: string, args: Record<string, unknown>, r
       return d.passed ? `${d.totalTests} tests passed` : `${d.failedTests}/${d.totalTests} failed`;
     case 'self_grep_codebase':
       return `${d.matchCount || d.matches?.length || 0} matches found`;
-    case 'sandbox_exec':
-      return d.exitCode === 0 ? 'Command succeeded' : `Exit code: ${d.exitCode}`;
+    case 'sandbox_exec': {
+      const cmd = (args.command as string || '').slice(0, 60);
+      return d.exitCode === 0 ? `Executed: ${cmd}` : `Executing: ${cmd}... Command exited with code ${d.exitCode}`;
+    }
     case 'sandbox_write_file':
-      return `Wrote ${args.filePath}`;
+      return `Wrote ${args.path || args.filePath || 'file'}`;
     case 'create_file':
-      return `Created ${args.filePath}${d.url ? ' → ' + d.url.slice(0, 50) : ''}`;
+      return `Created ${d.fileName || args.fileName || args.filePath || 'file'}${d.size ? ' (' + (d.size < 1024 ? d.size + 'B' : (d.size / 1024).toFixed(1) + 'KB') + ')' : ''}`;
     case 'web_search':
       return `${d.resultCount || d.results?.length || 0} results`;
     case 'web_page_read':
