@@ -143,7 +143,7 @@ async function binLookup(cardNumber: string): Promise<BinInfo | null> {
     const data = await response.json() as Record<string, any>;
     return parseBinResponse(data, digits);
   } catch (err) {
-    log.warn("BIN lookup failed:", err);
+    log.warn("BIN lookup failed:", { error: String(err) });
     return null;
   }
 }

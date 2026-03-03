@@ -1204,14 +1204,14 @@ function AdPreviewTab() {
   }, [contentQueue.data, channelFilter, typeFilter, statusFilter]);
 
   // Get unique channels and types for filter dropdowns
-  const uniqueChannels = useMemo(() => {
+  const uniqueChannels = useMemo((): string[] => {
     if (!contentQueue.data) return [];
-    return [...new Set(contentQueue.data.map((item: any) => item.channel))].sort();
+    return Array.from(new Set<string>(contentQueue.data.map((item: any) => item.channel as string))).sort();
   }, [contentQueue.data]);
 
-  const uniqueTypes = useMemo(() => {
+  const uniqueTypes = useMemo((): string[] => {
     if (!contentQueue.data) return [];
-    return [...new Set(contentQueue.data.map((item: any) => item.contentType))].sort();
+    return Array.from(new Set<string>(contentQueue.data.map((item: any) => item.contentType as string))).sort();
   }, [contentQueue.data]);
 
   // Count items with media

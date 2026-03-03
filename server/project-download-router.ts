@@ -230,7 +230,7 @@ export function registerProjectDownloadRoutes(app: Express) {
 
       const archive = archiver("zip", { zlib: { level: 6 } });
 
-      archive.on("error", (err) => {
+      archive.on("error", (err: Error) => {
         log.error("[ProjectDownload] ZIP archive error:", { error: String(err) });
         if (!res.headersSent) {
           res.status(500).json({ error: "ZIP creation failed" });

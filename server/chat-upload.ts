@@ -73,7 +73,7 @@ export function registerChatUploadRoute(app: Express) {
         )
       );
 
-      const rows = result[0] as any[];
+      const rows = result[0] as unknown as any[];
       if (!rows || rows.length === 0) {
         return res.status(404).json({ error: "File not found" });
       }
