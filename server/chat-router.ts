@@ -23,6 +23,7 @@ import {
 } from "../drizzle/schema";
 import { PROVIDERS } from "../shared/fetcher";
 import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
+// NOTE: EXTERNAL_BUILD_TOOLS is the focused toolset for user-facing project builds
 import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild } from "./chat-stream";
 import { executeToolCall } from "./chat-executor";
 import {
@@ -65,7 +66,7 @@ import {
 const log = createLogger("ChatRouter");
 
 const MAX_CONTEXT_MESSAGES = 20; // max messages loaded into LLM context (lower = faster + more room for tool results)
-const MAX_TOOL_ROUNDS = 25; // complex builder tasks need more rounds — increased from 20
+const MAX_TOOL_ROUNDS = 40; // complex builder tasks need many rounds: plan + create files + install + test + fix + retest
 
 /**
  * Sanitize tool_call IDs to match the pattern ^[a-zA-Z0-9_-]+$
@@ -1356,18 +1357,21 @@ Do NOT attempt any tool calls or builds.`;
         });
       } else if (isExternalBuild) {
         forceFirstTool = getForceFirstTool(input.message, false);
-        // Inject external build system reminder
+        // Inject BOTH the builder system prompt AND the external build reminder
+        // The BUILDER_SYSTEM_PROMPT defines the workflow and rules
+        // The EXTERNAL_BUILD_REMINDER provides templates and quality standards
         const userMsgIdx = llmMessages.length - 1;
         llmMessages.splice(userMsgIdx, 0, {
           role: 'system',
-          content: `${BUILDER_SYSTEM_PROMPT}\n\n${ANTI_REPLICATION_PROMPT}`,
+          content: `${BUILDER_SYSTEM_PROMPT}\n\n${EXTERNAL_BUILD_REMINDER}\n\n${ANTI_REPLICATION_PROMPT}`,
         });
       }
 
       // Choose tool set:
       // - Self-build: BUILDER_TOOLS (self_modify_file, NO sandbox tools)
-      // - External build & general chat: TITAN_TOOLS (full platform access, gated by membership/credits)
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : TITAN_TOOLS;
+      // - External build: EXTERNAL_BUILD_TOOLS (focused builder tools — create_file, sandbox, web research, GitHub)
+      // - General chat: TITAN_TOOLS (full platform access, gated by membership/credits)
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? EXTERNAL_BUILD_TOOLS : TITAN_TOOLS);
       log.info(`[Chat] Self-build: ${isSelfBuild}, External-build: ${isExternalBuild}, force tool: ${forceFirstTool || 'none'}, tools: ${activeTools.length}`);
 
       // Enable deferred mode ONLY for self-build — file writes will be staged
@@ -1394,14 +1398,18 @@ Do NOT attempt any tool calls or builds.`;
         while (rounds < MAX_TOOL_ROUNDS) {
           rounds++;
 
-          // PROACTIVE CONTEXT COMPRESSION: After round 8, compress old tool results to free tokens
-          // Keep more context for longer to avoid losing important file content the LLM needs
-          if (rounds > 8 && isBuildRequest) {
-            for (let i = 0; i < llmMessages.length - 8; i++) {
+          // PROACTIVE CONTEXT COMPRESSION: After round 12, compress old tool results to free tokens
+          // Keep the last 12 messages uncompressed so the LLM retains recent file contents and errors
+          // For build requests, preserve more context to avoid losing critical build state
+          if (rounds > 12 && isBuildRequest) {
+            const preserveRecent = 12; // keep last 12 messages fully intact
+            for (let i = 0; i < llmMessages.length - preserveRecent; i++) {
               const msg = llmMessages[i] as any;
-              if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 1000) {
-                // Compress old tool results but keep enough for reference
-                const preview = msg.content.slice(0, 500);
+              if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 2000) {
+                // Keep file creation confirmations short but preserve error details
+                const isError = msg.content.includes('"success":false') || msg.content.includes('error');
+                const keepLen = isError ? 1500 : 800;
+                const preview = msg.content.slice(0, keepLen);
                 msg.content = `[Compressed] ${preview}... [full result omitted to save context]`;
               }
             }

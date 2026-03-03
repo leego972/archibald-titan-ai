@@ -46,7 +46,7 @@ const execAsync = promisify(exec);
 
 const SANDBOX_BASE_DIR = path.join(os.tmpdir(), "titan-sandboxes");
 const MAX_OUTPUT_SIZE = 100 * 1024; // 100KB max output per command
-const DEFAULT_TIMEOUT_MS = 60_000; // 60 seconds default
+const DEFAULT_TIMEOUT_MS = 120_000; // 120 seconds default — npm install and pip install need more time
 const MAX_TIMEOUT_MS = 300_000; // 5 minutes max
 
 // Blocked commands that could damage the host system

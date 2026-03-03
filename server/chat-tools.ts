@@ -972,7 +972,7 @@ const sandboxExec: Tool = {
   function: {
     name: "sandbox_exec",
     description:
-      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a Linux environment with Python 3.11 and pre-installed cybersecurity tools (nmap, scapy, requests, beautifulsoup4, paramiko, cryptography, pycryptodome). You can run any command: compile code, install packages (pip install), run scripts, use security tools, etc. Output is captured and returned. Use this to actually RUN code you've built, test applications, execute security scans, or run any command-line tool. Always test your code after writing it.",
+      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a Linux environment with Python 3.11 and common packages pre-installed. You can run any command: compile code, install packages (pip install, npm install), run scripts, test applications, etc. Output is captured and returned. CRITICAL: You MUST use this tool to test every project you build. After creating files with sandbox_write_file, run them with this tool to verify they work. If the command shows errors, fix the code and retest. Never report a build as complete without testing it first.",
     parameters: {
       type: "object",
       properties: {
@@ -999,7 +999,7 @@ const sandboxWriteFile: Tool = {
   function: {
     name: "sandbox_write_file",
     description:
-      "Write a file to the user's sandbox environment. Use this to create scripts, config files, source code, or any file that can then be executed with sandbox_exec. The file persists across sessions.",
+      "Write a file to the user's sandbox environment for testing. Use this alongside create_file: create_file stores the file in the cloud for the user to download, while sandbox_write_file puts it in the sandbox so you can test it with sandbox_exec. ALWAYS write files to BOTH create_file AND sandbox_write_file. Use paths like /home/sandbox/project/filename.",
     parameters: {
       type: "object",
       properties: {
@@ -1551,7 +1551,7 @@ const createProjectFile: Tool = {
   function: {
     name: "create_file",
     description:
-      "Create a file in the user's project. The file is stored permanently and the user can view, download, and push it to GitHub. ALWAYS use this tool instead of pasting code in your message. The user CANNOT copy code from chat — they need actual files.",
+      "Create a file in the user's project (stored in cloud, downloadable by user). ALWAYS use this for every file you build — the user can only get files through this tool, NOT from chat messages. IMPORTANT: Also write the same file to the sandbox using sandbox_write_file so you can test it. Every file must contain COMPLETE, WORKING code — no stubs, no TODOs, no placeholders. There are NO directory restrictions — any file path works.",
     parameters: {
       type: "object",
       properties: {

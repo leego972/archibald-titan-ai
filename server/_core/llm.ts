@@ -490,8 +490,10 @@ async function _invokeLLMWithRetry(
       }
 
       // Fall back to gpt-4.1-nano after 2 retries on gpt-4.1-mini
-      if (attempt >= 2 && modelPreference === "strong" && useOpenAI) {
-        log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries`);
+      // BUT: Never fall back for chat/build requests — nano produces much worse code
+      // Only fall back for background tasks where quality is less critical
+      if (attempt >= 2 && modelPreference === "strong" && useOpenAI && priority !== "chat") {
+        log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries (background task)`);
         const fallbackParams = { ...params, model: "fast" as const };
         await new Promise((r) => setTimeout(r, waitMs));
         return _invokeLLMWithRetry(fallbackParams, priority, 0);
