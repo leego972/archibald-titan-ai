@@ -70,7 +70,7 @@ const PROTECTED_PATHS: string[] = [
   // Environment and secrets
   ".env",
   "server/_core/env.ts",
-  // Kill switch — emergency shutdown must always work
+  // Safety engine — critical safety checks must always work
   "server/fetcher-engine/safety-engine.ts",
   // Stripe/payment — financial operations are critical
   "server/stripe-router.ts",

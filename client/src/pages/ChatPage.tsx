@@ -156,7 +156,6 @@ const HELP_CATEGORIES = [
     items: [
       "Scan for leaked credentials on the dark web",
       "Set up two-factor authentication (2FA)",
-      "Activate emergency kill switch",
       "View audit logs of all actions",
       "Manage vault entries securely",
     ],
@@ -264,7 +263,6 @@ const TOOL_LABELS: Record<string, string> = {
   check_provider_health: "Checked provider health",
   get_recommendations: "Fetched recommendations",
   get_audit_logs: "Fetched audit logs",
-  activate_kill_switch: "Activated kill switch",
   get_system_status: "Fetched system status",
   get_plan_usage: "Fetched plan usage",
   self_read_file: "Read file",

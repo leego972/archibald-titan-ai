@@ -1227,6 +1227,24 @@ const MODULE_CATALOG: ModuleDef[] = [
     totalSales: 41,
     viewCount: 2400,
   },
+
+  // ── Kill Switch Module (Archibald Titan Official) — Moved from core to marketplace ──
+  {
+    merchantIndex: 7, // Archibald Titan Official
+    title: "Kill Switch — Emergency Automation Control",
+    description: "Enterprise-grade emergency shutdown module for Archibald Titan. Instantly halt all running fetch jobs, automations, and scheduled tasks with a secure 10-digit alphanumeric code. Includes SEO engine kill switch, affiliate discovery kill switch, and signup automation kill switch.",
+    longDescription: `# Kill Switch — Emergency Automation Control\n\nA comprehensive emergency shutdown module built by the Archibald Titan core team. Provides instant, secure control over all running automations.\n\n## Features\n- **Master Kill Switch**: Halt all running fetch jobs and automations instantly\n- **SEO Engine Kill Switch**: Stop all autonomous SEO operations\n- **Affiliate Discovery Kill Switch**: Pause affiliate program discovery\n- **Signup Automation Kill Switch**: Stop automated affiliate signups\n- **Secure Activation**: Requires a unique 10-digit alphanumeric code per user\n- **Code Reset**: Generate a new kill switch code at any time\n- **Instant Effect**: All running jobs are cancelled within seconds\n- **Session Wipe**: Active sessions are cleared on activation\n- **Audit Logged**: Every activation and deactivation is recorded\n\n## How It Works\n1. Install the module from the Grand Bazaar\n2. A unique 10-digit kill switch code is generated for your account\n3. Enter the code to activate — all automations halt immediately\n4. Enter the code again to deactivate and resume operations\n5. Reset the code at any time from the module settings\n\n## Integration\nOnce installed, the Kill Switch integrates with:\n- Fetcher Engine (credential fetch jobs)\n- SEO Command Center (autonomous optimization)\n- Affiliate Engine (discovery and signup automation)\n- Pre-flight safety checks (blocks new jobs while active)\n\n## Use Cases\n- Emergency response when automation behaves unexpectedly\n- Compliance pauses during audits or investigations\n- Maintenance windows requiring all automation to stop\n- Quick shutdown before account credential rotation\n\n## Requirements\n- Archibald Titan Pro plan or higher\n- Active subscription`,
+    category: "modules",
+    riskCategory: "safe",
+    priceCredits: 75,
+    tags: ["emergency", "safety", "automation", "kill-switch", "shutdown", "control", "official"],
+    language: "TypeScript",
+    license: "Proprietary",
+    featured: true,
+    version: "1.0.0",
+    totalSales: 0,
+    viewCount: 0,
+  },
 ];
 
 // ─── Seed Function ──────────────────────────────────────────────────

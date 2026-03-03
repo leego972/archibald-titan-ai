@@ -487,12 +487,6 @@ export default function LandingPage() {
                 color: "from-cyan-500 to-cyan-600",
               },
               {
-                icon: ShieldAlert,
-                title: "Kill Switch",
-                desc: "Emergency shutdown with alphanumeric code. Instantly terminates all running jobs, wipes active sessions, and locks the system. Safety first.",
-                color: "from-red-500 to-red-600",
-              },
-              {
                 icon: FileJson,
                 title: "Multi-Format Export",
                 desc: "Export credentials as JSON, CSV, or .env files. Copy individual keys or bulk export your entire vault for easy integration into your projects.",
@@ -756,7 +750,7 @@ export default function LandingPage() {
                 name: "Elena Vasquez",
                 role: "Security Analyst",
                 company: "Fortify Labs",
-                text: "I audited the encryption implementation and it's solid. The kill switch feature is a nice touch — gives you an emergency off-ramp if anything goes sideways. Exactly what a security-conscious tool should have.",
+                text: "I audited the encryption implementation and it's solid. AES-256-GCM with proper key derivation — exactly what a security-conscious tool should have. The vault isolation and audit logging give you full visibility into everything happening with your credentials.",
                 rating: 5,
                 initials: "EV",
                 color: "from-amber-500 to-orange-500",

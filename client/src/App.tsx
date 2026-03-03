@@ -31,7 +31,6 @@ import FetcherJobDetail from "./pages/FetcherJobDetail";
 import FetcherCredentials from "./pages/FetcherCredentials";
 import FetcherExport from "./pages/FetcherExport";
 import FetcherSettings from "./pages/FetcherSettings";
-import FetcherKillSwitch from "./pages/FetcherKillSwitch";
 
 // Developer Tools
 import ReplicatePage from "./pages/ReplicatePage";
@@ -145,7 +144,6 @@ function DashboardRouter() {
         <Route path="/fetcher/team" component={TeamManagementPage} />
         <Route path="/fetcher/team-vault" component={TeamVaultPage} />
         <Route path="/fetcher/settings" component={FetcherSettings} />
-        <Route path="/fetcher/killswitch" component={FetcherKillSwitch} />
         <Route path="/fetcher/account" component={AccountSettingsPage} />
 
         {/* Automation */}

@@ -186,7 +186,7 @@ export async function executeToolCall(
         "/fetcher/totp-vault", "/fetcher/notifications",
         "/fetcher/history", "/fetcher/audit-logs", "/fetcher/developer-docs",
         "/fetcher/webhooks", "/fetcher/api-analytics", "/fetcher/account",
-        "/fetcher/settings", "/fetcher/killswitch", "/fetcher/releases",
+        "/fetcher/settings", "/fetcher/releases",
         "/fetcher/admin", "/fetcher/self-improvement",
         // Marketplace & Business
         "/marketplace", "/replicate", "/companies", "/business-plans",
@@ -458,12 +458,7 @@ export async function executeToolCall(
         return await execGetAuditLogs(args as any);
       }
 
-      // ── Kill Switch (Pro+) ──────────────────────────────────────
-      case "activate_kill_switch": {
-        const gate = gateResult("kill_switch", "Kill Switch");
-        if (gate) return gate;
-        return await execActivateKillSwitch(userId, args.code as string);
-      }
+      // ── Kill Switch — REMOVED (now a Grand Bazaar module)
 
       // ── System ──────────────────────────────────────────────────
       case "get_system_status":

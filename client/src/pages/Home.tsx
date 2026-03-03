@@ -513,7 +513,6 @@ function FeatureAccessWidget({ sub, setLocation }: { sub: any; setLocation: (pat
             { name: "JSON Export", available: true },
             { name: "All 15+ Providers", available: sub.canUse("proxy_pool") },
             { name: "CAPTCHA Auto-Solving", available: sub.canUse("captcha_solving") },
-            { name: "Kill Switch", available: sub.canUse("kill_switch") },
             { name: "Proxy Pool", available: sub.canUse("proxy_pool") },
             { name: ".ENV Export", available: sub.canUse("env_export") },
             { name: "CSV Export", available: sub.canUse("csv_export") },

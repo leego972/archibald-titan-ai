@@ -51,10 +51,6 @@ const PAGE_TIPS: Record<string, string[]> = {
     "Customize Titan to work exactly how you want.",
     "Tip: Enable dark mode for late-night credential management sessions!",
   ],
-  "/fetcher/killswitch": [
-    "The Kill Switch — for when things go sideways. Use with caution!",
-    "This will immediately halt all automated processes. Only use in emergencies.",
-  ],
   "/grants": [
     "Looking for funding? I'll help you find the perfect grants for your business!",
     "Tip: Use filters to narrow down grants by industry, amount, and deadline.",

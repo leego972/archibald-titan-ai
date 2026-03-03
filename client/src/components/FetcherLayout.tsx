@@ -172,7 +172,6 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_36_r5c4"), label: "Team Management", path: "/fetcher/team" },
       { icon: featureIcon("icon_22_r3c6"), label: "Team Vault", path: "/fetcher/team-vault", isNew: true },
       { icon: featureIcon("icon_44_r6c4"), label: "Settings", path: "/fetcher/settings" },
-      { icon: featureIcon("icon_26_r4c2"), label: "Kill Switch", path: "/fetcher/killswitch" },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

@@ -185,7 +185,6 @@ export function getAllowedProviders(planId: PlanId): string[] | null {
 export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
   const featureMap: Record<string, PlanId[]> = {
     captcha_solving: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
-    kill_switch: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     scheduled_fetches: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     proxy_pool: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     env_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],

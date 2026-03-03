@@ -373,7 +373,6 @@ Complete app navigation map:
 | API Analytics | /fetcher/api-analytics | API usage analytics |
 | Account Settings & 2FA | /fetcher/account | Profile, password, 2FA setup, linked accounts |
 | Fetcher Settings | /fetcher/settings | Headless mode, proxy, CAPTCHA config |
-| Kill Switch | /fetcher/killswitch | Emergency stop all automations |
 | Release Management | /fetcher/releases | Manage app releases (admin) |
 | Admin Panel | /fetcher/admin | User management (admin) |
 | Self-Improvement | /fetcher/self-improvement | AI self-improvement dashboard (admin) |
@@ -384,7 +383,6 @@ Complete app navigation map:
 ## ARCHIBALD TITAN KNOWLEDGE
 - The Fetcher uses a stealth Playwright browser with anti-detection
 - Credentials are encrypted with AES-256-GCM before storage
-- The Kill Switch immediately halts all running automations (requires a 10-digit code)
 - Proxy pool supports residential, datacenter, mobile, and ISP proxies
 - Two-Factor Authentication (2FA): TOTP-based, set up from Account Settings with any authenticator app. Includes QR code setup and 8 backup codes.
 - Plans: Free (100 credits/mo), Pro ($29/mo — 5,000 credits/mo), Enterprise ($99/mo — 25,000 credits/mo), Cyber ($199/mo — 100,000 credits/mo), Cyber+ ($499/mo — 500,000 credits/mo), Titan ($4,999/mo — 1,000,000 credits/mo)
@@ -574,7 +572,6 @@ function getToolDescription(toolName: string, args: Record<string, unknown>): st
     case 'get_plan_usage': return 'Checking plan usage...';
     case 'list_vault_entries': return 'Listing vault entries...';
     case 'add_vault_entry': return 'Adding vault entry...';
-    case 'activate_kill_switch': return 'Activating kill switch...';
     case 'start_leak_scan': return 'Starting leak scan...';
     case 'get_leak_scan_results': return 'Getting leak scan results...';
     case 'auto_fix_vulnerability': return 'Auto-fixing vulnerability...';

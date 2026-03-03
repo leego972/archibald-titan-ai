@@ -28,13 +28,12 @@ const SEED_RELEASE = {
     "- Stealth Playwright browser with device fingerprinting\n" +
     "- Integrated CAPTCHA solving (reCAPTCHA, hCaptcha, image)\n" +
     "- Residential proxy pool with automatic rotation\n" +
-    "- Kill switch with emergency shutdown code\n" +
     "- Export credentials as JSON, CSV, or .env\n\n" +
     "**Security:**\n" +
     "- All credentials encrypted at rest with AES-256-GCM\n" +
     "- Session-based authentication via Manus OAuth\n" +
     "- Proxy credentials encrypted separately\n" +
-    "- Kill switch for instant emergency shutdown",
+    "- Comprehensive audit logging and activity tracking",
   fileSizeMb: 185,
   isLatest: 1,
   isPrerelease: 1,

@@ -14,10 +14,6 @@ import {
   exportCredentials,
   getSettings,
   updateSettings,
-  getOrCreateKillSwitch,
-  activateKillSwitch,
-  deactivateKillSwitch,
-  resetKillSwitch,
   isKillSwitchActive,
   storeManualCredential,
 } from "./fetcher-db";
@@ -363,44 +359,7 @@ export const fetcherRouter = router({
     return RECOMMENDED_PROXY_PROVIDERS;
   }),
 
-  // ─── Kill Switch (gated: Pro+ only) ──────────────────────────
-  getKillSwitch: protectedProcedure.query(async ({ ctx }) => {
-    const plan = await getUserPlan(ctx.user.id);
-    const ks = await getOrCreateKillSwitch(ctx.user.id);
-    return {
-      code: ks.code,
-      active: ks.active === 1,
-      locked: plan.planId === "free",
-      currentPlan: plan.planId,
-    };
-  }),
-
-  activateKillSwitch: protectedProcedure
-    .input(z.object({ code: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "kill_switch", "Kill Switch");
-      const success = await activateKillSwitch(ctx.user.id, input.code);
-      if (!success) throw new Error("Invalid kill switch code");
-      return { success: true, active: true };
-    }),
-
-  deactivateKillSwitch: protectedProcedure
-    .input(z.object({ code: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      // Always allow deactivation even on free plan (safety)
-      const success = await deactivateKillSwitch(ctx.user.id, input.code);
-      if (!success) throw new Error("Invalid kill switch code");
-      return { success: true, active: false };
-    }),
-
-  resetKillSwitch: protectedProcedure
-    .mutation(async ({ ctx }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "kill_switch", "Kill Switch");
-      const newCode = await resetKillSwitch(ctx.user.id);
-      return { code: newCode, active: false };
-    }),
+  // ─── Kill Switch — REMOVED from core (now a Grand Bazaar marketplace module) ───
 
   // ─── Pre-flight Check Endpoint ─────────────────────────────────
   preflight: protectedProcedure

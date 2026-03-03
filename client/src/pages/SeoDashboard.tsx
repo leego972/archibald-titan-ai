@@ -41,9 +41,6 @@ export default function SeoDashboard() {
     },
   });
 
-  const killSwitch = trpc.seo.killSwitch.useMutation({
-    onSuccess: () => statusQuery.refetch(),
-  });
 
   if (user?.role !== "admin") {
     return (
@@ -87,16 +84,6 @@ export default function SeoDashboard() {
           <p className="text-gray-400 mt-1">Autonomous search engine optimization for Archibald Titan</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Kill Switch */}
-          <Button
-            variant="outline"
-            size="sm"
-            className={`${statusQuery.data?.isKilled ? "border-red-500/50 text-red-400" : "border-gray-600 text-gray-400"}`}
-            onClick={() => killSwitch.mutate({ action: statusQuery.data?.isKilled ? "deactivate" : "activate" })}
-          >
-            <Shield className="w-4 h-4 mr-1" />
-            {statusQuery.data?.isKilled ? "Engine Killed" : "Kill Switch"}
-          </Button>
           {/* Run Optimization */}
           <Button
             size="sm"

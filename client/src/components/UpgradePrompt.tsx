@@ -82,7 +82,7 @@ export function UpgradeDialog({
                 <li>5,000 AI credits/month</li>
                 <li>Unlimited fetches & all 15+ providers</li>
                 <li>CAPTCHA auto-solving</li>
-                <li>5 proxy slots & kill switch</li>
+                <li>5 proxy slots & advanced automation</li>
                 <li>JSON & .ENV export</li>
               </>
             ) : (

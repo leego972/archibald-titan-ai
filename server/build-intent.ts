@@ -71,7 +71,7 @@ const SELF_CONTEXT_PHRASES = [
   'credentials page', 'dashboard page', 'settings page', 'admin page',
   'sidebar', 'header', 'footer', 'navigation', 'nav bar', 'navbar',
   'fetcher', 'watchdog', 'leak scanner', 'bulk sync', 'auto-sync',
-  'kill switch', 'killswitch', 'team vault', 'audit log',
+  'team vault', 'audit log',
   'this app', 'this site', 'this platform', 'this tool',
   'the app', 'the site', 'the platform', 'archibald', 'titan',
   'marketplace', 'grand bazaar', 'bazaar',

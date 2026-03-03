@@ -299,7 +299,7 @@ export default function TermsPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-1 shrink-0">•</span>
-                <span>Any failure of the encryption, security mechanisms, kill switch, sandbox isolation, or any other protective feature of the Software.</span>
+                <span>Any failure of the encryption, security mechanisms, sandbox isolation, or any other protective feature of the Software.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-1 shrink-0">•</span>

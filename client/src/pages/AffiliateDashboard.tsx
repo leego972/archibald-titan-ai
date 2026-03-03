@@ -148,14 +148,6 @@ export default function AffiliateDashboard() {
     onError: (err) => toast.error(err.message),
   });
 
-  const killSwitchMutation = trpc.affiliate.discoveryKillSwitch.useMutation({
-    onSuccess: (data) => {
-      if (data.success) toast.success(data.message);
-      else toast.error(data.message);
-      discoveryStatusQuery.refetch();
-    },
-    onError: (err) => toast.error(err.message),
-  });
 
   const runSignupMutation = trpc.affiliate.runSignupBatch.useMutation({
     onSuccess: (data) => {
@@ -166,13 +158,7 @@ export default function AffiliateDashboard() {
     onError: (err) => toast.error(err.message),
   });
 
-  const signupKillSwitchMutation = trpc.affiliate.signupKillSwitch.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.message);
-      discoveryStatusQuery.refetch();
-    },
-    onError: (err) => toast.error(err.message),
-  });
+
 
   const stats = statsQuery.data;
   const partners = partnersQuery.data || [];
@@ -407,20 +393,7 @@ export default function AffiliateDashboard() {
                 <Search className="w-4 h-4 mr-1" />
                 {runDiscoveryMutation.isPending ? "Discovering..." : "Run Discovery Now"}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={discoveryStatus?.isKilled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                onClick={() => {
-                  const code = prompt(`Enter kill switch code to ${discoveryStatus?.isKilled ? "resume" : "stop"} discovery:`);
-                  if (code) {
-                    killSwitchMutation.mutate({ code, action: discoveryStatus?.isKilled ? "reset" : "kill" });
-                  }
-                }}
-              >
-                <Power className="w-4 h-4 mr-1" />
-                {discoveryStatus?.isKilled ? "Resume" : "Kill Switch"}
-              </Button>
+
             </div>
           </div>
 
@@ -671,15 +644,7 @@ export default function AffiliateDashboard() {
                 <Play className="w-4 h-4 mr-1" />
                 {runSignupMutation.isPending ? "Signing up..." : "Run Signup Batch"}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={discoveryStatus?.isSignupKilled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                onClick={() => signupKillSwitchMutation.mutate({ action: discoveryStatus?.isSignupKilled ? "reset" : "kill" })}
-              >
-                <Power className="w-4 h-4 mr-1" />
-                {discoveryStatus?.isSignupKilled ? "Resume" : "Kill Switch"}
-              </Button>
+
             </div>
           </div>
 

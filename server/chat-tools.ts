@@ -574,27 +574,7 @@ const getAuditLogs: Tool = {
   },
 };
 
-// ─── Kill Switch Tool ────────────────────────────────────────────────
-
-const activateKillSwitch: Tool = {
-  type: "function",
-  function: {
-    name: "activate_kill_switch",
-    description:
-      "EMERGENCY: Activate the kill switch to immediately halt all running fetch jobs and automations. Requires a 10-digit alphanumeric confirmation code. Only use when the user explicitly requests emergency shutdown.",
-    parameters: {
-      type: "object",
-      properties: {
-        code: {
-          type: "string",
-          description:
-            "10-digit alphanumeric confirmation code. Ask the user for their kill switch code before activating.",
-        },
-      },
-      required: ["code"],
-    },
-  },
-};
+// ─── Kill Switch Tool — REMOVED (now a Grand Bazaar marketplace module) ────
 
 // ─── System Status Tool ──────────────────────────────────────────────
 
@@ -904,7 +884,7 @@ const navigateToPage: Tool = {
   function: {
     name: "navigate_to_page",
     description:
-      "Navigate the user to a specific page within the Archibald Titan app. Use this when the user asks about a feature, wants to set something up, or needs to go somewhere. Returns a clickable link. Available pages: CORE: dashboard, dashboard/credits, dashboard/subscription, project-files, sandbox, pricing, contact. FETCHER: fetcher/new, fetcher/jobs, fetcher/credentials, fetcher/export, fetcher/import, fetcher/api-access, fetcher/smart-fetch, fetcher/cli, fetcher/watchdog, fetcher/provider-health, fetcher/health-trends, fetcher/credential-health, fetcher/leak-scanner, fetcher/bulk-sync, fetcher/auto-sync, fetcher/onboarding, fetcher/team, fetcher/team-vault, fetcher/totp-vault, fetcher/notifications, fetcher/history, fetcher/audit-logs, fetcher/developer-docs, fetcher/webhooks, fetcher/api-analytics, fetcher/account, fetcher/settings, fetcher/killswitch, fetcher/releases, fetcher/admin, fetcher/self-improvement. BUSINESS: marketplace, replicate, companies, business-plans, grants, grant-applications, crowdfunding, referrals, affiliate. MARKETING: blog, blog-admin, seo, marketing, advertising.",
+      "Navigate the user to a specific page within the Archibald Titan app. Use this when the user asks about a feature, wants to set something up, or needs to go somewhere. Returns a clickable link. Available pages: CORE: dashboard, dashboard/credits, dashboard/subscription, project-files, sandbox, pricing, contact. FETCHER: fetcher/new, fetcher/jobs, fetcher/credentials, fetcher/export, fetcher/import, fetcher/api-access, fetcher/smart-fetch, fetcher/cli, fetcher/watchdog, fetcher/provider-health, fetcher/health-trends, fetcher/credential-health, fetcher/leak-scanner, fetcher/bulk-sync, fetcher/auto-sync, fetcher/onboarding, fetcher/team, fetcher/team-vault, fetcher/totp-vault, fetcher/notifications, fetcher/history, fetcher/audit-logs, fetcher/developer-docs, fetcher/webhooks, fetcher/api-analytics, fetcher/account, fetcher/settings, fetcher/releases, fetcher/admin, fetcher/self-improvement. BUSINESS: marketplace, replicate, companies, business-plans, grants, grant-applications, crowdfunding, referrals, affiliate. MARKETING: blog, blog-admin, seo, marketing, advertising.",
     parameters: {
       type: "object",
       properties: {
@@ -1894,8 +1874,7 @@ export const TITAN_TOOLS: Tool[] = [
   getRecommendations,
   // Audit
   getAuditLogs,
-  // Kill Switch
-  activateKillSwitch,
+  // Kill Switch — REMOVED (now a Grand Bazaar module)
   // System
   getSystemStatus,
   getPlanUsage,
