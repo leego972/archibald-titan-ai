@@ -3654,6 +3654,9 @@ async function execCreateFile(
     // Store in sandboxFiles table (reuse existing table)
     const db = await getDb();
     const sbId = await getOrCreateDefaultSandbox(userId);
+    // Derive project name from the first path segment (e.g. "src/main.py" → "src", "main.py" → "general")
+    const pathParts = fileName.split("/");
+    const derivedProjectName = pathParts.length > 1 ? pathParts[0] : "general";
     if (db) {
       await db.insert(sandboxFiles).values({
         sandboxId: sbId,
@@ -3662,6 +3665,8 @@ async function execCreateFile(
         s3Key: s3Key,
         fileSize: Buffer.byteLength(content, "utf-8"),
         isDirectory: 0,
+        conversationId: conversationId || null,
+        projectName: derivedProjectName,
       });
     }
 

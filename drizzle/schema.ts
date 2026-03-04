@@ -1154,6 +1154,8 @@ export const sandboxFiles = mysqlTable("sandbox_files", {
   s3Key: varchar("s3Key", { length: 256 }), // for larger files stored in S3
   fileSize: int("fileSize").default(0).notNull(),
   isDirectory: int("isDirectory").default(0).notNull(),
+  conversationId: int("conversationId"),
+  projectName: varchar("projectName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

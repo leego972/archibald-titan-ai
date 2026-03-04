@@ -2687,7 +2687,10 @@ export default function ChatPage() {
                               const fileBlob = await s3Res.blob();
                               saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), file.name);
                             } else {
-                              const zipRes = await fetch('/api/project-files/download-zip?all=true', { credentials: 'include' });
+                              const dlUrl = activeConversationId
+                                ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
+                                : '/api/project-files/download-zip?all=true';
+                              const zipRes = await fetch(dlUrl, { credentials: 'include' });
                               if (zipRes.ok) {
                                 const zipBlob = await zipRes.blob();
                                 saveAs(zipBlob, 'project-files.zip');
@@ -2746,7 +2749,10 @@ export default function ChatPage() {
               onClick={async () => {
                 try {
                   toast.info('Preparing zip file...');
-                  const res = await fetch('/api/project-files/download-zip?all=true', {
+                  const downloadUrl = activeConversationId
+                    ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
+                    : '/api/project-files/download-zip?all=true';
+                  const res = await fetch(downloadUrl, {
                     credentials: 'include',
                   });
                   if (res.ok) {

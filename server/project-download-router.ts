@@ -177,11 +177,12 @@ export function registerProjectDownloadRoutes(app: Express) {
         return;
       }
 
-      let files: Array<{ id: number; filePath: string; content: string | null; s3Key: string | null; fileSize: number | null }>;
+      let files: Array<{ id: number; filePath: string; content: string | null; s3Key: string | null; fileSize: number | null; conversationId: number | null; projectName: string | null }>;
 
       const idsParam = req.query.ids as string;
       const projectParam = req.query.project as string;
       const allParam = req.query.all as string;
+      const conversationParam = req.query.conversationId as string;
 
       if (idsParam) {
         // Download specific files by ID
@@ -194,17 +195,30 @@ export function registerProjectDownloadRoutes(app: Express) {
           .select()
           .from(sandboxFiles)
           .where(and(eq(sandboxFiles.sandboxId, sandboxId), eq(sandboxFiles.isDirectory, 0), inArray(sandboxFiles.id, ids)));
+      } else if (conversationParam) {
+        // Download all files from a specific conversation
+        const convId = parseInt(conversationParam, 10);
+        if (isNaN(convId)) {
+          res.status(400).json({ error: "Invalid conversationId" });
+          return;
+        }
+        files = await db
+          .select()
+          .from(sandboxFiles)
+          .where(and(eq(sandboxFiles.sandboxId, sandboxId), eq(sandboxFiles.isDirectory, 0), eq(sandboxFiles.conversationId, convId)))
+          .orderBy(desc(sandboxFiles.createdAt));
       } else if (projectParam) {
-        // Download all files in a project (by top-level directory name)
-        const allFiles = await db
+        // Download all files in a project (by projectName column or top-level directory name)
+        files = await db
           .select()
           .from(sandboxFiles)
           .where(and(eq(sandboxFiles.sandboxId, sandboxId), eq(sandboxFiles.isDirectory, 0)))
           .orderBy(desc(sandboxFiles.createdAt));
-        files = allFiles.filter(f => {
+        files = files.filter(f => {
+          if (f.projectName) return f.projectName === projectParam;
           const parts = f.filePath.split("/");
-          const projectName = parts.length > 1 ? parts[0] : "general";
-          return projectName === projectParam;
+          const derivedName = parts.length > 1 ? parts[0] : "general";
+          return derivedName === projectParam;
         });
       } else if (allParam === "true") {
         // Download all files
@@ -214,7 +228,7 @@ export function registerProjectDownloadRoutes(app: Express) {
           .where(and(eq(sandboxFiles.sandboxId, sandboxId), eq(sandboxFiles.isDirectory, 0)))
           .orderBy(desc(sandboxFiles.createdAt));
       } else {
-        res.status(400).json({ error: "Provide ?ids=1,2,3 or ?project=name or ?all=true" });
+        res.status(400).json({ error: "Provide ?ids=1,2,3 or ?conversationId=N or ?project=name or ?all=true" });
         return;
       }
 
@@ -224,7 +238,7 @@ export function registerProjectDownloadRoutes(app: Express) {
       }
 
       // Set up ZIP streaming response
-      const zipName = projectParam ? `${projectParam}-files.zip` : "project-files.zip";
+      const zipName = projectParam ? `${projectParam}-files.zip` : conversationParam ? `conversation-${conversationParam}-files.zip` : "project-files.zip";
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(zipName)}"`);
 

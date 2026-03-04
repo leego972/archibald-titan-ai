@@ -454,6 +454,9 @@ async function startServer() {
         "ALTER TABLE `audit_logs` ADD COLUMN `category` varchar(64) DEFAULT 'general' NOT NULL",
         // Security hardening: audit_logs severity column for triage
         "ALTER TABLE `audit_logs` ADD COLUMN `severity` varchar(16) DEFAULT 'low'",
+        // sandbox_files: track which conversation/project each file belongs to
+        "ALTER TABLE `sandbox_files` ADD COLUMN `conversationId` int NULL",
+        "ALTER TABLE `sandbox_files` ADD COLUMN `projectName` varchar(255) NULL",
       ];
       for (const sql of missingColumns) {
         try {
