@@ -1598,11 +1598,8 @@ Do NOT attempt any tool calls or builds.`;
             // inject a verification round to force the AI to test the code.
             const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
             const ranSandboxExec = executedActions.some(a => a.tool === 'sandbox_exec');
-            let needsVerification = false;
-            if (!needsVerification) {
-              // Track if we already injected verification to avoid infinite loops
-              needsVerification = isExternalBuild && createdFiles.length > 0 && !ranSandboxExec && rounds < MAX_TOOL_ROUNDS - 1;
-            }
+            log.info(`[Chat] VERIFICATION CHECK: isExternalBuild=${isExternalBuild}, createdFiles=${createdFiles.length}, ranSandboxExec=${ranSandboxExec}, rounds=${rounds}, allTools=${executedActions.map(a => a.tool).join(',')}`);
+            const needsVerification = isExternalBuild && createdFiles.length > 0 && !ranSandboxExec && rounds < MAX_TOOL_ROUNDS - 1;
             // Check if we already injected a verification prompt (prevent infinite loop)
             const alreadyInjectedVerification = llmMessages.some(
               (m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('VERIFICATION REQUIRED')
