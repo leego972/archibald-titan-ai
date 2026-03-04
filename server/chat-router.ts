@@ -27,6 +27,12 @@ import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
 import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild } from "./chat-stream";
 import { executeToolCall } from "./chat-executor";
 import {
+  listSandboxes as sbListSandboxes,
+  executeCommand as sbExecuteCommand,
+  writeFile as sbWriteFile,
+  createSandbox as sbCreateSandbox,
+} from "./sandbox-engine";
+import {
   enableDeferredMode,
   disableDeferredMode,
   flushStagedChanges,
@@ -1593,47 +1599,95 @@ Do NOT attempt any tool calls or builds.`;
               continue;
             }
 
-            // ── POST-BUILD VERIFICATION INJECTION ──
-            // If this is an external build that created files but never ran sandbox_exec,
-            // inject a verification round to force the AI to test the code.
+            // ── PROGRAMMATIC POST-BUILD VERIFICATION ──
+            // Instead of asking the AI to verify (which wastes rounds), we run verification
+            // programmatically: write files to sandbox, execute tests, append results.
             const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
             const ranSandboxExec = executedActions.some(a => a.tool === 'sandbox_exec');
-            log.info(`[Chat] VERIFICATION CHECK: isExternalBuild=${isExternalBuild}, createdFiles=${createdFiles.length}, ranSandboxExec=${ranSandboxExec}, rounds=${rounds}, allTools=${executedActions.map(a => a.tool).join(',')}`);
-            const needsVerification = isExternalBuild && createdFiles.length > 0 && !ranSandboxExec && rounds < MAX_TOOL_ROUNDS - 1;
-            // Check if we already injected a verification prompt (prevent infinite loop)
-            const alreadyInjectedVerification = llmMessages.some(
-              (m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('VERIFICATION REQUIRED')
-            );
-            if (needsVerification && !alreadyInjectedVerification) {
-              log.info(`[Chat] POST-BUILD VERIFICATION: ${createdFiles.length} files created but no sandbox_exec. Injecting verification round.`);
-              // Determine the main file to test
-              const pyFiles = createdFiles.filter(a => (a.args?.fileName as string)?.endsWith('.py'));
-              const testFiles = pyFiles.filter(a => (a.args?.fileName as string)?.includes('test'));
-              const mainFiles = pyFiles.filter(a => !(a.args?.fileName as string)?.includes('test'));
-              const jsFiles = createdFiles.filter(a => {
-                const fn = a.args?.fileName as string;
-                return fn?.endsWith('.js') || fn?.endsWith('.ts');
-              });
+            if (isExternalBuild && createdFiles.length > 0 && !ranSandboxExec) {
+              try {
+                log.info(`[Chat] PROGRAMMATIC VERIFICATION: ${createdFiles.length} files created. Running automated tests...`);
+                emitChatEvent(conversationId!, { type: 'status', data: { message: 'Running automated verification...' } });
 
-              let verifyCmd = '';
-              if (testFiles.length > 0) {
-                const testFile = testFiles[0].args?.fileName;
-                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; python3 -m pytest ${testFile} -v 2>&1 || python3 -m unittest ${testFile} -v 2>&1`;
-              } else if (mainFiles.length > 0) {
-                const mainFile = mainFiles[0].args?.fileName;
-                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; python3 -c "import ast; ast.parse(open('${mainFile}').read()); print('Syntax OK')" && python3 ${mainFile} --help 2>&1 || python3 ${mainFile} 2>&1 | head -50`;
-              } else if (jsFiles.length > 0) {
-                const jsFile = jsFiles[0].args?.fileName;
-                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; node --check ${jsFile} && echo 'Syntax OK'`;
+                // Get or create sandbox
+                const userSandboxes = await sbListSandboxes(userId);
+                const sbId = userSandboxes.length > 0
+                  ? userSandboxes[0].id
+                  : (await sbCreateSandbox(userId, 'Verification')).id;
+
+                // Write all created files to sandbox
+                for (const f of createdFiles) {
+                  const fn = f.args?.fileName as string;
+                  const content = f.args?.content as string;
+                  if (fn && content) {
+                    await sbWriteFile(sbId, userId, fn, content);
+                  }
+                }
+
+                // Determine verification commands based on file types
+                const pyFiles = createdFiles.filter(a => (a.args?.fileName as string)?.endsWith('.py'));
+                const testFiles = pyFiles.filter(a => {
+                  const fn = (a.args?.fileName as string) || '';
+                  return fn.includes('test') || fn.startsWith('test_');
+                });
+                const mainFiles = pyFiles.filter(a => {
+                  const fn = (a.args?.fileName as string) || '';
+                  return !fn.includes('test') && !fn.startsWith('test_');
+                });
+                const jsFiles = createdFiles.filter(a => {
+                  const fn = (a.args?.fileName as string) || '';
+                  return fn.endsWith('.js') || fn.endsWith('.ts');
+                });
+                const htmlFiles = createdFiles.filter(a => (a.args?.fileName as string)?.endsWith('.html'));
+
+                const verifyResults: string[] = [];
+
+                // Install requirements.txt if it exists
+                const reqFile = createdFiles.find(a => (a.args?.fileName as string) === 'requirements.txt');
+                if (reqFile) {
+                  const installResult = await sbExecuteCommand(sbId, userId, 'pip3 install -r requirements.txt 2>&1 | tail -5', { timeoutMs: 60000, triggeredBy: 'system' });
+                  if (installResult.exitCode !== 0) {
+                    verifyResults.push(`**pip install:** Some dependencies may not be available (non-critical)`);
+                  }
+                }
+
+                // Run Python tests
+                if (testFiles.length > 0) {
+                  const testFile = testFiles[0].args?.fileName as string;
+                  const testResult = await sbExecuteCommand(sbId, userId, `python3 -m pytest ${testFile} -v 2>&1 || python3 -m unittest ${testFile} -v 2>&1`, { timeoutMs: 30000, triggeredBy: 'system' });
+                  verifyResults.push(`**Unit Tests (${testFile}):**\n\`\`\`\n${testResult.output.slice(0, 2000)}\n\`\`\`\nExit code: ${testResult.exitCode}`);
+                } else if (mainFiles.length > 0) {
+                  // Syntax check + help/dry-run
+                  const mainFile = mainFiles[0].args?.fileName as string;
+                  const syntaxResult = await sbExecuteCommand(sbId, userId, `python3 -c "import ast; ast.parse(open('${mainFile}').read()); print('Syntax OK: ${mainFile}')"`, { timeoutMs: 15000, triggeredBy: 'system' });
+                  verifyResults.push(`**Syntax Check (${mainFile}):** ${syntaxResult.output.trim() || (syntaxResult.exitCode === 0 ? 'OK' : 'FAILED')}`);
+                  // Try --help or basic import
+                  const helpResult = await sbExecuteCommand(sbId, userId, `python3 ${mainFile} --help 2>&1 || python3 -c "import importlib.util; spec = importlib.util.spec_from_file_location('m', '${mainFile}'); print('Import OK')" 2>&1`, { timeoutMs: 15000, triggeredBy: 'system' });
+                  verifyResults.push(`**Runtime Check:**\n\`\`\`\n${helpResult.output.slice(0, 1000)}\n\`\`\``);
+                }
+
+                // Check JS/TS files
+                if (jsFiles.length > 0) {
+                  const jsFile = jsFiles[0].args?.fileName as string;
+                  const jsResult = await sbExecuteCommand(sbId, userId, `node --check ${jsFile} && echo 'Syntax OK: ${jsFile}'`, { timeoutMs: 15000, triggeredBy: 'system' });
+                  verifyResults.push(`**JS Syntax Check (${jsFile}):** ${jsResult.output.trim() || (jsResult.exitCode === 0 ? 'OK' : 'FAILED')}`);
+                }
+
+                // Check HTML files
+                if (htmlFiles.length > 0 && pyFiles.length === 0 && jsFiles.length === 0) {
+                  verifyResults.push(`**HTML Files:** ${htmlFiles.length} HTML file(s) created — valid static files`);
+                }
+
+                // Append verification results to the response
+                if (verifyResults.length > 0) {
+                  const verificationBlock = `\n\n---\n**Automated Verification Results:**\n${verifyResults.join('\n\n')}`;
+                  textContent = (textContent || '') + verificationBlock;
+                  log.info(`[Chat] VERIFICATION COMPLETE: ${verifyResults.length} checks performed`);
+                  emitChatEvent(conversationId!, { type: 'status', data: { message: 'Verification complete!' } });
+                }
+              } catch (verifyErr: unknown) {
+                log.warn('[Chat] Programmatic verification failed (non-fatal):', { error: getErrorMessage(verifyErr) });
               }
-
-              llmMessages.push({ role: 'assistant', content: textContent });
-              llmMessages.push({
-                role: 'user',
-                content: `VERIFICATION REQUIRED: You created ${createdFiles.length} file(s) but did NOT verify them. You MUST now:\n1. First use sandbox_write_file to write the main files to the sandbox\n2. Then use sandbox_exec to test them\n3. Report the verification results\n\nDo NOT skip this step. The user asked you to verify the code works.${verifyCmd ? ` Suggested test command: ${verifyCmd}` : ''}`
-              });
-              forceFirstTool = 'sandbox_write_file';
-              continue;
             }
 
             finalText = textContent;

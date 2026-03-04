@@ -1995,9 +1995,7 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   createProjectFile,
   readUploadedFile,
   provideProjectZip,
-  // Sandbox tools — execute, read, write, list
-  sandboxExec,
-  sandboxWriteFile,
+  // Sandbox tools — read and list only (verification is automated post-build)
   sandboxReadFile,
   sandboxListFiles,
   // Web Research
