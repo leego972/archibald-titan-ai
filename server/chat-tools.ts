@@ -952,7 +952,7 @@ const sandboxExec: Tool = {
   function: {
     name: "sandbox_exec",
     description:
-      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a minimal Linux environment with basic shell utilities (bash, ls, cat, grep, mkdir, etc.) and Node.js. IMPORTANT: Python is NOT available in this sandbox. Do NOT attempt to run python or python3 commands — they will fail. Use this tool sparingly and only when needed (e.g., to install npm packages or run Node.js scripts). For most builds, focus on creating high-quality files with create_file — do NOT waste rounds trying to execute code that cannot run in this environment.",
+      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a Linux environment with bash, core utilities, Python3, pip3, and Node.js. Use this to VERIFY your work after creating files: run syntax checks (python3 -c 'import py_compile; py_compile.compile(\"file.py\")'), run unit tests, install dependencies (pip3 install -r requirements.txt), or execute scripts. IMPORTANT: Be efficient — verify with 1-2 targeted commands, not exhaustive testing. If a command fails, diagnose and fix the code, don't retry the same command.",
     parameters: {
       type: "object",
       properties: {
@@ -1989,13 +1989,15 @@ export const BUILDER_TOOLS: Tool[] = [
 ];
 
 // Focused tool subset for EXTERNAL project building — creates real files the user can download
-// Sandbox exec/write removed: the sandbox lacks Python and most runtimes, causing wasted rounds
+// Python3 and Node.js are available in the sandbox for verification
 export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // Core builder tools — create real files
   createProjectFile,
   readUploadedFile,
   provideProjectZip,
-  // Sandbox tools — read/list only (no exec or write — they waste rounds)
+  // Sandbox tools — execute, read, write, list
+  sandboxExec,
+  sandboxWriteFile,
   sandboxReadFile,
   sandboxListFiles,
   // Web Research

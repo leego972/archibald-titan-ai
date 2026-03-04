@@ -29,9 +29,12 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Install Playwright/Chromium system dependencies
-# These are required for the fetcher engine's browser automation
+# Install Python3 for sandbox code execution/verification
+# Install Playwright/Chromium system dependencies for fetcher engine
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
     wget \
     ca-certificates \
     fonts-liberation \
@@ -81,6 +84,9 @@ RUN addgroup --system --gid 1001 titan && \
 
 # Give titan user access to Playwright browser cache
 RUN mkdir -p /home/titan/.cache && chown -R titan:titan /home/titan
+
+# Create sandbox temp directory with proper permissions
+RUN mkdir -p /tmp/titan-sandboxes && chown -R titan:titan /tmp/titan-sandboxes
 
 USER titan
 
