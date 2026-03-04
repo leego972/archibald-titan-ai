@@ -53,11 +53,24 @@ async function storeInDatabase(
  */
 export function registerChatUploadRoute(app: Express) {
   // ── Serve endpoint for database-stored uploads ──────────────────
+  // SECURITY: Requires authentication and verifies the file belongs to the requesting user
   app.get("/api/chat/uploads/*", async (req: Request, res: Response) => {
     try {
       const fileKey = req.params[0]; // everything after /api/chat/uploads/
       if (!fileKey) {
         return res.status(400).json({ error: "File key required" });
+      }
+
+      // ── AUTHENTICATION: Verify the user is logged in ──────────
+      let userId: number | null = null;
+      try {
+        const ctx = await createContext({ req, res, info: {} as any });
+        userId = ctx.user?.id ?? null;
+      } catch {
+        userId = null;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
       }
 
       const { getDb } = await import("./db");
@@ -67,9 +80,10 @@ export function registerChatUploadRoute(app: Express) {
         return res.status(500).json({ error: "Database unavailable" });
       }
 
+      // ── AUTHORIZATION: Only return files owned by the authenticated user ──
       const result = await db.execute(
         sql.raw(
-          `SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`
+          `SELECT userId, mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`
         )
       );
 
@@ -79,6 +93,13 @@ export function registerChatUploadRoute(app: Express) {
       }
 
       const row = rows[0];
+
+      // Verify the file belongs to the requesting user
+      if (row.userId !== userId) {
+        log.warn(`[Chat Upload] Unauthorized access attempt: user ${userId} tried to access file owned by user ${row.userId}`);
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const mimeType = row.mimeType || "application/octet-stream";
       const data = row.data as Buffer;
       const fileName = row.fileName || "file";
@@ -91,9 +112,7 @@ export function registerChatUploadRoute(app: Express) {
       } else {
         res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
       }
-      // Allow cross-origin access for the chat to display images
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Cache-Control", "private, max-age=86400");
       res.send(data);
     } catch (err) {
       log.error("[Chat Upload] Serve error:", { error: String(err) });
