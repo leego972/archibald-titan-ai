@@ -85,6 +85,7 @@ import {
   getSandbox,
   listSandboxes,
   executeCommand,
+  updateEnvVars as sandboxUpdateEnvVars,
   listFiles as sandboxListFilesImpl,
   readFile as sandboxReadFileImpl,
   writeFile as sandboxWriteFileImpl,
@@ -1214,6 +1215,28 @@ async function execSaveCredential(
         storedIn.push(`Vault Bridge (patched ${bridgeResult.patched.join(", ")} into ENV)`);
       }
     } catch { /* vault bridge is best-effort */ }
+
+    // ── 4. Inject into sandbox env vars so sandbox_exec commands can use the token directly ──
+    // Map secretType → ENV var name for tokens that are useful in the sandbox
+    const sandboxEnvMap: Record<string, string> = {
+      expo_token: "EXPO_TOKEN",
+      openai_api_key: "OPENAI_API_KEY",
+      anthropic_api_key: "ANTHROPIC_API_KEY",
+      github_pat: "GITHUB_TOKEN",
+      replicate_api_token: "REPLICATE_API_TOKEN",
+      huggingface_api_token: "HUGGINGFACE_TOKEN",
+    };
+    const sandboxEnvKey = sandboxEnvMap[secretType];
+    if (sandboxEnvKey && savedToUserSecrets) {
+      try {
+        // Find or create the user's default sandbox and inject the env var
+        const existingSandboxes = await listSandboxes(userId);
+        if (existingSandboxes.length > 0) {
+          await sandboxUpdateEnvVars(existingSandboxes[0].id, userId, { [sandboxEnvKey]: trimmedValue });
+          storedIn.push(`Sandbox ENV (${sandboxEnvKey} available in sandbox_exec)`);
+        }
+      } catch { /* sandbox env injection is best-effort */ }
+    }
 
     return {
       success: true,
