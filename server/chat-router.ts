@@ -1593,6 +1593,52 @@ Do NOT attempt any tool calls or builds.`;
               continue;
             }
 
+            // ── POST-BUILD VERIFICATION INJECTION ──
+            // If this is an external build that created files but never ran sandbox_exec,
+            // inject a verification round to force the AI to test the code.
+            const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
+            const ranSandboxExec = executedActions.some(a => a.tool === 'sandbox_exec');
+            let needsVerification = false;
+            if (!needsVerification) {
+              // Track if we already injected verification to avoid infinite loops
+              needsVerification = isExternalBuild && createdFiles.length > 0 && !ranSandboxExec && rounds < MAX_TOOL_ROUNDS - 1;
+            }
+            // Check if we already injected a verification prompt (prevent infinite loop)
+            const alreadyInjectedVerification = llmMessages.some(
+              (m: any) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('VERIFICATION REQUIRED')
+            );
+            if (needsVerification && !alreadyInjectedVerification) {
+              log.info(`[Chat] POST-BUILD VERIFICATION: ${createdFiles.length} files created but no sandbox_exec. Injecting verification round.`);
+              // Determine the main file to test
+              const pyFiles = createdFiles.filter(a => (a.args?.fileName as string)?.endsWith('.py'));
+              const testFiles = pyFiles.filter(a => (a.args?.fileName as string)?.includes('test'));
+              const mainFiles = pyFiles.filter(a => !(a.args?.fileName as string)?.includes('test'));
+              const jsFiles = createdFiles.filter(a => {
+                const fn = a.args?.fileName as string;
+                return fn?.endsWith('.js') || fn?.endsWith('.ts');
+              });
+
+              let verifyCmd = '';
+              if (testFiles.length > 0) {
+                const testFile = testFiles[0].args?.fileName;
+                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; python3 -m pytest ${testFile} -v 2>&1 || python3 -m unittest ${testFile} -v 2>&1`;
+              } else if (mainFiles.length > 0) {
+                const mainFile = mainFiles[0].args?.fileName;
+                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; python3 -c "import ast; ast.parse(open('${mainFile}').read()); print('Syntax OK')" && python3 ${mainFile} --help 2>&1 || python3 ${mainFile} 2>&1 | head -50`;
+              } else if (jsFiles.length > 0) {
+                const jsFile = jsFiles[0].args?.fileName;
+                verifyCmd = `cd /tmp/sandbox-* 2>/dev/null || true; node --check ${jsFile} && echo 'Syntax OK'`;
+              }
+
+              llmMessages.push({ role: 'assistant', content: textContent });
+              llmMessages.push({
+                role: 'user',
+                content: `VERIFICATION REQUIRED: You created ${createdFiles.length} file(s) but did NOT verify them. You MUST now:\n1. First use sandbox_write_file to write the main files to the sandbox\n2. Then use sandbox_exec to test them\n3. Report the verification results\n\nDo NOT skip this step. The user asked you to verify the code works.${verifyCmd ? ` Suggested test command: ${verifyCmd}` : ''}`
+              });
+              forceFirstTool = 'sandbox_write_file';
+              continue;
+            }
+
             finalText = textContent;
             break;
           }
