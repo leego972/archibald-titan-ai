@@ -1686,7 +1686,10 @@ Do NOT attempt any tool calls or builds.`;
                   emitChatEvent(conversationId!, { type: 'status', data: { message: 'Verification complete!' } });
                 }
               } catch (verifyErr: unknown) {
-                log.warn('[Chat] Programmatic verification failed (non-fatal):', { error: getErrorMessage(verifyErr) });
+                const verifyErrMsg = getErrorMessage(verifyErr);
+                log.warn('[Chat] Programmatic verification failed (non-fatal):', { error: verifyErrMsg });
+                // Show the verification error in the response so it's visible
+                textContent = (textContent || '') + `\n\n---\n**Automated Verification:** Could not run automated tests (${verifyErrMsg}). Please test the code locally.`;
               }
             }
 
