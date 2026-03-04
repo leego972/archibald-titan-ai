@@ -102,6 +102,8 @@ const EXTERNAL_BUILD_KEYWORDS = [
   'in the sandbox', 'in sandbox', 'in my sandbox',
   'new project', 'new app', 'new website', 'new script',
   'landing page', 'portfolio', 'todo app', 'calculator',
+  'ios app', 'android app', 'mobile app', 'react native', 'expo app',
+  'iphone app', 'ipad app', 'build for ios', 'build for android',
 ];
 
 // ── General Build Keywords (fallback — used for ongoing build detection) ──
@@ -283,6 +285,25 @@ export const REFUSAL_PHRASES = [
   'i don\'t have access to the files',
   'i cannot access the files',
   'i\'m not able to access the files',
+  // iOS/mobile build refusals — Titan should build the source, not refuse
+  'requires xcode',
+  'requires a mac',
+  'xcode on macos',
+  'macos with xcode',
+  'signing certificates',
+  'provisioning profiles',
+  'this environment doesn\'t support',
+  'environment does not support',
+  'cannot build ios',
+  'can\'t build ios',
+  'cannot compile ios',
+  'can\'t compile ios',
+  'cannot produce an ipa',
+  'can\'t produce an ipa',
+  'cannot generate an ipa',
+  'building an ios app requires',
+  'build an ios app requires',
+  'not possible to build ios',
 ];
 
 /**
@@ -1153,6 +1174,29 @@ This ensures the user gets the files AND you can verify they work.
 | Desktop app | Electron + React + TypeScript |
 | Script/automation | Python 3 |
 | Security tool | Python 3 + relevant libs |
+| Mobile app (iOS/Android) | Expo + React Native + TypeScript |
+
+## MOBILE APP BUILDS (iOS / Android)
+
+When a user asks for an iOS app, Android app, or mobile app:
+
+### WHAT YOU DO
+1. **Build the full Expo + React Native project** — all source files, screens, navigation, logic. Use `create_file` for every file as normal.
+2. **Test the JavaScript/TypeScript layer** in the sandbox: `cd /home/sandbox/project && npm install && npx tsc --noEmit` to verify it compiles cleanly.
+3. **Package it** with `provide_project_zip` so the user can download it.
+4. **Explain the two ways to get a real .ipa / .apk:**
+   - **EAS Build (recommended — no Mac needed):** `npm install -g eas-cli && eas login && eas build --platform ios` — Expo's cloud build service compiles the native binary for them. Free tier available.
+   - **Local Xcode build:** Requires macOS + Xcode. Run `npx expo run:ios` after installing dependencies.
+5. Include a clear README with both options.
+
+### WHAT YOU DO NOT DO
+- Do NOT say "I can't build iOS apps" — you CAN build the full source project.
+- Do NOT refuse or stop. Build the code, then explain the compilation step.
+- The only thing this environment cannot do is run Xcode itself — everything else (writing code, testing JS, packaging) works fine.
+
+### RULE: ALWAYS BUILD FIRST, EXPLAIN COMPILATION SECOND
+Never lead with limitations. Build the complete project, then at the end say:
+"The full source is ready. To compile to a native .ipa/.apk, use EAS Build (no Mac needed) or Xcode locally — see the README for step-by-step instructions."
 
 ## RESPONSE FORMAT
 
