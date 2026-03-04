@@ -952,7 +952,7 @@ const sandboxExec: Tool = {
   function: {
     name: "sandbox_exec",
     description:
-      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a Linux environment with Python 3.11 and common packages pre-installed. You can run any command: compile code, install packages (pip install, npm install), run scripts, test applications, etc. Output is captured and returned. CRITICAL: You MUST use this tool to test every project you build. After creating files with sandbox_write_file, run them with this tool to verify they work. If the command shows errors, fix the code and retest. Never report a build as complete without testing it first.",
+      "Execute a shell command in the user's persistent sandbox environment. The sandbox is a minimal Linux environment with basic shell utilities (bash, ls, cat, grep, mkdir, etc.) and Node.js. IMPORTANT: Python is NOT available in this sandbox. Do NOT attempt to run python or python3 commands — they will fail. Use this tool sparingly and only when needed (e.g., to install npm packages or run Node.js scripts). For most builds, focus on creating high-quality files with create_file — do NOT waste rounds trying to execute code that cannot run in this environment.",
     parameters: {
       type: "object",
       properties: {
