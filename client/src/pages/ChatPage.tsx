@@ -1637,6 +1637,11 @@ export default function ChatPage() {
       }
 
       utils.chat.listConversations.invalidate();
+      // The server generates the conversation title asynchronously via LLM.
+      // Schedule a follow-up invalidation after ~3 seconds to pick up the generated title.
+      setTimeout(() => {
+        utils.chat.listConversations.invalidate();
+      }, 3000);
     } catch (err: any) {
       const serverMessage = err?.message || err?.data?.message || "";
       let userFacingError = "Something went wrong. Please try again.";

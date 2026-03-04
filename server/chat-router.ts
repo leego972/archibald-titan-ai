@@ -65,8 +65,8 @@ import {
   logSecurityEvent,
   validateSessionIntegrity,
 } from "./security-hardening";
-import {
 import { isAdminRole } from '@shared/const';
+import {
   sanitizeLLMOutput,
   trackIncident,
 } from "./security-fortress";
@@ -1112,6 +1112,31 @@ export const chatRouter = router({
         }).catch((err) => {
           log.error("[chat] Failed to generate conversation title:", { error: err?.message || err });
         });
+      } else {
+        // Conversation was pre-created by the client (for SSE streaming) before the first message.
+        // In that case, the title is still "New Conversation" and messageCount is 0.
+        // We need to generate the title now that we have the actual message content.
+        const [existingConv] = await db
+          .select({ title: chatConversations.title, messageCount: chatConversations.messageCount })
+          .from(chatConversations)
+          .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, userId)))
+          .limit(1);
+
+        if (existingConv && existingConv.title === "New Conversation" && existingConv.messageCount === 0) {
+          // Generate title asynchronously — don't block the response
+          const titleConvId = conversationId;
+          generateTitle(input.message).then(async (title) => {
+            const innerDb = await getDb();
+            if (innerDb) {
+              await innerDb
+                .update(chatConversations)
+                .set({ title })
+                .where(eq(chatConversations.id, titleConvId));
+            }
+          }).catch((err) => {
+            log.error("[chat] Failed to generate conversation title for pre-created conversation:", { error: err?.message || err });
+          });
+        }
       }
 
       // ── Credit Check ─────────────────────────────────────────
