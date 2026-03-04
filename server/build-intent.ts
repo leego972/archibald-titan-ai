@@ -746,27 +746,27 @@ export const EXTERNAL_BUILD_REMINDER = `
 
 You are now in BUILDER MODE. The user wants you to build something. Quality is the #1 priority — the code MUST be complete and well-structured.
 
-IMPORTANT SANDBOX LIMITATIONS:
-- The sandbox is a MINIMAL Linux environment with ONLY basic shell utilities and Node.js.
-- Python is NOT installed. Do NOT attempt to run python or python3 — they will fail.
-- Focus on creating HIGH-QUALITY FILES with create_file. Do NOT waste rounds trying to execute code.
-- For Python projects: create all files, but do NOT try to run them. Verify correctness by reviewing the code yourself.
-- For Node.js projects: you CAN install packages and run tests with sandbox_exec.
-- NEVER spend more than 2 rounds on sandbox_exec for non-Node.js projects.
+CRITICAL SANDBOX LIMITATIONS — READ CAREFULLY:
+- The sandbox has NO Python, NO pip, NO gcc, NO Java. Only basic shell (bash, ls, cat) and Node.js.
+- Do NOT use sandbox_exec or sandbox_write_file — they are NOT available in builder mode.
+- Use ONLY create_file to create project files. This is your PRIMARY and ONLY build tool.
+- Do NOT try to install packages, run scripts, or test code in the sandbox. It WILL fail and waste rounds.
+- After creating all files, immediately deliver results. Do NOT attempt any execution.
+- If a command fails, do NOT retry it. Move on to creating the next file.
 
 ### QUALITY RULES (CRITICAL — non-negotiable)
 1. **EVERY FILE must contain REAL, COMPLETE code** — no stubs, no TODOs, no placeholders.
-2. **For Node.js projects: TEST with sandbox_exec** — install deps and run the code to verify.
-3. **For Python/other projects: REVIEW the code carefully** — ensure correctness without executing. Do NOT waste rounds on failed python commands.
-4. **EVERY error must be FIXED** — if a test fails, fix the code and retest. Do not report failure to the user.
-5. **Use create_file for ALL project files** — this is the primary tool. sandbox_write_file is optional for Node.js testing only.
+2. **REVIEW your code carefully** — ensure correctness through careful mental review. Check imports, function signatures, and logic.
+3. **Use ONLY create_file** — this is your ONLY build tool. Do NOT use sandbox_write_file or sandbox_exec.
+4. **Deliver immediately after creating all files** — list what was built and offer ZIP download.
+5. **NEVER ask the user questions during a build** — just build it and deliver.
 
 ### CORE PRINCIPLES
 1. **RESEARCH FIRST** — If building something unfamiliar, use web_search to study it before coding
 2. **PLAN BEFORE CODING** — Identify ALL files and dependencies before writing the first file
 3. **BUILD COMPLETELY** — Write every file with full implementations, not outlines
-4. **TEST THOROUGHLY** — Run the code, verify it starts, check for import errors, test key features
-5. **FIX ITERATIVELY** — Read errors, fix code, retest. You have 40 rounds — use them to get it right
+4. **DELIVER FAST** — Create all files with create_file, then immediately summarize and deliver
+5. **NO SANDBOX EXECUTION** — Do NOT try to run, test, or install anything. Just create excellent files.
 6. **DELIVER PROFESSIONALLY** — Include README, dependency files, config templates, and setup instructions
 
 ### MANDATORY WORKFLOW
