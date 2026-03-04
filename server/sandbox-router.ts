@@ -587,28 +587,43 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { getDb } = await import("./db");
       const { sandboxFiles } = await import("../drizzle/schema");
-      const { eq, and, like, inArray } = await import("drizzle-orm");
+      const { eq, and, like, notLike, inArray } = await import("drizzle-orm");
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
       const sandboxes = await listSandboxes(ctx.user.id);
       if (sandboxes.length === 0) throw new Error("No sandbox found — please create a project first");
-      // Find all files belonging to this project (path starts with projectName/)
-      const files = await db
-        .select()
-        .from(sandboxFiles)
-        .where(and(
-          eq(sandboxFiles.sandboxId, sandboxes[0].id),
-          like(sandboxFiles.filePath, `${input.projectName}/%`)
-        ));
-      // Also include files with exact match (no subdirectory)
-      const exactFiles = await db
-        .select()
-        .from(sandboxFiles)
-        .where(and(
-          eq(sandboxFiles.sandboxId, sandboxes[0].id),
-          eq(sandboxFiles.filePath, input.projectName)
-        ));
-      const allFiles = [...files, ...exactFiles];
+
+      let allFiles: any[] = [];
+
+      if (input.projectName === "Ungrouped") {
+        // "Ungrouped" = files without a directory prefix (no "/" in path)
+        allFiles = await db
+          .select()
+          .from(sandboxFiles)
+          .where(and(
+            eq(sandboxFiles.sandboxId, sandboxes[0].id),
+            notLike(sandboxFiles.filePath, "%/%")
+          ));
+      } else {
+        // Find all files belonging to this project (path starts with projectName/)
+        const files = await db
+          .select()
+          .from(sandboxFiles)
+          .where(and(
+            eq(sandboxFiles.sandboxId, sandboxes[0].id),
+            like(sandboxFiles.filePath, `${input.projectName}/%`)
+          ));
+        // Also include files with exact match (no subdirectory)
+        const exactFiles = await db
+          .select()
+          .from(sandboxFiles)
+          .where(and(
+            eq(sandboxFiles.sandboxId, sandboxes[0].id),
+            eq(sandboxFiles.filePath, input.projectName)
+          ));
+        allFiles = [...files, ...exactFiles];
+      }
+
       if (allFiles.length === 0) throw new Error(`No files found for project "${input.projectName}"`);
       // Delete S3 objects (best-effort, don't block on failure)
       for (const file of allFiles) {
