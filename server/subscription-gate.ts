@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { subscriptions, fetcherJobs, users } from "../drizzle/schema";
 import { PRICING_TIERS, type PlanId, type PricingTier } from "../shared/pricing";
+import { isAdminRole } from '@shared/const';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
 
   // Admin bypass: admins get full titan-level access (highest tier)
   const titanTier = PRICING_TIERS.find((t) => t.id === "titan")!;
-  if (userResult.length > 0 && userResult[0].role === "admin") {
+  if (userResult.length > 0 && isAdminRole(userResult[0].role)) {
     return { planId: "titan", tier: titanTier, status: "active", isActive: true };
   }
 

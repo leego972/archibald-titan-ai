@@ -14,6 +14,7 @@ import {
 import { COOKIE_NAME } from "../shared/const";
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
+import { isAdminRole } from '@shared/const';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
@@ -262,7 +263,7 @@ export const downloadRouter = router({
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
       }
 

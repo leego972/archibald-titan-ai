@@ -164,7 +164,7 @@ export function cleanupRequest(conversationId: number): void {
 export function emitChatEvent(
   conversationId: number,
   event: {
-    type: "thinking" | "tool_start" | "tool_result" | "text_chunk" | "done" | "error";
+    type: "thinking" | "tool_start" | "tool_result" | "text_chunk" | "done" | "error" | "status" | "verification";
     data: Record<string, unknown>;
   }
 ): void {

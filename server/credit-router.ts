@@ -18,6 +18,7 @@ import {
 import { CREDIT_COSTS, CREDIT_PACKS } from "../shared/pricing";
 import { ENV } from "./_core/env";
 import Stripe from "stripe";
+import { isAdminRole } from '@shared/const';
 
 // ─── Stripe Client (reuse pattern from stripe-router) ──────────────
 
@@ -136,7 +137,7 @@ export const creditRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
       }
       return adminAdjustCredits(input.userId, input.amount, input.reason);
@@ -151,7 +152,7 @@ export const creditRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
       }
       await setUnlimited(input.userId, input.unlimited);

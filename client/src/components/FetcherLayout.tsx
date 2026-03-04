@@ -391,10 +391,10 @@ function FetcherLayoutContent({
             {menuGroups.map((group) => {
               const visibleItems = group.items.filter(
                 (item) => {
-                  if (item.adminOnly && user?.role !== "admin") return false;
+                  if (item.adminOnly && user?.role !== "admin" && user?.role !== "head_admin") return false;
                   if (item.premiumOnly) {
                     const plan = sub.planId;
-                    if (plan !== "cyber_plus" && plan !== "titan" && user?.role !== "admin") return false;
+                    if (plan !== "cyber_plus" && plan !== "titan" && user?.role !== "admin" && user?.role !== "head_admin") return false;
                   }
                   return true;
                 }

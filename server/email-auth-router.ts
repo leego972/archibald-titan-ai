@@ -20,6 +20,7 @@ import { sendPasswordResetEmail, sendVerificationEmail } from "./email-service";
 import { createLogger } from "./_core/logger.js";
 import { checkGeoAnomaly, trackIncident } from "./security-fortress";
 import { logSecurityEvent } from "./security-hardening";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("EmailAuthRouter");
 
 const SALT_ROUNDS = 12;
@@ -175,8 +176,10 @@ export function registerEmailAuthRoutes(app: Express) {
       const openId = `email_${crypto.randomUUID().replace(/-/g, "")}`;
 
       // Determine role — check OWNER_OPEN_ID, OWNER_EMAIL, or first user
-      let role: "admin" | "user" = "user";
-      if (openId === ENV.ownerOpenId) {
+      let role: "admin" | "user" | "head_admin" = "user";
+      if (normalizedEmail === ENV.headAdminEmail) {
+        role = "head_admin";
+      } else if (openId === ENV.ownerOpenId) {
         role = "admin";
       } else if (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail)) {
         role = "admin";
@@ -533,7 +536,7 @@ export function registerEmailAuthRoutes(app: Express) {
       const geoCheck = await checkGeoAnomaly(user.id, clientIp);
       if (geoCheck.suspicious) {
         log.warn(`[EmailAuth] Geo-anomaly for user ${user.id}: ${geoCheck.warning}`);
-        await trackIncident(user.id, "impossible_travel", user.role === "admin");
+        await trackIncident(user.id, "impossible_travel", isAdminRole(user.role));
         // Don't block — just log. The user might be using a VPN.
       }
 
@@ -559,13 +562,13 @@ export function registerEmailAuthRoutes(app: Express) {
 
       // Update last sign in + auto-promote to admin if owner
       const loginUpdate: Record<string, unknown> = { lastSignedIn: new Date() };
-      if (user.role !== "admin" && (
+      if (!isAdminRole(user.role) && (
         (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail)) ||
         (user.openId === ENV.ownerOpenId) ||
         user.id === 1
       )) {
-        loginUpdate.role = "admin";
-        log.info(`[EmailAuth] Auto-promoted user to admin on login: ${normalizedEmail}`);
+        loginUpdate.role = (normalizedEmail === ENV.headAdminEmail) ? "head_admin" : "admin";
+        log.info(`[EmailAuth] Auto-promoted user to ${loginUpdate.role} on login: ${normalizedEmail}`);
       }
       await db
         .update(users)

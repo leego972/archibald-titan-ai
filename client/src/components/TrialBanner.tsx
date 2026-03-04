@@ -18,7 +18,7 @@ export default function TrialBanner() {
   const { user } = useAuth();
 
   // Admins never see trial banners — they have full access
-  if (user?.role === "admin") return null;
+  if (user?.role === "admin" || user?.role === "head_admin") return null;
 
   // CRITICAL: retry:false prevents repeated failed queries from triggering
   // the global error handler that redirects to /login

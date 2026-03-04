@@ -27,6 +27,7 @@ import { logAudit } from "./audit-log-db";
 import { addCredits } from "./credit-service";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { isAdminRole } from '@shared/const';
 
 export const adminRouter = router({
   /**
@@ -38,7 +39,7 @@ export const adminRouter = router({
         page: z.number().min(1).default(1),
         limit: z.number().min(1).max(100).default(20),
         search: z.string().optional(),
-        role: z.enum(["all", "user", "admin"]).default("all"),
+        role: z.enum(["all", "user", "admin", "head_admin"]).default("all"),
         sortBy: z.enum(["createdAt", "lastSignedIn", "name", "email"]).default("createdAt"),
         sortOrder: z.enum(["asc", "desc"]).default("desc"),
       })
@@ -198,7 +199,7 @@ export const adminRouter = router({
     .input(
       z.object({
         userId: z.number(),
-        role: z.enum(["user", "admin"]),
+        role: z.enum(["user", "admin", "head_admin"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -206,7 +207,7 @@ export const adminRouter = router({
       if (!db) throw new Error("Database unavailable");
 
       // Prevent self-demotion
-      if (input.userId === ctx.user.id && input.role !== "admin") {
+      if (input.userId === ctx.user.id && !isAdminRole(input.role)) {
         throw new Error("You cannot remove your own admin role.");
       }
 

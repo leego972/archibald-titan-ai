@@ -18,6 +18,7 @@ import {
 } from "./binance-pay-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("GrantFinderRouter");
 
 // ==========================================
@@ -491,7 +492,7 @@ export const crowdfundingRouter = router({
     const campaign = await db.getCampaignById(input.id);
     if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
     // Only owner or admin can update
-    if (campaign.userId !== ctx.user.id && ctx.user.role !== "admin") {
+    if (campaign.userId !== ctx.user.id && !isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
     }
     const { id, ...data } = input;
@@ -772,7 +773,7 @@ export const crowdfundingRouter = router({
 
   /** Get platform revenue stats (admin only) */
   revenueStats: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") {
+    if (!isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
     try {

@@ -847,7 +847,7 @@ export default function AccountSettingsPage() {
             </div>
             <div>
               <p className="text-muted-foreground">Role</p>
-              <p className="mt-1 capitalize">{user?.role || "user"}</p>
+              <p className="mt-1 capitalize">{user?.role === 'head_admin' ? 'Head Admin' : (user?.role || 'user')}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Sign-In Methods</p>

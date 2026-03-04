@@ -5,6 +5,7 @@ import { getDb } from "./db";
 import { contactSubmissions } from "../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
+import { isAdminRole } from '@shared/const';
 
 export const contactRouter = router({
   /**
@@ -44,7 +45,7 @@ export const contactRouter = router({
    * Admin: list all contact submissions
    */
   list: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") {
+    if (!isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
     }
     const db = await getDb();
@@ -63,7 +64,7 @@ export const contactRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
       }
       const db = await getDb();

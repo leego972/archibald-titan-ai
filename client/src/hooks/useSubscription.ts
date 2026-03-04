@@ -79,7 +79,7 @@ const FEATURE_ACCESS: Record<string, PlanId[]> = {
 
 export function useSubscription(): SubscriptionState {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "head_admin";
 
   const usageQuery = trpc.fetcher.planUsage.useQuery(undefined, {
     retry: false,

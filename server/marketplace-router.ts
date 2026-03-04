@@ -24,6 +24,7 @@ import {
   signModuleContent,
 } from "./security-hardening";
 import { auditQueryParam } from "./security-fortress";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("MarketplaceRouter");
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -492,7 +493,7 @@ export const marketplaceRouter = router({
       if (!ctx.user?.id) throw new TRPCError({ code: "UNAUTHORIZED" });
       const listing = await db.getListingById(input.id);
       if (!listing) throw new TRPCError({ code: "NOT_FOUND" });
-      if (listing.sellerId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (listing.sellerId !== ctx.user.id && !isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Not your listing" });
       }
 
@@ -528,7 +529,7 @@ export const marketplaceRouter = router({
       if (!ctx.user?.id) throw new TRPCError({ code: "UNAUTHORIZED" });
       const listing = await db.getListingById(input.id);
       if (!listing) throw new TRPCError({ code: "NOT_FOUND" });
-      if (listing.sellerId !== ctx.user.id && ctx.user.role !== "admin") {
+      if (listing.sellerId !== ctx.user.id && !isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Not your listing" });
       }
       await db.deleteListing(input.id);
@@ -810,7 +811,7 @@ export const marketplaceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user?.id || ctx.user.role !== "admin") {
+      if (!ctx.user?.id || !isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
       }
       const listing = await db.getListingById(input.listingId);
@@ -835,7 +836,7 @@ export const marketplaceRouter = router({
   adminExec: protectedProcedure
     .input(z.object({ statements: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+      if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
       const database = await getDb();
       if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
       const results: string[] = [];
@@ -853,7 +854,7 @@ export const marketplaceRouter = router({
 
   /** Diagnose marketplace tables (admin only) */
   diagnose: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+    if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
     const database = await getDb();
     if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     try {
@@ -867,7 +868,7 @@ export const marketplaceRouter = router({
 
   /** Recreate marketplace tables from scratch (admin only, DESTRUCTIVE) */
   recreateTables: protectedProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+    if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
     const database = await getDb();
     if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const drops = [
@@ -902,7 +903,7 @@ export const marketplaceRouter = router({
 
   /** Force-create marketplace tables (admin only) */
   forceMigrate: protectedProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+    if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
     const database = await getDb();
     if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
 
@@ -936,7 +937,7 @@ export const marketplaceRouter = router({
       const FEATURE_COST = 500;
       const listing = await db.getListingById(input.listingId);
       if (!listing) throw new TRPCError({ code: "NOT_FOUND" });
-      if (listing.sellerId !== ctx.user.id && ctx.user.role !== "admin")
+      if (listing.sellerId !== ctx.user.id && !isAdminRole(ctx.user.role))
         throw new TRPCError({ code: "FORBIDDEN", message: "You don't own this listing" });
       if (listing.featured) throw new TRPCError({ code: "BAD_REQUEST", message: "Already featured" });
       const balance = await getCreditBalance(ctx.user.id);
@@ -972,7 +973,7 @@ export const marketplaceRouter = router({
       const BOOST_COST = 200;
       const listing = await db.getListingById(input.listingId);
       if (!listing) throw new TRPCError({ code: "NOT_FOUND" });
-      if (listing.sellerId !== ctx.user.id && ctx.user.role !== "admin")
+      if (listing.sellerId !== ctx.user.id && !isAdminRole(ctx.user.role))
         throw new TRPCError({ code: "FORBIDDEN", message: "You don't own this listing" });
       const balance = await getCreditBalance(ctx.user.id);
       if (balance.credits < BOOST_COST && !balance.isUnlimited)
@@ -1291,7 +1292,7 @@ export const marketplaceRouter = router({
   adminListUserFiles: protectedProcedure
     .input(z.object({ userId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
-      if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+      if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
       const database = await getDb();
       if (!database) return { users: [], files: [] };
 
@@ -1345,7 +1346,7 @@ export const marketplaceRouter = router({
 
   /** Seed marketplace with merchant bots and professional module catalog */
   seed: protectedProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.user?.id || ctx.user.role !== "admin") throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
+    if (!ctx.user?.id || !isAdminRole(ctx.user.role)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Admin only" });
 
     // Step 1: Force-create tables first
     const database = await getDb();

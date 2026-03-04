@@ -31,6 +31,7 @@ import { sql, eq, desc } from "drizzle-orm";
 import { users } from "../drizzle/schema";
 import { logSecurityEvent } from "./security-hardening";
 import { createLogger } from "./_core/logger.js";
+import { isAdminRole } from '@shared/const';
 
 const log = createLogger("SecurityFortress");
 const execAsync = promisify(exec);
@@ -83,7 +84,7 @@ export async function enforceAdmin2FA(
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (!user || user.role !== "admin") {
+  if (!user || !isAdminRole(user.role)) {
     return { allowed: false, requires2FA: false, error: "Not an admin user" };
   }
 

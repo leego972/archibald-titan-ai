@@ -18,6 +18,7 @@ import { getDb } from "./db";
 import { eq, sql, and, gte, desc } from "drizzle-orm";
 import { creditBalances, creditTransactions, users } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
+import { isAdminRole } from '@shared/const';
 
 const log = createLogger("SecurityHardening");
 
@@ -34,7 +35,7 @@ async function isAdmin(userId: number): Promise<boolean> {
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
-    return user?.role === "admin";
+    return isAdminRole(user?.role);
   } catch {
     return false;
   }

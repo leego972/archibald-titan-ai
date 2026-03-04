@@ -11,6 +11,7 @@ import { getDb } from "./db";
 import { creditBalances, creditTransactions, users } from "../drizzle/schema";
 import { PRICING_TIERS, CREDIT_COSTS, type PlanId, type CreditActionType } from "../shared/pricing";
 import { getUserPlan } from "./subscription-gate";
+import { isAdminRole } from '@shared/const';
 import {
   validateCreditOperation,
   logSecurityEvent,
@@ -54,7 +55,7 @@ async function ensureBalance(userId: number): Promise<void> {
       .where(eq(users.id, userId))
       .limit(1);
 
-    const isAdmin = userResult.length > 0 && userResult[0].role === "admin";
+    const isAdmin = userResult.length > 0 && isAdminRole(userResult[0].role);
 
     // Get user's plan for signup bonus
     const plan = await getUserPlan(userId);

@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { scanFileForMalware, trackIncident } from "./security-fortress";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("MarketplaceFiles");
 
 // Max file size: 100MB
@@ -95,7 +96,7 @@ export function registerMarketplaceFileRoutes(app: Express) {
       if (!listing) {
         return res.status(404).json({ error: "Listing not found" });
       }
-      if (listing.sellerId !== user.id && user.role !== "admin") {
+      if (listing.sellerId !== user.id && !isAdminRole(user.role)) {
         return res.status(403).json({ error: "Not your listing" });
       }
 
@@ -173,7 +174,7 @@ export function registerMarketplaceFileRoutes(app: Express) {
         const malwareScan = await scanFileForMalware(fileContent, result.fileName, user.id);
         if (!malwareScan.safe) {
           log.error(`[Marketplace] Malware detected in upload "${result.fileName}" (risk: ${malwareScan.riskScore}/100)`);
-          await trackIncident(user.id, "malware_upload", user.role === "admin");
+          await trackIncident(user.id, "malware_upload", isAdminRole(user.role));
           return res.status(403).json({
             error: "Security scan failed: This file contains suspicious code patterns and cannot be uploaded.",
             riskScore: malwareScan.riskScore,
@@ -259,7 +260,7 @@ export function registerMarketplaceFileRoutes(app: Express) {
       const purchase = purchases[0];
 
       // Verify buyer is the one downloading
-      if (purchase.buyerId !== user.id && user.role !== "admin") {
+      if (purchase.buyerId !== user.id && !isAdminRole(user.role)) {
         return res.status(403).json({ error: "This download token does not belong to you" });
       }
 

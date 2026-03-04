@@ -851,6 +851,9 @@ export default function ChatPage() {
     preview?: string;
     message?: string;
     round?: number;
+    results?: string[];
+    block?: string;
+    error?: string;
     timestamp: number;
   }
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([]);
@@ -1488,6 +1491,20 @@ export default function ChatPage() {
           setBuildLog(prev => [...prev, evt]);
           setLoadingPhase(data.message || 'Thinking...');
         });
+        es.addEventListener('status', (e) => {
+          const data = JSON.parse(e.data);
+          const evt: StreamEvent = { type: 'status', message: data.message, timestamp: Date.now() };
+          setStreamEvents(prev => [...prev, evt]);
+          setBuildLog(prev => [...prev, evt]);
+          setLoadingPhase(data.message || 'Working...');
+        });
+        es.addEventListener('verification', (e) => {
+          const data = JSON.parse(e.data);
+          const evt: StreamEvent = { type: 'verification', message: data.message, results: data.results, block: data.block, error: data.error, timestamp: Date.now() };
+          setStreamEvents(prev => [...prev, evt]);
+          setBuildLog(prev => [...prev, evt]);
+          setLoadingPhase(data.message || 'Verification complete');
+        });
         es.addEventListener('done', () => { es.close(); eventSourceRef.current = null; });
         es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; });
         es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; });
@@ -2117,6 +2134,15 @@ export default function ChatPage() {
                               {evt.type === 'tool_result' && !evt.success && (
                                 <><XCircle className="h-3 w-3 text-red-400/60 shrink-0 mt-0.5" /><span className="text-red-400/80">{evt.summary || 'Failed'}</span></>
                               )}
+                              {evt.type === 'status' && (
+                                <><Cpu className="h-3 w-3 text-blue-400/60 shrink-0 mt-0.5" /><span className="text-muted-foreground">{evt.message}</span></>
+                              )}
+                              {evt.type === 'verification' && !evt.error && (
+                                <><CheckCircle2 className="h-3 w-3 text-emerald-400/60 shrink-0 mt-0.5" /><span className="text-emerald-400/80">{evt.message || 'Verification complete'}{evt.results ? ` (${evt.results.length} checks)` : ''}</span></>
+                              )}
+                              {evt.type === 'verification' && evt.error && (
+                                <><XCircle className="h-3 w-3 text-amber-400/60 shrink-0 mt-0.5" /><span className="text-amber-400/80">{evt.message || 'Verification failed'}: {evt.error}</span></>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2171,6 +2197,15 @@ export default function ChatPage() {
                                 )}
                                 {evt.type === 'tool_result' && !evt.success && (
                                   <><XCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" /><span className="text-red-400">{evt.summary || `${(evt.tool || '').replace(/_/g, ' ')} — failed`}</span></>
+                                )}
+                                {evt.type === 'status' && (
+                                  <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message}</span></>
+                                )}
+                                {evt.type === 'verification' && !evt.error && (
+                                  <><CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" /><span className="text-emerald-400 font-medium">{evt.message || 'Verification complete'}{evt.results ? ` (${evt.results.length} checks)` : ''}</span></>
+                                )}
+                                {evt.type === 'verification' && evt.error && (
+                                  <><XCircle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" /><span className="text-amber-400">{evt.message || 'Verification failed'}: {evt.error}</span></>
                                 )}
                               </div>
                             ))}

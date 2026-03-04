@@ -546,18 +546,38 @@ async function startServer() {
         const db = await getDb();
         if (!db) return;
 
+        // Ensure the role enum includes 'head_admin' (safe ALTER — MySQL ignores if already correct)
+        try {
+          await db.execute({ sql: "ALTER TABLE `users` MODIFY COLUMN `role` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'" });
+          log.info('Ensured head_admin role exists in users table');
+        } catch (alterErr) {
+          // Ignore if already correct or if column doesn't exist yet
+          log.warn('ALTER TABLE for head_admin role (non-fatal):', { error: String(alterErr) });
+        }
+
+        // Promote HEAD ADMIN — leego972@gmail.com gets head_admin role
+        if (ENV.headAdminEmail) {
+          await db.update(users).set({ role: "head_admin" as any }).where(
+            eq(users.email, ENV.headAdminEmail)
+          ).catch(() => {});
+          log.info('Head admin promotion', { email: ENV.headAdminEmail });
+        }
+
         // Promote user ID 1 (first user) to admin
         await db.update(users).set({ role: "admin" }).where(
           eq(users.id, 1)
         ).catch(() => {});
 
-        // Promote by OWNER_EMAILS list
+        // Promote by OWNER_EMAILS list (except head admin who is already head_admin)
         if (ENV.ownerEmails && ENV.ownerEmails.length > 0) {
           const { inArray } = await import("drizzle-orm");
-          await db.update(users).set({ role: "admin" }).where(
-            inArray(users.email, ENV.ownerEmails)
-          ).catch(() => {});
-          log.info('Admin auto-promotion', { emails: ENV.ownerEmails });
+          const nonHeadOwners = ENV.ownerEmails.filter(e => e !== ENV.headAdminEmail);
+          if (nonHeadOwners.length > 0) {
+            await db.update(users).set({ role: "admin" }).where(
+              inArray(users.email, nonHeadOwners)
+            ).catch(() => {});
+          }
+          log.info('Admin auto-promotion', { emails: ENV.ownerEmails, headAdmin: ENV.headAdminEmail });
         }
 
         // Promote by OWNER_OPEN_ID

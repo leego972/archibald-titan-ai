@@ -5,6 +5,7 @@ import { desktopLicenses, users, creditBalances, subscriptions } from "../drizzl
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import * as jose from "jose";
+import { isAdminRole } from '@shared/const';
 
 const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "desktop-license-secret");
 const LICENSE_DURATION_DAYS = 30;
@@ -19,7 +20,7 @@ async function generateLicenseJWT(userId: number, deviceId: string, role: string
     deviceId,
     role,
     plan,
-    isUnlimited: role === "admin",
+    isUnlimited: isAdminRole(role),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -147,7 +148,7 @@ export const desktopLicenseRouter = router({
         },
         credits: {
           balance: balance?.credits ?? 0,
-          isUnlimited: user.role === "admin" || (balance?.isUnlimited ?? false),
+          isUnlimited: isAdminRole(user.role) || (balance?.isUnlimited ?? false),
         },
         plan,
       };
@@ -255,7 +256,7 @@ export const desktopLicenseRouter = router({
         },
         credits: {
           balance: balance?.credits ?? 0,
-          isUnlimited: user.role === "admin" || (balance?.isUnlimited ?? false),
+          isUnlimited: isAdminRole(user.role) || (balance?.isUnlimited ?? false),
         },
         plan,
       };

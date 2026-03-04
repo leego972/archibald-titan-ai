@@ -30,6 +30,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { ENV } from "./_core/env";
 import { createLogger } from "./_core/logger.js";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("SocialAuthRouter");
 
 // ─── Origin Helpers ──────────────────────────────────────────────
@@ -260,9 +261,10 @@ async function findOrCreateOAuthUser(opts: {
       await db.update(identityProviders).set({ lastUsedAt: new Date() }).where(and(eq(identityProviders.provider, opts.provider), eq(identityProviders.providerAccountId, opts.providerAccountId)));
       // Auto-promote to admin on login if email matches owner
       const updateFields: Record<string, unknown> = { lastSignedIn: new Date() };
-      if (user[0].role !== "admin" && shouldBeAdmin(user[0].openId, user[0].email, user[0].id)) {
-        updateFields.role = "admin";
-        log.info(`[Auth] Auto-promoted existing user to admin on login: ${user[0].email || user[0].openId}`);
+      if (!isAdminRole(user[0].role) && shouldBeAdmin(user[0].openId, user[0].email, user[0].id)) {
+        // Promote to head_admin if this is the head admin email, otherwise admin
+        updateFields.role = (user[0].email && user[0].email.toLowerCase() === ENV.headAdminEmail) ? "head_admin" : "admin";
+        log.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${user[0].email || user[0].openId}`);
       }
       await db.update(users).set(updateFields).where(eq(users.id, user[0].id));
       const effectiveRole = (updateFields.role as string) || user[0].role;
@@ -279,9 +281,9 @@ async function findOrCreateOAuthUser(opts: {
       });
       // Auto-promote to admin on login if email matches owner
       const updateFields: Record<string, unknown> = { lastSignedIn: new Date() };
-      if (existingUser[0].role !== "admin" && shouldBeAdmin(existingUser[0].openId, existingUser[0].email, existingUser[0].id)) {
-        updateFields.role = "admin";
-        log.info(`[Auth] Auto-promoted existing user to admin on login: ${existingUser[0].email || existingUser[0].openId}`);
+      if (!isAdminRole(existingUser[0].role) && shouldBeAdmin(existingUser[0].openId, existingUser[0].email, existingUser[0].id)) {
+        updateFields.role = (existingUser[0].email && existingUser[0].email.toLowerCase() === ENV.headAdminEmail) ? "head_admin" : "admin";
+        log.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${existingUser[0].email || existingUser[0].openId}`);
       }
       await db.update(users).set(updateFields).where(eq(users.id, existingUser[0].id));
       return { userId: existingUser[0].id, openId: existingUser[0].openId, name: existingUser[0].name || "", isNew: false };
@@ -291,9 +293,11 @@ async function findOrCreateOAuthUser(opts: {
   const openId = `${opts.provider}_${crypto.randomUUID().replace(/-/g, "")}`;
 
   // Auto-promote to admin: match by OWNER_OPEN_ID, OWNER_EMAIL, or first user
-  let role: "admin" | "user" = "user";
+  let role: "admin" | "user" | "head_admin" = "user";
   if (openId === ENV.ownerOpenId) {
     role = "admin";
+  } else if (opts.email && opts.email.toLowerCase() === ENV.headAdminEmail) {
+    role = "head_admin";
   } else if (ENV.ownerEmails && opts.email && ENV.ownerEmails.includes(opts.email.toLowerCase())) {
     role = "admin";
   } else {

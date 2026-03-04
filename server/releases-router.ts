@@ -12,6 +12,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { sdk } from "./_core/sdk";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { isAdminRole } from '@shared/const';
 const log = createLogger("ReleasesRouter");
 
 // ─── Default seed release (shown when DB has no releases) ───────────
@@ -155,7 +156,7 @@ export const releasesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
       }
 
@@ -198,7 +199,7 @@ export const releasesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
       }
 
@@ -223,7 +224,7 @@ export const releasesRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
+      if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
       }
 
@@ -236,7 +237,7 @@ export const releasesRouter = router({
 
   /** Admin: get full release list with download URLs visible */
   adminList: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") {
+    if (!isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
     }
 
@@ -545,7 +546,7 @@ export function registerReleaseUploadRoute(app: Express) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      if (user.role !== "admin") {
+      if (!isAdminRole(user.role)) {
         return res.status(403).json({ error: "Admin access required" });
       }
 

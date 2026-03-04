@@ -19,6 +19,7 @@ import {
   logSecurityEvent,
 } from "./security-hardening";
 import {
+import { isAdminRole } from '@shared/const';
   createProject,
   getProject,
   listProjects,
@@ -131,7 +132,7 @@ export const replicateRouter = router({
       }
 
       // ═══ SECURITY: SSRF Prevention & Rate Limiting ═══
-      const isAdmin = ctx.user.role === "admin";
+      const isAdmin = isAdminRole(ctx.user.role);
       const urlCheck = validateExternalUrl(input.targetUrl, isAdmin);
       if (!urlCheck.valid) {
         throw new TRPCError({

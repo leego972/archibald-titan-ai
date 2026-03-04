@@ -66,6 +66,7 @@ import {
   validateSessionIntegrity,
 } from "./security-hardening";
 import {
+import { isAdminRole } from '@shared/const';
   sanitizeLLMOutput,
   trackIncident,
 } from "./security-fortress";
@@ -1047,7 +1048,7 @@ export const chatRouter = router({
       const userId = ctx.user.id;
       const userName = ctx.user.name || undefined;
       const userEmail = ctx.user.email || undefined;
-      const isAdmin = ctx.user.role === "admin";
+      const isAdmin = isAdminRole(ctx.user.role);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -1559,7 +1560,7 @@ Do NOT attempt any tool calls or builds.`;
 
           // If no tool calls, we have the final text response
           if (!toolCalls || toolCalls.length === 0) {
-            const textContent = extractText(message.content);
+            let textContent = extractText(message.content);
 
             // REFUSAL INTERCEPTOR: Detect and override any refusal response.
             // Works for both build requests (retry with tools) and general requests (retry with context reminder).
@@ -1678,18 +1679,21 @@ Do NOT attempt any tool calls or builds.`;
                   verifyResults.push(`**HTML Files:** ${htmlFiles.length} HTML file(s) created — valid static files`);
                 }
 
-                // Append verification results to the response
+                // Append verification results to the response AND stream them to client
                 if (verifyResults.length > 0) {
                   const verificationBlock = `\n\n---\n**Automated Verification Results:**\n${verifyResults.join('\n\n')}`;
                   textContent = (textContent || '') + verificationBlock;
                   log.info(`[Chat] VERIFICATION COMPLETE: ${verifyResults.length} checks performed`);
-                  emitChatEvent(conversationId!, { type: 'status', data: { message: 'Verification complete!' } });
+                  // Stream verification results to client in real-time
+                  emitChatEvent(conversationId!, { type: 'verification', data: { message: 'Verification complete!', results: verifyResults, block: verificationBlock } });
                 }
               } catch (verifyErr: unknown) {
                 const verifyErrMsg = getErrorMessage(verifyErr);
                 log.warn('[Chat] Programmatic verification failed (non-fatal):', { error: verifyErrMsg });
                 // Show the verification error in the response so it's visible
-                textContent = (textContent || '') + `\n\n---\n**Automated Verification:** Could not run automated tests (${verifyErrMsg}). Please test the code locally.`;
+                const verifyErrBlock = `\n\n---\n**Automated Verification:** Could not run automated tests (${verifyErrMsg}). Please test the code locally.`;
+                textContent = (textContent || '') + verifyErrBlock;
+                emitChatEvent(conversationId!, { type: 'verification', data: { message: 'Verification failed', error: verifyErrMsg, block: verifyErrBlock } });
               }
             }
 
@@ -1737,7 +1741,7 @@ Do NOT attempt any tool calls or builds.`;
 
             // Gate self-improvement write tools to admin only
             const selfWriteTools = ["self_modify_file", "self_multi_file_modify", "self_rollback", "self_restart"];
-            if (selfWriteTools.includes(tc.function.name) && ctx.user.role !== "admin") {
+            if (selfWriteTools.includes(tc.function.name) && !isAdminRole(ctx.user.role)) {
               const denyResult = {
                 success: false,
                 error: "Self-improvement write operations are restricted to admin users only.",
