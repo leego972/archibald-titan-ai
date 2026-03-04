@@ -561,15 +561,15 @@ export const sandboxRouter = router({
       const { sandboxFiles } = await import("../drizzle/schema");
       const { eq, and } = await import("drizzle-orm");
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable" };
+      if (!db) throw new Error("Database unavailable");
       const sandboxes = await listSandboxes(ctx.user.id);
-      if (sandboxes.length === 0) return { success: false, error: "No sandbox found" };
+      if (sandboxes.length === 0) throw new Error("No sandbox found");
       const [file] = await db
         .select()
         .from(sandboxFiles)
         .where(and(eq(sandboxFiles.id, input.fileId), eq(sandboxFiles.sandboxId, sandboxes[0].id)))
         .limit(1);
-      if (!file) return { success: false, error: "File not found" };
+      if (!file) throw new Error("File not found");
       // Delete from S3 if applicable
       if (file.s3Key) {
         try {
@@ -587,11 +587,11 @@ export const sandboxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { getDb } = await import("./db");
       const { sandboxFiles } = await import("../drizzle/schema");
-      const { eq, and, like } = await import("drizzle-orm");
+      const { eq, and, like, inArray } = await import("drizzle-orm");
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable", deleted: 0 };
+      if (!db) throw new Error("Database unavailable");
       const sandboxes = await listSandboxes(ctx.user.id);
-      if (sandboxes.length === 0) return { success: false, error: "No sandbox found", deleted: 0 };
+      if (sandboxes.length === 0) throw new Error("No sandbox found — please create a project first");
       // Find all files belonging to this project (path starts with projectName/)
       const files = await db
         .select()
@@ -609,8 +609,8 @@ export const sandboxRouter = router({
           eq(sandboxFiles.filePath, input.projectName)
         ));
       const allFiles = [...files, ...exactFiles];
-      if (allFiles.length === 0) return { success: false, error: "No files found for this project", deleted: 0 };
-      // Delete S3 objects
+      if (allFiles.length === 0) throw new Error(`No files found for project "${input.projectName}"`);
+      // Delete S3 objects (best-effort, don't block on failure)
       for (const file of allFiles) {
         if (file.s3Key) {
           try {
@@ -620,7 +620,6 @@ export const sandboxRouter = router({
         }
       }
       // Delete from DB
-      const { inArray } = await import("drizzle-orm");
       await db.delete(sandboxFiles).where(
         inArray(sandboxFiles.id, allFiles.map(f => f.id))
       );
@@ -635,9 +634,9 @@ export const sandboxRouter = router({
       const { sandboxFiles } = await import("../drizzle/schema");
       const { eq, and, inArray } = await import("drizzle-orm");
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable" };
+      if (!db) throw new Error("Database unavailable");
       const sandboxes = await listSandboxes(ctx.user.id);
-      if (sandboxes.length === 0) return { success: false, error: "No sandbox found" };
+      if (sandboxes.length === 0) throw new Error("No sandbox found");
       // Get files to delete S3 objects
       const files = await db
         .select()
@@ -646,7 +645,8 @@ export const sandboxRouter = router({
           inArray(sandboxFiles.id, input.fileIds),
           eq(sandboxFiles.sandboxId, sandboxes[0].id)
         ));
-      // Delete S3 objects
+      if (files.length === 0) throw new Error("No matching files found");
+      // Delete S3 objects (best-effort)
       for (const file of files) {
         if (file.s3Key) {
           try {
@@ -656,11 +656,9 @@ export const sandboxRouter = router({
         }
       }
       // Delete from DB
-      if (files.length > 0) {
-        await db.delete(sandboxFiles).where(
-          inArray(sandboxFiles.id, files.map(f => f.id))
-        );
-      }
+      await db.delete(sandboxFiles).where(
+        inArray(sandboxFiles.id, files.map(f => f.id))
+      );
       return { success: true, deleted: files.length };
     }),
 });

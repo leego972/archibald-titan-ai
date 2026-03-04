@@ -167,29 +167,42 @@ export default function ProjectFilesViewer() {
 
   // ── Mutations ──
   const deleteFileMut = trpc.sandbox.deleteProjectFile.useMutation({
-    onSuccess: () => {
-      toast.success("File deleted");
-      filesQuery.refetch();
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success("File deleted");
+        filesQuery.refetch();
+      } else {
+        toast.error(data.error || "Failed to delete file");
+      }
     },
     onError: (err) => toast.error(err.message),
   });
 
   const deleteFilesMut = trpc.sandbox.deleteProjectFiles.useMutation({
     onSuccess: (data) => {
-      toast.success(`Deleted ${data.deleted} files`);
-      setSelectedIds(new Set());
-      setSelectMode(false);
-      filesQuery.refetch();
+      if (data.success && data.deleted > 0) {
+        toast.success(`Deleted ${data.deleted} files`);
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        filesQuery.refetch();
+      } else {
+        toast.error(data.error || `Delete failed — no files were removed`);
+      }
     },
     onError: (err) => toast.error(err.message),
   });
 
   const deleteProjectMut = trpc.sandbox.deleteProject.useMutation({
     onSuccess: (data) => {
-      toast.success(`Project deleted — ${data.deleted} file(s) removed`);
-      setProjectToDelete(null);
-      setSelectedProject(null);
-      filesQuery.refetch();
+      if (data.success && data.deleted > 0) {
+        toast.success(`Project deleted — ${data.deleted} file(s) removed`);
+        setProjectToDelete(null);
+        setSelectedProject(null);
+        filesQuery.refetch();
+      } else {
+        toast.error(data.error || `Delete failed — ${data.deleted} file(s) found`);
+        setProjectToDelete(null);
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Failed to delete project");
