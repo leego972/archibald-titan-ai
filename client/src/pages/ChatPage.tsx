@@ -95,6 +95,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -869,6 +870,8 @@ export default function ChatPage() {
     'sandbox_exec', 'sandbox_write_file', 'create_file', 'provide_project_zip', 'eas_build'];
   const eventSourceRef = useRef<EventSource | null>(null);
   const isMobile = useIsMobile();
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin" || authUser?.role === "head_admin";
   const [, setLocation] = useLocation();
 
   // ─── Download App State ───────────────────────────────────────────
@@ -1866,7 +1869,7 @@ export default function ChatPage() {
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {buildLog.filter(e => e.type === 'tool_start').length > 0 && (
+            {!isAdmin && buildLog.filter(e => e.type === 'tool_start').length > 0 && (
               <button
                 onClick={() => setShowBuilderHistory(!showBuilderHistory)}
                 className={`flex items-center gap-1 rounded-lg font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all touch-target ${isMobile ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs'}`}
@@ -1877,7 +1880,7 @@ export default function ChatPage() {
                 {isMobile && buildLog.filter(e => e.type === 'tool_start').length}
               </button>
             )}
-            {createdFiles.length > 0 && (
+            {!isAdmin && createdFiles.length > 0 && (
               <button
                 onClick={() => setShowProjectFiles(!showProjectFiles)}
                 className={`flex items-center gap-1 rounded-lg font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all touch-target ${isMobile ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs'}`}
