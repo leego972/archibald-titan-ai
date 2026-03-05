@@ -441,6 +441,8 @@ async function startServer() {
         // Titan Referral Unlock columns
         "ALTER TABLE `users` ADD COLUMN `titanUnlockExpiry` datetime NULL",
         "ALTER TABLE `users` ADD COLUMN `titanUnlockGrantedBy` int NULL",
+        // Custom Instructions column (added for persistent user rules feature)
+        "ALTER TABLE `users` ADD COLUMN `customInstructions` text NULL",
         // seller_profiles subscription columns
         "ALTER TABLE `seller_profiles` ADD COLUMN `sellerSubscriptionActive` boolean NOT NULL DEFAULT false",
         "ALTER TABLE `seller_profiles` ADD COLUMN `sellerSubscriptionExpiresAt` datetime NULL",
