@@ -297,7 +297,7 @@ export function registerVoiceTTSRoute(app: Express) {
         return res.status(503).json({ error: "TTS not configured" });
       }
 
-      const ttsVoice = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"].includes(voice) ? voice : "nova";
+      const ttsVoice = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"].includes(voice) ? voice : "onyx";
       const ttsSpeed = typeof speed === "number" && speed >= 0.25 && speed <= 4.0 ? speed : 1.0;
 
       const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {

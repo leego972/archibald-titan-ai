@@ -1217,43 +1217,28 @@ export const chatRouter = router({
         }
       }
 
-      // ── Load user's personal API key (if set) ──────────────────
-      // If the user has stored their own OpenAI API key, all their
-      // chat/builder LLM calls will use it instead of system keys.
-      const userApiKey = await getUserOpenAIKey(userId);
+      // ── Parallelise pre-LLM async work ────────────────────────
+      // Run all independent async operations concurrently to minimise
+      // time-to-first-token. These do not depend on each other.
+      const [userApiKey, previousMessages, userContext] = await Promise.all([
+        // 1. Personal API key lookup
+        getUserOpenAIKey(userId).catch((err: unknown) => {
+          log.error("[Chat] Failed to load user API key:", { error: getErrorMessage(err) });
+          return undefined as string | undefined;
+        }),
+        // 2. Conversation history
+        loadConversationContext(conversationId, userId).catch((err: unknown) => {
+          log.error("[Chat] Failed to load conversation context:", { error: getErrorMessage(err) });
+          return [] as Message[];
+        }),
+        // 3. User context (credentials, jobs, proxies, etc.)
+        buildUserContext(userId).catch((err: unknown) => {
+          log.error("[Chat] Failed to build user context:", { error: getErrorMessage(err) });
+          return "";
+        }),
+      ]);
       if (userApiKey) {
         log.info(`[Chat] User ${userId} has personal API key — using it for this session`);
-      }
-
-      // Save user message to DB (use sanitized version for non-admin)
-      try {
-        await saveMessage(conversationId, userId, "user", sanitizedMessage);
-      } catch (saveErr: unknown) {
-        log.error("[Chat] Failed to save user message:", { error: getErrorMessage(saveErr) });
-        // Don't throw — continue so the user still gets a response
-      }
-
-      // ── Register Background Build ──────────────────────────────
-      // Track this build so it persists even if the user disconnects,
-      // navigates away, or logs out. Only an explicit abort can stop it.
-      registerBuild(conversationId, userId);
-
-      // Load conversation context from DB
-      let previousMessages: Message[] = [];
-      try {
-        previousMessages = await loadConversationContext(conversationId, userId);
-      } catch (ctxErr: unknown) {
-        log.error("[Chat] Failed to load conversation context:", { error: getErrorMessage(ctxErr) });
-        // Continue with empty context — the user's current message will still be sent
-      }
-
-      // Build LLM messages array
-      let userContext = "";
-      try {
-        userContext = await buildUserContext(userId);
-      } catch (ucErr: unknown) {
-        log.error("[Chat] Failed to build user context:", { error: getErrorMessage(ucErr) });
-        // Continue without user context
       }
       // ── Role-Based Content Restrictions ──────────────────────────
       // Admin users get the full unrestricted SYSTEM_PROMPT.
@@ -1594,6 +1579,10 @@ Do NOT attempt any tool calls or builds.`;
             // Temperature 0 for builder tasks = deterministic, precise code generation
             // Temperature 0.7 for general chat = natural, helpful responses
             temperature: isBuildRequest ? 0 : 0.7,
+            // Cap output tokens: chat replies rarely need more than 2048 tokens.
+            // Builder tasks need the full 16384 for large file generation.
+            // Smaller cap = faster time-to-first-token for conversational replies.
+            maxTokens: isBuildRequest ? 16384 : 2048,
             // Cost-effective model selection
             ...(modelTier ? { model: modelTier } : {}),
             // Use user's personal API key if available (bypasses system key pool)

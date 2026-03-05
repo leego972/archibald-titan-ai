@@ -407,8 +407,9 @@ async function _invokeLLMWithRetry(
     payload.tool_choice = normalizedToolChoice;
   }
 
-  // gpt-4.1-mini supports up to 32768 output tokens
-  const defaultMaxTokens = 16384;
+  // gpt-4.1-mini supports up to 32768 output tokens.
+  // Default 4096 keeps responses fast; callers that need more (builder) pass maxTokens explicitly.
+  const defaultMaxTokens = 4096;
   payload.max_tokens = maxTokens || max_tokens || defaultMaxTokens;
 
   const normalizedResponseFormat = normalizeResponseFormat({

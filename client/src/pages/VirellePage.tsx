@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import LeegoLogo from "@/components/LeegoLogo";
 import {
   Film,
   Plus,
@@ -750,6 +751,11 @@ export default function VirellePage() {
           currentBio={profile.bio ?? null}
         />
       )}
+
+      {/* Leego branding */}
+      <div className="flex justify-center pt-4 pb-2">
+        <LeegoLogo idleClassName="h-16 w-16" />
+      </div>
     </div>
   );
 }
