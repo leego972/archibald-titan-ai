@@ -924,6 +924,8 @@ export default function ChatPage() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [leegoExpanded, setLeegoExpanded] = useState(false);
   const leegoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leegoCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const leegoMatrixRafRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -2680,14 +2682,57 @@ export default function ChatPage() {
               {' · Conversations saved automatically · Powered by AI'}
             </p>
           )}
-          <div className={`flex justify-center ${isMobile ? 'mt-1' : 'mt-2'}`}>
+          <div
+            className={`flex justify-center ${isMobile ? 'mt-1' : 'mt-2'} relative`}
+            style={{ isolation: 'isolate' }}
+          >
+            {/* Matrix rain canvas — shown only while leegoExpanded */}
+            {leegoExpanded && (
+              <canvas
+                ref={(el) => {
+                  leegoCanvasRef.current = el;
+                  if (!el) {
+                    if (leegoMatrixRafRef.current) cancelAnimationFrame(leegoMatrixRafRef.current);
+                    return;
+                  }
+                  // Size the canvas to fill the viewport
+                  el.width = window.innerWidth;
+                  el.height = window.innerHeight;
+                  const ctx = el.getContext('2d')!;
+                  const cols = Math.floor(el.width / 16);
+                  const drops: number[] = Array(cols).fill(1);
+                  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+                  const draw = () => {
+                    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+                    ctx.fillRect(0, 0, el.width, el.height);
+                    ctx.font = '14px monospace';
+                    for (let i = 0; i < drops.length; i++) {
+                      const ch = chars[Math.floor(Math.random() * chars.length)];
+                      // Lead character is bright white-green, trail fades
+                      const y = drops[i] * 16;
+                      ctx.fillStyle = drops[i] * 16 < 32 ? '#afffaf' : '#00ff32';
+                      ctx.fillText(ch, i * 16, y);
+                      if (y > el.height && Math.random() > 0.975) drops[i] = 0;
+                      drops[i]++;
+                    }
+                    leegoMatrixRafRef.current = requestAnimationFrame(draw);
+                  };
+                  leegoMatrixRafRef.current = requestAnimationFrame(draw);
+                }}
+                className="fixed inset-0 pointer-events-none"
+                style={{ zIndex: 40, opacity: 0.85 }}
+              />
+            )}
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
               onClick={() => {
                 if (leegoTimerRef.current) clearTimeout(leegoTimerRef.current);
+                if (leegoMatrixRafRef.current) cancelAnimationFrame(leegoMatrixRafRef.current);
                 setLeegoExpanded(true);
                 leegoTimerRef.current = setTimeout(() => {
+                  if (leegoMatrixRafRef.current) cancelAnimationFrame(leegoMatrixRafRef.current);
+                  leegoMatrixRafRef.current = null;
                   setLeegoExpanded(false);
                   leegoTimerRef.current = null;
                 }, 3000);
@@ -2696,10 +2741,12 @@ export default function ChatPage() {
                 'object-contain cursor-pointer animate-pulse',
                 'transition-all duration-500 ease-in-out',
                 leegoExpanded
-                  ? 'scale-[3.5] z-50 relative brightness-150'
+                  ? 'scale-[3.5] brightness-150'
                   : `brightness-110 ${isMobile ? 'h-14 w-14' : 'h-24 w-24'}`,
               ].join(' ')}
               style={{
+                position: 'relative',
+                zIndex: 50,
                 filter: leegoExpanded
                   ? 'drop-shadow(0 0 18px rgba(0,255,50,1)) drop-shadow(0 0 40px rgba(0,255,50,0.9)) drop-shadow(0 0 80px rgba(0,255,50,0.6)) drop-shadow(0 0 120px rgba(0,255,50,0.3))'
                   : 'drop-shadow(0 0 10px rgba(0,255,50,0.7)) drop-shadow(0 0 20px rgba(0,255,50,0.4)) drop-shadow(0 0 40px rgba(0,255,50,0.2))',
