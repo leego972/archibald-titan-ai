@@ -624,6 +624,29 @@ export async function executeToolCall(
         return await execCheckCard(args);
       case "check_bin":
         return await execCheckBin(args);
+      // ── Advanced Security Tools ─────────────────────────────────────
+      case "install_security_toolkit":
+        return await execInstallSecurityToolkit(userId, args);
+      case "network_scan":
+        return await execNetworkScan(userId, args);
+      case "generate_yara_rule":
+        return await execGenerateYaraRule(userId, args);
+      case "generate_sigma_rule":
+        return await execGenerateSigmaRule(userId, args);
+      case "hash_crack":
+        return await execHashCrack(userId, args);
+      case "generate_payload":
+        return await execGeneratePayload(userId, args);
+      case "osint_lookup":
+        return await execOsintLookup(userId, args);
+      case "cve_lookup":
+        return await execCveLookup(userId, args);
+      case "run_exploit":
+        return await execRunExploit(userId, args);
+      case "decompile_binary":
+        return await execDecompileBinary(userId, args);
+      case "fuzzer_run":
+        return await execFuzzerRun(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -4506,4 +4529,531 @@ async function execProvideProjectZip(
   } catch (err: unknown) {
     return { success: false, error: `Failed to prepare ZIP: ${getErrorMessage(err)}` };
   }
+}
+
+// ─── Advanced Security Tool Implementations ──────────────────────────────────
+
+async function execInstallSecurityToolkit(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  const requestedTools = (args.tools as string[]) || [];
+  
+  const defaultToolkit = [
+    "nmap", "sqlmap", "hydra", "hashcat", "nikto", "gobuster", "masscan",
+    "john", "aircrack-ng", "binwalk", "radare2", "netcat", "curl", "wget",
+    "python3-pip", "git", "build-essential"
+  ];
+  const toolsToInstall = requestedTools.length > 0 ? requestedTools : defaultToolkit;
+  
+  // Install via apt and pip
+  const aptTools = toolsToInstall.filter(t => !["impacket", "pwntools", "scapy", "volatility3", "frida-tools", "angr"].includes(t));
+  const pipTools = toolsToInstall.filter(t => ["impacket", "pwntools", "scapy", "volatility3", "frida-tools", "angr"].includes(t));
+  
+  const results: string[] = [];
+  
+  if (aptTools.length > 0) {
+    const aptCmd = `apt-get update -qq 2>/dev/null && apt-get install -y ${aptTools.join(" ")} 2>&1 | tail -5`;
+    const aptResult = await executeCommand(sbId, userId, aptCmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+    results.push(`APT: ${aptResult.exitCode === 0 ? "OK" : aptResult.output.slice(-200)}`);
+  }
+  
+  if (pipTools.length > 0) {
+    const pipCmd = `pip3 install ${pipTools.join(" ")} 2>&1 | tail -5`;
+    const pipResult = await executeCommand(sbId, userId, pipCmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+    results.push(`PIP: ${pipResult.exitCode === 0 ? "OK" : pipResult.output.slice(-200)}`);
+  }
+  
+  // Verify installed tools
+  const verifyCmd = toolsToInstall.slice(0, 8).map(t => `which ${t} 2>/dev/null || echo "${t}: not found"`).join(" && ");
+  const verifyResult = await executeCommand(sbId, userId, verifyCmd, { timeoutMs: 30_000, triggeredBy: "ai" });
+  
+  return {
+    success: true,
+    data: {
+      installed: toolsToInstall,
+      installOutput: results.join("\n"),
+      verification: verifyResult.output,
+      message: `Security toolkit ready. ${toolsToInstall.length} tools installed/verified.`,
+    },
+  };
+}
+
+async function execNetworkScan(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const target = args.target as string;
+  if (!target) return { success: false, error: "Target is required" };
+  const flags = (args.flags as string) || "-sV --top-ports 1000 -T4";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  // Ensure nmap is installed
+  await executeCommand(sbId, userId, "which nmap || apt-get install -y nmap -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+  
+  const cmd = `nmap ${flags} ${target} 2>&1`;
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 300_000, triggeredBy: "ai" });
+  
+  return {
+    success: true,
+    data: {
+      target,
+      flags,
+      output: result.output,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+    },
+  };
+}
+
+async function execGenerateYaraRule(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const description = args.description as string;
+  if (!description) return { success: false, error: "Description is required" };
+  const strings = (args.strings as string[]) || [];
+  const ruleName = (args.ruleName as string) || description.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 50);
+  
+  const prompt = `Generate a complete, valid YARA rule for the following:
+Description: ${description}
+${strings.length > 0 ? `Known strings/patterns: ${strings.join(", ")}` : ""}
+Rule name: ${ruleName}
+
+Requirements:
+- Valid YARA syntax, ready to use with yara-python
+- Include meta section with description, author="Titan", date, and ATT&CK technique if applicable
+- Include strings section with relevant patterns (hex, text, regex as appropriate)
+- Include condition section with logical detection logic
+- Add comments explaining the detection logic
+- Output ONLY the YARA rule, no explanation`;
+
+  const ruleContent = await invokeLLM({
+    model: "gpt-4.1-mini",
+    messages: [{ role: "user", content: prompt }],
+    priority: "background",
+  });
+  
+  return {
+    success: true,
+    data: {
+      ruleName,
+      rule: ruleContent,
+      description,
+      message: `YARA rule '${ruleName}' generated. Save as ${ruleName}.yar and test with: yara ${ruleName}.yar <target_file>`,
+    },
+  };
+}
+
+async function execGenerateSigmaRule(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const description = args.description as string;
+  if (!description) return { success: false, error: "Description is required" };
+  const logSource = (args.logSource as string) || "windows";
+  const attackTechnique = (args.attackTechnique as string) || "";
+  
+  const prompt = `Generate a complete, valid Sigma detection rule for the following:
+Description: ${description}
+Log source: ${logSource}
+${attackTechnique ? `ATT&CK technique: ${attackTechnique}` : ""}
+
+Requirements:
+- Valid Sigma YAML format
+- Include title, id (UUID), status: experimental, description, references, author: Titan
+- Include date, logsource section, detection section with keywords/conditions
+- Include falsepositives and level fields
+- Include tags with ATT&CK mapping (infer technique if not provided)
+- Output ONLY the Sigma YAML, no explanation`;
+
+  const ruleContent = await invokeLLM({
+    model: "gpt-4.1-mini",
+    messages: [{ role: "user", content: prompt }],
+    priority: "background",
+  });
+  
+  return {
+    success: true,
+    data: {
+      rule: ruleContent,
+      logSource,
+      attackTechnique,
+      message: `Sigma rule generated. Convert with: sigma convert -t splunk rule.yml`,
+    },
+  };
+}
+
+async function execHashCrack(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const hash = args.hash as string;
+  if (!hash) return { success: false, error: "Hash is required" };
+  const hashType = (args.hashType as string) || "auto";
+  const wordlist = (args.wordlist as string) || "rockyou";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  // Install hashcat if needed
+  await executeCommand(sbId, userId, "which hashcat || apt-get install -y hashcat -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+  
+  // Download rockyou if not present
+  const wordlistPath = "/tmp/rockyou.txt";
+  await executeCommand(sbId, userId, 
+    `[ -f ${wordlistPath} ] || (wget -q https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt -O ${wordlistPath} 2>/dev/null || cp /usr/share/wordlists/rockyou.txt ${wordlistPath} 2>/dev/null || echo "test\npassword\n123456\nadmin\nletmein" > ${wordlistPath})`,
+    { timeoutMs: 60_000, triggeredBy: "ai" }
+  );
+  
+  // Hash type mapping
+  const hashTypeMap: Record<string, string> = {
+    md5: "0", sha1: "100", sha256: "1400", sha512: "1700",
+    ntlm: "1000", bcrypt: "3200", sha512crypt: "1800", md5crypt: "500",
+    wpa2: "22000", auto: "0",
+  };
+  const htCode = hashTypeMap[hashType.toLowerCase()] || "0";
+  
+  // Write hash to file
+  await executeCommand(sbId, userId, `echo '${hash}' > /tmp/target.hash`, { timeoutMs: 5_000, triggeredBy: "ai" });
+  
+  const cmd = `hashcat -m ${htCode} /tmp/target.hash ${wordlistPath} --force --quiet 2>&1; hashcat -m ${htCode} /tmp/target.hash --show 2>&1`;
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+  
+  const crackedMatch = result.output.match(/[a-fA-F0-9]{32,}:(.+)/);
+  const cracked = crackedMatch ? crackedMatch[1].trim() : null;
+  
+  return {
+    success: true,
+    data: {
+      hash,
+      hashType,
+      cracked,
+      output: result.output,
+      message: cracked ? `Cracked: ${cracked}` : "Hash not cracked with default wordlist. Try a larger wordlist or rules.",
+    },
+  };
+}
+
+async function execGeneratePayload(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const payloadType = args.payloadType as string;
+  if (!payloadType) return { success: false, error: "Payload type is required" };
+  const lhost = (args.lhost as string) || "10.10.14.1";
+  const lport = (args.lport as number) || 4444;
+  const platform = (args.platform as string) || "linux";
+  const language = (args.language as string) || "python";
+  const encoding = (args.encoding as string) || "none";
+  
+  const prompt = `Generate a ${payloadType} payload for authorized penetration testing.
+Platform: ${platform}
+Language: ${language}
+LHOST: ${lhost}
+LPORT: ${lport}
+Encoding: ${encoding}
+
+Requirements:
+- Complete, working payload code
+- Include setup instructions (listener command, how to deploy)
+- Include any required dependencies
+- If msfvenom: provide the exact msfvenom command
+- Output the payload code first, then setup instructions`;
+
+  const payloadContent = await invokeLLM({
+    model: "gpt-4.1-mini",
+    messages: [{ role: "user", content: prompt }],
+    priority: "background",
+  });
+  
+  return {
+    success: true,
+    data: {
+      payloadType,
+      platform,
+      language,
+      lhost,
+      lport,
+      payload: payloadContent,
+      message: `${payloadType} payload generated for ${platform}/${language}`,
+    },
+  };
+}
+
+async function execOsintLookup(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const target = args.target as string;
+  if (!target) return { success: false, error: "Target is required" };
+  const depth = (args.depth as string) || "standard";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  const results: Record<string, string> = {};
+  
+  // WHOIS
+  const whoisResult = await executeCommand(sbId, userId, `whois ${target} 2>&1 | head -40`, { timeoutMs: 15_000, triggeredBy: "ai" });
+  results.whois = whoisResult.output;
+  
+  // DNS records
+  const dnsResult = await executeCommand(sbId, userId, `dig +short A ${target} && dig +short MX ${target} && dig +short NS ${target} && dig +short TXT ${target} 2>&1`, { timeoutMs: 15_000, triggeredBy: "ai" });
+  results.dns = dnsResult.output;
+  
+  // Reverse DNS
+  const rdnsResult = await executeCommand(sbId, userId, `host ${target} 2>&1`, { timeoutMs: 10_000, triggeredBy: "ai" });
+  results.reverseDns = rdnsResult.output;
+  
+  // Certificate transparency (crt.sh)
+  const certResult = await executeCommand(sbId, userId, 
+    `curl -s "https://crt.sh/?q=${target}&output=json" 2>/dev/null | python3 -c "import sys,json; data=json.load(sys.stdin); [print(d['name_value']) for d in data[:20]]" 2>&1 || echo "cert lookup failed"`,
+    { timeoutMs: 20_000, triggeredBy: "ai" }
+  );
+  results.certificates = certResult.output;
+  
+  if (depth === "deep") {
+    // Shodan (if API key available)
+    const shodanResult = await executeCommand(sbId, userId,
+      `curl -s "https://api.shodan.io/shodan/host/${target}?key=\${SHODAN_API_KEY:-}" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({k:d[k] for k in ['ip_str','ports','hostnames','org','country_name'] if k in d}, indent=2))" 2>&1 || echo "Shodan: no API key"`,
+      { timeoutMs: 15_000, triggeredBy: "ai" }
+    );
+    results.shodan = shodanResult.output;
+  }
+  
+  return {
+    success: true,
+    data: {
+      target,
+      depth,
+      results,
+      message: `OSINT report for ${target} complete`,
+    },
+  };
+}
+
+async function execCveLookup(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const query = args.query as string;
+  if (!query) return { success: false, error: "Query is required" };
+  const includeExploits = args.includeExploits !== false;
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  // Query NVD API
+  const isCveId = /^CVE-\d{4}-\d+$/i.test(query.trim());
+  let nvdUrl: string;
+  if (isCveId) {
+    nvdUrl = `https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${query.trim().toUpperCase()}`;
+  } else {
+    const encoded = encodeURIComponent(query);
+    nvdUrl = `https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=${encoded}&resultsPerPage=5`;
+  }
+  
+  const nvdResult = await executeCommand(sbId, userId,
+    `curl -s "${nvdUrl}" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    vulns = d.get('vulnerabilities', [])[:5]
+    for v in vulns:
+        cve = v['cve']
+        cid = cve['id']
+        desc = cve.get('descriptions', [{}])[0].get('value', 'N/A')[:300]
+        metrics = cve.get('metrics', {})
+        cvss = 'N/A'
+        for k in ['cvssMetricV31', 'cvssMetricV30', 'cvssMetricV2']:
+            if k in metrics:
+                cvss = metrics[k][0]['cvssData'].get('baseScore', 'N/A')
+                break
+        print(f'{cid} | CVSS: {cvss} | {desc}')
+        print('---')
+except Exception as e:
+    print(f'Parse error: {e}')
+" 2>&1`,
+    { timeoutMs: 20_000, triggeredBy: "ai" }
+  );
+  
+  let exploitData = "";
+  if (includeExploits) {
+    const exploitResult = await executeCommand(sbId, userId,
+      `curl -s "https://www.exploit-db.com/search?q=${encodeURIComponent(query)}&type=exploits&platform=&language=&author=&port=&tag=&e_author=" 2>/dev/null | python3 -c "
+import sys, re
+html = sys.stdin.read()
+matches = re.findall(r'href=\"(/exploits/\d+)\"[^>]*>([^<]+)<', html)
+for m in matches[:5]:
+    print(f'https://www.exploit-db.com{m[0]} | {m[1].strip()}')
+" 2>&1 || echo "Exploit-DB search unavailable"`,
+      { timeoutMs: 15_000, triggeredBy: "ai" }
+    );
+    exploitData = exploitResult.output;
+  }
+  
+  return {
+    success: true,
+    data: {
+      query,
+      nvdResults: nvdResult.output,
+      exploitDbResults: exploitData,
+      message: `CVE lookup complete for: ${query}`,
+    },
+  };
+}
+
+async function execRunExploit(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const tool = args.tool as string;
+  const target = args.target as string;
+  if (!tool || !target) return { success: false, error: "Tool and target are required" };
+  const options = (args.options as string) || "";
+  const scriptPath = (args.scriptPath as string) || "";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  let cmd: string;
+  switch (tool.toLowerCase()) {
+    case "sqlmap":
+      cmd = `sqlmap -u "${target}" ${options} --batch --level=2 --risk=2 2>&1`;
+      await executeCommand(sbId, userId, "which sqlmap || pip3 install sqlmap -q 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+      break;
+    case "nikto":
+      cmd = `nikto -h "${target}" ${options} 2>&1`;
+      await executeCommand(sbId, userId, "which nikto || apt-get install -y nikto -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+      break;
+    case "hydra":
+      cmd = `hydra ${options} "${target}" 2>&1`;
+      await executeCommand(sbId, userId, "which hydra || apt-get install -y hydra -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+      break;
+    case "gobuster":
+      cmd = `gobuster dir -u "${target}" ${options || "-w /usr/share/wordlists/dirb/common.txt"} 2>&1`;
+      await executeCommand(sbId, userId, "which gobuster || apt-get install -y gobuster -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+      break;
+    case "ffuf":
+      cmd = `ffuf -u "${target}" ${options || "-w /usr/share/wordlists/dirb/common.txt"} 2>&1`;
+      await executeCommand(sbId, userId, "which ffuf || apt-get install -y ffuf -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+      break;
+    case "custom":
+      if (!scriptPath) return { success: false, error: "scriptPath required for custom tool" };
+      cmd = `python3 "${scriptPath}" 2>&1`;
+      break;
+    default:
+      cmd = `${tool} ${options} "${target}" 2>&1`;
+  }
+  
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 300_000, triggeredBy: "ai" });
+  
+  return {
+    success: true,
+    data: {
+      tool,
+      target,
+      output: result.output,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+    },
+  };
+}
+
+async function execDecompileBinary(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const filePath = args.filePath as string;
+  if (!filePath) return { success: false, error: "File path is required" };
+  const tool = (args.tool as string) || "radare2";
+  const analysis = (args.analysis as string) || "full";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  // Install radare2 if needed
+  if (tool === "radare2" || tool === "r2") {
+    await executeCommand(sbId, userId, "which r2 || apt-get install -y radare2 -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+  }
+  
+  let cmd: string;
+  switch (analysis) {
+    case "strings":
+      cmd = `strings "${filePath}" 2>&1 | head -100`;
+      break;
+    case "imports":
+      cmd = `r2 -q -c "ia" "${filePath}" 2>&1`;
+      break;
+    case "functions":
+      cmd = `r2 -q -c "aa; afl" "${filePath}" 2>&1`;
+      break;
+    case "main":
+      cmd = `r2 -q -c "aa; s main; pdf" "${filePath}" 2>&1`;
+      break;
+    default: // full
+      cmd = `r2 -q -c "aa; afl; s main; pdf; iz" "${filePath}" 2>&1 | head -200`;
+  }
+  
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+  
+  // Also get file info
+  const fileInfo = await executeCommand(sbId, userId, `file "${filePath}" && checksec --file="${filePath}" 2>/dev/null || echo "checksec not available"`, { timeoutMs: 10_000, triggeredBy: "ai" });
+  
+  return {
+    success: true,
+    data: {
+      filePath,
+      tool,
+      analysis,
+      fileInfo: fileInfo.output,
+      output: result.output,
+    },
+  };
+}
+
+async function execFuzzerRun(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const target = args.target as string;
+  if (!target) return { success: false, error: "Target is required" };
+  const fuzzerType = (args.fuzzerType as string) || "web";
+  const wordlist = (args.wordlist as string) || "common";
+  const options = (args.options as string) || "";
+  
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+  
+  const wordlistPaths: Record<string, string> = {
+    common: "/usr/share/wordlists/dirb/common.txt",
+    big: "/usr/share/wordlists/dirb/big.txt",
+    directories: "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt",
+    api: "/usr/share/wordlists/dirb/common.txt",
+  };
+  const wlPath = wordlistPaths[wordlist] || wordlist;
+  
+  let cmd: string;
+  if (fuzzerType === "web") {
+    // Install ffuf if needed
+    await executeCommand(sbId, userId, "which ffuf || apt-get install -y ffuf -qq 2>/dev/null || go install github.com/ffuf/ffuf/v2@latest 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+    // Ensure wordlist exists
+    await executeCommand(sbId, userId, `[ -f "${wlPath}" ] || apt-get install -y wordlists dirb -qq 2>/dev/null`, { timeoutMs: 30_000, triggeredBy: "ai" });
+    cmd = `ffuf -u "${target}" -w "${wlPath}" ${options} -mc 200,201,204,301,302,307,401,403 -t 50 2>&1 | head -100`;
+  } else if (fuzzerType === "binary") {
+    await executeCommand(sbId, userId, "which afl-fuzz || apt-get install -y afl++ -qq 2>/dev/null", { timeoutMs: 60_000, triggeredBy: "ai" });
+    cmd = `echo "AFL++ fuzzing setup for ${target}. Run: afl-fuzz -i /tmp/afl_in -o /tmp/afl_out -- ${target} @@" 2>&1`;
+  } else {
+    cmd = `ffuf -u "${target}" -w "${wlPath}" ${options} -t 30 2>&1 | head -100`;
+  }
+  
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 180_000, triggeredBy: "ai" });
+  
+  return {
+    success: true,
+    data: {
+      target,
+      fuzzerType,
+      wordlist: wlPath,
+      output: result.output,
+      durationMs: result.durationMs,
+    },
+  };
 }

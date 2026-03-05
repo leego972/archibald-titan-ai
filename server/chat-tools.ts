@@ -1138,6 +1138,328 @@ const sslCheck: Tool = {
   },
 };
 
+
+// ─── Advanced Security Tools ──────────────────────────────────────────────────
+const installSecurityToolkit: Tool = {
+  type: "function",
+  function: {
+    name: "install_security_toolkit",
+    description:
+      "Install a curated set of security tools in the sandbox (nmap, sqlmap, hydra, hashcat, nikto, gobuster, masscan, metasploit-framework, john, aircrack-ng, wireshark-cli, binwalk, volatility3, radare2, impacket, pwntools, scapy). Use this at the start of any offensive security or CTF task to ensure all tools are available. Returns the list of installed tools and their versions.",
+    parameters: {
+      type: "object",
+      properties: {
+        tools: {
+          type: "array",
+          items: { type: "string" },
+          description: "Specific tools to install (e.g. ['nmap', 'sqlmap']). Leave empty to install the full toolkit.",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: [],
+    },
+  },
+};
+const networkScan: Tool = {
+  type: "function",
+  function: {
+    name: "network_scan",
+    description:
+      "Run an nmap network scan against a target. Supports full nmap flag syntax. Use for port discovery, service enumeration, OS detection, and vulnerability scanning. Examples: '-sV -p 1-65535 target.com', '-sU --top-ports 100 target.com', '-A -T4 target.com', '--script vuln target.com'.",
+    parameters: {
+      type: "object",
+      properties: {
+        target: {
+          type: "string",
+          description: "Target IP address, hostname, or CIDR range (e.g. '192.168.1.0/24', 'target.com')",
+        },
+        flags: {
+          type: "string",
+          description: "nmap flags and options (e.g. '-sV -p 80,443,8080', '-A -T4', '--script vuln'). Default: '-sV --top-ports 1000'",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: ["target"],
+    },
+  },
+};
+const generateYaraRule: Tool = {
+  type: "function",
+  function: {
+    name: "generate_yara_rule",
+    description:
+      "Generate a YARA rule for malware detection based on a description, sample bytes, strings, or behavioral patterns. Returns a complete, valid YARA rule file ready for use with yara-python or any YARA scanner.",
+    parameters: {
+      type: "object",
+      properties: {
+        description: {
+          type: "string",
+          description: "Description of what to detect (e.g. 'Detect Emotet dropper', 'Match files containing base64-encoded PowerShell', 'Detect Cobalt Strike beacon')",
+        },
+        strings: {
+          type: "array",
+          items: { type: "string" },
+          description: "Known strings, byte patterns, or hex sequences to include in the rule",
+        },
+        ruleName: {
+          type: "string",
+          description: "Name for the YARA rule (e.g. 'Emotet_Dropper_v2'). Auto-generated if not provided.",
+        },
+      },
+      required: ["description"],
+    },
+  },
+};
+const generateSigmaRule: Tool = {
+  type: "function",
+  function: {
+    name: "generate_sigma_rule",
+    description:
+      "Generate a Sigma detection rule for SIEM systems (Splunk, Elastic, QRadar, etc.) based on a description of the attack technique or log pattern. Returns a complete Sigma YAML rule with ATT&CK mapping.",
+    parameters: {
+      type: "object",
+      properties: {
+        description: {
+          type: "string",
+          description: "Description of the attack or behavior to detect (e.g. 'Detect pass-the-hash via Windows Security logs', 'Detect PowerShell download cradle', 'Detect LSASS memory dumping')",
+        },
+        logSource: {
+          type: "string",
+          description: "Log source type (e.g. 'windows', 'linux', 'aws', 'azure', 'network'). Default: 'windows'",
+        },
+        attackTechnique: {
+          type: "string",
+          description: "MITRE ATT&CK technique ID (e.g. 'T1003.001', 'T1059.001'). Optional — will be inferred if not provided.",
+        },
+      },
+      required: ["description"],
+    },
+  },
+};
+const hashCrack: Tool = {
+  type: "function",
+  function: {
+    name: "hash_crack",
+    description:
+      "Attempt to crack a password hash using hashcat or john in the sandbox. Supports MD5, SHA1, SHA256, SHA512, NTLM, bcrypt, WPA2, and more. Uses rockyou.txt and common wordlists by default. Returns cracked password if successful.",
+    parameters: {
+      type: "object",
+      properties: {
+        hash: {
+          type: "string",
+          description: "The hash to crack (e.g. '5f4dcc3b5aa765d61d8327deb882cf99' for MD5)",
+        },
+        hashType: {
+          type: "string",
+          description: "Hash type (e.g. 'md5', 'sha1', 'sha256', 'ntlm', 'bcrypt', 'wpa2', 'sha512crypt'). Auto-detected if not provided.",
+        },
+        wordlist: {
+          type: "string",
+          description: "Wordlist to use: 'rockyou' (default), 'common', 'custom'. For custom, provide the wordlist content.",
+        },
+        rules: {
+          type: "string",
+          description: "Hashcat rules to apply (e.g. 'best64', 'dive', 'rockyou-30000'). Optional.",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: ["hash"],
+    },
+  },
+};
+const generatePayload: Tool = {
+  type: "function",
+  function: {
+    name: "generate_payload",
+    description:
+      "Generate a security payload for authorized penetration testing. Supports shellcode, reverse shells, bind shells, web shells, macro payloads, and encoded variants. Returns the payload code/bytes and usage instructions.",
+    parameters: {
+      type: "object",
+      properties: {
+        payloadType: {
+          type: "string",
+          description: "Type of payload: 'reverse_shell', 'bind_shell', 'web_shell', 'shellcode', 'macro', 'powershell_cradle', 'msfvenom'",
+        },
+        lhost: {
+          type: "string",
+          description: "Attacker IP address for reverse connections (e.g. '10.10.14.1')",
+        },
+        lport: {
+          type: "number",
+          description: "Listener port (e.g. 4444)",
+        },
+        platform: {
+          type: "string",
+          description: "Target platform: 'windows', 'linux', 'macos', 'web'. Default: 'linux'",
+        },
+        language: {
+          type: "string",
+          description: "Payload language: 'python', 'bash', 'powershell', 'c', 'php', 'asp', 'java'. Auto-selected based on platform if not provided.",
+        },
+        encoding: {
+          type: "string",
+          description: "Encoding/obfuscation: 'none', 'base64', 'xor', 'shikata_ga_nai'. Default: 'none'",
+        },
+      },
+      required: ["payloadType"],
+    },
+  },
+};
+const osintLookup: Tool = {
+  type: "function",
+  function: {
+    name: "osint_lookup",
+    description:
+      "Perform OSINT (Open Source Intelligence) lookups on a target. Aggregates data from multiple sources: WHOIS, DNS records, Shodan/Censys (if API key available), certificate transparency logs, breach databases, social media presence, and GitHub. Returns a structured intelligence report.",
+    parameters: {
+      type: "object",
+      properties: {
+        target: {
+          type: "string",
+          description: "Target to investigate: domain, IP address, email, username, or company name",
+        },
+        targetType: {
+          type: "string",
+          description: "Type of target: 'domain', 'ip', 'email', 'username', 'company'. Auto-detected if not provided.",
+        },
+        depth: {
+          type: "string",
+          description: "Investigation depth: 'quick' (DNS/WHOIS only), 'standard' (default), 'deep' (all sources including breach data)",
+        },
+      },
+      required: ["target"],
+    },
+  },
+};
+const cveLookup: Tool = {
+  type: "function",
+  function: {
+    name: "cve_lookup",
+    description:
+      "Look up CVE details, CVSS scores, affected versions, and available exploits from NVD (National Vulnerability Database) and Exploit-DB. Use before building exploits to get accurate vulnerability details.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "CVE ID (e.g. 'CVE-2021-44228') or keyword search (e.g. 'Apache Log4j RCE', 'SMB EternalBlue')",
+        },
+        includeExploits: {
+          type: "boolean",
+          description: "Whether to include known exploit code from Exploit-DB. Default: true",
+        },
+      },
+      required: ["query"],
+    },
+  },
+};
+const runExploit: Tool = {
+  type: "function",
+  function: {
+    name: "run_exploit",
+    description:
+      "Execute an exploit or penetration testing tool in the sandbox against a target. Supports Metasploit modules, custom exploit scripts, sqlmap, hydra, and other offensive tools. Returns the output and any captured credentials/shells.",
+    parameters: {
+      type: "object",
+      properties: {
+        tool: {
+          type: "string",
+          description: "Tool to use: 'metasploit', 'sqlmap', 'hydra', 'nikto', 'gobuster', 'wfuzz', 'ffuf', 'custom'",
+        },
+        target: {
+          type: "string",
+          description: "Target URL, IP, or host (e.g. 'http://target.com/login', '10.10.10.1')",
+        },
+        options: {
+          type: "string",
+          description: "Tool-specific options (e.g. for metasploit: 'use exploit/multi/handler; set PAYLOAD windows/x64/meterpreter/reverse_tcp; set LHOST 10.10.14.1; set LPORT 4444; run')",
+        },
+        scriptPath: {
+          type: "string",
+          description: "Path to a custom exploit script in the sandbox (e.g. '/home/sandbox/exploit.py'). Used when tool is 'custom'.",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: ["tool", "target"],
+    },
+  },
+};
+const decompileBinary: Tool = {
+  type: "function",
+  function: {
+    name: "decompile_binary",
+    description:
+      "Decompile or disassemble a binary file using radare2 or Ghidra (headless). Extracts functions, strings, imports, and pseudo-C code. Use for reverse engineering CTF challenges, malware analysis, or binary exploitation.",
+    parameters: {
+      type: "object",
+      properties: {
+        filePath: {
+          type: "string",
+          description: "Path to the binary in the sandbox (e.g. '/home/sandbox/challenge.elf', '/home/sandbox/malware.exe')",
+        },
+        tool: {
+          type: "string",
+          description: "Tool to use: 'radare2' (default, fast), 'ghidra' (thorough, slower), 'strings' (quick string extraction)",
+        },
+        analysis: {
+          type: "string",
+          description: "Analysis type: 'full' (complete decompilation), 'functions' (list functions), 'strings' (extract strings), 'imports' (list imports/exports), 'main' (decompile main function only). Default: 'full'",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: ["filePath"],
+    },
+  },
+};
+const fuzzerRun: Tool = {
+  type: "function",
+  function: {
+    name: "fuzzer_run",
+    description:
+      "Run a fuzzer against a target to discover vulnerabilities, hidden endpoints, or crash conditions. Supports web fuzzing (ffuf/gobuster), API fuzzing, and binary fuzzing (AFL++). Returns discovered paths, parameters, or crash inputs.",
+    parameters: {
+      type: "object",
+      properties: {
+        target: {
+          type: "string",
+          description: "Target URL or binary path (e.g. 'http://target.com/FUZZ', '/home/sandbox/vulnerable_binary')",
+        },
+        fuzzerType: {
+          type: "string",
+          description: "Type of fuzzer: 'web' (ffuf/gobuster for HTTP), 'api' (parameter fuzzing), 'binary' (AFL++ for binaries). Default: 'web'",
+        },
+        wordlist: {
+          type: "string",
+          description: "Wordlist: 'common' (default), 'big', 'api', 'directories', 'files', or a custom path in the sandbox",
+        },
+        options: {
+          type: "string",
+          description: "Additional fuzzer options (e.g. '-mc 200,301,302', '-H \'Authorization: Bearer token\'', '-X POST -d \'user=FUZZ\'')",
+        },
+        sandboxId: {
+          type: "number",
+          description: "The sandbox ID. If not provided, uses the user's default sandbox.",
+        },
+      },
+      required: ["target"],
+    },
+  },
+};
 // ─── Auto-Fix Tools ────────────────────────────────────────────────
 
 const autoFixVulnerability: Tool = {
@@ -2014,4 +2336,19 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   navigateToPage,
   // System
   getSystemStatus,
+  // Sandbox execution — for running and testing built tools
+  sandboxExec,
+  sandboxWriteFile,
+  // Advanced Security Tools
+  installSecurityToolkit,
+  networkScan,
+  generateYaraRule,
+  generateSigmaRule,
+  hashCrack,
+  generatePayload,
+  osintLookup,
+  cveLookup,
+  runExploit,
+  decompileBinary,
+  fuzzerRun,
 ];
