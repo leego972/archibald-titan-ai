@@ -44,6 +44,7 @@ import { marketplaceRouter } from "./marketplace-router";
 import { siteMonitorRouter } from "./site-monitor-router";
 import { securityDashboardRouter } from "./security-dashboard-router";
 import { filesRouter } from "./api/files";
+import { virelleRouter } from "./virelle-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -113,6 +114,7 @@ export const appRouter = router({
   siteMonitor: siteMonitorRouter,
   securityDashboard: securityDashboardRouter,
   customInstructions: customInstructionsRouter,
+  virelle: virelleRouter,
 });
 
 export type AppRouter = typeof appRouter;

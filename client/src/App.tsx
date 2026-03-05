@@ -94,6 +94,9 @@ import ProjectFilesViewer from "./pages/ProjectFilesViewer";
 // Site Monitor
 import SiteMonitorPage from "./pages/SiteMonitorPage";
 
+// Virelle Studios
+import VirellePage from "./pages/VirellePage";
+
 function DashboardRouter() {
   return (
     <FetcherLayout>
@@ -165,6 +168,9 @@ function DashboardRouter() {
         {/* Site Monitor */}
         <Route path="/site-monitor" component={SiteMonitorPage} />
 
+        {/* Virelle Studios */}
+        <Route path="/virelle" component={VirellePage} />
+
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
@@ -222,6 +228,7 @@ function Router() {
       <Route path="/blog-admin" component={DashboardRouter} />
       <Route path="/marketing" component={DashboardRouter} />
       <Route path="/site-monitor" component={DashboardRouter} />
+      <Route path="/virelle" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

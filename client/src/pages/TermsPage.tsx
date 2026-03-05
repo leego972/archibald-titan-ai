@@ -214,6 +214,37 @@ export default function TermsPage() {
             </ul>
           </section>
 
+          {/* Section 7b — Virelle Studios */}
+          <section>
+            <h2 className="text-xl font-bold text-white mb-4 pb-2 border-b border-white/10">7b. Virelle Studios and External Content</h2>
+            <p className="text-sm text-white/60 leading-relaxed mb-4">
+              The Virelle Studios feature allows authorized directors (admin users) to create, manage, and publish scenes. Directors may add external scenes by linking to content hosted on third-party platforms. The User acknowledges and agrees that:
+            </p>
+            <ul className="space-y-3 mb-6">
+              <li className="flex items-start gap-2 text-sm text-white/60 leading-relaxed">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span><strong className="text-white/80">Copyright responsibility:</strong> Any copyright material used without permission is the sole responsibility of the user and Virelle Studios are not liable for any misuse. Directors are solely responsible for ensuring they have all necessary rights, licenses, or permissions for any external content they link to or upload.</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white/60 leading-relaxed">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span><strong className="text-white/80">No content review:</strong> The Company does not review, moderate, or verify external content added through Virelle Studios. The Company assumes no liability for copyright infringement, intellectual property disputes, defamation, or any other legal claims arising from user-added content.</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white/60 leading-relaxed">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span><strong className="text-white/80">Director acknowledgement:</strong> By adding an external scene, the director explicitly acknowledges the copyright disclaimer and accepts full legal responsibility for the content.</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white/60 leading-relaxed">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span><strong className="text-white/80">Indemnification:</strong> Directors agree to indemnify and hold harmless the Company, its officers, directors, employees, and agents from any claims, damages, losses, or expenses (including legal fees) arising from their use of Virelle Studios or the content they add.</span>
+              </li>
+            </ul>
+            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10">
+              <p className="text-sm text-amber-300/90 leading-relaxed font-medium">
+                IMPORTANT NOTICE: Any copyright material used without permission is the sole responsibility of the user and Virelle Studios are not liable for any misuse. This disclaimer is acknowledged by the director at the time of adding each external scene.
+              </p>
+            </div>
+          </section>
+
           {/* Section 8 */}
           <section>
             <h2 className="text-xl font-bold text-white mb-4 pb-2 border-b border-white/10">8. Complete Disclaimer of Warranties</h2>
