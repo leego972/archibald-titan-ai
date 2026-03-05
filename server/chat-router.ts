@@ -20,6 +20,7 @@ import {
   fetcherSettings,
   fetcherProxies,
   credentialWatches,
+  builderActivityLog,
 } from "../drizzle/schema";
 import { PROVIDERS } from "../shared/fetcher";
 import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
@@ -2287,4 +2288,18 @@ Do NOT attempt any tool calls or builds.`;
       },
     ];
   }),
+
+  getBuilderHistory: protectedProcedure
+    .input(z.object({ limit: z.number().min(1).max(100).default(20) }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const limit = input?.limit ?? 20;
+      return db
+        .select()
+        .from(builderActivityLog)
+        .where(eq(builderActivityLog.userId, ctx.user.id))
+        .orderBy(desc(builderActivityLog.createdAt))
+        .limit(limit);
+    }),
 });

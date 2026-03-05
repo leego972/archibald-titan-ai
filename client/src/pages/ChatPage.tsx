@@ -90,6 +90,9 @@ import {
   VolumeX,
   AudioLines,
   PhoneOff,
+  Bug,
+  Crosshair,
+  ScanSearch,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import {
@@ -859,6 +862,11 @@ export default function ChatPage() {
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([]);
   const [showStreamPanel, setShowStreamPanel] = useState(true);
   const [buildLog, setBuildLog] = useState<StreamEvent[]>([]); // persistent log of all events for the current message
+  const [isBuildMode, setIsBuildMode] = useState(false); // true when Titan is using security/builder tools
+  const [showBuilderHistory, setShowBuilderHistory] = useState(false); // toggle builder history panel
+  const SECURITY_TOOLS = ['install_security_toolkit', 'network_scan', 'generate_yara_rule', 'generate_sigma_rule',
+    'hash_crack', 'generate_payload', 'osint_lookup', 'cve_lookup', 'run_exploit', 'decompile_binary', 'fuzzer_run',
+    'sandbox_exec', 'sandbox_write_file', 'create_file', 'provide_project_zip', 'eas_build'];
   const eventSourceRef = useRef<EventSource | null>(null);
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
@@ -1450,6 +1458,7 @@ export default function ChatPage() {
     setLocalMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setLoadingPhase("Thinking...");
+    setIsBuildMode(false);
     setStreamEvents([{ type: 'thinking', message: 'Processing your request...', timestamp: Date.now() }]);
     setBuildLog([]);
 
@@ -1477,6 +1486,8 @@ export default function ChatPage() {
           setStreamEvents(prev => [...prev, evt]);
           setBuildLog(prev => [...prev, evt]);
           setLoadingPhase(data.description || `Using ${data.tool.replace(/_/g, ' ')}...`);
+          // Detect builder/security mode
+          if (SECURITY_TOOLS.includes(data.tool)) setIsBuildMode(true);
         });
         es.addEventListener('tool_result', (e) => {
           const data = JSON.parse(e.data);
@@ -1847,8 +1858,25 @@ export default function ChatPage() {
                 Actions Enabled
               </Badge>
             )}
+            {!isMobile && isBuildMode && (
+              <Badge variant="outline" className="text-[10px] border-red-500/40 text-red-400 ml-1 shrink-0 animate-pulse">
+                <Crosshair className="h-2.5 w-2.5 mr-0.5" />
+                Builder Mode
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {buildLog.filter(e => e.type === 'tool_start').length > 0 && (
+              <button
+                onClick={() => setShowBuilderHistory(!showBuilderHistory)}
+                className={`flex items-center gap-1 rounded-lg font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all touch-target ${isMobile ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs'}`}
+                title="View builder action log"
+              >
+                <ScanSearch className="h-3.5 w-3.5 shrink-0" />
+                {!isMobile && `Actions (${buildLog.filter(e => e.type === 'tool_start').length})`}
+                {isMobile && buildLog.filter(e => e.type === 'tool_start').length}
+              </button>
+            )}
             {createdFiles.length > 0 && (
               <button
                 onClick={() => setShowProjectFiles(!showProjectFiles)}
@@ -2603,6 +2631,58 @@ export default function ChatPage() {
         </div>
       )}
       {/* Project Files Panel with Preview */}
+      {/* Builder History Panel (#32) */}
+      {showBuilderHistory && buildLog.length > 0 && (
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[420px] border-l border-border'} flex flex-col bg-background`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Bug className="h-4 w-4 text-red-400" />
+              <h3 className="font-semibold text-sm">Builder Action Log</h3>
+              <Badge variant="outline" className="text-[10px] border-red-500/30 text-red-400">{buildLog.filter(e => e.type === 'tool_start').length} actions</Badge>
+            </div>
+            <button
+              onClick={() => setShowBuilderHistory(false)}
+              className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {buildLog.map((evt, idx) => (
+              <div key={idx} className={`rounded-lg border px-3 py-2 text-xs ${
+                evt.type === 'tool_start' ? 'border-blue-500/20 bg-blue-500/5' :
+                evt.type === 'tool_result' ? (evt.success ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5') :
+                evt.type === 'verification' ? 'border-amber-500/20 bg-amber-500/5' :
+                'border-border/30 bg-card'
+              }`}>
+                <div className="flex items-center gap-2 mb-1">
+                  {evt.type === 'tool_start' && <Terminal className="h-3 w-3 text-blue-400 shrink-0" />}
+                  {evt.type === 'tool_result' && (evt.success
+                    ? <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                    : <XCircle className="h-3 w-3 text-red-400 shrink-0" />)}
+                  {evt.type === 'thinking' && <Activity className="h-3 w-3 text-muted-foreground shrink-0" />}
+                  {evt.type === 'verification' && <ScanLine className="h-3 w-3 text-amber-400 shrink-0" />}
+                  <span className="font-mono font-medium truncate">
+                    {evt.tool ? evt.tool.replace(/_/g, ' ') : evt.type}
+                  </span>
+                  <span className="ml-auto text-muted-foreground shrink-0">
+                    {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </div>
+                {(evt.description || evt.summary || evt.message) && (
+                  <p className="text-muted-foreground leading-relaxed">
+                    {evt.description || evt.summary || evt.message}
+                  </p>
+                )}
+                {evt.preview && (
+                  <pre className="mt-1 text-[10px] font-mono bg-black/20 rounded p-1.5 overflow-x-auto max-h-20 text-emerald-300">{evt.preview}</pre>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showProjectFiles && createdFiles.length > 0 && (
         <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[420px] border-l border-border'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
