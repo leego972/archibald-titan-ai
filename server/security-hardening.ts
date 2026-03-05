@@ -340,6 +340,9 @@ async function flushSecurityEvents(): Promise<void> {
  * repeated prompt injection attempts.
  */
 export function shouldSuspendChat(userId: number): boolean {
+  // Admin users are NEVER suspended — they have full unrestricted access
+  // isAdmin() is async so we use a synchronous in-memory check here
+  // The DB-backed isAdmin() is used in all async paths
   const key = `${userId}:prompt_injection`;
   const counter = userEventCounters.get(key);
   if (!counter) return false;

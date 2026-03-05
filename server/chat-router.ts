@@ -1067,7 +1067,8 @@ export const chatRouter = router({
       // ── SECURITY: Chat Suspension Check ────────────────────────
       // If a user has triggered too many prompt injection attempts,
       // temporarily suspend their chat access (10 min cooldown).
-      if (shouldSuspendChat(userId)) {
+      // Admin users are NEVER suspended.
+      if (!isAdmin && shouldSuspendChat(userId)) {
         await logSecurityEvent(userId, "chat_suspended", { reason: "repeated_injection_attempts" });
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -1140,22 +1141,25 @@ export const chatRouter = router({
         }
       }
 
-      // ── Credit Check ─────────────────────────────────────────
-      try {
-        const creditCheck = await checkCredits(userId, "chat_message");
-        if (!creditCheck.allowed) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: creditCheck.message || "Insufficient credits. Purchase more credits or upgrade your plan.",
-          });
+      // ── Credit Check ─────────────────────────────────────────────
+      // Admin users bypass credit checks entirely — unlimited access
+      if (!isAdmin) {
+        try {
+          const creditCheck = await checkCredits(userId, "chat_message");
+          if (!creditCheck.allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: creditCheck.message || "Insufficient credits. Purchase more credits or upgrade your plan.",
+            });
+          }
+        } catch (creditErr: unknown) {
+          // If this is a deliberate FORBIDDEN from insufficient credits, re-throw it
+          if (creditErr instanceof TRPCError && creditErr.code === "FORBIDDEN") {
+            throw creditErr;
+          }
+          // Otherwise (e.g. table missing), log and allow the message through
+          log.error("[Chat] Credit check failed (allowing message):", { error: getErrorMessage(creditErr) });
         }
-      } catch (creditErr: unknown) {
-        // If this is a deliberate FORBIDDEN from insufficient credits, re-throw it
-        if (creditErr instanceof TRPCError && creditErr.code === "FORBIDDEN") {
-          throw creditErr;
-        }
-        // Otherwise (e.g. table missing), log and allow the message through
-        log.error("[Chat] Credit check failed (allowing message):", { error: getErrorMessage(creditErr) });
       }
 
       // ── Load user's personal API key (if set) ──────────────────
@@ -2086,17 +2090,20 @@ Do NOT attempt any tool calls or builds.`;
           actionsSummary
         );
 
-        // ── Consume Credits ───────────────────────────────────────
+        // ── Consume Credits ───────────────────────────────────────────────
         // 1 credit for the chat message + 5 per builder action executed
-        try {
-          await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
-          for (const action of executedActions) {
-            if (action.success) {
-              await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+        // Admin users are never charged — unlimited access
+        if (!isAdmin) {
+          try {
+            await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
+            for (const action of executedActions) {
+              if (action.success) {
+                await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+              }
             }
+          } catch (consumeErr: unknown) {
+            log.error("[Chat] Credit consumption failed (non-fatal):", { error: getErrorMessage(consumeErr) });
           }
-        } catch (consumeErr: unknown) {
-          log.error("[Chat] Credit consumption failed (non-fatal):", { error: getErrorMessage(consumeErr) });
         }
 
         // ── Flush staged changes to disk ──────────────────────
