@@ -4892,13 +4892,37 @@ for m in matches[:5]:
     exploitData = exploitResult.output;
   }
   
+
+  // Query GitHub Security Advisories (#36)
+  const ghAdvisoryResult = await executeCommand(sbId, userId,
+    `curl -s -H "Accept: application/vnd.github+json" "https://api.github.com/advisories?q=${encodeURIComponent(query)}&per_page=5" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    advisories = json.load(sys.stdin)
+    if isinstance(advisories, list):
+        for a in advisories[:5]:
+            ghsa = a.get('ghsa_id', 'N/A')
+            severity = a.get('severity', 'N/A')
+            summary = a.get('summary', 'N/A')[:200]
+            cves = ', '.join(a.get('cve_id', []) or [])
+            print(f'{ghsa} | Severity: {severity} | CVEs: {cves or "none"} | {summary}')
+            print('---')
+    else:
+        print('No advisories found')
+except Exception as e:
+    print(f'Parse error: {e}')
+" 2>&1 || echo "GitHub Advisory API unavailable"`,
+    { timeoutMs: 15_000, triggeredBy: "ai" }
+  );
+
   return {
     success: true,
     data: {
       query,
       nvdResults: nvdResult.output,
       exploitDbResults: exploitData,
-      message: `CVE lookup complete for: ${query}`,
+      githubAdvisories: ghAdvisoryResult.output,
+      message: `CVE lookup complete for: ${query} (NVD + ExploitDB + GitHub Advisories)`,
     },
   };
 }
