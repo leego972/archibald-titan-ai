@@ -1990,8 +1990,8 @@ export default function ChatPage() {
               tabIndex={0}
               title="Go to home"
             >
-              <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-                <TitanLogo size="sm" className="!h-7 !w-7 sm:!h-9 sm:!w-9" />
+              <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                <TitanLogo size="sm" className="!h-10 !w-10 sm:!h-14 sm:!w-14" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm sm:text-lg font-semibold tracking-tight truncate">
