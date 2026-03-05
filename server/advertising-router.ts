@@ -7,6 +7,8 @@
 
 import { z } from "zod";
 import { router, adminProcedure } from "./_core/trpc";
+import { getAllChannelStatuses } from "./marketing-channels";
+import { getExpandedChannelStatuses } from "./expanded-channels";
 import {
   runAdvertisingCycle,
   getStrategyOverview,
@@ -334,6 +336,28 @@ export const advertisingRouter = router({
       const result = await generateSocialClip(input.feature, input.platform);
       return result;
     }),
+
+  /**
+   * Get the connection status of all advertising channels (free + paid)
+   */
+  getChannelStatuses: adminProcedure.query(() => {
+    const core = getAllChannelStatuses();
+    const expanded = getExpandedChannelStatuses();
+    const freeApiChannels = expanded.filter(c => c.type === "api_automated");
+    const contentQueueChannels = expanded.filter(c => c.type === "content_queue");
+    return {
+      core,
+      freeApiChannels,
+      contentQueueChannels,
+      summary: {
+        coreConnected: core.filter(c => c.connected).length,
+        coreTotal: core.length,
+        freeApiConnected: freeApiChannels.filter(c => c.connected).length,
+        freeApiTotal: freeApiChannels.length,
+        contentQueueTotal: contentQueueChannels.length,
+      },
+    };
+  }),
 
   getBudgetBreakdown: adminProcedure.query(async () => {
     const overview = getStrategyOverview();

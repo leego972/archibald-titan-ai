@@ -1839,11 +1839,13 @@ async function generateContentQueueItems(): Promise<AdvertisingAction> {
         const db = await getDb();
         if (db) {
           await db.insert(marketingContent).values({
-            channel: "content_seo" as any,
-            contentType: "blog_article" as any,
+            channel: ch.platform as any,
+            contentType: ch.type as any,
             title: item.title,
             body: item.content,
+            platform: ch.platform,
             status: "approved",
+            aiPrompt: `${ch.name} content — AI generated for ${pillar.pillar}`,
             metadata: { channel: ch.name, queueType: "manual_post", pillar: pillar.pillar },
           } as any);
         }

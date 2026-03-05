@@ -89,6 +89,7 @@ export default function AdvertisingDashboard() {
   const strategies = trpc.advertising.getStrategies.useQuery();
   const budget = trpc.advertising.getBudgetBreakdown.useQuery();
   const contentQueue = trpc.advertising.getContentQueue.useQuery({ limit: 20 });
+  const channelStatuses = trpc.advertising.getChannelStatuses.useQuery();
   const runCycle = trpc.advertising.runCycle.useMutation({
     onSuccess: (result) => {
       setIsRunning(false);
@@ -197,6 +198,7 @@ export default function AdvertisingDashboard() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="channels">Channels</TabsTrigger>
           <TabsTrigger value="strategies">Growth Strategies</TabsTrigger>
           <TabsTrigger value="content">Content Queue</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -491,6 +493,96 @@ export default function AdvertisingDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Channels Tab */}
+        <TabsContent value="channels" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">API-Automated Free Channels</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-500">
+                  {channelStatuses.data?.summary.freeApiConnected ?? 0}
+                  <span className="text-lg text-muted-foreground"> / {channelStatuses.data?.summary.freeApiTotal ?? 0}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Connected and posting automatically</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Content Queue Channels</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-500">
+                  {channelStatuses.data?.summary.contentQueueTotal ?? 0}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">AI generates content every cycle for manual posting</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Core Platform Channels</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {channelStatuses.data?.summary.coreConnected ?? 0}
+                  <span className="text-lg text-muted-foreground"> / {channelStatuses.data?.summary.coreTotal ?? 0}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Social + paid platforms connected</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Globe className="w-5 h-5 text-green-500" /> Free API-Automated Channels
+              </CardTitle>
+              <CardDescription>These channels post automatically every advertising cycle — no manual action needed. Add a token to activate any disconnected channel.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {channelStatuses.data?.freeApiChannels?.map((ch: any) => (
+                  <div key={ch.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${ch.connected ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      <div>
+                        <div className="font-medium text-sm">{ch.name}</div>
+                        <div className="text-xs text-muted-foreground">{ch.description}</div>
+                      </div>
+                    </div>
+                    <Badge variant={ch.connected ? 'default' : 'secondary'} className={ch.connected ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}>
+                      {ch.connected ? 'Active' : 'Add Token'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-500" /> Content Queue Channels
+              </CardTitle>
+              <CardDescription>AI generates ready-to-post content for these channels every cycle. Content appears in the Content Queue tab for you to copy and post.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {channelStatuses.data?.contentQueueChannels?.map((ch: any) => (
+                  <div key={ch.id} className="flex items-center gap-2 p-2 rounded-lg border text-sm">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <div>
+                      <div className="font-medium">{ch.name}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">{ch.description}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Activity Log Tab */}
