@@ -212,6 +212,14 @@ async function startServer() {
   registerEmailAuthRoutes(app);
   // Independent GitHub & Google OAuth (no Manus proxy)
   registerSocialAuthRoutes(app);
+  // CSRF token primer endpoint — called by the client on app startup to ensure the CSRF cookie
+  // is set before any tRPC POST requests fire. Critical for Safari iOS after OAuth redirects.
+  // The csrfCookieMiddleware above already set the cookie; this just returns the value.
+  app.get('/api/csrf-token', (req, res) => {
+    const token = req.cookies?.['csrf_token'] || '';
+    res.json({ token });
+  });
+
   // Health check endpoint (for Railway, load balancers, etc.)
   app.get('/api/health', async (_req, res) => {
     const health: Record<string, unknown> = {

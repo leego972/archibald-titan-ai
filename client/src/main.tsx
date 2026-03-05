@@ -48,6 +48,22 @@ function getCsrfToken(): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 
+/**
+ * Prime the CSRF cookie by calling the server's /api/csrf-token endpoint.
+ * This is critical for Safari iOS (ITP) which may not have the cookie set
+ * after an OAuth redirect. The server sets the cookie on this GET response,
+ * so all subsequent tRPC POST requests will have the token available.
+ */
+async function primeCsrfCookie(): Promise<void> {
+  // If we already have the cookie, no need to prime
+  if (getCsrfToken()) return;
+  try {
+    await fetch('/api/csrf-token', { credentials: 'include' });
+  } catch {
+    // Non-fatal — the app will still work, but mutations may fail on first try
+  }
+}
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -67,15 +83,21 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <App />
-      </LanguageProvider>
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+// Prime the CSRF cookie BEFORE rendering the app so that all tRPC requests
+// (including the initial useQuery calls which use POST via httpBatchLink)
+// have the token available. This prevents the "string did not match the
+// expected pattern" error on Safari iOS after Google OAuth redirects.
+primeCsrfCookie().finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+});
 
 // ── PWA Service Worker Registration ─────────────────────────────
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
