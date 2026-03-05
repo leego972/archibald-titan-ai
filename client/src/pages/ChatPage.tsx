@@ -1678,6 +1678,54 @@ export default function ChatPage() {
       }, 3000);
     } catch (err: any) {
       const serverMessage = err?.message || err?.data?.message || "";
+
+      // ── Network-level failure recovery (Safari iOS 'Load failed') ──────────
+      // When Safari drops the HTTP connection (Railway 5-min timeout, ITP, etc.)
+      // the fetch throws TypeError: 'Load failed'. The server may have already
+      // finished processing — poll the build-status endpoint to recover the result.
+      const isNetworkFailure = serverMessage === 'Load failed' ||
+        serverMessage.toLowerCase().includes('load failed') ||
+        serverMessage.toLowerCase().includes('network request failed') ||
+        serverMessage.toLowerCase().includes('failed to fetch');
+
+      if (isNetworkFailure && convIdForStream) {
+        // Poll build-status up to 12 times (60s total) waiting for completion
+        let recovered = false;
+        for (let attempt = 0; attempt < 12; attempt++) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            const statusRes = await fetch(`/api/chat/build-status/${convIdForStream}`, { credentials: 'include' });
+            if (statusRes.ok) {
+              const status = await statusRes.json();
+              if (status.status === 'completed' && status.response) {
+                // Build completed — show the response
+                const recoveredMsg: ChatMsg = {
+                  id: -Date.now() - 1,
+                  role: 'assistant',
+                  content: status.response,
+                  createdAt: Date.now(),
+                  actionsTaken: status.actions
+                    ? status.actions.map((a: any) => ({ tool: a.tool, success: a.success, summary: a.summary || `${a.success ? 'Executed' : 'Failed'} ${a.tool}` }))
+                    : null,
+                };
+                optimisticIdsRef.current.add(recoveredMsg.id);
+                setLocalMessages(prev => [...prev, recoveredMsg]);
+                if (voiceModeRef.current && status.response) speakText(status.response);
+                utils.chat.listConversations.invalidate();
+                recovered = true;
+                break;
+              } else if (status.status === 'failed') {
+                break; // Server-side failure — fall through to error display
+              }
+              // Still running — keep polling
+            }
+          } catch {
+            // Poll failed — keep trying
+          }
+        }
+        if (recovered) return; // Skip error display — response was recovered
+      }
+      // ── Standard error display ──────────────────────────────────────────────
       let userFacingError = "Something went wrong. Please try again.";
       if (serverMessage.toLowerCase().includes("credit")) {
         userFacingError = serverMessage;
@@ -1687,6 +1735,8 @@ export default function ChatPage() {
         userFacingError = "Rate limit reached. Please wait a moment and try again.";
       } else if (serverMessage.toLowerCase().includes("timeout") || serverMessage.toLowerCase().includes("timed out")) {
         userFacingError = "The request timed out. This can happen with complex builds. Try again or break the request into smaller parts.";
+      } else if (isNetworkFailure) {
+        userFacingError = "Connection dropped — the AI was still working. Please try again.";
       } else if (serverMessage) {
         userFacingError = serverMessage;
       }

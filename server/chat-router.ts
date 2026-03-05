@@ -2259,10 +2259,24 @@ Do NOT attempt any tool calls or builds.`;
           buyCreditsUrl: "/dashboard/credits",
         } : undefined;
 
+        // Truncate large result payloads before serializing the tRPC response.
+        // Full data is already persisted to DB and available via /api/chat/build-status.
+        // This prevents oversized JSON responses that can cause Safari 'Load failed' errors.
+        const trimmedActions = executedActions.length > 0
+          ? executedActions.map(a => ({
+              tool: a.tool,
+              args: a.args,
+              success: a.success,
+              result: a.result && JSON.stringify(a.result).length > 1500
+                ? { _truncated: true, url: (a.result as any)?.url, fileName: (a.result as any)?.fileName, size: (a.result as any)?.size }
+                : a.result,
+            }))
+          : undefined;
+
         return {
           conversationId,
           response: finalText,
-          actions: executedActions.length > 0 ? executedActions : undefined,
+          actions: trimmedActions,
           creditBalance: postBalance.isUnlimited ? undefined : {
             remaining: postBalance.credits,
             used: creditsUsed,
