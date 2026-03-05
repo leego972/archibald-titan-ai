@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -872,6 +873,7 @@ export default function ChatPage() {
   const isMobile = useIsMobile();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === "admin" || authUser?.role === "head_admin";
+  const { language: selectedLanguage } = useLanguage();
   const [, setLocation] = useLocation();
 
   // ─── Download App State ───────────────────────────────────────────
@@ -1160,7 +1162,10 @@ export default function ChatPage() {
             throw new Error(err.error || 'Failed to upload audio');
           }
           const { url: audioUrl } = await uploadRes.json();
-          const result = await transcribeMutation.mutateAsync({ audioUrl });
+          // Pass the selected UI language as a hint to Whisper STT.
+          // Whisper will auto-detect the actual spoken language regardless,
+          // but this hint improves accuracy when the language is known.
+          const result = await transcribeMutation.mutateAsync({ audioUrl, language: selectedLanguage });
           if (result.text && result.text.trim()) {
             if (voiceModeRef.current) setVoiceStatus('thinking');
             handleSend(result.text.trim());
@@ -1562,6 +1567,7 @@ export default function ChatPage() {
       const result = await sendMutation.mutateAsync({
         message: finalMessage,
         conversationId: convIdForStream || undefined,
+        preferredLanguage: selectedLanguage,
       });
 
       // If conversation was created server-side (fallback), update the ID

@@ -88,8 +88,17 @@ export async function transcribeAudio(
     formData.append("model", "whisper-1");
     formData.append("response_format", "verbose_json");
 
+    // Pass the language hint to Whisper as the dedicated `language` parameter.
+    // This improves accuracy for the expected language but Whisper will still
+    // auto-detect the actual spoken language and return it in the response.
+    // We do NOT force the language — we only hint — so if the user speaks a
+    // different language, Whisper detects it and the response language follows.
+    if (options.language && options.language !== 'auto') {
+      formData.append("language", options.language);
+    }
+
     const prompt = options.prompt || (
-      options.language ? `Transcribe in ${getLanguageName(options.language)}` : "Transcribe the audio"
+      options.language ? `Transcribe in ${getLanguageName(options.language)}` : "Transcribe the audio accurately"
     );
     formData.append("prompt", prompt);
 
