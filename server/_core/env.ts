@@ -85,8 +85,8 @@ export const ENV = {
   mastodonAccessToken: process.env.MASTODON_ACCESS_TOKEN ?? "",
   mastodonInstanceUrl: process.env.MASTODON_INSTANCE_URL ?? "https://infosec.exchange",
   // Telegram
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
-  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? "",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "8573259002:AAGPqrYpry2yduwZ9-J2cTOe3Y0H_9lhVEQ",
+  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? "-1003892437233",
   // WhatsApp Business Cloud API
   whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
