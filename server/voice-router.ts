@@ -321,23 +321,14 @@ export function registerVoiceTTSRoute(app: Express) {
         return res.status(502).json({ error: "TTS generation failed" });
       }
 
+      // Buffer the full audio before sending — Safari iOS requires a complete response
+      // with Content-Length set; it cannot play audio from chunked/streaming responses.
+      const audioBuffer = Buffer.from(await ttsRes.arrayBuffer());
       res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", audioBuffer.length.toString());
+      res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "no-cache");
-
-      const reader = ttsRes.body?.getReader();
-      if (!reader) {
-        return res.status(502).json({ error: "No audio stream" });
-      }
-
-      const pump = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(Buffer.from(value));
-        }
-        res.end();
-      };
-      await pump();
+      res.end(audioBuffer);
     } catch (err) {
       log.error("[TTS] Error:", { error: String(err) });
       if (!res.headersSent) {

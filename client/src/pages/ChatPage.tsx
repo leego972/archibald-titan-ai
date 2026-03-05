@@ -932,12 +932,19 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vadAnalyserRef = useRef<AnalyserNode | null>(null);
+  const vadStreamRef = useRef<MediaStream | null>(null);
+  const vadSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const vadHasSpokenRef = useRef(false); // true once volume exceeded threshold
 
   // Voice Mode State (full-screen voice assistant)
   const [voiceModeActive, setVoiceModeActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const voiceModeRef = useRef(false); // non-reactive ref for use in async callbacks
 
   // Keep voiceModeRef in sync
@@ -962,18 +969,22 @@ export default function ChatPage() {
       .trim();
   };
 
-  // TTS: speak text aloud
+  // Stop any in-progress TTS playback
+  const stopTtsPlayback = () => {
+    try { audioSourceRef.current?.stop(); } catch (_) { /* already stopped */ }
+    audioSourceRef.current = null;
+    if (ttsAudioRef.current) { ttsAudioRef.current.pause(); ttsAudioRef.current = null; }
+  };
+
+  // TTS: speak text aloud using AudioContext (Safari iOS safe)
+  // Safari blocks new Audio(blobUrl).play() for programmatic audio;
+  // AudioContext.decodeAudioData + BufferSource is the reliable approach.
   const speakText = async (text: string) => {
     if (!text.trim()) return;
     const cleanText = stripMarkdown(text).slice(0, 4096);
     if (!cleanText) return;
 
-    // Stop any currently playing audio
-    if (ttsAudioRef.current) {
-      ttsAudioRef.current.pause();
-      ttsAudioRef.current = null;
-    }
-
+    stopTtsPlayback();
     setIsSpeaking(true);
     setVoiceStatus('speaking');
 
@@ -989,23 +1000,28 @@ export default function ChatPage() {
         body: JSON.stringify({ text: cleanText, voice: 'nova', speed: 1.0 }),
       });
 
-      if (!res.ok) {
-        throw new Error('TTS request failed');
+      if (!res.ok) throw new Error('TTS request failed');
+
+      const arrayBuffer = await res.arrayBuffer();
+
+      // Create or reuse AudioContext
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') await ctx.resume();
 
-      const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      ttsAudioRef.current = audio;
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      audioSourceRef.current = source;
 
-      audio.onended = () => {
+      source.onended = () => {
+        audioSourceRef.current = null;
         setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        ttsAudioRef.current = null;
-        // Auto-listen after speaking if voice mode is still active
         if (voiceModeRef.current) {
           setVoiceStatus('idle');
-          // Small delay before auto-listening
           setTimeout(() => {
             if (voiceModeRef.current) {
               startRecording();
@@ -1015,14 +1031,7 @@ export default function ChatPage() {
         }
       };
 
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-        ttsAudioRef.current = null;
-        if (voiceModeRef.current) setVoiceStatus('idle');
-      };
-
-      await audio.play();
+      source.start(0);
     } catch (err) {
       console.error('[TTS] Error:', err);
       setIsSpeaking(false);
@@ -1050,21 +1059,13 @@ export default function ChatPage() {
       mediaRecorderRef.current.stop();
     }
     // Stop any TTS playback
-    if (ttsAudioRef.current) {
-      ttsAudioRef.current.pause();
-      ttsAudioRef.current = null;
-      setIsSpeaking(false);
-    }
+    stopTtsPlayback();
+    setIsSpeaking(false);
   };
 
   // Cleanup TTS on unmount
   useEffect(() => {
-    return () => {
-      if (ttsAudioRef.current) {
-        ttsAudioRef.current.pause();
-        ttsAudioRef.current = null;
-      }
-    };
+    return () => { stopTtsPlayback(); };
   }, []);
 
   // File Upload State
@@ -1190,6 +1191,77 @@ export default function ChatPage() {
       }, 1000);
       if (!voiceModeRef.current) toast.success('Recording started. Tap stop when done.');
       if (voiceModeRef.current) setVoiceStatus('listening');
+
+      // ── Voice Activity Detection (VAD) ─────────────────────────────
+      // Only active in voice mode. Monitors microphone volume via AnalyserNode.
+      // Auto-stops after 1.5s of silence once the user has spoken (volume > threshold).
+      if (voiceModeRef.current) {
+        vadHasSpokenRef.current = false;
+        vadStreamRef.current = stream;
+        try {
+          const vadCtx = audioCtxRef.current && audioCtxRef.current.state !== 'closed'
+            ? audioCtxRef.current
+            : new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+            audioCtxRef.current = vadCtx;
+          }
+          if (vadCtx.state === 'suspended') await vadCtx.resume();
+          const source = vadCtx.createMediaStreamSource(stream);
+          const analyser = vadCtx.createAnalyser();
+          analyser.fftSize = 512;
+          analyser.smoothingTimeConstant = 0.3;
+          source.connect(analyser);
+          vadAnalyserRef.current = analyser;
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const SILENCE_THRESHOLD = 12;   // RMS below this = silence
+          const SILENCE_DURATION = 1500;  // ms of silence before auto-stop
+          const MIN_SPEECH_MS = 400;      // must have spoken for at least this long
+          let speechStartTime = 0;
+          const checkVad = () => {
+            if (!vadAnalyserRef.current) return;
+            analyser.getByteTimeDomainData(dataArray);
+            // Compute RMS volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const v = (dataArray[i] - 128) / 128;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / dataArray.length) * 100;
+            if (rms > SILENCE_THRESHOLD) {
+              // User is speaking
+              if (!vadHasSpokenRef.current) {
+                vadHasSpokenRef.current = true;
+                speechStartTime = Date.now();
+              }
+              // Cancel any pending silence timer
+              if (vadSilenceTimerRef.current) {
+                clearTimeout(vadSilenceTimerRef.current);
+                vadSilenceTimerRef.current = null;
+              }
+            } else if (vadHasSpokenRef.current && !vadSilenceTimerRef.current) {
+              // Silence detected after speech — start countdown
+              const spokenMs = Date.now() - speechStartTime;
+              if (spokenMs >= MIN_SPEECH_MS) {
+                vadSilenceTimerRef.current = setTimeout(() => {
+                  vadSilenceTimerRef.current = null;
+                  // Auto-stop recording
+                  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                  }
+                  // Clean up VAD
+                  vadAnalyserRef.current = null;
+                  if (vadRafRef.current) cancelAnimationFrame(vadRafRef.current);
+                  vadRafRef.current = null;
+                }, SILENCE_DURATION);
+              }
+            }
+            vadRafRef.current = requestAnimationFrame(checkVad);
+          };
+          vadRafRef.current = requestAnimationFrame(checkVad);
+        } catch (vadErr) {
+          console.warn('[VAD] Could not start voice activity detection:', vadErr);
+        }
+      }
     } catch (err: any) {
       console.error('[Voice] Microphone access error:', err);
       if (err.name === 'NotAllowedError') {
@@ -1201,6 +1273,10 @@ export default function ChatPage() {
   };
 
   const stopRecording = () => {
+    // Cancel VAD before stopping so it doesn't fire again
+    vadAnalyserRef.current = null;
+    if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
+    if (vadSilenceTimerRef.current) { clearTimeout(vadSilenceTimerRef.current); vadSilenceTimerRef.current = null; }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -3153,10 +3229,7 @@ export default function ChatPage() {
             {voiceStatus === 'speaking' && (
               <button
                 onClick={() => {
-                  if (ttsAudioRef.current) {
-                    ttsAudioRef.current.pause();
-                    ttsAudioRef.current = null;
-                  }
+                  stopTtsPlayback();
                   setIsSpeaking(false);
                   setVoiceStatus('idle');
                 }}
