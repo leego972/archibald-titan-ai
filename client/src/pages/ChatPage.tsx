@@ -1338,11 +1338,14 @@ export default function ChatPage() {
         const offset = window.innerHeight - viewport.height;
         document.documentElement.style.setProperty('--keyboard-offset', `${offset}px`);
         // After keyboard resize, scroll to bottom so user sees latest messages
-        if (scrollRef.current) {
-          requestAnimationFrame(() => {
-            scrollRef.current!.scrollTop = scrollRef.current!.scrollHeight;
-          });
-        }
+        // and the input bar stays visible above the keyboard
+        requestAnimationFrame(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          }
+          // Scroll the textarea into view so it sits just above the keyboard
+          textareaRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+        });
       }
     };
     const handleScroll = () => {
@@ -2482,14 +2485,14 @@ export default function ChatPage() {
             )}
 
             {/* Input container with integrated buttons */}
-            <div className="flex items-end gap-1.5">
-              {/* Action buttons - always side-by-side for accessibility */}
-              <div className="flex shrink-0 gap-1">
+            <div className={`flex gap-1.5 ${isMobile ? 'items-end' : 'items-end'}`}>
+              {/* Action buttons — vertical stack on mobile, horizontal on desktop */}
+              <div className={`flex shrink-0 ${isMobile ? 'flex-col gap-1' : 'flex-row gap-1'}`}>
                 <button
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={isLoading || isTranscribing}
                   className={`flex items-center justify-center rounded-xl transition-all touch-target ${
-                    isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'
+                    isMobile ? 'h-[40px] w-[40px]' : 'h-10 w-10'
                   } ${
                     isRecording
                       ? 'bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500/50'
@@ -2503,7 +2506,7 @@ export default function ChatPage() {
                 <button
                   onClick={handleFileUploadClick}
                   className={`flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-primary hover:bg-primary/10 hover:border-primary/50 transition-all touch-target ${
-                    isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'
+                    isMobile ? 'h-[40px] w-[40px]' : 'h-10 w-10'
                   }`}
                   title="Upload files"
                 >
@@ -2521,7 +2524,7 @@ export default function ChatPage() {
                 <button
                   onClick={enterVoiceMode}
                   className={`flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all touch-target ${
-                    isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'
+                    isMobile ? 'h-[40px] w-[40px]' : 'h-10 w-10'
                   }`}
                   title="Voice Mode — talk to Titan"
                 >
@@ -2529,13 +2532,24 @@ export default function ChatPage() {
                 </button>
               </div>
 
-              {/* Textarea */}
+              {/* Textarea — takes all remaining width */}
               <div className="flex-1 min-w-0">
                 <Textarea
                   ref={textareaRef}
                   value={input}
                   onChange={handleTextareaInput}
                   onKeyDown={handleKeyDown}
+                  onFocus={() => {
+                    // On iOS, scroll the input into view when keyboard opens
+                    if (isMobile) {
+                      setTimeout(() => {
+                        textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        if (scrollRef.current) {
+                          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                        }
+                      }, 350);
+                    }
+                  }}
                   placeholder={
                     isLoading ? 'Titan is building... type here to queue a message'
                     : isRecording ? 'Recording... tap Stop when done'
@@ -2544,7 +2558,7 @@ export default function ChatPage() {
                     : 'Ask Titan anything — type / for commands...'
                   }
                   className={`resize-none rounded-xl border-border/50 focus-visible:ring-primary/30 leading-relaxed ${
-                    isMobile ? 'min-h-[44px] max-h-[120px] text-[16px] py-2.5' : 'min-h-[56px] max-h-[200px] text-base py-3'
+                    isMobile ? 'min-h-[44px] max-h-[160px] text-[16px] py-2.5 w-full' : 'min-h-[56px] max-h-[200px] text-base py-3'
                   }`}
                   rows={1}
                   disabled={isRecording || isTranscribing}
@@ -3113,9 +3127,7 @@ export default function ChatPage() {
                 <span className="text-lg font-medium text-purple-400">Speaking...</span>
               </>
             )}
-            {voiceStatus === 'idle' && (
-              <span className="text-lg font-medium text-muted-foreground">Tap the logo to speak</span>
-            )}
+            {voiceStatus === 'idle' && null}
           </div>
 
           {/* Tap-to-talk / Stop buttons */}

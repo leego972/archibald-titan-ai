@@ -18,7 +18,7 @@ import { registerApiRoutes } from "../api-access-router";
 import { registerV5ApiRoutes } from "../v5-features-router";
 import { registerEmailAuthRoutes } from "../email-auth-router";
 import { registerReleaseUploadRoute, registerUpdateFeedRoutes, registerGitHubSyncRoute } from "../releases-router";
-import { registerVoiceUploadRoute, registerVoiceTTSRoute } from "../voice-router";
+import { registerVoiceUploadRoute, registerVoiceTTSRoute, registerVoiceTempRoute } from "../voice-router";
 import { registerSocialAuthRoutes } from "../social-auth-router";
 import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
@@ -365,6 +365,8 @@ async function startServer() {
   registerGitHubSyncRoute(app);
   // Desktop bundle sync — serves latest web client for auto-sync
   registerBundleSyncRoutes(app);
+  // Voice temp audio serve endpoint (for transcription without S3)
+  registerVoiceTempRoute(app);
   // Voice audio upload endpoint
   registerVoiceUploadRoute(app);
   // Voice text-to-speech endpoint
