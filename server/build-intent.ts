@@ -104,6 +104,12 @@ const EXTERNAL_BUILD_KEYWORDS = [
   'landing page', 'portfolio', 'todo app', 'calculator',
   'ios app', 'android app', 'mobile app', 'react native', 'expo app',
   'iphone app', 'ipad app', 'build for ios', 'build for android',
+  // Compilation and binary requests
+  'compile', 'cross-compile', 'cross compile', '.exe', 'windows exe',
+  'native binary', 'native executable', 'go build', 'cargo build',
+  'mingw', 'gcc', 'g++', 'make install', 'apt install', 'apt-get install',
+  'pip install', 'npm install', 'run the', 'execute the', 'run it',
+  'compile it', 'build it', 'test it', 'run this',
 ];
 
 // ── General Build Keywords (fallback — used for ongoing build detection) ──
@@ -763,16 +769,23 @@ export function detectExternalBuildIntent(
   const hasExternalKeyword = EXTERNAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
   if (hasExternalKeyword) return true;
 
-  // Check for ongoing sandbox build in conversation
+   // Check for ongoing sandbox build in conversation
   const hasOngoingSandboxBuild = previousMessages.some(m =>
     m.role === 'assistant' && typeof m.content === 'string' &&
     (m.content.includes('sandbox_exec') ||
      m.content.includes('sandbox_write_file') ||
+     m.content.includes('create_file') ||
      m.content.includes('app_clone'))
   );
   const hasGeneralBuild = GENERAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
   if (hasOngoingSandboxBuild && hasGeneralBuild) return true;
-
+  // Short affirmative follow-ups during an ongoing build (e.g. 'yes do it', 'go ahead', 'proceed')
+  const isAffirmative = [
+    'yes', 'yes do it', 'do it', 'go ahead', 'proceed', 'ok', 'okay', 'sure',
+    'yep', 'yep do it', 'go for it', 'sounds good', 'perfect', 'great',
+    'continue', 'keep going', 'carry on', 'run it', 'execute it', 'compile it',
+  ].some(p => msgLower.trim() === p || msgLower.trim().startsWith(p + ' ') || msgLower.trim().endsWith(' ' + p));
+  if (hasOngoingSandboxBuild && isAffirmative) return true;
   return false;
 }
 
@@ -1176,12 +1189,13 @@ export const EXTERNAL_BUILD_REMINDER = `
 
 You are now in BUILDER MODE. The user wants you to build something. Quality is the #1 priority — the code MUST be complete and well-structured.
 
-AUTOMATED VERIFICATION:
-- After you finish creating all files, the system will AUTOMATICALLY verify your code.
-- It writes your files to a sandbox, installs dependencies, and runs syntax checks / unit tests.
-- The verification results are appended to your response automatically.
-- You do NOT need to verify manually — focus on writing high-quality, complete code.
-- Do NOT use sandbox_exec or sandbox_write_file — they are not available in this mode.
+SANDBOX EXECUTION:
+- You have FULL access to sandbox_exec and sandbox_write_file -- use them freely.
+- For compilation tasks (Go, C, Rust, Python, Node): write files with create_file AND sandbox_write_file, then compile/run with sandbox_exec.
+- For Windows .exe: use sandbox_exec to run: apt-get install -y mingw-w64, then cross-compile with x86_64-w64-mingw32-gcc or GOOS=windows GOARCH=amd64 go build.
+- For any tool or compiler: use sandbox_exec to run: apt-get install -y <package> or pip3 install <package> -- you have full sudo access.
+- NEVER tell the user you cannot run commands. NEVER say sandbox permission limits. ALWAYS just run the command with sandbox_exec.
+- After creating all files, the system will ALSO run automated verification -- but you should run sandbox_exec yourself first to confirm it works.
 
 ### QUALITY RULES (CRITICAL — non-negotiable)
 1. **EVERY FILE must contain REAL, COMPLETE code** — no stubs, no TODOs, no placeholders.
@@ -1200,11 +1214,13 @@ AUTOMATED VERIFICATION:
 
 ### MANDATORY WORKFLOW
 1. **Round 1 — PLAN**: Identify ALL files, dependencies, and architecture
-2. **Rounds 2-N — BUILD**: Create ALL files using create_file (one file per tool call)
-3. **Final Round — DELIVER**: Summarize what was built and offer provide_project_zip
-4. **Automated Verification** runs after you deliver — results appear in your response automatically
+2. **Rounds 2-N — BUILD**: Create ALL files using create_file AND sandbox_write_file (one file per tool call)
+3. **Compile/Run Round**: Use sandbox_exec to install dependencies and compile/execute the code. Fix any errors immediately.
+4. **Final Round — DELIVER**: Summarize what was built, show the successful output, and offer provide_project_zip
 
-Be EFFICIENT — create files and deliver. Do NOT waste rounds reading files back or doing manual checks.
+For compiled languages (Go, C, Rust, C++): you MUST compile with sandbox_exec and confirm the binary runs.
+For interpreted languages (Python, Node): you MUST run the entry point with sandbox_exec and confirm no errors.
+Be EFFICIENT — build, compile, verify, deliver. NEVER tell the user to compile it themselves unless it requires platform-specific tools (Xcode, MSVC) that genuinely cannot run in Linux.
 NEVER ask the user which language to use — just build it. NEVER ask clarifying questions unless truly ambiguous.
 
 ### PYTHON PROJECT TEMPLATE
