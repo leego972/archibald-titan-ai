@@ -922,6 +922,8 @@ export default function ChatPage() {
   const [slashFilter, setSlashFilter] = useState('');
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [leegoExpanded, setLeegoExpanded] = useState(false);
+  const leegoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -2682,8 +2684,26 @@ export default function ChatPage() {
             <img
               src="/Madebyleego.png"
               alt="Created by Leego"
-              className={`object-contain opacity-100 brightness-110 transition-all duration-300 drop-shadow-[0_0_14px_rgba(0,255,50,0.8)] hover:drop-shadow-[0_0_22px_rgba(0,255,50,1)] hover:brightness-125 animate-pulse ${isMobile ? 'h-14 w-14' : 'h-24 w-24'}`}
-              style={{ filter: 'drop-shadow(0 0 10px rgba(0, 255, 50, 0.7)) drop-shadow(0 0 20px rgba(0, 255, 50, 0.4)) drop-shadow(0 0 40px rgba(0, 255, 50, 0.2))' }}
+              onClick={() => {
+                if (leegoTimerRef.current) clearTimeout(leegoTimerRef.current);
+                setLeegoExpanded(true);
+                leegoTimerRef.current = setTimeout(() => {
+                  setLeegoExpanded(false);
+                  leegoTimerRef.current = null;
+                }, 3000);
+              }}
+              className={[
+                'object-contain cursor-pointer animate-pulse',
+                'transition-all duration-500 ease-in-out',
+                leegoExpanded
+                  ? 'scale-[3.5] z-50 relative brightness-150'
+                  : `brightness-110 ${isMobile ? 'h-14 w-14' : 'h-24 w-24'}`,
+              ].join(' ')}
+              style={{
+                filter: leegoExpanded
+                  ? 'drop-shadow(0 0 18px rgba(0,255,50,1)) drop-shadow(0 0 40px rgba(0,255,50,0.9)) drop-shadow(0 0 80px rgba(0,255,50,0.6)) drop-shadow(0 0 120px rgba(0,255,50,0.3))'
+                  : 'drop-shadow(0 0 10px rgba(0,255,50,0.7)) drop-shadow(0 0 20px rgba(0,255,50,0.4)) drop-shadow(0 0 40px rgba(0,255,50,0.2))',
+              }}
               loading="lazy"
             />
           </div>
