@@ -315,6 +315,14 @@ async function startServer() {
       diag.llmTest = { status: 'error', error: getErrorMessage(llmErr) };
     }
 
+    // 5. Recent chat errors (in-memory log)
+    try {
+      const { recentChatErrors } = await import('../chat-router.js');
+      diag.recentChatErrors = recentChatErrors;
+    } catch {
+      diag.recentChatErrors = 'unavailable';
+    }
+
     res.json(diag);
   });
 

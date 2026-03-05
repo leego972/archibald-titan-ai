@@ -74,6 +74,14 @@ import {
 } from "./security-fortress";
 const log = createLogger("ChatRouter");
 
+// ── In-memory error log for diagnostics ──────────────────────────────────────
+// Stores the last 10 LLM errors so they can be inspected via /api/diagnose
+export const recentChatErrors: Array<{ ts: string; error: string; userId?: number }> = [];
+export function logChatError(error: string, userId?: number): void {
+  recentChatErrors.unshift({ ts: new Date().toISOString(), error, userId });
+  if (recentChatErrors.length > 10) recentChatErrors.pop();
+}
+
 const MAX_CONTEXT_MESSAGES = 20; // max messages loaded into LLM context (lower = faster + more room for tool results)
 const MAX_TOOL_ROUNDS = 40; // complex builder tasks need many rounds: plan + create files + install + test + fix + retest
 
@@ -2302,7 +2310,9 @@ Do NOT attempt any tool calls or builds.`;
       } catch (err: unknown) {
         // Clean up deferred mode on error
         disableDeferredMode();
-        log.error("[Chat] LLM error:", { error: getErrorMessage(err) });
+        const errMsg = getErrorMessage(err);
+        log.error("[Chat] LLM error:", { error: errMsg });
+        logChatError(errMsg, userId);
         // Instead of throwing (which loses the user's message), save an error response
         const errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
         emitChatEvent(conversationId!, {
