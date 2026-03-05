@@ -1460,6 +1460,220 @@ const fuzzerRun: Tool = {
     },
   },
 };
+
+// ── New Security Tool Definitions (#51-#62) ──────────────────────────────
+
+const shellcodeGenTool: Tool = {
+  type: "function",
+  function: {
+    name: "shellcode_gen",
+    description: "Generate raw shellcode for a target architecture and OS. Supports x86/x64/ARM for Linux/Windows. Can encode with XOR, base64, or shikata_ga_nai. Returns shellcode in hex, C array, Python bytes, or base64 format. Uses msfvenom if available, falls back to pwntools.",
+    parameters: {
+      type: "object",
+      properties: {
+        arch: { type: "string", description: "Target architecture: 'x86', 'x64' (default), 'arm'" },
+        os: { type: "string", description: "Target OS: 'linux' (default), 'windows'" },
+        shellcodeType: { type: "string", description: "Type: 'reverse_shell' (default), 'bind_shell', 'shell', 'exec'" },
+        lhost: { type: "string", description: "Attacker IP for reverse shell (default: 10.10.14.1)" },
+        lport: { type: "number", description: "Listener port (default: 4444)" },
+        encoder: { type: "string", description: "Encoding: 'none' (default), 'xor', 'base64', 'x86/shikata_ga_nai'" },
+        outputFormat: { type: "string", description: "Output format: 'hex' (default), 'c', 'python', 'base64'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional, uses default)" },
+      },
+      required: [],
+    },
+  },
+};
+
+const codeObfuscateTool: Tool = {
+  type: "function",
+  function: {
+    name: "code_obfuscate",
+    description: "Obfuscate code to evade static analysis and AV detection. Supports Python (PyArmor/base64+zlib), PowerShell (base64 encoded command + char array), JavaScript (atob/eval + hex), and Bash (base64 pipe). Returns obfuscated version ready to execute.",
+    parameters: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "The source code to obfuscate" },
+        language: { type: "string", description: "Language: 'python' (default), 'powershell', 'javascript', 'bash'" },
+        level: { type: "string", description: "Obfuscation level: 'light', 'medium' (default), 'heavy'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["code"],
+    },
+  },
+};
+
+const privescCheckTool: Tool = {
+  type: "function",
+  function: {
+    name: "privesc_check",
+    description: "Run privilege escalation checks against the sandbox or a target OS. For Linux: runs LinPEAS or manual checks (SUID, sudo, capabilities, cron, kernel). For Windows: provides WinPEAS commands and manual checklist. Returns prioritised findings.",
+    parameters: {
+      type: "object",
+      properties: {
+        targetOs: { type: "string", description: "Target OS: 'linux' (default), 'windows'" },
+        depth: { type: "string", description: "Check depth: 'quick', 'standard' (default), 'thorough'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: [],
+    },
+  },
+};
+
+const webAttackTool: Tool = {
+  type: "function",
+  function: {
+    name: "web_attack",
+    description: "Run web application attacks and security tests against a target URL. Supports: nikto (full scan), sqli (SQLMap injection), xss (XSStrike cross-site scripting), ssrf (server-side request forgery), headers (security headers analysis). Returns findings and vulnerabilities.",
+    parameters: {
+      type: "object",
+      properties: {
+        target: { type: "string", description: "Target URL (e.g. 'http://target.com/page?id=1')" },
+        attackType: { type: "string", description: "Attack type: 'scan'/'nikto', 'sqli', 'xss', 'ssrf', 'headers'" },
+        options: { type: "string", description: "Additional options passed to the tool" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["target"],
+    },
+  },
+};
+
+const threatIntelLookupTool: Tool = {
+  type: "function",
+  function: {
+    name: "threat_intel_lookup",
+    description: "Look up an IOC (IP address, domain, file hash, or URL) across multiple threat intelligence sources simultaneously: VirusTotal, AbuseIPDB (IPs), AlienVault OTX, and Shodan (IPs). Returns aggregated verdict and details from each source.",
+    parameters: {
+      type: "object",
+      properties: {
+        ioc: { type: "string", description: "The IOC to look up: IP address, domain, MD5/SHA1/SHA256 hash, or URL" },
+        iocType: { type: "string", description: "IOC type: 'auto' (default, auto-detect), 'ip', 'domain', 'md5', 'sha1', 'sha256', 'url'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["ioc"],
+    },
+  },
+};
+
+const trafficCaptureTool: Tool = {
+  type: "function",
+  function: {
+    name: "traffic_capture",
+    description: "Capture network traffic in the sandbox using tcpdump, then analyse with Scapy. Returns protocol breakdown, top source/destination IPs, port statistics, DNS queries, and suspicious patterns. Saves PCAP file for further analysis.",
+    parameters: {
+      type: "object",
+      properties: {
+        interface: { type: "string", description: "Network interface to capture on (default: 'eth0')" },
+        duration: { type: "number", description: "Capture duration in seconds (default: 10)" },
+        filter: { type: "string", description: "BPF filter expression (e.g. 'tcp port 80', 'host 192.168.1.1')" },
+        analysisType: { type: "string", description: "Analysis type: 'summary' (default), 'detailed', 'suspicious'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: [],
+    },
+  },
+};
+
+const adAttackTool: Tool = {
+  type: "function",
+  function: {
+    name: "ad_attack",
+    description: "Execute Active Directory attacks using Impacket tools. Supports: kerberoasting (GetUserSPNs), AS-REP roasting (GetNPUsers), DCSync (secretsdump), WMIExec remote execution, PSExec, LDAP enumeration, and BloodHound collection. Returns hashes, credentials, or enumeration data.",
+    parameters: {
+      type: "object",
+      properties: {
+        attackType: { type: "string", description: "Attack: 'enum'/'ldap', 'kerberoast', 'asreproast', 'dcsync', 'wmiexec', 'psexec', 'bloodhound'" },
+        dcIp: { type: "string", description: "Domain controller IP address" },
+        domain: { type: "string", description: "Domain name (e.g. 'corp.local')" },
+        username: { type: "string", description: "Username for authentication" },
+        password: { type: "string", description: "Password for authentication" },
+        hash: { type: "string", description: "NTLM hash for pass-the-hash (alternative to password)" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["attackType"],
+    },
+  },
+};
+
+const cloudEnumTool: Tool = {
+  type: "function",
+  function: {
+    name: "cloud_enum",
+    description: "Enumerate cloud infrastructure using stolen credentials or from inside a cloud instance. Supports AWS (identity, IAM, S3, EC2, Lambda, metadata), Azure (ROADtools, AADInternals), GCP (gcloud, metadata), and Kubernetes (kubectl, RBAC, secrets). Returns discovered resources and misconfigurations.",
+    parameters: {
+      type: "object",
+      properties: {
+        provider: { type: "string", description: "Cloud provider: 'aws' (default), 'azure', 'gcp', 'kubernetes'" },
+        enumType: { type: "string", description: "What to enumerate: 'identity', 'iam', 's3', 'ec2', 'lambda', 'metadata', 'all'" },
+        accessKey: { type: "string", description: "AWS access key ID (optional)" },
+        secretKey: { type: "string", description: "AWS secret access key (optional)" },
+        sessionToken: { type: "string", description: "AWS session token (optional, for temporary credentials)" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["provider"],
+    },
+  },
+};
+
+const generatePentestReportTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_pentest_report",
+    description: "Generate a professional penetration test report in Markdown format. Includes executive summary, risk summary table, scope and methodology, detailed findings with CVSS v3.1 scores, MITRE ATT&CK mappings, evidence, business impact, and specific remediation steps. Saves report to sandbox.",
+    parameters: {
+      type: "object",
+      properties: {
+        clientName: { type: "string", description: "Client/company name" },
+        scope: { type: "string", description: "Scope of the assessment (e.g. 'Internal network 192.168.1.0/24, web app https://target.com')" },
+        tester: { type: "string", description: "Tester name or team" },
+        findings: {
+          type: "array",
+          description: "Array of findings. Each finding: {title, severity, description, evidence, impact, remediation}",
+          items: { type: "object" },
+        },
+        format: { type: "string", description: "Output format: 'markdown' (default), 'html'" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: [],
+    },
+  },
+};
+
+const sandboxDeleteFileTool: Tool = {
+  type: "function",
+  function: {
+    name: "sandbox_delete_file",
+    description: "Delete a file or directory from the sandbox filesystem. Use recursive=true to delete directories. Protected system paths (/, /etc, /usr, /bin) cannot be deleted.",
+    parameters: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "Absolute path to the file or directory to delete" },
+        recursive: { type: "boolean", description: "If true, delete directory and all contents (rm -rf). Default: false" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["filePath"],
+    },
+  },
+};
+
+const sandboxDownloadUrlTool: Tool = {
+  type: "function",
+  function: {
+    name: "sandbox_download_url",
+    description: "Download a file from a URL into the sandbox filesystem. Useful for pulling exploit code, wordlists, tools, or any remote resource. Returns HTTP status, file size, and save path.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL to download (http/https)" },
+        outputPath: { type: "string", description: "Destination path in sandbox (e.g. '/tmp/exploit.py', '/home/sandbox/wordlist.txt')" },
+        followRedirects: { type: "boolean", description: "Follow HTTP redirects (default: true)" },
+        sandboxId: { type: "number", description: "Sandbox ID (optional)" },
+      },
+      required: ["url"],
+    },
+  },
+};
+
 // ─── Auto-Fix Tools ────────────────────────────────────────────────
 
 const autoFixVulnerability: Tool = {
@@ -2351,4 +2565,16 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   runExploit,
   decompileBinary,
   fuzzerRun,
+  // New tools (#51-#62)
+  shellcodeGenTool,
+  codeObfuscateTool,
+  privescCheckTool,
+  webAttackTool,
+  threatIntelLookupTool,
+  trafficCaptureTool,
+  adAttackTool,
+  cloudEnumTool,
+  generatePentestReportTool,
+  sandboxDeleteFileTool,
+  sandboxDownloadUrlTool,
 ];
