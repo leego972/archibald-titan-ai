@@ -140,6 +140,7 @@ function getLanguageName(langCode: string): string {
     'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
     'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese',
     'ko': 'Korean', 'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi',
+    'he': 'Hebrew',
   };
   return map[langCode] || langCode;
 }
