@@ -29,6 +29,8 @@ export const users = mysqlTable("users", {
   // ── Referral Titan Unlock ──
   titanUnlockExpiry: timestamp("titanUnlockExpiry"), // if set and in the future, user gets Titan features
   titanUnlockGrantedBy: int("titanUnlockGrantedBy"), // userId of the referred user who triggered the unlock
+  // ── Custom Instructions ──
+  customInstructions: text("customInstructions"), // user-defined persistent instructions for Titan (low priority, cannot override system rules)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

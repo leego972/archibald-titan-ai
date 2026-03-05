@@ -1071,7 +1071,11 @@ export default function ChatPage() {
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [tokenValue, setTokenValue] = useState('');
-  const [savedTokens, setSavedTokens] = useState<Array<{name: string; preview: string}>>([]);
+  const [savedTokens, setSavedTokens] = useState<Array<{name: string; preview: string}>>([]); 
+  // ── Custom Instructions ──
+  const [showCustomInstructions, setShowCustomInstructions] = useState(false);
+  const [customInstructionsText, setCustomInstructionsText] = useState('');
+  const [customInstructionsSaved, setCustomInstructionsSaved] = useState(false);
   const [createdFiles, setCreatedFiles] = useState<Array<{name: string; url: string; size: number; language: string; content?: string}>>([]);
   const [expandedFileIdx, setExpandedFileIdx] = useState<number | null>(null);
   const [filePreviewContent, setFilePreviewContent] = useState<Record<number, string>>({});
@@ -1213,6 +1217,16 @@ export default function ChatPage() {
   const { data: quickActions } = trpc.chat.quickActions.useQuery(undefined, { refetchOnWindowFocus: false });
   const sendMutation = trpc.chat.send.useMutation();
   const utils = trpc.useUtils();
+
+  // ── Custom Instructions ──
+  const { data: customInstructionsData } = trpc.customInstructions.get.useQuery(undefined, { refetchOnWindowFocus: false });
+  const saveCustomInstructionsMutation = trpc.customInstructions.save.useMutation();
+  useEffect(() => {
+    if (customInstructionsData?.customInstructions != null) {
+      setCustomInstructionsText(customInstructionsData.customInstructions);
+    }
+  }, [customInstructionsData]);
+
   // Track optimistic (unsaved) message IDs so the DB sync never wipes them
   const optimisticIdsRef = useRef<Set<number>>(new Set());
   // Track the conversation ID that was last synced to detect conversation switches
@@ -1898,6 +1912,14 @@ export default function ChatPage() {
               <Key className="h-3.5 w-3.5 shrink-0" />
               {!isMobile && `Tokens${savedTokens.length > 0 ? ` (${savedTokens.length})` : ''}`}
               {isMobile && savedTokens.length > 0 && savedTokens.length}
+            </button>
+            <button
+              onClick={() => setShowCustomInstructions(!showCustomInstructions)}
+              className={`flex items-center gap-1 rounded-lg font-medium transition-all touch-target ${customInstructionsText.trim() ? 'bg-violet-500/10 text-violet-400 border border-violet-500/30 hover:bg-violet-500/20' : 'bg-accent/50 text-muted-foreground border border-border hover:bg-accent hover:text-foreground'} ${isMobile ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs'}`}
+              title="Set custom instructions for Titan"
+            >
+              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+              {!isMobile && (customInstructionsText.trim() ? 'My Rules ✓' : 'My Rules')}
             </button>
             {isMobile && (
               <button
@@ -2633,6 +2655,71 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+      {/* Custom Instructions Panel */}
+      {showCustomInstructions && (
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[400px] border-l border-border'} flex flex-col bg-background`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-violet-400" />
+              <h3 className="font-semibold text-sm">My Rules for Titan</h3>
+            </div>
+            <button onClick={() => setShowCustomInstructions(false)} className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 space-y-1">
+              <p className="text-xs font-medium text-violet-400">What you can control</p>
+              <p className="text-[11px] text-muted-foreground">Set preferences for how Titan responds — output style, verification steps, project structure, language preferences, and anything about how you like to work.</p>
+            </div>
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-1">
+              <p className="text-xs font-medium text-amber-400">Platform rules always take priority</p>
+              <p className="text-[11px] text-muted-foreground">Your instructions are applied after all system rules. They cannot override security settings, platform behaviour, or admin configuration. Any instruction that conflicts with platform rules is silently ignored.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground">Your instructions</label>
+              <textarea
+                value={customInstructionsText}
+                onChange={e => { setCustomInstructionsText(e.target.value); setCustomInstructionsSaved(false); }}
+                placeholder={`Examples:\n• Always provide complete, working projects — no partial code\n• Verify functionality of every build before marking it done\n• Use TypeScript strict mode in all projects\n• Always include a README with setup instructions\n• Prefer functional components over class components`}
+                className="w-full h-48 rounded-lg border border-border bg-background text-sm p-3 resize-none focus:outline-none focus:ring-1 focus:ring-violet-500/50 placeholder:text-muted-foreground/50"
+                maxLength={2000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">{customInstructionsText.length}/2000 characters</span>
+                {customInstructionsSaved && <span className="text-[10px] text-emerald-400">Saved ✓</span>}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  await saveCustomInstructionsMutation.mutateAsync({ customInstructions: customInstructionsText.trim() || null });
+                  setCustomInstructionsSaved(true);
+                }}
+                disabled={saveCustomInstructionsMutation.isPending}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-medium py-2 transition-colors disabled:opacity-50"
+              >
+                {saveCustomInstructionsMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {saveCustomInstructionsMutation.isPending ? 'Saving...' : 'Save Instructions'}
+              </button>
+              {customInstructionsText.trim() && (
+                <button
+                  onClick={async () => {
+                    setCustomInstructionsText('');
+                    await saveCustomInstructionsMutation.mutateAsync({ customInstructions: null });
+                    setCustomInstructionsSaved(true);
+                  }}
+                  className="px-3 rounded-lg border border-border hover:bg-destructive/10 hover:text-destructive text-muted-foreground text-xs transition-colors"
+                  title="Clear all instructions"
+                >
+                  <Eraser className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Project Files Panel with Preview */}
       {/* Builder History Panel (#32) */}
       {showBuilderHistory && buildLog.length > 0 && (
