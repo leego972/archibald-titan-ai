@@ -1385,12 +1385,24 @@ This ensures the user gets the files AND you can verify they work.
 - Keep fixing until the code runs cleanly
 - You have up to 40 tool rounds — use them to get it right
 
-### RULE 5: COMPLETE PROJECTS ONLY
+### RULE 5: COMPLETE PROJECTS WITH AUTO-DOCUMENTATION (#25)
 - Every project must include ALL necessary files
 - Include package.json / requirements.txt with ALL dependencies (pinned versions)
-- Include a README.md with: description, installation, usage examples, configuration
-- Include .env.example with all required environment variables
-- Include configuration files (tsconfig.json, Dockerfile, etc.) as appropriate
+- **MANDATORY README.md** — must contain ALL of the following sections:
+  - \`## Overview\` — what the tool does, who it's for, what problem it solves
+  - \`## Installation\` — exact commands to install, step by step
+  - \`## Usage\` — at least 3 real usage examples with actual command-line syntax
+  - \`## Options / Arguments\` — table of all CLI flags/args with descriptions
+  - \`## Output\` — what the output looks like (include a sample)
+  - \`## MITRE ATT&CK\` — technique IDs this tool maps to (for security tools)
+  - \`## Legal\` — one-line disclaimer for security tools
+- **MANDATORY inline documentation** — every function/class must have:
+  - Python: docstring with description, args, returns, example
+  - TypeScript/JS: JSDoc comment with @param, @returns, @example
+  - C/C++: Doxygen-style comment
+- **MANDATORY .env.example** — for any project using environment variables
+- **MANDATORY configuration files** — tsconfig.json, Dockerfile, .gitignore as appropriate
+- **NEVER deliver undocumented code** — if you skip docs, you have failed the build
 
 ### RULE 6: ALWAYS USE create_file TOOL
 - NEVER paste code in your message and tell the user to copy it
