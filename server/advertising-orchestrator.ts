@@ -17,7 +17,7 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { getDb } from "./db";
 import { generateContent, allocateBudget, runAutonomousCycle as runMarketingCycle } from "./marketing-engine";
-import { runScheduledSeoOptimization, analyzeSeoHealth, analyzeKeywords, generateSeoReport } from "./seo-engine";
+import { runScheduledSeoOptimization, analyzeSeoHealth, analyzeKeywords, generateSeoReport, submitToIndexNow } from "./seo-engine";
 import { getAffiliateRecommendationContext } from "./affiliate-recommendation-engine";
 import {
   xAdapter,
@@ -803,26 +803,48 @@ Return as JSON: { "title": "...", "metaDescription": "...", "content": "...(mark
       categoryId = newCat.insertId;
     }
 
+    // Calculate SEO score
+    const wordCount = (post.content || "").split(/\s+/).length;
+    let seoScore = 0;
+    if (post.title?.toLowerCase().includes(targetKeyword.toLowerCase())) seoScore += 15;
+    if (post.metaDescription?.length >= 120 && post.metaDescription?.length <= 160) seoScore += 10;
+    if (wordCount >= 1500) seoScore += 15;
+    else if (wordCount >= 800) seoScore += 10;
+    if (post.content?.includes("## ")) seoScore += 10;
+    if (post.metaDescription?.length >= 50) seoScore += 10;
+    const keywordCount = (post.content?.toLowerCase().match(new RegExp(targetKeyword.toLowerCase(), "g")) || []).length;
+    const density = wordCount > 0 ? (keywordCount / wordCount) * 100 : 0;
+    if (density >= 0.5 && density <= 2.5) seoScore += 10;
+    seoScore = Math.min(seoScore, 100);
+
     // Insert the blog post
     await db.insert(blogPosts).values({
       title: post.title,
       slug,
       content: post.content,
       excerpt: post.metaDescription,
-      category: "cybersecurity",
+      category: (post.category || "cybersecurity").toLowerCase().replace(/\s+/g, "-"),
       status: "published",
       tags: post.tags || [],
       metaTitle: post.title,
       metaDescription: post.metaDescription,
       focusKeyword: targetKeyword,
+      seoScore,
+      readingTimeMinutes: Math.ceil(wordCount / 200),
+      aiGenerated: true,
       publishedAt: new Date(),
     } as any);
+
+    // Notify search engines of the new blog post via IndexNow
+    try {
+      await submitToIndexNow([`https://www.archibaldtitan.com/blog/${slug}`]);
+    } catch { /* non-critical */ }
 
     return {
       channel: "blog_content",
       action: "generate_blog_post",
       status: "success",
-      details: `Published: "${post.title}" targeting "${targetKeyword}"`,
+      details: `Published: "${post.title}" targeting "${targetKeyword}" (SEO score: ${seoScore}/100)`,
       cost: 0,
     };
   } catch (err: unknown) {
@@ -1265,6 +1287,7 @@ Return as JSON: { "platform": "${platform}", "topic": "...", "content": "...", "
         body: post.content,
         platform: platform.toLowerCase(),
         status: "draft",
+        aiPrompt: `Community engagement post for ${platform} — AI generated`,
         metadata: { platform: post.platform, isPromotional: post.isPromotional },
       } as any);
     }

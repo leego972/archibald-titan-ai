@@ -2072,6 +2072,40 @@ export async function generateSeoReport(): Promise<SeoReport> {
   const contentBriefs = await generateContentBriefs(3).catch(() => [] as ContentBrief[]);
   const webVitals = getWebVitalsSummary();
 
+  // Auto-optimize blog posts that have seoScore=0 (e.g. posts created by advertising-orchestrator)
+  try {
+    const db = await getDb();
+    if (db) {
+      const unoptimizedPosts = await db
+        .select({ id: blogPosts.id, slug: blogPosts.slug, title: blogPosts.title, content: blogPosts.content, focusKeyword: blogPosts.focusKeyword })
+        .from(blogPosts)
+        .where(eq(blogPosts.seoScore, 0))
+        .limit(5); // Process up to 5 per run to avoid rate limits
+      for (const post of unoptimizedPosts) {
+        try {
+          const wordCount = (post.content || "").split(/\s+/).length;
+          let seoScore = 0;
+          const keyword = (post.focusKeyword || "").toLowerCase();
+          if (keyword && post.title?.toLowerCase().includes(keyword)) seoScore += 15;
+          if (post.content?.includes("## ")) seoScore += 10;
+          if (wordCount >= 1500) seoScore += 15;
+          else if (wordCount >= 800) seoScore += 10;
+          if (keyword) {
+            const kCount = (post.content?.toLowerCase().match(new RegExp(keyword, "g")) || []).length;
+            const density = wordCount > 0 ? (kCount / wordCount) * 100 : 0;
+            if (density >= 0.5 && density <= 2.5) seoScore += 10;
+          }
+          seoScore = Math.min(seoScore + 20, 100); // +20 base for having content
+          await (db as any)
+            .update(blogPosts)
+            .set({ seoScore, readingTimeMinutes: Math.ceil(wordCount / 200), aiGenerated: true })
+            .where(eq(blogPosts.id, post.id));
+          logSeoEvent("blog_seo", `Auto-scored blog post: ${post.slug} (${seoScore}/100)`);
+        } catch { /* non-critical per-post */ }
+      }
+    }
+  } catch { /* non-critical */ }
+
   const report: SeoReport = {
     score,
     keywords,
@@ -2283,12 +2317,19 @@ export function registerSeoRoutes(app: Express): void {
 let lastOptimizationRun: number = 0;
 let cachedReport: SeoReport | null = null;
 
+const SEO_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours — prevents double-runs when advertising cycle and daily scheduler overlap
+
 export async function runScheduledSeoOptimization(): Promise<SeoReport | null> {
   if (isKilled) {
     log.info("[SEO] Kill switch active — skipping optimization run");
     return null;
   }
-
+  // Cooldown check: skip if ran within the last 4 hours
+  if (lastOptimizationRun > 0 && Date.now() - lastOptimizationRun < SEO_COOLDOWN_MS) {
+    const minutesAgo = Math.round((Date.now() - lastOptimizationRun) / 60000);
+    log.info(`[SEO] Skipping optimization run — already ran ${minutesAgo}m ago (cooldown: 4h)`);
+    return cachedReport;
+  }
   log.info("[SEO] Starting scheduled optimization run...");
 
   try {
