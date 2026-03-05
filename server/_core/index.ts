@@ -326,26 +326,6 @@ async function startServer() {
     res.json(diag);
   });
 
-  // One-time admin promotion endpoint (secured by secret token, self-removes after use)
-  app.post('/api/admin/promote-user', async (req: any, res: any) => {
-    const { secret, userId, role } = req.body || {};
-    const PROMOTE_SECRET = 'TitanAdminPromo2026!xK9';
-    if (secret !== PROMOTE_SECRET) return res.status(403).json({ error: 'Forbidden' });
-    if (!userId || !role) return res.status(400).json({ error: 'userId and role required' });
-    try {
-      const { getDb } = await import('../db.js');
-      const { users: usersTable } = await import('../../drizzle/schema.js');
-      const { eq } = await import('drizzle-orm');
-      const db = await getDb();
-      if (!db) return res.status(500).json({ error: 'No DB' });
-      await db.update(usersTable).set({ role, emailVerified: true }).where(eq(usersTable.id, userId));
-      const updated = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-      return res.json({ success: true, user: { id: updated[0]?.id, email: updated[0]?.email, role: updated[0]?.role } });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  });
-
   // SEO routes (sitemap.xml, robots.txt, security.txt, RSS feed, structured data, redirects)
   registerSeoRoutes(app);
   // SEO v4 routes (llms.txt, programmatic SEO, enhanced structured data, GEO optimization)
