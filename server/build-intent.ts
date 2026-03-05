@@ -1330,11 +1330,19 @@ You MUST follow this workflow for EVERY project. No shortcuts. No skipping steps
 - Every import must reference a real file or package
 - Every config must have real, working values (or .env.example with clear instructions)
 
-### PHASE 4: INSTALL DEPENDENCIES (1-2 rounds)
-- Use **sandbox_exec** to install all dependencies:
-  - Python: \`cd /home/sandbox/project && pip install -r requirements.txt\`
-  - Node.js: \`cd /home/sandbox/project && npm install\`
-- If installation fails, FIX the dependency list and retry
+### PHASE 4: INSTALL DEPENDENCIES WITH PRE-CACHING (#22)
+**Step 4a — Security toolkit pre-cache check** (saves time on every security build):
+\`\`\`
+sandbox_exec: python3 -c "import scapy, pwntools; print('Security toolkit: CACHED')" 2>/dev/null || pip install scapy impacket pwntools pycryptodome requests httpx dnspython yara-python pefile lief capstone keystone-engine unicorn ropper shodan censys python-whois python-nmap paramiko pyOpenSSL passlib 2>&1 | tail -3
+\`\`\`
+**Step 4b — Install project-specific dependencies:**
+- Python: \`cd /home/sandbox/project && pip install -r requirements.txt 2>&1 | tail -5\`
+- Node.js: \`cd /home/sandbox/project && npm install 2>&1 | tail -5\`
+**Step 4c — Verify critical imports work:**
+\`\`\`
+sandbox_exec: python3 -c "import sys; [print(f'{m}: OK') for m in ['requests','scapy','pwntools'] if __import__(m)]" 2>&1
+\`\`\`
+- If installation fails, FIX the dependency list and retry immediately
 
 ### PHASE 5: TEST (2-5 rounds) — THIS IS MANDATORY, NEVER SKIP
 - Use **sandbox_exec** to actually RUN the code
