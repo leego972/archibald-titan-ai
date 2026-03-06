@@ -2007,17 +2007,30 @@ Do NOT attempt any tool calls or builds.`;
               // 1. LLM mentions it will continue or lists files it hasn't created yet
               // 2. Very few files created and text mentions more components/files
               // 3. Text is a progress update, not a final delivery
+              // 4. LLM is being lazy — created a wrapper/launcher instead of real implementation
               const mentionsContinuation = /\b(next|continue|now (i'll|let me|i will)|remaining|still need|more files|let's (create|build|add))\b/i.test(textContent || '');
               const mentionsUnbuiltFiles = /\b(will create|need to create|haven't (created|built)|todo|to do|upcoming)\b/i.test(textContent || '');
               const looksLikeDelivery = /\b(done|complete|finished|all files|here('s| is) (the|your)|ready to|download|zip)\b/i.test(textContent || '');
               const isProgressUpdate = (mentionsContinuation || mentionsUnbuiltFiles) && !looksLikeDelivery;
-              // Also detect when the LLM just created config files and stopped (< 5 files for a multi-file request)
-              const tooFewFiles = createdSoFar.length > 0 && createdSoFar.length < 5 && isExternalBuild;
+              // Detect wrapper/launcher laziness — LLM created a thin GUI/CLI that wraps an external binary
+              const looksLikeWrapper = /\b(wrapper|launcher|gui.*(start|stop)|subprocess\.run|os\.system|exec\(|spawn|child_process|shells? out)\b/i.test(textContent || '');
+              // Detect when LLM created too few files for the complexity of the request
+              // For external builds: < 5 files is almost always incomplete
+              // For security/framework builds: < 8 files is almost always incomplete
+              const isComplexRequest = /\b(framework|replicate|clone|reproduce|recreate|platform|system|engine|full|complete|comprehensive)\b/i.test(input.message || '');
+              const minFiles = isComplexRequest ? 8 : 5;
+              const tooFewFiles = createdSoFar.length > 0 && createdSoFar.length < minFiles && isExternalBuild;
               
-              if ((isProgressUpdate || tooFewFiles) && !looksLikeDelivery && rounds < 10) {
-                log.info(`[Chat] BUILD CONTINUATION: LLM paused at round ${rounds} with ${createdSoFar.length} files. Nudging to continue...`);
+              // Anti-laziness: if LLM says "done" but only created a wrapper or too few files, override and force continuation
+              const prematureCompletion = looksLikeDelivery && (tooFewFiles || looksLikeWrapper);
+              
+              if ((isProgressUpdate || tooFewFiles || prematureCompletion || looksLikeWrapper) && rounds < MAX_TOOL_ROUNDS - 5) {
+                const nudgeMessage = prematureCompletion || looksLikeWrapper
+                  ? 'STOP. You have NOT completed this build. You created a thin wrapper/launcher or too few files. The user asked you to BUILD the actual implementation — not wrap an existing binary. Go back and implement the REAL core logic from scratch. Create all the necessary files with full implementations. Do NOT declare done until you have a complete, working, multi-file project with real functionality.'
+                  : 'Continue building. Create the remaining files now using create_file. Do not stop until ALL files are created and tested.';
+                log.info(`[Chat] BUILD CONTINUATION: LLM paused at round ${rounds} with ${createdSoFar.length} files (min=${minFiles}, wrapper=${looksLikeWrapper}, premature=${prematureCompletion}). Nudging to continue...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
-                llmMessages.push({ role: 'user', content: 'Continue building. Create the remaining files now using create_file. Do not stop until ALL files are created.' });
+                llmMessages.push({ role: 'user', content: nudgeMessage });
                 continue;
               }
             }
@@ -2245,6 +2258,24 @@ Do NOT attempt any tool calls or builds.`;
               content: deferredSystemHints.join('\n\n'),
             });
             log.info(`[Chat] Injected ${deferredSystemHints.length} deferred system hint(s) after tool responses`);
+          }
+
+          // ── ACTION PADDING DETECTION ──
+          // Detect when the LLM is wasting rounds by repeatedly calling list_files
+          // or read_file without actually creating any files. This is a lazy pattern
+          // where the LLM looks busy but accomplishes nothing.
+          if (isBuildRequest && rounds >= 3) {
+            const recentActions = executedActions.slice(-6); // Last 6 actions
+            const paddingTools = ['self_list_files', 'sandbox_list_files', 'sandbox_read_file'];
+            const recentPaddingCount = recentActions.filter(a => paddingTools.includes(a.tool)).length;
+            const recentCreateCount = recentActions.filter(a => a.tool === 'create_file').length;
+            if (recentPaddingCount >= 4 && recentCreateCount === 0) {
+              log.warn(`[Chat] ACTION PADDING DETECTED: ${recentPaddingCount} list/read calls in last 6 actions with 0 file creations. Injecting anti-padding nudge.`);
+              llmMessages.push({
+                role: 'system',
+                content: 'WARNING: You are wasting rounds by repeatedly listing/reading files without creating anything. STOP browsing and START BUILDING. Use create_file to write actual implementation files NOW. Every round you waste on list_files is a round you could use to create real code.',
+              });
+            }
           }
 
           // ── PROJECT MANIFEST INJECTION ──
