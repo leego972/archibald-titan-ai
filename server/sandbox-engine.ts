@@ -112,6 +112,9 @@ export async function createSandbox(
   // Create a basic workspace structure
   const homeDir = path.join(workspacePath, "home", "sandbox");
   fs.mkdirSync(homeDir, { recursive: true });
+  // Auto-create projects directory so builder files are accessible
+  const projectsDir = path.join(homeDir, "projects");
+  fs.mkdirSync(projectsDir, { recursive: true });
   fs.writeFileSync(
     path.join(homeDir, "README.md"),
     `# Sandbox: ${name}\n\nYour persistent workspace. Files here are saved between sessions.\n`
@@ -267,6 +270,13 @@ export async function executeCommand(
     fs.mkdirSync(workspacePath, { recursive: true });
     const homeDir = path.join(workspacePath, "home", "sandbox");
     fs.mkdirSync(homeDir, { recursive: true });
+    // Auto-create projects directory
+    fs.mkdirSync(path.join(homeDir, "projects"), { recursive: true });
+  }
+  // Always ensure projects dir exists (may have been created by writeFile but not mkdir)
+  const projectsDir = path.join(workspacePath, "home", "sandbox", "projects");
+  if (!fs.existsSync(projectsDir)) {
+    fs.mkdirSync(projectsDir, { recursive: true });
   }
 
   // Determine working directory
@@ -306,19 +316,27 @@ export async function executeCommand(
         exitCode = 1;
       }
     } else {
+      // Rewrite virtual /home/sandbox paths to real workspace paths
+      // so compound commands like "cd /home/sandbox/projects && npm install" work
+      const realHome = path.join(workspacePath, "home", "sandbox");
+      let rewrittenCommand = command.replace(
+        /\/home\/sandbox/g,
+        realHome
+      );
+
       // Execute the command
       const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>(
         (resolve) => {
           const env: Record<string, string> = {
-            HOME: path.join(workspacePath, "home", "sandbox"),
+            HOME: realHome,
             USER: "sandbox",
-            PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${path.join(workspacePath, "home", "sandbox", ".local", "bin")}`,
+            PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${path.join(realHome, ".local", "bin")}`,
             ...(sandbox.envVars || {}),
           };
 
           execFile(
             "bash",
-            ["-c", command],
+            ["-c", rewrittenCommand],
             {
               cwd: realCwd,
               env,
@@ -345,6 +363,8 @@ export async function executeCommand(
       );
 
       output = result.stdout + (result.stderr ? result.stderr : "");
+      // Rewrite real paths back to virtual paths in output
+      output = output.replace(new RegExp(realHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '/home/sandbox');
       exitCode = result.exitCode;
 
       // Truncate output if too large

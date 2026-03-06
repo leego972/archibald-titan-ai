@@ -1509,6 +1509,7 @@ Do NOT attempt any tool calls or builds.`;
         // ── Tool-calling loop ──────────────────────────────────────
         let finalText = "";
         let rounds = 0;
+        let consecutiveSandboxFails = 0; // Track consecutive sandbox_exec failures to prevent retry loops
 
         while (rounds < MAX_TOOL_ROUNDS) {
           rounds++;
@@ -2018,21 +2019,32 @@ Do NOT attempt any tool calls or builds.`;
             // When a tool fails, inject specific guidance so the LLM can self-correct
             // Works for self-improvement, sandbox, and external build tools
             if (!execResult.success && (tc.function.name === 'sandbox_exec' || tc.function.name === 'sandbox_write_file')) {
+              consecutiveSandboxFails++;
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
-              let sandboxHint = '';
-              if (errorStr.includes('not found') || errorStr.includes('No such file')) {
-                sandboxHint = 'RECOVERY: File or directory not found. Use sandbox_list_files to check what exists, or use sandbox_exec with "mkdir -p" to create directories first.';
-              } else if (errorStr.includes('permission denied')) {
-                sandboxHint = 'RECOVERY: Permission denied. Try using sandbox_exec with "chmod" to fix permissions, or write to a different path.';
-              } else if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
-                sandboxHint = 'RECOVERY: Command timed out. Break the operation into smaller steps, or use a simpler command.';
-              } else if (errorStr.includes('syntax error') || errorStr.includes('SyntaxError')) {
-                sandboxHint = 'RECOVERY: Syntax error in the code. Review the file content and fix the syntax issue before retrying.';
+              
+              // If sandbox keeps failing, force the LLM to stop retrying and deliver
+              if (consecutiveSandboxFails >= 3) {
+                const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
+                llmMessages.push({ role: 'system', content: `STOP RETRYING. Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created are saved and valid. Move to DELIVERY now — summarize what was built (${createdFiles.length} files created) and offer provide_project_zip. Do NOT run any more sandbox commands.` });
+                log.info(`[Chat] Forced delivery after ${consecutiveSandboxFails} consecutive sandbox failures`);
               } else {
-                sandboxHint = `RECOVERY: Sandbox operation failed: ${errorStr.slice(0, 200)}. Try a different approach or check the sandbox state with sandbox_list_files.`;
+                let sandboxHint = '';
+                if (errorStr.includes('not found') || errorStr.includes('No such file')) {
+                  sandboxHint = 'RECOVERY: File or directory not found. Use sandbox_list_files to check what exists, or use sandbox_exec with "mkdir -p" to create directories first.';
+                } else if (errorStr.includes('permission denied')) {
+                  sandboxHint = 'RECOVERY: Permission denied. Try using sandbox_exec with "chmod" to fix permissions, or write to a different path.';
+                } else if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
+                  sandboxHint = 'RECOVERY: Command timed out. Break the operation into smaller steps, or use a simpler command.';
+                } else if (errorStr.includes('syntax error') || errorStr.includes('SyntaxError')) {
+                  sandboxHint = 'RECOVERY: Syntax error in the code. Review the file content and fix the syntax issue before retrying.';
+                } else {
+                  sandboxHint = `RECOVERY: Sandbox operation failed: ${errorStr.slice(0, 200)}. Try a different approach or check the sandbox state with sandbox_list_files.`;
+                }
+                llmMessages.push({ role: 'system', content: sandboxHint });
+                log.info(`[Chat] Injected sandbox recovery hint (fail ${consecutiveSandboxFails}): ${sandboxHint.slice(0, 100)}...`);
               }
-              llmMessages.push({ role: 'system', content: sandboxHint });
-              log.info(`[Chat] Injected sandbox recovery hint: ${sandboxHint.slice(0, 100)}...`);
+            } else if (execResult.success && tc.function.name === 'sandbox_exec') {
+              consecutiveSandboxFails = 0; // Reset on success
             }
             if (!execResult.success && (tc.function.name === 'create_file')) {
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
