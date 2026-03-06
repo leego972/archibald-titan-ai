@@ -714,7 +714,7 @@ async function loadConversationContext(
         eq(chatMessages.userId, userId)
       )
     )
-    .orderBy(desc(chatMessages.createdAt))
+    .orderBy(desc(chatMessages.id))
     .limit(MAX_CONTEXT_MESSAGES);
 
   // Reverse to chronological order
@@ -887,7 +887,7 @@ export const chatRouter = router({
             eq(chatMessages.userId, ctx.user.id)
           )
         )
-        .orderBy(chatMessages.createdAt);
+        .orderBy(chatMessages.id);
 
       return {
         conversation,
