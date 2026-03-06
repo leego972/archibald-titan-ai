@@ -1512,6 +1512,12 @@ Do NOT attempt any tool calls or builds.`;
         while (rounds < MAX_TOOL_ROUNDS) {
           rounds++;
 
+          // Inter-round delay for build requests to avoid hammering the API
+          // Rapid successive calls are the #1 cause of rate limits and connection drops
+          if (isBuildRequest && rounds > 1) {
+            await new Promise(r => setTimeout(r, 800));
+          }
+
           // PROACTIVE CONTEXT COMPRESSION: After round 15, compress old tool results to free tokens
           // NEVER compress create_file results — the LLM needs to know what files exist
           // For build requests, preserve more context to avoid losing critical build state

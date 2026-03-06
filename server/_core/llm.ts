@@ -553,5 +553,20 @@ async function _invokeLLMWithRetry(
   // ── Success — release key back to pool ──
   if (keyHandle) releaseKey(keyHandle.index, keyHandle.envVar);
 
-  return (await response.json()) as InvokeResult;
+  // Parse JSON response with error handling — malformed responses under load
+  // can cause unhandled exceptions that bypass all retry logic
+  let body: InvokeResult;
+  try {
+    body = (await response.json()) as InvokeResult;
+  } catch (parseErr: unknown) {
+    const MAX_PARSE_RETRIES = priority === "chat" ? 2 : 1;
+    if (attempt < MAX_PARSE_RETRIES) {
+      const waitMs = 2000 * Math.pow(2, attempt);
+      log.warn(`[LLM] ${systemTag}: JSON parse error (attempt ${attempt + 1}/${MAX_PARSE_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s: ${(parseErr as Error).message}`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return _invokeLLMWithRetry(params, priority, attempt + 1);
+    }
+    throw new Error(`LLM response JSON parse failed after ${MAX_PARSE_RETRIES} retries: ${(parseErr as Error).message}`);
+  }
+  return body;
 }
