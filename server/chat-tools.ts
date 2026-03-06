@@ -979,7 +979,7 @@ const sandboxWriteFile: Tool = {
   function: {
     name: "sandbox_write_file",
     description:
-      "Write a file to the user's sandbox environment for testing. Use this alongside create_file: create_file stores the file in the cloud for the user to download, while sandbox_write_file puts it in the sandbox so you can test it with sandbox_exec. ALWAYS write files to BOTH create_file AND sandbox_write_file. Use paths like /home/sandbox/project/filename.",
+      "Write a file ONLY to the sandbox environment (not stored in cloud, not downloadable by user). Use this for temporary test files, config overrides, or scratch work. For project files that the user should receive, use create_file instead — it automatically syncs to sandbox too. Use paths like /home/sandbox/project/filename.",
     parameters: {
       type: "object",
       properties: {
@@ -2067,7 +2067,7 @@ const createProjectFile: Tool = {
   function: {
     name: "create_file",
     description:
-      "Create a file in the user's project (stored in cloud, downloadable by user). ALWAYS use this for every file you build — the user can only get files through this tool, NOT from chat messages. IMPORTANT: Also write the same file to the sandbox using sandbox_write_file so you can test it. Every file must contain COMPLETE, WORKING code — no stubs, no TODOs, no placeholders. There are NO directory restrictions — any file path works.",
+      "Create a file in the user's project. Files are stored in cloud (downloadable by user) AND automatically synced to the sandbox filesystem at /home/sandbox/projects/<fileName>. You do NOT need to also call sandbox_write_file — create_file handles both. ALWAYS use this for every file you build. Every file must contain COMPLETE, WORKING code — no stubs, no TODOs, no placeholders. There are NO directory restrictions — any file path works.",
     parameters: {
       type: "object",
       properties: {

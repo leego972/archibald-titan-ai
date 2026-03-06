@@ -52,6 +52,7 @@ import {
   BUILD_SYSTEM_REMINDER,
   EXTERNAL_BUILD_REMINDER,
   BUILDER_SYSTEM_PROMPT,
+  SECURITY_BUILD_ADDENDUM,
   REFUSAL_CORRECTION,
 } from "./build-intent";
 import { getAffiliateRecommendationContext } from "./affiliate-recommendation-engine";
@@ -733,7 +734,26 @@ async function loadConversationContext(
 
   const messages: Message[] = [];
   for (const row of rows) {
-    if (row.role === "tool") continue; // tool messages are ephemeral
+    if (row.role === "tool") continue; // tool messages are ephemeral — but assistant messages with toolCalls/actionsTaken summaries are preserved below
+    // If this is an assistant message that has tool call summaries, inject a condensed file manifest
+    if (row.role === "assistant" && row.toolCalls && Array.isArray(row.toolCalls) && (row.toolCalls as any[]).length > 0) {
+      const toolCalls = row.toolCalls as Array<{ name: string; args: Record<string, unknown>; result: unknown }>;
+      const fileCreations = toolCalls.filter(tc => tc.name === 'create_file' || tc.name === 'sandbox_write_file');
+      if (fileCreations.length > 0) {
+        const fileList = fileCreations.map(tc => {
+          const path = (tc.args as any)?.path || (tc.args as any)?.filePath || 'unknown';
+          const success = (tc.result as any)?.success !== false;
+          return `  - ${path} ${success ? '✓' : '✗'}`;
+        }).join('\n');
+        // Append file manifest to the assistant message so the LLM knows what was created
+        const manifestNote = `\n\n[Files created in this turn:\n${fileList}\n]`;
+        messages.push({
+          role: "assistant",
+          content: (row.content || '') + manifestNote,
+        });
+        continue;
+      }
+    }
     // Convert image URLs in user messages to vision content parts
     if (row.role === "user" && row.content.includes("[Attached image:")) {
       const imageRegex = /\[Attached image:[^\]]*\]\((https?:\/\/[^)]+)\)/g;
@@ -1455,13 +1475,21 @@ Do NOT attempt any tool calls or builds.`;
         });
       } else if (isExternalBuild) {
         forceFirstTool = getForceFirstTool(input.message, false);
-        // Inject BOTH the builder system prompt AND the external build reminder
-        // The BUILDER_SYSTEM_PROMPT defines the workflow and rules
-        // The EXTERNAL_BUILD_REMINDER provides templates and quality standards
+        // Detect if this is a security-specific build to conditionally inject security templates
+        const isSecurityRequest = /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|hardening|zero.?trust|nist|mitre|owasp|rat|c2|keylog|payload|shellcode|reverse.?shell|privilege.?escalat|lateral.?move|exfiltrat|persistence|evasion|obfuscat|rootkit|backdoor|trojan|botnet|phishing|spoof|sniff|crack|deauth|arp.?poison|dns.?poison|mitm|man.?in.?the.?middle|packet.?craft|port.?scan|network.?scan|web.?fuzz|directory.?brute|subdomain|enumerat|footprint|fingerprint|social.?engineer)\b/i.test(input.message);
+        // Build the system prompt: core builder + external reminder + security addendum (only if security build)
+        const builderPromptParts = [BUILDER_SYSTEM_PROMPT, EXTERNAL_BUILD_REMINDER];
+        if (isSecurityRequest) {
+          builderPromptParts.push(SECURITY_BUILD_ADDENDUM);
+          log.info(`[Chat] Security build detected — injecting security addendum`);
+        } else {
+          log.info(`[Chat] General build detected — using core builder prompt only (no security templates)`);
+        }
+        builderPromptParts.push(ANTI_REPLICATION_PROMPT);
         const userMsgIdx = llmMessages.length - 1;
         llmMessages.splice(userMsgIdx, 0, {
           role: 'system',
-          content: `${BUILDER_SYSTEM_PROMPT}\n\n${EXTERNAL_BUILD_REMINDER}\n\n${ANTI_REPLICATION_PROMPT}`,
+          content: builderPromptParts.join('\n\n'),
         });
       }
 
@@ -1496,17 +1524,20 @@ Do NOT attempt any tool calls or builds.`;
         while (rounds < MAX_TOOL_ROUNDS) {
           rounds++;
 
-          // PROACTIVE CONTEXT COMPRESSION: After round 12, compress old tool results to free tokens
-          // Keep the last 12 messages uncompressed so the LLM retains recent file contents and errors
+          // PROACTIVE CONTEXT COMPRESSION: After round 15, compress old tool results to free tokens
+          // NEVER compress create_file results — the LLM needs to know what files exist
           // For build requests, preserve more context to avoid losing critical build state
-          if (rounds > 12 && isBuildRequest) {
-            const preserveRecent = 12; // keep last 12 messages fully intact
+          if (rounds > 15 && isBuildRequest) {
+            const preserveRecent = 16; // keep last 16 messages fully intact
             for (let i = 0; i < llmMessages.length - preserveRecent; i++) {
               const msg = llmMessages[i] as any;
-              if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 2000) {
-                // Keep file creation confirmations short but preserve error details
-                const isError = msg.content.includes('"success":false') || msg.content.includes('error');
-                const keepLen = isError ? 1500 : 800;
+              if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 3000) {
+                // NEVER compress create_file results — these are the project manifest
+                const isFileCreation = msg.content.includes('create_file') || msg.content.includes('"path"') || msg.content.includes('"fileName"');
+                if (isFileCreation) continue; // preserve file creation results completely
+                // Keep error details longer than success results
+                const isError = msg.content.includes('"success":false') || msg.content.includes('error') || msg.content.includes('Error');
+                const keepLen = isError ? 2500 : 1500;
                 const preview = msg.content.slice(0, keepLen);
                 msg.content = `[Compressed] ${preview}... [full result omitted to save context]`;
               }
@@ -1835,6 +1866,23 @@ Do NOT attempt any tool calls or builds.`;
             content: message.content || "",
             tool_calls: sanitizedToolCalls,
           });
+
+          // ── PROJECT MANIFEST INJECTION ──
+          // After every 3 rounds, inject a running list of all created files
+          // so the LLM always knows what files exist and can reference them
+          if (isExternalBuild && rounds > 1 && rounds % 3 === 0) {
+            const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
+            if (createdSoFar.length > 0) {
+              const manifest = createdSoFar.map(a => {
+                const fn = (a.args as any)?.fileName || (a.args as any)?.filePath || 'unknown';
+                return `  - ${fn}`;
+              }).join('\n');
+              llmMessages.push({
+                role: 'system',
+                content: `[PROJECT MANIFEST — ${createdSoFar.length} files created so far:\n${manifest}\nEnsure all new files properly import/reference these existing files. Do NOT recreate files that already exist.]`,
+              });
+            }
+          }
 
           // Execute each tool call and add results
           for (const tc of sanitizedToolCalls) {
