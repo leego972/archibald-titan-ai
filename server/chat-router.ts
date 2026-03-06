@@ -1607,6 +1607,38 @@ Do NOT attempt any tool calls or builds.`;
           const toolTokens = activeTools ? Math.ceil(JSON.stringify(activeTools).length / 3.5) : 0;
           log.info(`[Chat] Round ${rounds}: ~${estimatedTokens + toolTokens} tokens (${llmMessages.length} msgs, ~${estimatedTokens} content + ~${toolTokens} tools)`);
 
+          // ── PRE-CALL VALIDATION: Fix broken tool_call/tool message pairing ──
+          // OpenAI requires every assistant message with tool_calls to be followed by
+          // matching tool response messages. If any are missing, the API returns 400.
+          // This can happen due to aborts, errors, or context trimming.
+          for (let vi = 0; vi < llmMessages.length; vi++) {
+            const vmsg = llmMessages[vi] as any;
+            if (vmsg.role === 'assistant' && vmsg.tool_calls?.length > 0) {
+              const requiredIds = new Set(vmsg.tool_calls.map((tc: any) => tc.id));
+              // Check subsequent messages for matching tool responses
+              for (let vj = vi + 1; vj < llmMessages.length; vj++) {
+                const tmsg = llmMessages[vj] as any;
+                if (tmsg.role === 'tool' && tmsg.tool_call_id) {
+                  requiredIds.delete(tmsg.tool_call_id);
+                }
+                // Stop checking when we hit the next assistant message with tool_calls
+                if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
+              }
+              // Add dummy responses for any missing tool_call_ids
+              if (requiredIds.size > 0) {
+                log.warn(`[Chat] PRE-CALL FIX: Adding ${requiredIds.size} missing tool responses at position ${vi}`);
+                const insertAt = vi + 1;
+                const dummies = [...requiredIds].map(id => ({
+                  role: 'tool' as const,
+                  tool_call_id: id as string,
+                  content: JSON.stringify({ success: false, error: 'Tool response was lost — execution may have been interrupted' }),
+                }));
+                llmMessages.splice(insertAt, 0, ...dummies);
+                vi += dummies.length; // skip past the inserted messages
+              }
+            }
+          }
+
           // Retry wrapper for the LLM call — survives transient errors mid-build
           // without killing the entire build. The inner invokeLLM already retries at
           // the fetch level, but this catches errors that slip through (e.g. JSON parse
@@ -1953,6 +1985,16 @@ Do NOT attempt any tool calls or builds.`;
             // Check if request was aborted
             if (isAborted(conversationId!)) {
               log.info(`[Chat] Request aborted by user at round ${rounds}`);
+              // Push dummy tool results for ALL remaining tool_calls (including current)
+              // to prevent "tool_call_id without response" errors on next LLM call
+              const currentIdx = sanitizedToolCalls.indexOf(tc);
+              for (let ri = currentIdx; ri < sanitizedToolCalls.length; ri++) {
+                llmMessages.push({
+                  role: "tool",
+                  tool_call_id: sanitizedToolCalls[ri].id,
+                  content: JSON.stringify({ success: false, error: "Request cancelled by user" }),
+                });
+              }
               finalText = "Right, cancelled. What would you like instead?";
               break;
             }
@@ -1978,15 +2020,21 @@ Do NOT attempt any tool calls or builds.`;
               continue;
             }
 
-            const execResult = await executeToolCall(
-              tc.function.name,
-              args,
-              userId,
-              userName,
-              userEmail,
-              userApiKey,
-              conversationId
-            );
+            let execResult: { success: boolean; data?: unknown; error?: string };
+            try {
+              execResult = await executeToolCall(
+                tc.function.name,
+                args,
+                userId,
+                userName,
+                userEmail,
+                userApiKey,
+                conversationId
+              );
+            } catch (toolErr: any) {
+              log.error(`[Chat] Tool execution threw: ${tc.function.name}`, { error: toolErr?.message || toolErr });
+              execResult = { success: false, data: { error: `Tool execution failed: ${toolErr?.message || 'unknown error'}` } };
+            }
 
             executedActions.push({
               tool: tc.function.name,
@@ -2079,6 +2127,33 @@ Do NOT attempt any tool calls or builds.`;
                   content: recoveryHint,
                 });
                 log.info(`[Chat] Injected recovery hint: ${recoveryHint.slice(0, 100)}...`);
+              }
+            }
+          }
+
+          // ── SAFETY NET: Ensure all tool_call_ids have matching tool responses ──
+          // If any tool_call_id from the last assistant message doesn't have a matching
+          // tool response, add a dummy one to prevent 400 errors from OpenAI
+          const lastAssistantIdx = llmMessages.map((m, i) => ({ m, i })).filter(x => (x.m as any).tool_calls?.length > 0).pop();
+          if (lastAssistantIdx) {
+            const assistantMsg = llmMessages[lastAssistantIdx.i] as any;
+            const toolCallIds = new Set((assistantMsg.tool_calls || []).map((tc: any) => tc.id));
+            // Collect all tool response IDs that come after this assistant message
+            for (let ti = lastAssistantIdx.i + 1; ti < llmMessages.length; ti++) {
+              const tmsg = llmMessages[ti] as any;
+              if (tmsg.role === 'tool' && tmsg.tool_call_id) {
+                toolCallIds.delete(tmsg.tool_call_id);
+              }
+            }
+            // Any remaining IDs are missing responses — add dummy ones
+            if (toolCallIds.size > 0) {
+              log.warn(`[Chat] SAFETY NET: Adding ${toolCallIds.size} missing tool responses for tool_call_ids: ${[...toolCallIds].join(', ')}`);
+              for (const missingId of toolCallIds) {
+                llmMessages.push({
+                  role: 'tool',
+                  tool_call_id: missingId as string,
+                  content: JSON.stringify({ success: false, error: 'Tool execution was skipped or failed silently' }),
+                });
               }
             }
           }
