@@ -1995,43 +1995,77 @@ Do NOT attempt any tool calls or builds.`;
               }
             }
 
-            // ── BUILD CONTINUATION: Detect incomplete builds and nudge LLM to continue ──
-            // If this is a build request and the LLM returned text instead of tool calls,
-            // check if the build looks incomplete (few files created relative to what was planned).
-            // If so, push the text as an assistant message and inject a continuation prompt
-            // instead of breaking out of the loop.
+            // ── BUILD QUALITY GATE: Verify completeness, testing, and feature coverage before allowing delivery ──
             if (isBuildRequest && rounds <= MAX_TOOL_ROUNDS - 2) {
               const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
+              const successfulTests = executedActions.filter(a => a.tool === 'sandbox_exec' && a.success);
+              const failedTests = executedActions.filter(a => a.tool === 'sandbox_exec' && !a.success);
               const textLower = (textContent || '').toLowerCase();
+
               // Heuristics for "build is incomplete":
-              // 1. LLM mentions it will continue or lists files it hasn't created yet
-              // 2. Very few files created and text mentions more components/files
-              // 3. Text is a progress update, not a final delivery
-              // 4. LLM is being lazy — created a wrapper/launcher instead of real implementation
               const mentionsContinuation = /\b(next|continue|now (i'll|let me|i will)|remaining|still need|more files|let's (create|build|add))\b/i.test(textContent || '');
               const mentionsUnbuiltFiles = /\b(will create|need to create|haven't (created|built)|todo|to do|upcoming)\b/i.test(textContent || '');
               const looksLikeDelivery = /\b(done|complete|finished|all files|here('s| is) (the|your)|ready to|download|zip)\b/i.test(textContent || '');
               const isProgressUpdate = (mentionsContinuation || mentionsUnbuiltFiles) && !looksLikeDelivery;
-              // Detect wrapper/launcher laziness — LLM created a thin GUI/CLI that wraps an external binary
               const looksLikeWrapper = /\b(wrapper|launcher|gui.*(start|stop)|subprocess\.run|os\.system|exec\(|spawn|child_process|shells? out)\b/i.test(textContent || '');
-              // Detect when LLM created too few files for the complexity of the request
-              // For external builds: < 5 files is almost always incomplete
-              // For security/framework builds: < 8 files is almost always incomplete
               const isComplexRequest = /\b(framework|replicate|clone|reproduce|recreate|platform|system|engine|full|complete|comprehensive)\b/i.test(input.message || '');
               const minFiles = isComplexRequest ? 8 : 5;
               const tooFewFiles = createdSoFar.length > 0 && createdSoFar.length < minFiles && isExternalBuild;
-              
-              // Anti-laziness: if LLM says "done" but only created a wrapper or too few files, override and force continuation
               const prematureCompletion = looksLikeDelivery && (tooFewFiles || looksLikeWrapper);
-              
+
+              // ── GATE 1: Wrapper/too-few-files detection ──
               if ((isProgressUpdate || tooFewFiles || prematureCompletion || looksLikeWrapper) && rounds < MAX_TOOL_ROUNDS - 5) {
                 const nudgeMessage = prematureCompletion || looksLikeWrapper
                   ? 'STOP. You have NOT completed this build. You created a thin wrapper/launcher or too few files. The user asked you to BUILD the actual implementation — not wrap an existing binary. Go back and implement the REAL core logic from scratch. Create all the necessary files with full implementations. Do NOT declare done until you have a complete, working, multi-file project with real functionality.'
                   : 'Continue building. Create the remaining files now using create_file. Do not stop until ALL files are created and tested.';
-                log.info(`[Chat] BUILD CONTINUATION: LLM paused at round ${rounds} with ${createdSoFar.length} files (min=${minFiles}, wrapper=${looksLikeWrapper}, premature=${prematureCompletion}). Nudging to continue...`);
+                log.info(`[Chat] BUILD GATE 1 (incomplete): round ${rounds}, ${createdSoFar.length} files (min=${minFiles}, wrapper=${looksLikeWrapper}, premature=${prematureCompletion}). Forcing continuation...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
                 llmMessages.push({ role: 'user', content: nudgeMessage });
                 continue;
+              }
+
+              // ── GATE 2: Mandatory verification — did Titan actually TEST the code? ──
+              // If Titan says "done" but never ran sandbox_exec successfully, force testing
+              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && successfulTests.length === 0 && rounds < MAX_TOOL_ROUNDS - 3) {
+                log.info(`[Chat] BUILD GATE 2 (untested): Titan says done with ${createdSoFar.length} files but 0 successful sandbox_exec runs. Forcing verification...`);
+                llmMessages.push({ role: 'assistant', content: textContent || '' });
+                llmMessages.push({ role: 'user', content: 'STOP. You said "done" but you have NOT tested the code. You MUST run sandbox_exec to verify the code actually works before delivering. Install dependencies first (pip install -r requirements.txt or npm install), then run the entry point. If it fails, FIX the code and retest. Do NOT deliver untested code.' });
+                continue;
+              }
+
+              // ── GATE 3: Last test failed — force fix before delivery ──
+              // If the most recent sandbox_exec FAILED and Titan is trying to deliver anyway, force a fix
+              const lastSandboxAction = [...executedActions].reverse().find(a => a.tool === 'sandbox_exec');
+              if (looksLikeDelivery && lastSandboxAction && !lastSandboxAction.success && rounds < MAX_TOOL_ROUNDS - 3) {
+                log.info(`[Chat] BUILD GATE 3 (last test failed): Titan trying to deliver but last sandbox_exec failed. Forcing fix...`);
+                llmMessages.push({ role: 'assistant', content: textContent || '' });
+                llmMessages.push({ role: 'user', content: 'STOP. Your last test FAILED. You cannot deliver code that you know is broken. Read the error output from your last sandbox_exec, identify the bug, fix the code with create_file, and retest with sandbox_exec. Keep fixing until it runs cleanly. Do NOT deliver until tests pass.' });
+                continue;
+              }
+
+              // ── GATE 4: Feature completeness check ──
+              // If the user's request mentions specific features, check if Titan addressed them
+              if (looksLikeDelivery && isExternalBuild && rounds < MAX_TOOL_ROUNDS - 3) {
+                const userMsg = (input.message || '').toLowerCase();
+                // Extract numbered features or feature keywords from the user's request
+                const featurePatterns = userMsg.match(/\d+\)\s*[^,\n]+|\d+\.\s*[^,\n]+/g) || [];
+                const keyFeatures = userMsg.match(/(?:must include|must have|should have|i want|i need|with|including)[:\s]+([^.]+)/gi) || [];
+                const allRequestedFeatures = [...featurePatterns, ...keyFeatures];
+                
+                if (allRequestedFeatures.length >= 3) {
+                  // User explicitly listed 3+ features — check if Titan's response mentions them
+                  const responseText = (textContent || '').toLowerCase();
+                  const missingFeatures = allRequestedFeatures.filter(f => {
+                    const keywords = f.toLowerCase().replace(/^\d+[.)\s]+/, '').trim().split(/\s+/).filter(w => w.length > 3);
+                    return !keywords.some(kw => responseText.includes(kw));
+                  });
+                  if (missingFeatures.length >= 2 && missingFeatures.length > allRequestedFeatures.length * 0.3) {
+                    log.info(`[Chat] BUILD GATE 4 (missing features): ${missingFeatures.length}/${allRequestedFeatures.length} features possibly missing. Forcing review...`);
+                    llmMessages.push({ role: 'assistant', content: textContent || '' });
+                    llmMessages.push({ role: 'user', content: `WAIT. The user requested these specific features that may be missing from your build: ${missingFeatures.slice(0, 5).join('; ')}. Review your implementation and either confirm these are covered or add the missing features now. Do NOT deliver an incomplete build.` });
+                    continue;
+                  }
+                }
               }
             }
 
@@ -2172,10 +2206,11 @@ Do NOT attempt any tool calls or builds.`;
               consecutiveSandboxFails++;
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
               
-              if (consecutiveSandboxFails >= 3) {
+              if (consecutiveSandboxFails >= 5) {
+                // Only force delivery after 5+ consecutive failures (was 3 — too aggressive)
                 const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
-                deferredSystemHints.push(`STOP RETRYING. Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created are saved and valid. Move to DELIVERY now — summarize what was built (${createdFiles.length} files created) and offer provide_project_zip. Do NOT run any more sandbox commands.`);
-                log.info(`[Chat] Forced delivery after ${consecutiveSandboxFails} consecutive sandbox failures`);
+                deferredSystemHints.push(`Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created (${createdFiles.length}) are saved. Try a COMPLETELY DIFFERENT approach to fix the issue — for example, if pip install fails, try installing packages individually, or use a virtual environment. If you truly cannot fix it, deliver what you have with provide_project_zip and explain what needs to be done locally.`);
+                log.info(`[Chat] Sandbox recovery guidance after ${consecutiveSandboxFails} consecutive failures`);
               } else {
                 let sandboxHint = '';
                 if (errorStr.includes('not found') || errorStr.includes('No such file')) {
