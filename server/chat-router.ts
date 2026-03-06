@@ -1607,23 +1607,61 @@ Do NOT attempt any tool calls or builds.`;
           const toolTokens = activeTools ? Math.ceil(JSON.stringify(activeTools).length / 3.5) : 0;
           log.info(`[Chat] Round ${rounds}: ~${estimatedTokens + toolTokens} tokens (${llmMessages.length} msgs, ~${estimatedTokens} content + ~${toolTokens} tools)`);
 
-          // ── PRE-CALL VALIDATION: Fix broken tool_call/tool message pairing ──
-          // OpenAI requires every assistant message with tool_calls to be followed by
-          // matching tool response messages. If any are missing, the API returns 400.
-          // This can happen due to aborts, errors, or context trimming.
+          // ── PRE-CALL VALIDATION: Fix message ordering for OpenAI compliance ──
+          // OpenAI requires strict ordering:
+          //   assistant (with tool_calls) → tool responses (contiguous) → then other messages
+          // Any system/user messages between assistant+tool_calls and tool responses cause 400.
+          // This pass: (1) moves stray system messages out of tool response blocks,
+          //            (2) adds dummy responses for missing tool_call_ids.
           for (let vi = 0; vi < llmMessages.length; vi++) {
             const vmsg = llmMessages[vi] as any;
             if (vmsg.role === 'assistant' && vmsg.tool_calls?.length > 0) {
               const requiredIds = new Set(vmsg.tool_calls.map((tc: any) => tc.id));
-              // Check subsequent messages for matching tool responses
+              
+              // First pass: collect tool responses and identify stray non-tool messages
+              // that sit between the assistant message and its tool responses
+              const strayIndices: number[] = [];
+              let lastToolResponseIdx = vi; // track where tool responses end
               for (let vj = vi + 1; vj < llmMessages.length; vj++) {
                 const tmsg = llmMessages[vj] as any;
+                // Stop at next assistant message with tool_calls
+                if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
                 if (tmsg.role === 'tool' && tmsg.tool_call_id) {
                   requiredIds.delete(tmsg.tool_call_id);
+                  lastToolResponseIdx = vj;
+                } else if (tmsg.role === 'system' || tmsg.role === 'user') {
+                  // Check if there are still tool responses after this non-tool message
+                  let hasToolAfter = false;
+                  for (let vk = vj + 1; vk < llmMessages.length; vk++) {
+                    const fmsg = llmMessages[vk] as any;
+                    if (fmsg.role === 'assistant' && fmsg.tool_calls?.length > 0) break;
+                    if (fmsg.role === 'tool' && fmsg.tool_call_id) { hasToolAfter = true; break; }
+                  }
+                  if (hasToolAfter) {
+                    strayIndices.push(vj);
+                  }
                 }
-                // Stop checking when we hit the next assistant message with tool_calls
-                if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
               }
+              
+              // Move stray messages to after the last tool response
+              if (strayIndices.length > 0) {
+                log.warn(`[Chat] PRE-CALL FIX: Relocating ${strayIndices.length} stray system/user message(s) from inside tool response block`);
+                // Extract in reverse order to maintain indices
+                const strayMsgs: any[] = [];
+                for (let si = strayIndices.length - 1; si >= 0; si--) {
+                  strayMsgs.unshift(llmMessages.splice(strayIndices[si], 1)[0]);
+                }
+                // Recalculate lastToolResponseIdx after removals
+                let newLastToolIdx = vi;
+                for (let vj = vi + 1; vj < llmMessages.length; vj++) {
+                  const tmsg = llmMessages[vj] as any;
+                  if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
+                  if (tmsg.role === 'tool' && tmsg.tool_call_id) newLastToolIdx = vj;
+                }
+                // Insert stray messages after the last tool response
+                llmMessages.splice(newLastToolIdx + 1, 0, ...strayMsgs);
+              }
+              
               // Add dummy responses for any missing tool_call_ids
               if (requiredIds.size > 0) {
                 log.warn(`[Chat] PRE-CALL FIX: Adding ${requiredIds.size} missing tool responses at position ${vi}`);
@@ -1665,15 +1703,39 @@ Do NOT attempt any tool calls or builds.`;
               // For 400 errors (tool_call_id mismatch), fix the payload before retrying
               if (errMsg.includes('400') && errMsg.includes('tool_call') && llmAttempt < MAX_LOOP_RETRIES) {
                 log.warn(`[Chat] 400 tool_call mismatch in round ${rounds} — running pre-call validation fix before retry`);
-                // Re-run the pre-call validation to fix broken tool_call/tool message pairing
+                // Re-run the full pre-call validation: fix ordering AND missing tool responses
                 for (let vi = 0; vi < llmMessages.length; vi++) {
                   const vmsg = llmMessages[vi] as any;
                   if (vmsg.role === 'assistant' && vmsg.tool_calls?.length > 0) {
                     const requiredIds = new Set(vmsg.tool_calls.map((tc: any) => tc.id));
+                    // Find and relocate stray system/user messages between assistant and tool responses
+                    const strayIdx: number[] = [];
                     for (let vj = vi + 1; vj < llmMessages.length; vj++) {
                       const tmsg = llmMessages[vj] as any;
-                      if (tmsg.role === 'tool' && tmsg.tool_call_id) requiredIds.delete(tmsg.tool_call_id);
                       if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
+                      if (tmsg.role === 'tool' && tmsg.tool_call_id) {
+                        requiredIds.delete(tmsg.tool_call_id);
+                      } else if ((tmsg.role === 'system' || tmsg.role === 'user')) {
+                        let hasToolAfter = false;
+                        for (let vk = vj + 1; vk < llmMessages.length; vk++) {
+                          const fmsg = llmMessages[vk] as any;
+                          if (fmsg.role === 'assistant' && fmsg.tool_calls?.length > 0) break;
+                          if (fmsg.role === 'tool' && fmsg.tool_call_id) { hasToolAfter = true; break; }
+                        }
+                        if (hasToolAfter) strayIdx.push(vj);
+                      }
+                    }
+                    if (strayIdx.length > 0) {
+                      log.warn(`[Chat] RETRY FIX: Relocating ${strayIdx.length} stray messages`);
+                      const strays: any[] = [];
+                      for (let si = strayIdx.length - 1; si >= 0; si--) strays.unshift(llmMessages.splice(strayIdx[si], 1)[0]);
+                      let newEnd = vi;
+                      for (let vj = vi + 1; vj < llmMessages.length; vj++) {
+                        const t = llmMessages[vj] as any;
+                        if (t.role === 'assistant' && t.tool_calls?.length > 0) break;
+                        if (t.role === 'tool' && t.tool_call_id) newEnd = vj;
+                      }
+                      llmMessages.splice(newEnd + 1, 0, ...strays);
                     }
                     if (requiredIds.size > 0) {
                       log.warn(`[Chat] RETRY FIX: Injecting ${requiredIds.size} missing tool responses`);
@@ -1976,22 +2038,10 @@ Do NOT attempt any tool calls or builds.`;
             tool_calls: sanitizedToolCalls,
           });
 
-          // ── PROJECT MANIFEST INJECTION ──
-          // After every 3 rounds, inject a running list of all created files
-          // so the LLM always knows what files exist and can reference them
-          if (isExternalBuild && rounds > 1 && rounds % 3 === 0) {
-            const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
-            if (createdSoFar.length > 0) {
-              const manifest = createdSoFar.map(a => {
-                const fn = (a.args as any)?.fileName || (a.args as any)?.filePath || 'unknown';
-                return `  - ${fn}`;
-              }).join('\n');
-              llmMessages.push({
-                role: 'system',
-                content: `[PROJECT MANIFEST — ${createdSoFar.length} files created so far:\n${manifest}\nEnsure all new files properly import/reference these existing files. Do NOT recreate files that already exist.]`,
-              });
-            }
-          }
+          // Recovery hints are buffered here and pushed AFTER all tool responses
+          // to avoid breaking OpenAI's strict message ordering requirement:
+          // assistant (with tool_calls) → tool responses (contiguous) → then system hints
+          const deferredSystemHints: string[] = [];
 
           // Execute each tool call and add results
           for (const tc of sanitizedToolCalls) {
@@ -2103,16 +2153,15 @@ Do NOT attempt any tool calls or builds.`;
             });
 
             // ── Smart Error Recovery for Builder ──
-            // When a tool fails, inject specific guidance so the LLM can self-correct
-            // Works for self-improvement, sandbox, and external build tools
+            // Buffer recovery hints — they'll be pushed AFTER all tool responses
+            // to maintain OpenAI's strict message ordering requirement
             if (!execResult.success && (tc.function.name === 'sandbox_exec' || tc.function.name === 'sandbox_write_file')) {
               consecutiveSandboxFails++;
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
               
-              // If sandbox keeps failing, force the LLM to stop retrying and deliver
               if (consecutiveSandboxFails >= 3) {
                 const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
-                llmMessages.push({ role: 'system', content: `STOP RETRYING. Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created are saved and valid. Move to DELIVERY now — summarize what was built (${createdFiles.length} files created) and offer provide_project_zip. Do NOT run any more sandbox commands.` });
+                deferredSystemHints.push(`STOP RETRYING. Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created are saved and valid. Move to DELIVERY now — summarize what was built (${createdFiles.length} files created) and offer provide_project_zip. Do NOT run any more sandbox commands.`);
                 log.info(`[Chat] Forced delivery after ${consecutiveSandboxFails} consecutive sandbox failures`);
               } else {
                 let sandboxHint = '';
@@ -2127,15 +2176,15 @@ Do NOT attempt any tool calls or builds.`;
                 } else {
                   sandboxHint = `RECOVERY: Sandbox operation failed: ${errorStr.slice(0, 200)}. Try a different approach or check the sandbox state with sandbox_list_files.`;
                 }
-                llmMessages.push({ role: 'system', content: sandboxHint });
-                log.info(`[Chat] Injected sandbox recovery hint (fail ${consecutiveSandboxFails}): ${sandboxHint.slice(0, 100)}...`);
+                deferredSystemHints.push(sandboxHint);
+                log.info(`[Chat] Buffered sandbox recovery hint (fail ${consecutiveSandboxFails}): ${sandboxHint.slice(0, 100)}...`);
               }
             } else if (execResult.success && tc.function.name === 'sandbox_exec') {
               consecutiveSandboxFails = 0; // Reset on success
             }
             if (!execResult.success && (tc.function.name === 'create_file')) {
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
-              llmMessages.push({ role: 'system', content: `RECOVERY: create_file failed: ${errorStr.slice(0, 200)}. Verify the filePath and content parameters. filePath should be a relative path like "src/app.tsx". Content must not be empty.` });
+              deferredSystemHints.push(`RECOVERY: create_file failed: ${errorStr.slice(0, 200)}. Verify the filePath and content parameters. filePath should be a relative path like "src/app.tsx". Content must not be empty.`);
             }
             if (!execResult.success && isSelfBuild && (tc.function.name === 'self_modify_file' || tc.function.name === 'self_multi_file_modify')) {
               const errorStr = JSON.stringify(execResult.data || '');
@@ -2152,11 +2201,8 @@ Do NOT attempt any tool calls or builds.`;
                 recoveryHint = 'RECOVERY: The modification failed. Try a different approach — use action="patch" for existing files, or break the change into smaller steps.';
               }
               if (recoveryHint) {
-                llmMessages.push({
-                  role: 'system',
-                  content: recoveryHint,
-                });
-                log.info(`[Chat] Injected recovery hint: ${recoveryHint.slice(0, 100)}...`);
+                deferredSystemHints.push(recoveryHint);
+                log.info(`[Chat] Buffered recovery hint: ${recoveryHint.slice(0, 100)}...`);
               }
             }
           }
@@ -2185,6 +2231,37 @@ Do NOT attempt any tool calls or builds.`;
                   content: JSON.stringify({ success: false, error: 'Tool execution was skipped or failed silently' }),
                 });
               }
+            }
+          }
+
+          // ── DEFERRED SYSTEM HINTS ──
+          // Now that ALL tool responses are in place, inject any buffered system hints.
+          // These MUST come after the contiguous tool response block to satisfy OpenAI's
+          // strict message ordering: assistant → tool responses → then system/user messages.
+          if (deferredSystemHints.length > 0) {
+            // Combine all hints into a single system message to minimize token overhead
+            llmMessages.push({
+              role: 'system',
+              content: deferredSystemHints.join('\n\n'),
+            });
+            log.info(`[Chat] Injected ${deferredSystemHints.length} deferred system hint(s) after tool responses`);
+          }
+
+          // ── PROJECT MANIFEST INJECTION ──
+          // After every 3 rounds, inject a running list of all created files
+          // so the LLM always knows what files exist and can reference them.
+          // Placed AFTER tool responses to maintain strict message ordering.
+          if (isExternalBuild && rounds > 1 && rounds % 3 === 0) {
+            const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
+            if (createdSoFar.length > 0) {
+              const manifest = createdSoFar.map(a => {
+                const fn = (a.args as any)?.fileName || (a.args as any)?.filePath || 'unknown';
+                return `  - ${fn}`;
+              }).join('\n');
+              llmMessages.push({
+                role: 'system',
+                content: `[PROJECT MANIFEST — ${createdSoFar.length} files created so far:\n${manifest}\nEnsure all new files properly import/reference these existing files. Do NOT recreate files that already exist.]`,
+              });
             }
           }
         }
