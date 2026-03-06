@@ -68,20 +68,28 @@ const SELF_BUILD_KEYWORDS = [
 
 // Phrases that indicate the user is talking about Titan's own pages/components
 const SELF_CONTEXT_PHRASES = [
+  // Page references — specific enough to avoid false positives
   'credentials page', 'dashboard page', 'settings page', 'admin page',
-  'sidebar', 'header', 'footer', 'navigation', 'nav bar', 'navbar',
+  'chat page', 'chatbox', 'chat box', 'login page',
+  // Titan-specific features
   'fetcher', 'watchdog', 'leak scanner', 'bulk sync', 'auto-sync',
   'team vault', 'audit log',
+  // UI element references — MUST use "the" or "your" prefix to avoid matching generic terms
+  // WRONG: 'header' (matches "HTTP header analysis")
+  // RIGHT: 'the header' (only matches "fix the header")
+  'the sidebar', 'the header', 'the footer', 'the navigation', 'the nav bar', 'the navbar',
+  'your sidebar', 'your header', 'your footer',
+  'in the sidebar', 'with a sidebar link',
+  // App/platform references — require possessive or article
   'this app', 'this site', 'this platform', 'this tool',
   'the app', 'the site', 'the platform', 'archibald', 'titan',
   'marketplace', 'grand bazaar', 'bazaar',
-  'chat page', 'chatbox', 'chat box', 'login page',
   'the interface', 'the ui', 'the design',
   'your interface', 'your ui', 'your design',
-  'your page', 'your sidebar', 'your header',
+  'your page',
+  // Route references
   '/dashboard', '/credentials', '/settings', '/marketplace',
-  'with a sidebar link', 'under the', 'in the sidebar',
-  // CSS / theme / styling context — always refers to Titan’s own codebase
+  // CSS / theme / styling context — always refers to Titan's own codebase
   'the colors', 'the colours', 'the theme', 'the css', 'the styles', 'the styling',
   'the visibility', 'the background', 'the text color', 'the text colour',
   'dark mode', 'light mode', 'color scheme', 'colour scheme',

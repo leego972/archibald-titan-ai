@@ -216,60 +216,81 @@ export async function executeToolCall(
     case "web_search": {
       const query = args.query as string;
       if (!query) return { success: false, error: "Search query is required" };
-      try {
-        // Use DuckDuckGo HTML search as a simple, free search API
-        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-        const resp = await fetch(searchUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          },
-        });
-        const html = await resp.text();
-        // Parse results from DuckDuckGo HTML
+
+      const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+      const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+
+      // ── Helper: Parse Brave Search HTML ──
+      const parseBrave = (html: string): Array<{ title: string; url: string; snippet: string }> => {
+        const results: Array<{ title: string; url: string; snippet: string }> = [];
+        // Brave wraps each result in <div class="snippet" data-pos="N" data-type="web">
+        const parts = html.split(/data-pos="(\d+)"[^>]*data-type="web"/);
+        for (let i = 1; i < parts.length && results.length < 8; i += 2) {
+          const content = (parts[i + 1] || "").slice(0, 3000);
+          const urlM = content.match(/<a[^>]*href="(https?:\/\/[^"]+)"/);
+          const titleM = content.match(/class="title[^"]*"[^>]*title="([^"]+)"/);
+          // Fallback title: text inside the title div
+          const titleAlt = content.match(/class="title[^"]*"[^>]*>(.*?)<\/div>/s);
+          const descM = content.match(/class="snippet-description[^"]*"[^>]*>(.*?)<\/div>/s);
+          const url = urlM ? urlM[1] : "";
+          const title = titleM ? titleM[1] : (titleAlt ? stripTags(titleAlt[1]) : "");
+          const snippet = descM ? stripTags(descM[1]).slice(0, 200) : "";
+          if (url && title) results.push({ title, url, snippet });
+        }
+        return results;
+      };
+
+      // ── Helper: Parse DuckDuckGo HTML ──
+      const parseDDG = (html: string): Array<{ title: string; url: string; snippet: string }> => {
         const results: Array<{ title: string; url: string; snippet: string }> = [];
         const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
         let match;
-        let count = 0;
-        while ((match = resultRegex.exec(html)) !== null && count < 8) {
-          const rawUrl = match[1];
-          const title = match[2].replace(/<[^>]*>/g, "").trim();
-          const snippet = match[3].replace(/<[^>]*>/g, "").trim();
-          // DuckDuckGo wraps URLs in a redirect - extract the actual URL
-          let url = rawUrl;
-          const uddgMatch = rawUrl.match(/uddg=([^&]*)/);
-          if (uddgMatch) {
-            url = decodeURIComponent(uddgMatch[1]);
-          }
-          if (title && url) {
-            results.push({ title, url, snippet });
-            count++;
-          }
+        while ((match = resultRegex.exec(html)) !== null && results.length < 8) {
+          let url = match[1];
+          const uddgMatch = url.match(/uddg=([^&]*)/);
+          if (uddgMatch) url = decodeURIComponent(uddgMatch[1]);
+          const title = stripTags(match[2]);
+          const snippet = stripTags(match[3]);
+          if (title && url) results.push({ title, url, snippet });
         }
-        // Fallback: try simpler regex if the above didn't match
+        return results;
+      };
+
+      // ── Helper: Detect CAPTCHA / bot block ──
+      const isCaptcha = (html: string): boolean =>
+        /anomaly|captcha|challenge|unusual traffic|blocked|verify you are human/i.test(html.slice(0, 2000));
+
+      try {
+        let results: Array<{ title: string; url: string; snippet: string }> = [];
+        let source = "brave";
+
+        // PRIMARY: Brave Search (no CAPTCHA, reliable)
+        try {
+          const braveUrl = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
+          const resp = await fetch(braveUrl, { headers: { "User-Agent": UA } });
+          const html = await resp.text();
+          if (!isCaptcha(html)) {
+            results = parseBrave(html);
+          }
+        } catch (_braveErr) { /* Brave failed, try fallback */ }
+
+        // FALLBACK: DuckDuckGo HTML (may CAPTCHA on some IPs)
         if (results.length === 0) {
-          const simpleRegex = /<a[^>]*class="result__a"[^>]*>([\s\S]*?)<\/a>/g;
-          const snippetRegex = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-          const urlRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*/g;
-          const titles: string[] = [];
-          const urls: string[] = [];
-          const snippets: string[] = [];
-          let m;
-          while ((m = simpleRegex.exec(html)) !== null) titles.push(m[1].replace(/<[^>]*>/g, "").trim());
-          while ((m = urlRegex.exec(html)) !== null) {
-            let u = m[1];
-            const uddg = u.match(/uddg=([^&]*)/);
-            if (uddg) u = decodeURIComponent(uddg[1]);
-            urls.push(u);
-          }
-          while ((m = snippetRegex.exec(html)) !== null) snippets.push(m[1].replace(/<[^>]*>/g, "").trim());
-          for (let i = 0; i < Math.min(titles.length, urls.length, 8); i++) {
-            results.push({ title: titles[i], url: urls[i], snippet: snippets[i] || "" });
-          }
+          source = "duckduckgo";
+          try {
+            const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+            const resp = await fetch(ddgUrl, { headers: { "User-Agent": UA } });
+            const html = await resp.text();
+            if (!isCaptcha(html)) {
+              results = parseDDG(html);
+            }
+          } catch (_ddgErr) { /* DDG also failed */ }
         }
+
         if (results.length === 0) {
-          return { success: true, data: { message: "No results found. Try a different search query.", query } };
+          return { success: true, data: { message: "No results found. Try a different search query.", query, source } };
         }
-        return { success: true, data: { query, resultCount: results.length, results } };
+        return { success: true, data: { query, resultCount: results.length, results, source } };
       } catch (err: unknown) {
         return { success: false, error: `Search failed: ${getErrorMessage(err)}` };
       }
