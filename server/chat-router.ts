@@ -1661,9 +1661,39 @@ Do NOT attempt any tool calls or builds.`;
               });
               break; // success
             } catch (llmErr: unknown) {
+              const errMsg = getErrorMessage(llmErr);
+              // For 400 errors (tool_call_id mismatch), fix the payload before retrying
+              if (errMsg.includes('400') && errMsg.includes('tool_call') && llmAttempt < MAX_LOOP_RETRIES) {
+                log.warn(`[Chat] 400 tool_call mismatch in round ${rounds} — running pre-call validation fix before retry`);
+                // Re-run the pre-call validation to fix broken tool_call/tool message pairing
+                for (let vi = 0; vi < llmMessages.length; vi++) {
+                  const vmsg = llmMessages[vi] as any;
+                  if (vmsg.role === 'assistant' && vmsg.tool_calls?.length > 0) {
+                    const requiredIds = new Set(vmsg.tool_calls.map((tc: any) => tc.id));
+                    for (let vj = vi + 1; vj < llmMessages.length; vj++) {
+                      const tmsg = llmMessages[vj] as any;
+                      if (tmsg.role === 'tool' && tmsg.tool_call_id) requiredIds.delete(tmsg.tool_call_id);
+                      if (tmsg.role === 'assistant' && tmsg.tool_calls?.length > 0) break;
+                    }
+                    if (requiredIds.size > 0) {
+                      log.warn(`[Chat] RETRY FIX: Injecting ${requiredIds.size} missing tool responses`);
+                      const dummies = [...requiredIds].map(id => ({
+                        role: 'tool' as const,
+                        tool_call_id: id as string,
+                        content: JSON.stringify({ success: false, error: 'Tool execution was interrupted' }),
+                      }));
+                      llmMessages.splice(vi + 1, 0, ...dummies);
+                      vi += dummies.length;
+                    }
+                  }
+                }
+                const waitMs = 2000 * Math.pow(2, llmAttempt);
+                await new Promise(r => setTimeout(r, waitMs));
+                continue;
+              }
               if (llmAttempt < MAX_LOOP_RETRIES) {
                 const waitMs = 2000 * Math.pow(2, llmAttempt);
-                log.warn(`[Chat] LLM call failed in round ${rounds} (attempt ${llmAttempt + 1}/${MAX_LOOP_RETRIES + 1}), retrying in ${waitMs / 1000}s: ${getErrorMessage(llmErr)}`);
+                log.warn(`[Chat] LLM call failed in round ${rounds} (attempt ${llmAttempt + 1}/${MAX_LOOP_RETRIES + 1}), retrying in ${waitMs / 1000}s: ${errMsg}`);
                 await new Promise(r => setTimeout(r, waitMs));
                 continue;
               }
