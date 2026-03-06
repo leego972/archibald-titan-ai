@@ -1502,6 +1502,7 @@ Do NOT attempt any tool calls or builds.`;
         args: Record<string, unknown>;
         result: unknown;
         success: boolean;
+        size?: number;
       }> = [];
 
       try {
@@ -2043,7 +2044,20 @@ Do NOT attempt any tool calls or builds.`;
                 continue;
               }
 
-              // ── GATE 4: Feature completeness check ──
+              // ── GATE 4b: Total code size check ──
+              // If total code output is too small for the request complexity, force continuation
+              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && rounds < MAX_TOOL_ROUNDS - 5) {
+                const totalBytes = createdSoFar.reduce((sum, f) => sum + (f.size || 0), 0);
+                const minBytes = isComplexRequest ? 50000 : 15000; // 50KB for complex, 15KB for simple
+                if (totalBytes < minBytes) {
+                  log.info(`[Chat] BUILD GATE 4b (undersized): ${totalBytes} bytes total across ${createdSoFar.length} files (min=${minBytes}). Forcing expansion...`);
+                  llmMessages.push({ role: 'assistant', content: textContent || '' });
+                  llmMessages.push({ role: 'user', content: `STOP. Your build is UNDERSIZED. You created ${createdSoFar.length} files totaling only ${Math.round(totalBytes/1024)}KB — the minimum for this request is ${Math.round(minBytes/1024)}KB. Go back and ADD MORE SUBSTANCE to each file: comprehensive error handling, input validation, logging, docstrings, type hints, edge cases, configuration options, and output formatting. Also add any missing features. Do NOT deliver thin skeleton code.` });
+                  continue;
+                }
+              }
+
+              // ── GATE 5: Feature completeness check ──
               // If the user's request mentions specific features, check if Titan addressed them
               if (looksLikeDelivery && isExternalBuild && rounds < MAX_TOOL_ROUNDS - 3) {
                 const userMsg = (input.message || '').toLowerCase();
@@ -2163,11 +2177,16 @@ Do NOT attempt any tool calls or builds.`;
               execResult = { success: false, data: { error: `Tool execution failed: ${toolErr?.message || 'unknown error'}` } };
             }
 
+            // Track file size for create_file actions (used by build quality gates)
+            const fileSize = tc.function.name === 'create_file' || tc.function.name === 'createProjectFile'
+              ? ((args.content as string) || (args.code as string) || '').length
+              : 0;
             executedActions.push({
               tool: tc.function.name,
               args,
               result: execResult.data,
               success: execResult.success,
+              size: fileSize,
             });
 
             // Emit tool result event with human-readable summary

@@ -30,12 +30,19 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Install Python3 for sandbox code execution/verification
+# Install Go compiler for sandbox Go builds
 # Install Playwright/Chromium system dependencies for fetcher engine
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    python3-dev \
+    build-essential \
+    golang \
+    gcc \
     wget \
+    curl \
+    git \
     ca-certificates \
     fonts-liberation \
     fonts-noto-color-emoji \
@@ -64,6 +71,58 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# Pre-install common Python packages so sandbox builds can test without pip install
+# This covers 90%+ of typical build requests
+RUN pip3 install --break-system-packages --no-cache-dir \
+    requests \
+    flask \
+    fastapi \
+    uvicorn \
+    aiohttp \
+    asyncio \
+    websockets \
+    httpx \
+    beautifulsoup4 \
+    lxml \
+    scrapy \
+    selenium \
+    dnspython \
+    python-whois \
+    cryptography \
+    pycryptodome \
+    paramiko \
+    scapy \
+    impacket \
+    rich \
+    click \
+    typer \
+    colorama \
+    tabulate \
+    pyyaml \
+    toml \
+    python-dotenv \
+    jinja2 \
+    pillow \
+    numpy \
+    pandas \
+    matplotlib \
+    sqlalchemy \
+    psutil \
+    pynput \
+    pyautogui \
+    schedule \
+    watchdog \
+    pytest \
+    black \
+    mypy \
+    builtwith \
+    tqdm \
+    pydantic \
+    python-jose \
+    passlib \
+    bcrypt \
+    python-multipart
+
 # Copy package manifests, npmrc, patches, and install production-only dependencies
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY patches/ ./patches/
@@ -88,11 +147,18 @@ RUN mkdir -p /home/titan/.cache && chown -R titan:titan /home/titan
 # Create sandbox temp directory with proper permissions
 RUN mkdir -p /tmp/titan-sandboxes && chown -R titan:titan /tmp/titan-sandboxes
 
+# Give titan user write access to Python site-packages so sandbox pip install works
+# PEP 668 workaround: allow pip to install system-wide
+RUN chmod -R a+rw /usr/local/lib/python3*/dist-packages/ 2>/dev/null || true && \
+    chmod -R a+rw /usr/lib/python3/dist-packages/ 2>/dev/null || true && \
+    mkdir -p /usr/local/lib/python3.11/dist-packages && chmod a+rw /usr/local/lib/python3.11/dist-packages
+
 USER titan
 
 # Railway injects PORT; default to 5000
 ENV NODE_ENV=production
 ENV PORT=5000
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 EXPOSE 5000
 
 CMD ["node", "dist/index.js"]

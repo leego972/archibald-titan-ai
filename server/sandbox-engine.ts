@@ -324,6 +324,38 @@ export async function executeCommand(
         realHome
       );
 
+      // Auto-fix pip commands: add --break-system-packages flag if not present
+      // This handles PEP 668 "externally managed" restriction on Debian/Ubuntu
+      if (/\bpip3?\s+install\b/.test(rewrittenCommand) && !rewrittenCommand.includes('--break-system-packages')) {
+        rewrittenCommand = rewrittenCommand.replace(
+          /(pip3?\s+install)/g,
+          '$1 --break-system-packages'
+        );
+      }
+
+      // Auto-fix python3 -m venv: the sandbox doesn't need venvs since packages
+      // install system-wide with --break-system-packages
+      // Rewrite "python3 -m venv <path> && source <path>/bin/activate &&" to just run the rest
+      rewrittenCommand = rewrittenCommand.replace(
+        /python3\s+-m\s+venv\s+\S+\s*&&\s*(source|\.)\s+\S+\/bin\/activate\s*&&\s*/g,
+        ''
+      );
+      // Also handle standalone venv creation followed by activation
+      rewrittenCommand = rewrittenCommand.replace(
+        /python3\s+-m\s+venv\s+\S+\s*$/g,
+        'echo "Skipping venv — packages install system-wide in sandbox"'
+      );
+      rewrittenCommand = rewrittenCommand.replace(
+        /^\s*(source|\.)\s+\S+\/bin\/activate\s*(&&\s*)?/g,
+        ''
+      );
+
+      // Ensure pip target directory exists for user-level installs
+      const pipTargetDir = path.join(realHome, ".local", "lib", "python3", "site-packages");
+      if (!fs.existsSync(pipTargetDir)) {
+        fs.mkdirSync(pipTargetDir, { recursive: true });
+      }
+
       // Execute the command
       const result = await new Promise<{ stdout: string; stderr: string; exitCode: number }>(
         (resolve) => {
@@ -331,6 +363,11 @@ export async function executeCommand(
             HOME: realHome,
             USER: "sandbox",
             PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${path.join(realHome, ".local", "bin")}`,
+            PYTHONPATH: pipTargetDir,
+            PIP_TARGET: pipTargetDir,
+            PIP_BREAK_SYSTEM_PACKAGES: "1",
+            PYTHONDONTWRITEBYTECODE: "1",
+            GOPATH: path.join(realHome, "go"),
             ...(sandbox.envVars || {}),
           };
 
