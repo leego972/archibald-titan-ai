@@ -74,7 +74,6 @@ import {
   Moon,
   FolderOpen,
   Globe,
-  Film,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -201,12 +200,6 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_28_r4c4"), label: "Notifications", path: "/fetcher/notifications", isNew: true },
       { icon: featureIcon("icon_30_r4c6"), label: "API Analytics", path: "/fetcher/api-analytics", isNew: true },
       { icon: featureIcon("icon_41_r6c1"), label: "CLI Tool", path: "/fetcher/cli", isNew: true },
-    ],
-  },
-  {
-    title: "Creative Suite",
-    items: [
-      { icon: Film, label: "Virelle Studios", path: "/virelle", adminOnly: true, isNew: true },
     ],
   },
   {
