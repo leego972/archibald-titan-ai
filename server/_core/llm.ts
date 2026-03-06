@@ -464,6 +464,16 @@ async function _invokeLLMWithRetry(
     if ((err as Error).name === 'AbortError') {
       throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`);
     }
+
+    // Retry on network errors (ECONNRESET, ECONNREFUSED, fetch failures)
+    // These are transient and usually succeed on retry
+    const MAX_NETWORK_RETRIES = priority === "chat" ? 3 : 1;
+    if (attempt < MAX_NETWORK_RETRIES) {
+      const waitMs = Math.min(1000 * Math.pow(2, attempt), 8_000);
+      log.warn(`[LLM] ${systemTag}: Network error (attempt ${attempt + 1}/${MAX_NETWORK_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s: ${(err as Error).message}`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return _invokeLLMWithRetry(params, priority, attempt + 1);
+    }
     throw err;
   } finally {
     clearTimeout(fetchTimeout);
@@ -514,7 +524,24 @@ async function _invokeLLMWithRetry(
     );
   }
 
-  // ── Handle other errors ──
+  // ── Handle transient server errors (500, 502, 503, 504) with retry ──
+  const RETRYABLE_STATUS = [500, 502, 503, 504];
+  if (RETRYABLE_STATUS.includes(response.status)) {
+    if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
+    const MAX_SERVER_RETRIES = priority === "chat" ? 3 : 1;
+    if (attempt < MAX_SERVER_RETRIES) {
+      const waitMs = Math.min(2000 * Math.pow(2, attempt), 15_000);
+      log.warn(`[LLM] ${systemTag}: Server error ${response.status} (attempt ${attempt + 1}/${MAX_SERVER_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return _invokeLLMWithRetry(params, priority, attempt + 1);
+    }
+    const errorText = await response.text();
+    throw new Error(
+      `LLM invoke failed after ${MAX_SERVER_RETRIES} retries: ${response.status} ${response.statusText} – ${errorText}`
+    );
+  }
+
+  // ── Handle other non-retryable errors ──
   if (!response.ok) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
     const errorText = await response.text();

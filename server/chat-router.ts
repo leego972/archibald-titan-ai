@@ -1851,6 +1851,33 @@ Do NOT attempt any tool calls or builds.`;
               }
             }
 
+            // ── BUILD CONTINUATION: Detect incomplete builds and nudge LLM to continue ──
+            // If this is a build request and the LLM returned text instead of tool calls,
+            // check if the build looks incomplete (few files created relative to what was planned).
+            // If so, push the text as an assistant message and inject a continuation prompt
+            // instead of breaking out of the loop.
+            if (isBuildRequest && rounds <= MAX_TOOL_ROUNDS - 2) {
+              const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
+              const textLower = (textContent || '').toLowerCase();
+              // Heuristics for "build is incomplete":
+              // 1. LLM mentions it will continue or lists files it hasn't created yet
+              // 2. Very few files created and text mentions more components/files
+              // 3. Text is a progress update, not a final delivery
+              const mentionsContinuation = /\b(next|continue|now (i'll|let me|i will)|remaining|still need|more files|let's (create|build|add))\b/i.test(textContent || '');
+              const mentionsUnbuiltFiles = /\b(will create|need to create|haven't (created|built)|todo|to do|upcoming)\b/i.test(textContent || '');
+              const looksLikeDelivery = /\b(done|complete|finished|all files|here('s| is) (the|your)|ready to|download|zip)\b/i.test(textContent || '');
+              const isProgressUpdate = (mentionsContinuation || mentionsUnbuiltFiles) && !looksLikeDelivery;
+              // Also detect when the LLM just created config files and stopped (< 5 files for a multi-file request)
+              const tooFewFiles = createdSoFar.length > 0 && createdSoFar.length < 5 && isExternalBuild;
+              
+              if ((isProgressUpdate || tooFewFiles) && !looksLikeDelivery && rounds < 10) {
+                log.info(`[Chat] BUILD CONTINUATION: LLM paused at round ${rounds} with ${createdSoFar.length} files. Nudging to continue...`);
+                llmMessages.push({ role: 'assistant', content: textContent || '' });
+                llmMessages.push({ role: 'user', content: 'Continue building. Create the remaining files now using create_file. Do not stop until ALL files are created.' });
+                continue;
+              }
+            }
+
             finalText = textContent;
             break;
           }
