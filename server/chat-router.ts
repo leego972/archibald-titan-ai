@@ -1495,14 +1495,15 @@ Do NOT attempt any tool calls or builds.`;
         enableDeferredMode();
       }
 
+      // Collect all tool actions executed (hoisted above try/catch so catch can access partial results)
+      const executedActions: Array<{
+        tool: string;
+        args: Record<string, unknown>;
+        result: unknown;
+        success: boolean;
+      }> = [];
+
       try {
-        // Collect all tool actions executed
-        const executedActions: Array<{
-          tool: string;
-          args: Record<string, unknown>;
-          result: unknown;
-          success: boolean;
-        }> = [];
 
         // ── Tool-calling loop ──────────────────────────────────────
         let finalText = "";
@@ -1589,23 +1590,35 @@ Do NOT attempt any tool calls or builds.`;
             log.info(`[Chat] Round ${rounds}: model=${modelTier || 'default'} (build=${isSelfBuild ? 'self' : 'external'})`);
           }
 
-          const result = await invokeLLM({
-            priority: "chat",
-            messages: llmMessages,
-            tools: activeTools,
-            tool_choice: toolChoice,
-            // Temperature 0 for builder tasks = deterministic, precise code generation
-            // Temperature 0.7 for general chat = natural, helpful responses
-            temperature: isBuildRequest ? 0 : 0.7,
-            // Cap output tokens: chat replies rarely need more than 2048 tokens.
-            // Builder tasks need the full 16384 for large file generation.
-            // Smaller cap = faster time-to-first-token for conversational replies.
-            maxTokens: isBuildRequest ? 16384 : 2048,
-            // Cost-effective model selection
-            ...(modelTier ? { model: modelTier } : {}),
-            // Use user's personal API key if available (bypasses system key pool)
-            ...(userApiKey ? { userApiKey } : {}),
-          });
+          // Retry wrapper for the LLM call — survives transient errors mid-build
+          // without killing the entire build. The inner invokeLLM already retries at
+          // the fetch level, but this catches errors that slip through (e.g. JSON parse
+          // failures, unexpected response formats, or errors between retries).
+          let result: any;
+          const MAX_LOOP_RETRIES = isBuildRequest ? 2 : 1;
+          for (let llmAttempt = 0; llmAttempt <= MAX_LOOP_RETRIES; llmAttempt++) {
+            try {
+              result = await invokeLLM({
+                priority: "chat",
+                messages: llmMessages,
+                tools: activeTools,
+                tool_choice: toolChoice,
+                temperature: isBuildRequest ? 0 : 0.7,
+                maxTokens: isBuildRequest ? 16384 : 2048,
+                ...(modelTier ? { model: modelTier } : {}),
+                ...(userApiKey ? { userApiKey } : {}),
+              });
+              break; // success
+            } catch (llmErr: unknown) {
+              if (llmAttempt < MAX_LOOP_RETRIES) {
+                const waitMs = 2000 * Math.pow(2, llmAttempt);
+                log.warn(`[Chat] LLM call failed in round ${rounds} (attempt ${llmAttempt + 1}/${MAX_LOOP_RETRIES + 1}), retrying in ${waitMs / 1000}s: ${getErrorMessage(llmErr)}`);
+                await new Promise(r => setTimeout(r, waitMs));
+                continue;
+              }
+              throw llmErr; // exhausted retries, propagate to outer catch
+            }
+          }
 
           const choice = result.choices?.[0];
           if (!choice) {
@@ -2378,7 +2391,19 @@ Do NOT attempt any tool calls or builds.`;
         log.error("[Chat] LLM error:", { error: errMsg });
         logChatError(errMsg, userId);
         // Instead of throwing (which loses the user's message), save an error response
-        const errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
+        // If files were already created before the error, show partial success instead of generic error
+        let errorText: string;
+        if (executedActions.length > 0) {
+          const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
+          if (createdFiles.length > 0) {
+            const fileList = createdFiles.map((a: any) => (a.args as any)?.fileName || 'unknown').join(', ');
+            errorText = `Hit a snag mid-build — the AI service dropped out after creating ${createdFiles.length} file(s): ${fileList}. Send "continue building" to pick up where I left off, or start a fresh conversation.`;
+          } else {
+            errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
+          }
+        } else {
+          errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
+        }
         emitChatEvent(conversationId!, {
           type: "error",
           data: { message: getErrorMessage(err) },
