@@ -406,6 +406,10 @@ async function _invokeLLMWithRetry(
 
   if (tools && tools.length > 0) {
     payload.tools = tools;
+    // Force sequential tool calls — prevents the LLM from returning multiple
+    // tool_calls in one response, which causes 400 errors when any single
+    // tool execution fails (missing tool_call_id response messages).
+    payload.parallel_tool_calls = false;
   }
 
   const normalizedToolChoice = normalizeToolChoice(
