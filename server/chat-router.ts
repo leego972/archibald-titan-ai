@@ -679,6 +679,7 @@ async function generateTitle(userMessage: string): Promise<string> {
     const result = await invokeLLM({
       priority: "background",  // Don't waste chat rate limit on titles
       model: "fast",           // gpt-4.1-nano is perfect for title generation
+      useGemini: true,         // Free Gemini API — no need to waste OpenAI on titles
       messages: [
         {
           role: "system",
@@ -1613,6 +1614,8 @@ Do NOT attempt any tool calls or builds.`;
                 maxTokens: isBuildRequest ? 16384 : 2048,
                 ...(modelTier ? { model: modelTier } : {}),
                 ...(userApiKey ? { userApiKey } : {}),
+                // Non-build chat uses free Gemini API to preserve OpenAI credits for builds
+                ...(!isBuildRequest && !userApiKey ? { useGemini: true } : {}),
               });
               break; // success
             } catch (llmErr: unknown) {
@@ -1655,6 +1658,7 @@ Do NOT attempt any tool calls or builds.`;
               const fallbackResult = await invokeLLM({
                 priority: "chat",
                 model: "fast", // nano for fallback — no tools, just text
+                useGemini: true, // Free Gemini for fallback — OpenAI already failed
                 messages: [
                   { role: 'system', content: 'You are Titan — a sharp, friendly AI assistant with a dry British wit. Keep answers brief and to the point. Be warm but professional. Lead with the practical answer. Only go into technical depth if asked. A well-placed quip is welcome. No preamble, no corporate speak.' },
                   { role: 'user', content: input.message },
@@ -2061,7 +2065,7 @@ Do NOT attempt any tool calls or builds.`;
 
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
-          const fallback = await invokeLLM({ priority: "chat", model: "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}) });
+          const fallback = await invokeLLM({ priority: "chat", model: "fast", useGemini: true, messages: llmMessages, ...(userApiKey ? { userApiKey } : {}) });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
