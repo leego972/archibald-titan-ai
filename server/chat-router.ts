@@ -1598,6 +1598,15 @@ Do NOT attempt any tool calls or builds.`;
             log.info(`[Chat] Round ${rounds}: model=${modelTier || 'default'} (build=${isSelfBuild ? 'self' : 'external'})`);
           }
 
+          // Token estimation for debugging context size issues
+          const estimatedChars = llmMessages.reduce((sum: number, m: any) => {
+            const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content || '');
+            return sum + content.length;
+          }, 0);
+          const estimatedTokens = Math.ceil(estimatedChars / 3.5); // rough estimate
+          const toolTokens = activeTools ? Math.ceil(JSON.stringify(activeTools).length / 3.5) : 0;
+          log.info(`[Chat] Round ${rounds}: ~${estimatedTokens + toolTokens} tokens (${llmMessages.length} msgs, ~${estimatedTokens} content + ~${toolTokens} tools)`);
+
           // Retry wrapper for the LLM call — survives transient errors mid-build
           // without killing the entire build. The inner invokeLLM already retries at
           // the fetch level, but this catches errors that slip through (e.g. JSON parse
@@ -2419,12 +2428,12 @@ Do NOT attempt any tool calls or builds.`;
           const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
           if (createdFiles.length > 0) {
             const fileList = createdFiles.map((a: any) => (a.args as any)?.fileName || 'unknown').join(', ');
-            errorText = `Hit a snag mid-build — the AI service dropped out after creating ${createdFiles.length} file(s): ${fileList}. Send "continue building" to pick up where I left off, or start a fresh conversation.`;
+            errorText = `Hit a snag mid-build — the AI service dropped out after creating ${createdFiles.length} file(s): ${fileList}. Send "continue building" to pick up where I left off, or start a fresh conversation.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
           } else {
-            errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
+            errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
           }
         } else {
-          errorText = "Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.";
+          errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
         }
         emitChatEvent(conversationId!, {
           type: "error",
