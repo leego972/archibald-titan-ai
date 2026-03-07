@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Globe, DollarSign, Building2, Loader2, RefreshCw, ExternalLink, Calendar, CheckCircle2 } from "lucide-react";
+import { Search, Globe, DollarSign, Building2, Loader2, RefreshCw, ExternalLink, Calendar, CheckCircle2, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -191,7 +191,7 @@ export default function GrantsPage() {
             <Card
               key={grant.id}
               className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer"
-              onClick={() => grant.url ? window.open(grant.url, "_blank") : navigate(`/grants/${grant.id}`)}
+              onClick={() => navigate(`/grants/${grant.id}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -240,9 +240,26 @@ export default function GrantsPage() {
                     </Badge>
                   ))}
                 </div>
-                {grant.url && (
-                  <ExternalLink className="w-3 h-3 text-zinc-500" />
-                )}
+                <div className="flex items-center gap-2">
+                  {grant.url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-zinc-400 hover:text-white"
+                      onClick={(e) => { e.stopPropagation(); window.open(grant.url, "_blank"); }}
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1" /> Visit
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-blue-600/10 text-blue-400 border-blue-600/30 hover:bg-blue-600/20"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/grants/${grant.id}`); }}
+                  >
+                    <Sparkles className="w-3 h-3 mr-1" /> Apply
+                  </Button>
+                </div>
               </CardFooter>
             </Card>
           ))}
