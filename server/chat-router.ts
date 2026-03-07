@@ -85,7 +85,9 @@ export function logChatError(error: string, userId?: number): void {
   if (recentChatErrors.length > 10) recentChatErrors.pop();
 }
 
-const MAX_CONTEXT_MESSAGES = 20; // max messages loaded into LLM context (lower = faster + more room for tool results)
+const MAX_CONTEXT_MESSAGES = 12; // max messages loaded into LLM context
+// Reduced from 20 to 12 — Tier 1 OpenAI has 200K TPM limit.
+// 12 messages keeps context under ~30K tokens, leaving room for system prompt + tools + response.
 const MAX_TOOL_ROUNDS = 40; // complex builder tasks need many rounds: plan + create files + install + test + fix + retest
 
 /**
@@ -2756,9 +2758,10 @@ Do NOT attempt any tool calls or builds.`;
         } else {
           errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.`;
         }
+        // Emit sanitized error event — never leak raw error details to the frontend
         emitChatEvent(conversationId!, {
           type: "error",
-          data: { message: getErrorMessage(err) },
+          data: { message: errorText },
         });
         completeBuild(conversationId!, { status: "failed" });
         cleanupRequest(conversationId!);
@@ -2776,12 +2779,12 @@ Do NOT attempt any tool calls or builds.`;
      } catch (outerErr: unknown) {
        // Re-throw known tRPC errors (rate limit, forbidden, etc.) as-is
        if (outerErr instanceof TRPCError) throw outerErr;
-       // For any unknown error, surface the REAL message instead of letting tRPC mask it
+       // Log the real error server-side but show a sanitized message to the user
        const realMessage = outerErr instanceof Error ? outerErr.message : String(outerErr);
        log.error("[Chat] Unhandled outer error in send mutation:", { error: realMessage, stack: outerErr instanceof Error ? outerErr.stack : undefined });
        throw new TRPCError({
          code: "BAD_REQUEST",
-         message: `Chat error: ${realMessage}`,
+         message: "Something went wrong processing your message. Please try again.",
        });
      }
     }),

@@ -351,8 +351,10 @@ const normalizeResponseFormat = ({
 // Main invokeLLM — Multi-key pool + priority queue + auto-retry on 429
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Maximum retries on 429 rate limit errors */
-const MAX_429_RETRIES_CHAT = 4;
+/** Maximum retries on 429 rate limit errors.
+ * Tier 1 OpenAI = 500 RPM / 200K TPM. With longer conversations the TPM
+ * limit is hit easily, so we need patience + longer backoff to survive. */
+const MAX_429_RETRIES_CHAT = 8;
 const MAX_429_RETRIES_BACKGROUND = 2;
 
 
@@ -519,18 +521,20 @@ async function _invokeLLMWithRetry(
       if (retryAfterHeader) {
         waitMs = Math.min(parseFloat(retryAfterHeader) * 1000, 30_000);
       } else if (priority === "chat") {
-        // Chat: fast backoff — 1s, 2s, 4s, 8s
-        waitMs = Math.min(1000 * Math.pow(2, attempt), 15_000);
+        // Chat: patient backoff — 3s, 5s, 8s, 12s, 18s, 25s, 30s, 30s
+        // Tier 1 TPM resets every 60s, so we need to wait long enough for tokens to free up
+        waitMs = Math.min(3000 + 2000 * attempt + 500 * attempt * attempt, 30_000);
       } else {
         // Background: longer backoff — 5s, 15s
         waitMs = Math.min(5_000 * Math.pow(3, attempt), 30_000);
       }
 
-      // Fall back to gpt-4.1-nano after 2 retries on gpt-4.1-mini
-      // BUT: Never fall back for chat/build requests — nano produces much worse code
-      // Only fall back for background tasks where quality is less critical
-      if (attempt >= 2 && modelPreference === "strong" && useOpenAI && priority !== "chat") {
-        log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries (background task)`);
+      // Fall back to gpt-4.1-nano after retries on gpt-4.1-mini to reduce TPM pressure.
+      // For builds: fall back after 4 retries (code quality matters)
+      // For chat/background: fall back after 2 retries (speed > quality for text responses)
+      const nanoFallbackThreshold = (params.tools && params.tools.length > 0) ? 4 : 2;
+      if (attempt >= nanoFallbackThreshold && modelPreference === "strong" && useOpenAI) {
+        log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries`);
         const fallbackParams = { ...params, model: "fast" as const };
         await new Promise((r) => setTimeout(r, waitMs));
         return _invokeLLMWithRetry(fallbackParams, priority, 0);
