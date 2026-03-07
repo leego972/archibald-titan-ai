@@ -2569,37 +2569,69 @@ let advertisingInterval: ReturnType<typeof setInterval> | null = null;
 const ADVERTISING_RUN_DAYS = [1, 3, 5];
 
 /**
+ * Get the last advertising run date from the database.
+ * This persists across Railway restarts so we don't miss or double-run cycles.
+ */
+async function getLastRunDate(): Promise<string> {
+  try {
+    const db = await getDb();
+    if (!db) return "";
+    const rows = await db.select().from(marketingSettings).where(eq(marketingSettings.key, "advertising_last_run_date")).limit(1);
+    return rows[0]?.value || "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Persist the last advertising run date to the database.
+ */
+async function setLastRunDate(dateStr: string): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    // Upsert: try insert, on duplicate key update
+    await db.insert(marketingSettings).values({ key: "advertising_last_run_date", value: dateStr })
+      .onDuplicateKeyUpdate({ set: { value: dateStr } });
+  } catch (err: unknown) {
+    log.error("[AdvertisingOrchestrator] Failed to persist last run date:", { error: String(getErrorMessage(err)) });
+  }
+}
+
+/**
  * Start the autonomous advertising scheduler.
  * Runs 3x per week (Mon/Wed/Fri) to balance reach and API credit usage.
- * Checks every 4 hours whether it's a run day and hasn't already run today.
+ * Checks every 30 minutes whether it's a run day and hasn't already run today.
+ * Persists last run date in DB so Railway restarts don't cause missed cycles.
  */
 export function startAdvertisingScheduler(): void {
   log.info("[AdvertisingOrchestrator] Starting autonomous advertising scheduler (Mon/Wed/Fri)...");
 
-  // COST OPTIMIZATION: Do NOT run on startup.
-  // Every Railway deploy triggers a restart which was burning API credits.
-  log.info("[AdvertisingOrchestrator] Skipping startup cycle (cost optimization). Checking every 4h for run days.");
-
-  let lastRunDate = "";
-
-  // Check every 4 hours if today is a run day and we haven't run yet today
-  advertisingInterval = setInterval(async () => {
+  const runCheck = async () => {
     try {
       const now = new Date();
       const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
-      const hour = now.getHours();
       const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
-      // Only run on designated days, between 8-10 AM server time, and only once per day
-      if (ADVERTISING_RUN_DAYS.includes(dayOfWeek) && hour >= 8 && hour <= 10 && lastRunDate !== todayStr) {
-        lastRunDate = todayStr;
+      // Check DB for last run date (survives restarts)
+      const lastRunDate = await getLastRunDate();
+
+      // Run on designated days, only once per day
+      if (ADVERTISING_RUN_DAYS.includes(dayOfWeek) && lastRunDate !== todayStr) {
+        await setLastRunDate(todayStr);
         log.info(`[AdvertisingOrchestrator] Running scheduled advertising cycle (${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayOfWeek]})...`);
         await runAdvertisingCycle();
       }
     } catch (err: unknown) {
       log.error("[AdvertisingOrchestrator] Scheduled cycle failed:", { error: String(getErrorMessage(err)) });
     }
-  }, 4 * 60 * 60 * 1000); // Check every 4 hours
+  };
+
+  // Run first check 60 seconds after startup (give DB time to connect)
+  setTimeout(runCheck, 60_000);
+
+  // Then check every 30 minutes (catches any run day reliably)
+  advertisingInterval = setInterval(runCheck, 30 * 60 * 1000);
 }
 
 /**
