@@ -11,6 +11,8 @@ import { TRPCError } from "@trpc/server";
 import { invokeLLM, type Message, type ToolCall } from "./_core/llm";
 import { getUserOpenAIKey } from "./user-secrets-router";
 import { checkCredits, consumeCredits, getCreditBalance } from "./credit-service";
+import { checkRateLimit, recordRequest, buildStarted, buildFinished } from "./rate-limiter";
+import { getUserPlan } from "./subscription-gate";
 import { getDb } from "./db";
 import {
   chatConversations,
@@ -679,7 +681,7 @@ async function generateTitle(userMessage: string): Promise<string> {
     const result = await invokeLLM({
       priority: "background",  // Don't waste chat rate limit on titles
       model: "fast",           // gpt-4.1-nano is perfect for title generation
-      useGemini: true,         // Free Gemini API — no need to waste OpenAI on titles
+      // Titles use nano (cheapest OpenAI model) — fast and reliable via key pool
       messages: [
         {
           role: "system",
@@ -1225,6 +1227,27 @@ export const chatRouter = router({
         }
       }
 
+      // ── Per-User Rate Limit Check ───────────────────────────
+      // Enforces RPM limits per subscription tier to protect the API key pool.
+      // Admin/unlimited users bypass this check.
+      if (!isAdmin) {
+        try {
+          const userPlan = await getUserPlan(userId);
+          const creditBalance = await getCreditBalance(userId);
+          const rateCheck = checkRateLimit(userId, userPlan.planId, creditBalance.isUnlimited);
+          if (!rateCheck.allowed) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS" as any,
+              message: rateCheck.message || "You're sending messages too quickly. Please wait a moment and try again.",
+            });
+          }
+          recordRequest(userId);
+        } catch (rateErr: unknown) {
+          if (rateErr instanceof TRPCError) throw rateErr;
+          log.error("[Chat] Rate limit check failed (allowing message):", { error: getErrorMessage(rateErr) });
+        }
+      }
+
       // ── Parallelise pre-LLM async work ────────────────────────
       // Run all independent async operations concurrently to minimise
       // time-to-first-token. These do not depend on each other.
@@ -1450,6 +1473,25 @@ Do NOT attempt any tool calls or builds.`;
       const isBuildRequest = isSelfBuild || isExternalBuild;
       let forceFirstTool: string | null = null;
 
+      // Track concurrent builds for rate limiting
+      if (isBuildRequest && !isAdmin) {
+        try {
+          const userPlan = await getUserPlan(userId);
+          const creditBalance = await getCreditBalance(userId);
+          const buildCheck = checkRateLimit(userId, userPlan.planId, creditBalance.isUnlimited, true);
+          if (!buildCheck.allowed) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS" as any,
+              message: buildCheck.message || "Too many concurrent builds. Please wait for a build to finish.",
+            });
+          }
+          buildStarted(userId);
+        } catch (buildRateErr: unknown) {
+          if (buildRateErr instanceof TRPCError) throw buildRateErr;
+          log.error("[Chat] Build rate limit check failed (allowing build):", { error: getErrorMessage(buildRateErr) });
+        }
+      }
+
       // PROACTIVE: No more clarification prompts. If ambiguous, detectBuildIntentAsync
       // now defaults to external build. The builder should just start building.
 
@@ -1495,6 +1537,11 @@ Do NOT attempt any tool calls or builds.`;
       if (isSelfBuild) {
         enableDeferredMode();
       }
+
+      // ── Save user message to DB FIRST ────────────────────────────
+      // This ensures the user message gets a lower auto-increment ID than
+      // the assistant response, so messages always display in correct order.
+      await saveMessage(conversationId, userId, "user", sanitizedMessage);
 
       // Collect all tool actions executed (hoisted above try/catch so catch can access partial results)
       const executedActions: Array<{
@@ -1695,8 +1742,7 @@ Do NOT attempt any tool calls or builds.`;
                 maxTokens: isBuildRequest ? 16384 : 2048,
                 ...(modelTier ? { model: modelTier } : {}),
                 ...(userApiKey ? { userApiKey } : {}),
-                // Non-build chat uses free Gemini API to preserve OpenAI credits for builds
-                ...(!isBuildRequest && !userApiKey ? { useGemini: true } : {}),
+                // All traffic routes through OpenAI key pool (6 keys with rotation)
               });
               break; // success
             } catch (llmErr: unknown) {
@@ -1793,7 +1839,7 @@ Do NOT attempt any tool calls or builds.`;
               const fallbackResult = await invokeLLM({
                 priority: "chat",
                 model: "fast", // nano for fallback — no tools, just text
-                useGemini: true, // Free Gemini for fallback — OpenAI already failed
+                // Emergency fallback — simple text response, no tools
                 messages: [
                   { role: 'system', content: 'You are Titan — a sharp, friendly AI assistant with a dry British wit. Keep answers brief and to the point. Be warm but professional. Lead with the practical answer. Only go into technical depth if asked. A well-placed quip is welcome. No preamble, no corporate speak.' },
                   { role: 'user', content: input.message },
@@ -2353,7 +2399,7 @@ Do NOT attempt any tool calls or builds.`;
 
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
-          const fallback = await invokeLLM({ priority: "chat", model: "fast", useGemini: true, messages: llmMessages, ...(userApiKey ? { userApiKey } : {}) });
+          const fallback = await invokeLLM({ priority: "chat", model: "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}) });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
@@ -2561,6 +2607,11 @@ Do NOT attempt any tool calls or builds.`;
           }
         }
 
+        // ── Release Build Slot ───────────────────────────────
+        if (isBuildRequest && !isAdmin) {
+          buildFinished(userId);
+        }
+
         // ── Flush staged changes to disk ──────────────────────
         // If deferred mode was active (build requests), flush all staged
         // file writes now that the conversation loop is complete and the
@@ -2683,8 +2734,11 @@ Do NOT attempt any tool calls or builds.`;
           upsell,
         };
       } catch (err: unknown) {
-        // Clean up deferred mode on error
+        // Clean up deferred mode and release build slot on error
         disableDeferredMode();
+        if (isBuildRequest && !isAdmin) {
+          buildFinished(userId);
+        }
         const errMsg = getErrorMessage(err);
         log.error("[Chat] LLM error:", { error: errMsg });
         logChatError(errMsg, userId);
@@ -2695,12 +2749,12 @@ Do NOT attempt any tool calls or builds.`;
           const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
           if (createdFiles.length > 0) {
             const fileList = createdFiles.map((a: any) => (a.args as any)?.fileName || 'unknown').join(', ');
-            errorText = `Hit a snag mid-build — the AI service dropped out after creating ${createdFiles.length} file(s): ${fileList}. Send "continue building" to pick up where I left off, or start a fresh conversation.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
+            errorText = `Hit a snag mid-build — the AI service dropped out after creating ${createdFiles.length} file(s): ${fileList}. Send "continue building" to pick up where I left off, or start a fresh conversation.`;
           } else {
-            errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
+            errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.`;
           }
         } else {
-          errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.\n\n_Debug: ${errMsg.slice(0, 300)}_`;
+          errorText = `Connection blip on my end — couldn't reach the AI service. Send that again, would you? If it keeps happening, a fresh conversation usually sorts it out.`;
         }
         emitChatEvent(conversationId!, {
           type: "error",

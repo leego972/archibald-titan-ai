@@ -13,17 +13,21 @@ const log = createLogger("KeyPool");
  * │  System                  │  Env Variable         │  Key        │
  * │─────────────────────────────────────────────────────────────────│
  * │  Chat + Builder (primary)│  OPENAI_API_KEY       │  Key-0      │
- * │  Chat + Builder (overflow│  OPENAI_API_KEY_5     │  Key-5      │
+ * │  Chat + Builder (fallback│  OPENAI_API_KEY_5     │  Key-5      │
+ * │  Chat + Builder (fallback│  OPENAI_API_KEY_6     │  Key-6      │
+ * │  Chat + Builder (fallback│  OPENAI_API_KEY_7     │  Key-7      │
  * │  Advertising Orchestrator│  OPENAI_API_KEY_1     │  Key-1      │
  * │  SEO Engine              │  OPENAI_API_KEY_2     │  Key-2      │
  * │  Affiliate + Marketing   │  OPENAI_API_KEY_3     │  Key-3      │
  * │  Blog + Grants + Misc    │  OPENAI_API_KEY_4     │  Key-4      │
  * └─────────────────────────────────────────────────────────────────┘
  *
+ * Updated 2025-03-07: Replaced 5 expired keys with 3 fresh keys.
+ * Chat/Builder has 4 keys total (primary + 3 fallbacks).
  * Each system declares its SystemTag when calling invokeLLM.
  * The key pool returns the dedicated key for that system.
  * If a system's key gets 429'd, it retries on its OWN key only.
- * Chat has 2 keys — if primary is 429'd, it falls over to overflow.
+ * Chat has 3 keys — if primary is 429'd, it falls over to fallbacks.
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -87,7 +91,7 @@ const allKeys: Map<string, KeyEntry> = new Map();
  * Each system has a primary key and optionally a fallback key.
  */
 const systemKeys: Record<SystemTag, { primary: string; fallbacks?: string[] }> = {
-  chat:          { primary: "OPENAI_API_KEY",   fallbacks: ["OPENAI_API_KEY_5", "OPENAI_API_KEY_6", "OPENAI_API_KEY_7", "OPENAI_API_KEY_8", "OPENAI_API_KEY_9"] },
+  chat:          { primary: "OPENAI_API_KEY",   fallbacks: ["OPENAI_API_KEY_5", "OPENAI_API_KEY_6", "OPENAI_API_KEY_7", "OPENAI_API_KEY_8"] },
   advertising:   { primary: "OPENAI_API_KEY_1" },
   seo:           { primary: "OPENAI_API_KEY_2" },
   affiliate:     { primary: "OPENAI_API_KEY_3" },
@@ -98,11 +102,11 @@ const systemKeys: Record<SystemTag, { primary: string; fallbacks?: string[] }> =
 /** Builder key pool (base64-encoded) — decoded at runtime for chat/builder rotation */
 const _d = (s: string) => Buffer.from(s, "base64").toString("utf-8");
 const BUILDER_KEY_POOL: Record<string, string> = {
-  OPENAI_API_KEY_5: _d("c2stcHJvai1UUFl3YlJ5anNqbDVSV0psM19zWTB6MERIVGlpVWtLaktkcXJZa0lxSHpLd2UwX1dFbWZ0eEtDN2VodWt1NjlkdE5Sdm9lVExfaFQzQmxia0ZKem1EM3htNENlVmpINllseEx1X0NQdVdicnlPSkZFdldVQ2luamd1UnBtb0RXaTB3Q2dGS01TT1dqQ0NESk1OMW5HTVJUNmk4OEE="),
-  OPENAI_API_KEY_6: _d("c2stcHJvai1ZVE9OUDdNaC1pTW5fWFMzT1NUSWRPcGpsY1h0bG9FeDktNGJZWHgzakFEaXpUcDdZMWxBcHdJVDZpb29EM3dXVDNEc1RBeFZLZlQzQmxia0ZKU2VGTDN2aTBjcUtBdkZOWU5HbjJOYjlZY3pET2lCbkVvSUlUcmYyT2hJWlpQT3l1cG9yZjBIbHNSTlA1Sk5veGRxUWZUMkcxWUE="),
-  OPENAI_API_KEY_7: _d("c2stcHJvai1Wb0JPTEhJV1BrbkdnYjZJRGtzZ0JOX2VaNHJnYnpXOGZ1Vk1zVGpQdjFsZGZfVUhObl9rNkRqcXFERGFsVEs5S0RvUzdlbzNxS1QzQmxia0ZKYWl1b1RqNkpzNG5WWDdyOEZma1ppM2x0OEllTFpmeWU0d3pSWGxtak82bElEZ2VucmpVQ0ZfSFptSV94bmszWHlQVERRTHh3TUE="),
-  OPENAI_API_KEY_8: _d("c2stcHJvai1sVjdoaXA3TVVkcTR2N01fb0F3ckZoS0RmcFlXQU9CRldCd0k1cVppNXQxM2JtTENybEt0Sjc3Zi1YZkk4cXZYdVRSanhFSDJTOFQzQmxia0ZKbjJsTVB5YzdnMVpaOVc5bzlCN3lhUGZEYnlEUXJGWlhzUlcwUnpfMXBxcFV6SW1BOVlpTDQwNndOT1FKcnU4WHFZNm40OUhEa0E="),
-  OPENAI_API_KEY_9: _d("c2stcHJvai15aFhlU0VVWjBtMFFpaUFjX1dLbExGQzdDNTZYcUQzTnRNbkNiNjBMN2lQWVJBdEhCR0ptdGZBbWZCX3ZsSzR1ZjlfWnh2ZVRoRlQzQmxia0ZKaE9GSUg4SGdpMmpjQjBOVzBjSGtYaE5iZFdKMmV5VTZ5eHJNVzJqdS01d25WNkNEMl85Y19FaDVHLXNaVUNwZUhsVUozUWdtUUE="),
+  // Fresh keys — replaced 2025-03-07
+  OPENAI_API_KEY_5: _d("c2stcHJvai16T0tSMl96SEMtLUhYek40X0lSSm8za3hSUG5GaWlQZGJEb2FvbDB1bjBNbWJoelYyQ0NqM3RwWktqdVRnYm1yX2poMFVSV1kyelQzQmxia0ZKWUN2LXUzX3BISHZMSzhpdDBHSHFQaDktdnpMTk9XNk92b1FXVXJXczRIX01ISnFSbUZMaE9jSlRIN29MODhxbmxCV213blk4WUE="),
+  OPENAI_API_KEY_6: _d("c2stcHJvai1YcHpfR3NTaFVDSEVYa3Y1RTZNVmtSaWdHYUdxam9hWWZBN1NMZ3JsUmxzNzQ1bVdodjl1cU1NT3BLbE9ZMXp5VUJwT01kbGh5TlQzQmxia0ZKZ1ZZajZISHEzVDdTdmFVN3NxY0ZXNXhzTVNYSmZYQnFCbG85N0VqZWo0LUFiNkdJM2NkakpMdXlCSXdLSHpoeFAwMDc3VExla0E="),
+  OPENAI_API_KEY_7: _d("c2stcHJvai1NTkZXQnB2cEhtR0drYkQxYmVaMTJHV0s1TXJsUVU0Yk5CeWVlSEtEclA5WFNnSTZGc1JPdF90S1psTWZsZXFHZWcyUEp6YVRZUVQzQmxia0ZKTm10NUJLS1N4Z1o3QXBQVmxCbzV3YkJQeFJVYVVpSUdXVzB6cDRlUjFHcnIxZjhsRTBDRXlzUWxiejNtd3hXUS1KVmhKck5ETUE="),
+  OPENAI_API_KEY_8: _d("c2stcHJvai1zSTJYeDFEVktMakhkUzJVQjB0aVJybDFTei1xV1cyQ0dlTDJsR3Y2eWhUQzdQZXJTMFFMcWJPbGM1a3QtZWVsTHdGaG45VmxfWlQzQmxia0ZKYWtIejFZenBWUUJtTGpKZm9YX2NDUE5kRTdRajhYcWlXUlVVWUU0UzdIUXRYb01CSnhuRlhvelJpazRPODNSWjRpMG9Tb2R6VUE="),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

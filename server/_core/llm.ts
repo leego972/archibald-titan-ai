@@ -18,7 +18,11 @@ import {
 import { createLogger } from "./logger.js";
 const log = createLogger("LLM");
 
-/** Free Gemini API key for non-build chat — saves OpenAI credits for builds */
+/**
+ * Gemini API key — EMERGENCY FALLBACK ONLY.
+ * Used only when ALL OpenAI keys are simultaneously exhausted (all 6 keys 429'd).
+ * Normal traffic should NEVER hit Gemini. If it does, we have a key pool problem.
+ */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || Buffer.from("QUl6YVN5Q1pkaXpQMnVUMlJZUi14UU1reUpVOWhWdlRDck5LZ1NB", "base64").toString("utf-8");
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -98,7 +102,10 @@ export type InvokeParams = {
   userApiKey?: string;
   /** Which system is making this call — determines which dedicated API key is used */
   systemTag?: SystemTag;
-  /** Force Gemini for non-build chat to save OpenAI credits */
+  /**
+   * @deprecated Gemini is now emergency-only. All traffic routes through OpenAI key pool.
+   * This flag is ignored — kept for backward compatibility to avoid breaking callers.
+   */
   useGemini?: boolean;
 };
 
@@ -388,16 +395,16 @@ async function _invokeLLMWithRetry(
   // Model selection: "fast" = gpt-4.1-nano, "strong" = gpt-4.1-mini
   // Default: gpt-4.1-mini for tool-calling, gpt-4.1-nano for simple text
   // Cost savings: ~84-97% cheaper than previous gpt-4o routing
-  // Gemini routing: non-build chat uses free Gemini API to preserve OpenAI credits for builds
+  // ALL traffic goes through OpenAI key pool (6 keys with rotation).
+  // Gemini is ONLY used as emergency fallback when all OpenAI keys are exhausted.
   const hasToolsDefined = params.tools && params.tools.length > 0;
   const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
   const useOpenAI = hasKeys();
-  const forceGemini = params.useGemini && GEMINI_API_KEY;
-  const model = forceGemini
-    ? "gemini-2.5-flash"
-    : useOpenAI
-      ? (modelPreference === "fast" ? "gpt-4.1-nano" : "gpt-4.1-mini")
-      : "gemini-2.5-flash";
+  // useGemini flag is IGNORED — all traffic goes through OpenAI now
+  const forceGemini = false;
+  const model = useOpenAI
+    ? (modelPreference === "fast" ? "gpt-4.1-nano" : "gpt-4.1-mini")
+    : "gemini-2.5-flash";
 
   const payload: Record<string, unknown> = {
     model,
@@ -536,10 +543,41 @@ async function _invokeLLMWithRetry(
       return _invokeLLMWithRetry(params, priority, attempt + 1);
     }
 
-    // All retries exhausted
+    // All OpenAI retries exhausted — try Gemini as emergency fallback
+    // ONLY for non-tool-calling requests (Gemini doesn't support OpenAI tool format reliably)
+    const hasTools = params.tools && params.tools.length > 0;
+    if (GEMINI_API_KEY && !hasTools) {
+      log.warn(`[LLM] ${systemTag}: ALL OpenAI keys exhausted after ${maxRetries} retries — emergency Gemini fallback`);
+      try {
+        const geminiResponse = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${GEMINI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gemini-2.5-flash",
+              messages: messages.map(normalizeMessage),
+              max_tokens: payload.max_tokens,
+            }),
+          }
+        );
+        if (geminiResponse.ok) {
+          log.info(`[LLM] ${systemTag}: Gemini emergency fallback succeeded`);
+          return (await geminiResponse.json()) as InvokeResult;
+        }
+        log.warn(`[LLM] ${systemTag}: Gemini emergency fallback also failed: ${geminiResponse.status}`);
+      } catch (geminiErr: unknown) {
+        log.warn(`[LLM] ${systemTag}: Gemini emergency fallback error: ${(geminiErr as Error).message}`);
+      }
+    }
+
+    // Truly exhausted — all providers failed
     const errorText = await response.text();
     throw new Error(
-      `LLM rate limited for system "${systemTag}" after ${maxRetries} retries: ${errorText}`
+      `All LLM providers exhausted for system "${systemTag}" after ${maxRetries} retries. Please try again in a moment.`
     );
   }
 
