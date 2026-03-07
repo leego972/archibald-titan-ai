@@ -177,8 +177,38 @@ export const grantRouter = router({
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
 
-    const grants = await db.listGrantOpportunities();
-    const prompt = `Analyze this company and score each grant opportunity for fit.
+    const allGrants = await db.listGrantOpportunities();
+
+    // Smart filtering: prioritize grants matching the company's region, then include global/nearby
+    const companyLocation = (company.location || '').toLowerCase();
+    let regionHints: string[] = [];
+    if (companyLocation.includes('united kingdom') || companyLocation.includes('london') || companyLocation.includes('uk')) {
+      regionHints = ['United Kingdom', 'European Union'];
+    } else if (companyLocation.includes('australia') || companyLocation.includes('sydney') || companyLocation.includes('melbourne')) {
+      regionHints = ['Australia', 'New Zealand'];
+    } else if (companyLocation.includes('united states') || companyLocation.includes('usa') || companyLocation.includes('new york') || companyLocation.includes('san francisco')) {
+      regionHints = ['United States', 'Canada'];
+    } else if (companyLocation.includes('canada')) {
+      regionHints = ['Canada', 'United States'];
+    } else if (companyLocation.includes('singapore')) {
+      regionHints = ['Singapore'];
+    } else if (companyLocation.includes('israel')) {
+      regionHints = ['Israel'];
+    }
+
+    // Filter to relevant regions (max ~40 grants per batch), fall back to all if no region match
+    let grants = regionHints.length > 0
+      ? allGrants.filter((g: any) => regionHints.some(r => (g.region || '').includes(r)))
+      : allGrants;
+    if (grants.length === 0) grants = allGrants;
+
+    // Batch into chunks of 40 to avoid token limits
+    const BATCH_SIZE = 40;
+    let allMatches: any[] = [];
+
+    for (let i = 0; i < grants.length; i += BATCH_SIZE) {
+      const batch = grants.slice(i, i + BATCH_SIZE);
+      const prompt = `Analyze this company and score each grant opportunity for fit.
 
 Company: ${company.name}
 Industry: ${company.industry || 'General'}
@@ -196,28 +226,34 @@ For each grant, provide a JSON array with objects containing:
 - eligibilityScore (0-100)
 - alignmentScore (0-100)
 - competitivenessScore (0-100)
-- reason (string)
+- reason (string, max 100 chars)
 - successProbability (0-100)
 
 Grants:
-${grants.map((g: any) => `ID:${g.id} - ${g.agency} ${g.programName}: ${g.title} (${g.region}, $${g.minAmount}-$${g.maxAmount})`).join('\n')}
+${batch.map((g: any) => `ID:${g.id} - ${g.agency}: ${g.title} ($${g.minAmount}-$${g.maxAmount})`).join('\n')}
 
-Return ONLY a JSON array, no other text.`;
+Return ONLY a JSON object with a "matches" array.`;
 
-    const response = await invokeLLM({
-      systemTag: "misc",
-      userApiKey,
-      model: "fast",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_schema", json_schema: { name: "grant_matches", strict: true, schema: { type: "object", properties: { matches: { type: "array", items: { type: "object", properties: { grantId: { type: "number" }, matchScore: { type: "number" }, eligibilityScore: { type: "number" }, alignmentScore: { type: "number" }, competitivenessScore: { type: "number" }, reason: { type: "string" }, successProbability: { type: "number" } }, required: ["grantId", "matchScore", "eligibilityScore", "alignmentScore", "competitivenessScore", "reason", "successProbability"], additionalProperties: false } } }, required: ["matches"], additionalProperties: false } } },
-    });
+      try {
+        const response = await invokeLLM({
+          systemTag: "misc",
+          userApiKey,
+          model: "default",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_schema", json_schema: { name: "grant_matches", strict: true, schema: { type: "object", properties: { matches: { type: "array", items: { type: "object", properties: { grantId: { type: "number" }, matchScore: { type: "number" }, eligibilityScore: { type: "number" }, alignmentScore: { type: "number" }, competitivenessScore: { type: "number" }, reason: { type: "string" }, successProbability: { type: "number" } }, required: ["grantId", "matchScore", "eligibilityScore", "alignmentScore", "competitivenessScore", "reason", "successProbability"], additionalProperties: false } } }, required: ["matches"], additionalProperties: false } } },
+        });
 
-    const content = String(response.choices[0]?.message?.content || '{"matches":[]}');
-    let matches: any[] = [];
-    try {
-      const parsed = JSON.parse(content);
-      matches = parsed.matches || parsed;
-    } catch { matches = []; }
+        const content = String(response.choices[0]?.message?.content || '{"matches":[]}');
+        try {
+          const parsed = JSON.parse(content);
+          allMatches.push(...(parsed.matches || parsed));
+        } catch { /* skip bad batch */ }
+      } catch (e) {
+        console.error(`Grant match batch ${i}-${i + BATCH_SIZE} failed:`, e);
+      }
+    }
+
+    const matches = allMatches;
 
     const results = [];
     for (const m of matches) {
