@@ -30,7 +30,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Install Python3 for sandbox code execution/verification
-# Install Go compiler for sandbox Go builds
+# Install Go 1.22 compiler for sandbox Go builds (requires 1.21+ for 'slices' package)
 # Install Playwright/Chromium system dependencies for fetcher engine
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
@@ -38,7 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     python3-dev \
     build-essential \
-    golang \
     gcc \
     wget \
     curl \
@@ -69,7 +68,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     libxshmfence1 \
     xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -q https://go.dev/dl/go1.22.10.linux-amd64.tar.gz -O /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+
+# Set Go environment
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/tmp/go"
+ENV GOROOT="/usr/local/go"
 
 # Pre-install common Python packages so sandbox builds can test without pip install
 # This covers 90%+ of typical build requests
@@ -146,6 +153,9 @@ RUN mkdir -p /home/titan/.cache && chown -R titan:titan /home/titan
 
 # Create sandbox temp directory with proper permissions
 RUN mkdir -p /tmp/titan-sandboxes && chown -R titan:titan /tmp/titan-sandboxes
+
+# Ensure Go module cache is writable for sandbox builds
+RUN mkdir -p /tmp/go && chmod -R a+rwx /tmp/go
 
 # Give titan user write access to Python site-packages so sandbox pip install works
 # PEP 668 workaround: allow pip to install system-wide

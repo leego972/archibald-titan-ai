@@ -362,12 +362,13 @@ export async function executeCommand(
           const env: Record<string, string> = {
             HOME: realHome,
             USER: "sandbox",
-            PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${path.join(realHome, ".local", "bin")}`,
+            PATH: `/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${path.join(realHome, ".local", "bin")}`,
             PYTHONPATH: pipTargetDir,
             PIP_TARGET: pipTargetDir,
             PIP_BREAK_SYSTEM_PACKAGES: "1",
             PYTHONDONTWRITEBYTECODE: "1",
             GOPATH: path.join(realHome, "go"),
+            GOROOT: "/usr/local/go",
             ...(sandbox.envVars || {}),
           };
 
