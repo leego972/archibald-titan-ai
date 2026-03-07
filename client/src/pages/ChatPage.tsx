@@ -1366,6 +1366,47 @@ export default function ChatPage() {
     }
   }, [activeConversationId]);
 
+  // ── Auto-reconnect to active builds on page load / conversation switch ──
+  // If the user logged out, closed the tab, or refreshed while Titan was working,
+  // this detects the still-running build and reconnects the SSE stream.
+  useEffect(() => {
+    if (!activeConversationId || isLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat/build-status/${activeConversationId}`, { credentials: 'include' });
+        if (!res.ok || cancelled) return;
+        const status = await res.json();
+        if (status.active) {
+          // Build is still running — reconnect SSE and show loading state
+          setIsLoading(true);
+          setLoadingPhase(status.currentPhase || 'Resuming build...');
+          toast.info('Titan is still working — reconnecting...');
+          // Reconnect SSE stream
+          const es = new EventSource(`/api/chat/stream/${activeConversationId}`, { withCredentials: true });
+          eventSourceRef.current = es;
+          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message }]); setLoadingPhase(d.message || 'Thinking...'); } catch {} });
+          es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
+          es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary }]); } catch {} });
+          es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
+          es.addEventListener('done', () => {
+            es.close(); eventSourceRef.current = null;
+            setIsLoading(false); setStreamEvents([]);
+            utils.chat.getConversation.invalidate({ id: activeConversationId });
+          });
+          es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
+          es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
+        } else if (status.status === 'completed' && status.response) {
+          // Build finished while we were away — refresh messages
+          utils.chat.getConversation.invalidate({ id: activeConversationId });
+        }
+      } catch {
+        // Silently fail — not critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeConversationId]);
+
   // Auto-scroll to bottom — use double-rAF to ensure layout is settled
   useEffect(() => {
     if (scrollRef.current) {
@@ -2654,15 +2695,42 @@ export default function ChatPage() {
                 />
               </div>
 
-              {/* Send button */}
-              <Button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isRecording || isTranscribing}
-                size="icon"
-                className={`rounded-xl shrink-0 touch-target ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              {/* Send / Stop button */}
+              {isLoading ? (
+                <Button
+                  onClick={async () => {
+                    try {
+                      if (activeConversationId) {
+                        const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+                        await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
+                      }
+                      if (eventSourceRef.current) {
+                        eventSourceRef.current.close();
+                        eventSourceRef.current = null;
+                      }
+                      setIsLoading(false);
+                      setStreamEvents([]);
+                      toast.info('Titan stopped');
+                    } catch {
+                      toast.error('Failed to stop');
+                    }
+                  }}
+                  size="icon"
+                  className={`rounded-xl shrink-0 touch-target bg-red-600 hover:bg-red-700 text-white animate-pulse ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
+                  title="Stop Titan"
+                >
+                  <Square className="h-4 w-4 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || isRecording || isTranscribing}
+                  size="icon"
+                  className={`rounded-xl shrink-0 touch-target ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
