@@ -1,7 +1,7 @@
 import { eq, and, or, gte, lte, like, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
-import { InsertUser, users, companies, InsertCompany, businessPlans, InsertBusinessPlan, grantOpportunities, InsertGrantOpportunity, grantApplications, InsertGrantApplication, grantMatches, InsertGrantMatch, crowdfundingCampaigns, InsertCrowdfundingCampaign, crowdfundingRewards, InsertCrowdfundingReward, crowdfundingContributions, InsertCrowdfundingContribution, crowdfundingUpdates, InsertCrowdfundingUpdate, marketplaceListings, InsertMarketplaceListing, marketplacePurchases, InsertMarketplacePurchase, marketplaceReviews, InsertMarketplaceReview, sellerProfiles, InsertSellerProfile, sellerPayoutMethods, InsertSellerPayoutMethod } from "../drizzle/schema";
+import { InsertUser, users, companies, InsertCompany, businessPlans, InsertBusinessPlan, grantOpportunities, InsertGrantOpportunity, grantApplications, InsertGrantApplication, grantMatches, InsertGrantMatch, crowdfundingCampaigns, InsertCrowdfundingCampaign, crowdfundingRewards, InsertCrowdfundingReward, crowdfundingContributions, InsertCrowdfundingContribution, crowdfundingUpdates, InsertCrowdfundingUpdate, crowdfundingComments, InsertCrowdfundingComment, marketplaceListings, InsertMarketplaceListing, marketplacePurchases, InsertMarketplacePurchase, marketplaceReviews, InsertMarketplaceReview, sellerProfiles, InsertSellerProfile, sellerPayoutMethods, InsertSellerPayoutMethod } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createLogger } from "./_core/logger.js";
 const log = createLogger("Database");
@@ -298,6 +298,31 @@ export async function createCampaignUpdate(data: InsertCrowdfundingUpdate) {
 export async function getUpdatesByCampaign(campaignId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(crowdfundingUpdates).where(eq(crowdfundingUpdates.campaignId, campaignId)).orderBy(desc(crowdfundingUpdates.createdAt));
+}
+
+// --- Crowdfunding Delete ---
+export async function deleteCampaign(id: number) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  await db.delete(crowdfundingRewards).where(eq(crowdfundingRewards.campaignId, id));
+  await db.delete(crowdfundingContributions).where(eq(crowdfundingContributions.campaignId, id));
+  await db.delete(crowdfundingUpdates).where(eq(crowdfundingUpdates.campaignId, id));
+  await db.delete(crowdfundingComments).where(eq(crowdfundingComments.campaignId, id));
+  await db.delete(crowdfundingCampaigns).where(eq(crowdfundingCampaigns.id, id));
+}
+
+// --- Crowdfunding Comments ---
+export async function createComment(data: InsertCrowdfundingComment) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  const result = await db.insert(crowdfundingComments).values(data);
+  return { id: result[0].insertId };
+}
+export async function getCommentsByCampaign(campaignId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(crowdfundingComments).where(eq(crowdfundingComments.campaignId, campaignId)).orderBy(desc(crowdfundingComments.createdAt));
+}
+export async function deleteComment(id: number) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  await db.delete(crowdfundingComments).where(eq(crowdfundingComments.id, id));
 }
 
 // ==========================================

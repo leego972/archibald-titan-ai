@@ -1102,6 +1102,17 @@ export const crowdfundingUpdates = mysqlTable("crowdfundingUpdates", {
 export type CrowdfundingUpdate = typeof crowdfundingUpdates.$inferSelect;
 export type InsertCrowdfundingUpdate = typeof crowdfundingUpdates.$inferInsert;
 
+export const crowdfundingComments = mysqlTable("crowdfundingComments", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull().references(() => crowdfundingCampaigns.id),
+  userId: int("userId").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  parentId: int("parentId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CrowdfundingComment = typeof crowdfundingComments.$inferSelect;
+export type InsertCrowdfundingComment = typeof crowdfundingComments.$inferInsert;
+
 // ─── V8.0: Persistent Sandboxes ──────────────────────────────────
 
 export const sandboxes = mysqlTable("sandboxes", {

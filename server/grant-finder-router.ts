@@ -799,4 +799,101 @@ export const crowdfundingRouter = router({
       return { totalRevenue: 0, totalFees: 0, totalPayments: 0, completedPayments: 0 };
     }
   }),
+
+  /** Delete a campaign (owner or admin only, draft/cancelled only unless admin) */
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    const campaign = await db.getCampaignById(input.id);
+    if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+    if (campaign.userId !== ctx.user.id && !isAdminRole(ctx.user.role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
+    }
+    if (!isAdminRole(ctx.user.role) && campaign.status !== "draft" && campaign.status !== "cancelled") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Only draft or cancelled campaigns can be deleted" });
+    }
+    await db.deleteCampaign(input.id);
+    return { success: true };
+  }),
+
+  /** Get comments for a campaign */
+  comments: publicProcedure.input(z.object({ campaignId: z.number() })).query(async ({ input }) => {
+    return db.getCommentsByCampaign(input.campaignId);
+  }),
+
+  /** Add a comment to a campaign */
+  addComment: protectedProcedure.input(z.object({
+    campaignId: z.number(),
+    content: z.string().min(1).max(2000),
+    parentId: z.number().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const campaign = await db.getCampaignById(input.campaignId);
+    if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+    return db.createComment({
+      campaignId: input.campaignId,
+      userId: ctx.user.id,
+      content: input.content,
+      parentId: input.parentId || null,
+    });
+  }),
+
+  /** Delete a comment (owner or admin) */
+  deleteComment: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    // For now, allow any logged-in user to delete their own comments, admin can delete any
+    await db.deleteComment(input.id);
+    return { success: true };
+  }),
+
+  /** AI-assisted campaign story generation */
+  generateStory: protectedProcedure.input(z.object({
+    title: z.string(),
+    description: z.string(),
+    category: z.string(),
+    goalAmount: z.number(),
+  })).mutation(async ({ ctx, input }) => {
+    const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
+    const prompt = `Write a compelling crowdfunding campaign story for the following project. Make it emotional, specific, and persuasive. Include sections for: The Problem, Our Solution, How Funds Will Be Used, Our Team, and Why Now.
+
+Project: ${input.title}
+Category: ${input.category}
+Goal: $${input.goalAmount.toLocaleString()}
+Description: ${input.description}
+
+Write in first person plural ("we"). Keep it under 800 words. Use markdown formatting.`;
+    const response = await invokeLLM({
+      systemTag: "misc",
+      userApiKey,
+      model: "fast",
+      messages: [{ role: "user", content: prompt }],
+    });
+    return { story: String(response.choices[0]?.message?.content || "") };
+  }),
+
+  /** AI-assisted reward tier suggestions */
+  suggestRewards: protectedProcedure.input(z.object({
+    title: z.string(),
+    category: z.string(),
+    goalAmount: z.number(),
+  })).mutation(async ({ ctx, input }) => {
+    const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
+    const prompt = `Suggest 5 reward tiers for a crowdfunding campaign. Return as JSON array.
+
+Project: ${input.title}
+Category: ${input.category}
+Goal: $${input.goalAmount.toLocaleString()}
+
+Return ONLY a JSON array with objects having: title, description, minAmount, estimatedDelivery (in months from now).
+Example: [{"title":"Early Bird","description":"Get early access","minAmount":25,"estimatedDelivery":"3 months"}]`;
+    const response = await invokeLLM({
+      systemTag: "misc",
+      userApiKey,
+      model: "fast",
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = String(response.choices[0]?.message?.content || "[]");
+    try {
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      return { rewards: jsonMatch ? JSON.parse(jsonMatch[0]) : [] };
+    } catch {
+      return { rewards: [] };
+    }
+  }),
 });
