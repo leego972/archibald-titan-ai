@@ -238,7 +238,7 @@ Return ONLY a JSON object with a "matches" array.`;
         const response = await invokeLLM({
           systemTag: "misc",
           userApiKey,
-          model: "default",
+          model: "strong",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_schema", json_schema: { name: "grant_matches", strict: true, schema: { type: "object", properties: { matches: { type: "array", items: { type: "object", properties: { grantId: { type: "number" }, matchScore: { type: "number" }, eligibilityScore: { type: "number" }, alignmentScore: { type: "number" }, competitivenessScore: { type: "number" }, reason: { type: "string" }, successProbability: { type: "number" } }, required: ["grantId", "matchScore", "eligibilityScore", "alignmentScore", "competitivenessScore", "reason", "successProbability"], additionalProperties: false } } }, required: ["matches"], additionalProperties: false } } },
         });
@@ -305,63 +305,323 @@ export const grantApplicationRouter = router({
       }
     }
 
-    const prompt = `Generate a complete grant application for the following:
-
-Company: ${company.name} (${company.industry || 'General'})
-Technology: ${company.technologyArea || 'General'}
+    // ── Shared context for all section prompts ──
+    const companyCtx = `Company: ${company.name}
+Industry: ${company.industry || 'Technology / AI'}
+Technology Area: ${company.technologyArea || 'Artificial Intelligence'}
 Location: ${company.location || 'Not specified'}
-${businessPlanContext}
+Country: ${company.country || 'United Kingdom'}
+Employees: ${company.employeeCount || 'Startup (<10)'}
+Annual Revenue: ${company.annualRevenue ? '$' + company.annualRevenue.toLocaleString() : 'Pre-revenue / Early stage'}
+Founded: ${company.foundedYear || 'Recently founded'}
+Website: ${company.website || 'N/A'}
+Description: ${company.description || company.name + ' is an innovative technology company.'}
+${businessPlanContext}`;
 
-Grant: ${grant.agency} - ${grant.programName}
-Title: ${grant.title}
-Description: ${grant.description}
-Focus Areas: ${grant.focusAreas}
-Amount: $${grant.minAmount?.toLocaleString()} - $${grant.maxAmount?.toLocaleString()}
-Eligibility: ${grant.eligibilityCriteria}
+    const grantCtx = `Grant Agency: ${grant.agency}
+Grant Program: ${grant.programName}
+Grant Title: ${grant.title}
+Grant Description: ${grant.description || 'Innovation funding for technology projects'}
+Focus Areas: ${grant.focusAreas || 'Technology, Innovation, R&D'}
+Funding Range: ${grant.currency || '$'}${grant.minAmount?.toLocaleString() || '25,000'} - ${grant.currency || '$'}${grant.maxAmount?.toLocaleString() || '500,000'}
+Eligibility: ${grant.eligibilityCriteria || 'UK-based SMEs and startups'}
+Region: ${grant.region || 'UK'}`;
 
-Generate these sections:
-## Technical Abstract
-## Project Description
-## Specific Aims
-## Innovation
-## Approach
-## Commercialization Plan
-## Budget (estimated breakdown)
-## Budget Justification
-## Timeline
+    const systemPrompt = `You are an expert grant writer who has successfully secured over $50 million in government innovation funding. You write in a professional, compelling, evidence-based style that grant reviewers love. You understand what makes applications score highly: clear problem statements, measurable outcomes, realistic budgets, and strong innovation narratives. Write in plain English, avoid jargon, and be specific with numbers and timelines.`;
 
-Also provide:
-- Success Probability (0-100)
-- Quality Score (0-100)
-- Priority ranking (1-10, 1 being highest)`;
+    // ── Helper to call LLM for each section ──
+    async function generateSection(sectionPrompt: string): Promise<string> {
+      try {
+        const response = await invokeLLM({
+          systemTag: "misc",
+          userApiKey,
+          model: "strong",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: sectionPrompt },
+          ],
+        });
+        return String(response.choices[0]?.message?.content || '').trim();
+      } catch (err) {
+        log.error(`[GrantGen] Section generation failed: ${getErrorMessage(err)}`);
+        return '';
+      }
+    }
 
-    const response = await invokeLLM({
-      systemTag: "misc",
-      userApiKey,
-      model: "fast", messages: [{ role: "user", content: prompt }] });
-    const content = String(response.choices[0]?.message?.content || '');
+    // ── Generate each section with expert prompts ──
+    log.info(`[GrantGen] Starting multi-section generation for ${company.name} → ${grant.programName}`);
 
-    const successMatch = content.match(/Success Probability[:\s]*(\d+)/i);
-    const qualityMatch = content.match(/Quality Score[:\s]*(\d+)/i);
-    const priorityMatch = content.match(/Priority[:\s]*(\d+)/i);
+    // 1. Technical Abstract (250 words max — most critical section)
+    const technicalAbstract = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write a Technical Abstract (250 words maximum) for this grant application. This is the MOST IMPORTANT section — reviewers read this first and form their initial impression.
+
+The abstract MUST include:
+1. The problem being solved and why it matters (2-3 sentences)
+2. The proposed solution and what makes it innovative (2-3 sentences)
+3. The technical approach in brief (2-3 sentences)
+4. Expected outcomes and impact — use specific numbers (2-3 sentences)
+5. Why this team/company is uniquely positioned to deliver (1-2 sentences)
+
+Write it as a single flowing paragraph. Be specific, use numbers, and make every word count. Do NOT include any headers or labels — just the abstract text.`);
+
+    // 2. Project Description (detailed, 800-1200 words)
+    const projectDescription = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write a detailed Project Description (800-1200 words) for this grant application. Structure it with clear subheadings:
+
+### The Problem
+Describe the market/industry problem in detail. Use statistics and evidence. Explain who is affected and the cost of inaction.
+
+### Our Solution
+Describe the proposed technology/product in detail. Explain how it works technically. What makes it different from existing solutions?
+
+### How It Works
+Provide a technical walkthrough of the solution architecture, key components, and user experience. Be specific about the technology stack and methodology.
+
+### Key Innovations
+List 3-5 specific technical innovations with brief explanations of each.
+
+### Target Users & Market
+Describe the target market, market size (TAM/SAM/SOM), and go-to-market strategy.
+
+### Expected Benefits & Impact
+Quantify the expected outcomes: users served, revenue potential, jobs created, efficiency gains, environmental impact, etc.
+
+Write in a professional, evidence-based tone. Use specific numbers wherever possible. Do NOT include any section labels like "Project Description" — just start with the content.`);
+
+    // 3. Specific Aims (3-5 measurable objectives)
+    const specificAims = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write 3-5 Specific Aims for this grant application. Each aim must be:
+- Numbered (Aim 1, Aim 2, etc.)
+- A clear, measurable objective with a specific deliverable
+- Include a success metric (e.g., "achieve 95% accuracy", "onboard 1,000 users", "reduce processing time by 60%")
+- Include a timeline (e.g., "by Month 6", "within the first quarter")
+- Include a brief rationale (1-2 sentences explaining why this aim matters)
+
+Format each aim as:
+**Aim N: [Title]**
+Objective: [What will be achieved]
+Success Metric: [How success is measured]
+Timeline: [When it will be completed]
+Rationale: [Why this matters]
+
+Make the aims progressive — each building on the previous. Together they should tell a complete story from R&D through to market validation. Do NOT include any section labels like "Specific Aims" — just start with Aim 1.`);
+
+    // 4. Innovation Statement
+    const innovation = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write an Innovation Statement (400-600 words) for this grant application. This section must convince reviewers that this project represents genuine innovation, not incremental improvement.
+
+Address these points:
+1. **What is genuinely new** — describe the novel technical contribution (not just "we use AI")
+2. **Current state of the art** — what exists today and its limitations
+3. **How this advances beyond the state of the art** — specific technical differentiators
+4. **Intellectual property** — any patents, trade secrets, or proprietary methods
+5. **Why now** — what recent advances make this possible today but not 2 years ago
+6. **Risk and mitigation** — acknowledge technical risks and how they'll be managed
+
+Be specific and technical. Avoid vague claims. Reference real technologies and approaches. Do NOT include any section labels — just start with the content.`);
+
+    // 5. Approach / Methodology
+    const approach = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write a detailed Technical Approach / Methodology section (600-800 words) for this grant application.
+
+Structure it as:
+
+### Research & Development Methodology
+Describe the R&D approach: agile sprints, user-centered design, iterative prototyping, etc.
+
+### Work Packages
+Define 4-6 work packages, each with:
+- WP title and duration
+- Key activities (3-4 bullet points)
+- Deliverables
+- Dependencies on other WPs
+
+### Technical Architecture
+Describe the system architecture, key technologies, and integration points.
+
+### Testing & Validation
+How will the solution be tested? What metrics define success? Include alpha/beta testing plans.
+
+### Risk Management
+Identify 3-4 key technical risks with mitigation strategies.
+
+Be practical and realistic. Reviewers want to see you've thought through HOW you'll actually deliver. Do NOT include any section labels like "Approach" — just start with the content.`);
+
+    // 6. Commercialization Plan
+    const commercializationPlan = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Write a Commercialization Plan (400-600 words) for this grant application. Grant agencies want to see that public money will generate economic returns.
+
+Cover:
+1. **Business Model** — how the product/service generates revenue (SaaS, licensing, freemium, etc.)
+2. **Pricing Strategy** — specific price points and tiers
+3. **Go-to-Market Strategy** — how you'll acquire customers (channels, partnerships, marketing)
+4. **Revenue Projections** — Year 1, 2, 3 revenue estimates with assumptions
+5. **Market Validation** — any existing users, LOIs, pilot agreements, or waitlist numbers
+6. **Competitive Advantage** — sustainable moats (technology, data, network effects)
+7. **Job Creation** — how many jobs will be created in Years 1-3
+8. **Wider Economic Impact** — contribution to the local/national economy
+
+Use specific numbers. Be ambitious but realistic. Do NOT include any section labels — just start with the content.`);
+
+    // 7. Budget Breakdown
+    const budget = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Create a detailed Budget Breakdown for this grant application. The total budget should be realistic for the grant funding range (${grant.currency || '$'}${grant.minAmount?.toLocaleString() || '25,000'} - ${grant.currency || '$'}${grant.maxAmount?.toLocaleString() || '500,000'}).
+
+Format as a clear table-style breakdown:
+
+**Personnel Costs** (typically 50-60% of total)
+- Role 1: [Title] — [FTE] × [Duration] × [Rate] = [Total]
+- Role 2: etc.
+Subtotal: [Amount]
+
+**Equipment & Software** (typically 5-10%)
+- Item 1: [Description] = [Cost]
+Subtotal: [Amount]
+
+**Subcontracting & External Services** (typically 10-15%)
+- Service 1: [Description] = [Cost]
+Subtotal: [Amount]
+
+**Travel & Dissemination** (typically 5%)
+- Item 1: [Description] = [Cost]
+Subtotal: [Amount]
+
+**Overheads & Indirect Costs** (typically 15-20%)
+- Overhead rate: [Percentage] of direct costs = [Amount]
+
+**TOTAL PROJECT COST: [Amount]**
+**GRANT FUNDING REQUESTED: [Amount]** (typically 50-70% of total for Innovate UK)
+**COMPANY MATCH FUNDING: [Amount]**
+
+Make the numbers realistic and internally consistent. Every line item should be justifiable. Do NOT include any section labels like "Budget" — just start with the breakdown.`);
+
+    // 8. Budget Justification
+    const budgetJustification = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Based on this budget context:
+${budget.substring(0, 1500)}
+
+Write a Budget Justification (300-500 words) explaining why each major cost category is necessary and represents value for money.
+
+For each category explain:
+- Why this expenditure is essential to the project
+- How the costs were estimated (market rates, quotes, benchmarks)
+- Why this represents good value for money
+
+Also address:
+- How the company will provide match funding
+- Any in-kind contributions
+- How costs will be managed and monitored
+
+Be specific and practical. Reviewers want to see that money will be spent wisely. Do NOT include any section labels — just start with the justification.`);
+
+    // 9. Timeline / Milestones
+    const timeline = await generateSection(`
+${companyCtx}
+
+${grantCtx}
+
+Create a detailed Project Timeline with milestones for a 12-18 month project.
+
+Format as:
+
+**Phase 1: [Name] (Months 1-3)**
+- Milestone 1.1: [Description] — Deliverable: [What]
+- Milestone 1.2: [Description] — Deliverable: [What]
+- Key Decision Point: [Go/No-Go criteria]
+
+**Phase 2: [Name] (Months 4-6)**
+- Milestone 2.1: etc.
+
+**Phase 3: [Name] (Months 7-9)**
+
+**Phase 4: [Name] (Months 10-12)**
+
+**Phase 5: [Name] (Months 13-18)** (if applicable)
+
+Include:
+- Clear deliverables for each milestone
+- Go/No-Go decision points between phases
+- Dependencies between milestones
+- A final milestone for project completion and reporting
+
+Make the timeline realistic and achievable. Do NOT include any section labels like "Timeline" — just start with Phase 1.`);
+
+    // 10. Score the application
+    const scoreResponse = await generateSection(`
+You are a grant review panel assessor. Score this application objectively.
+
+Company: ${company.name} — ${company.description || company.technologyArea || 'AI technology company'}
+Grant: ${grant.agency} — ${grant.programName}
+
+Abstract: ${technicalAbstract.substring(0, 500)}
+Innovation: ${innovation.substring(0, 500)}
+Approach: ${approach.substring(0, 500)}
+
+Provide ONLY these three numbers on separate lines, nothing else:
+Success Probability: [0-100]
+Quality Score: [0-100]
+Priority: [1-10]
+
+Be realistic — most first-time applications score 40-65. Strong applications with clear innovation and realistic plans score 65-85. Only exceptional applications score 85+.`);
+
+    const successMatch = scoreResponse.match(/Success Probability[:\s]*(\d+)/i);
+    const qualityMatch = scoreResponse.match(/Quality Score[:\s]*(\d+)/i);
+    const priorityMatch = scoreResponse.match(/Priority[:\s]*(\d+)/i);
+    const successProb = successMatch ? Math.min(parseInt(successMatch[1]), 100) : 55;
+    const qualityScore = qualityMatch ? Math.min(parseInt(qualityMatch[1]), 100) : 60;
+    const priority = priorityMatch ? Math.min(parseInt(priorityMatch[1]), 10) : 3;
+
+    log.info(`[GrantGen] Complete! Score: ${successProb}% success, ${qualityScore}/100 quality, priority ${priority}`);
 
     const application = {
       companyId: input.companyId,
       grantOpportunityId: input.grantOpportunityId,
       businessPlanId: input.businessPlanId || null,
-      technicalAbstract: extractSection(content, 'Technical Abstract'),
-      projectDescription: extractSection(content, 'Project Description'),
-      specificAims: extractSection(content, 'Specific Aims'),
-      innovation: extractSection(content, 'Innovation'),
-      approach: extractSection(content, 'Approach'),
-      commercializationPlan: extractSection(content, 'Commercialization Plan'),
-      budget: extractSection(content, 'Budget'),
-      budgetJustification: extractSection(content, 'Budget Justification'),
-      timeline: extractSection(content, 'Timeline'),
-      successProbability: successMatch ? parseInt(successMatch[1]) : 50,
-      qualityScore: qualityMatch ? parseInt(qualityMatch[1]) : 50,
-      priority: priorityMatch ? parseInt(priorityMatch[1]) : 5,
-      expectedValue: grant.maxAmount ? Math.round((grant.maxAmount * (successMatch ? parseInt(successMatch[1]) : 50)) / 100) : 0,
+      technicalAbstract,
+      projectDescription,
+      specificAims,
+      innovation,
+      approach,
+      commercializationPlan,
+      budget,
+      budgetJustification,
+      timeline,
+      successProbability: successProb,
+      qualityScore,
+      priority,
+      expectedValue: grant.maxAmount ? Math.round((grant.maxAmount * successProb) / 100) : 0,
       status: "draft" as const,
     };
 
