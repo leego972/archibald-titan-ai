@@ -1736,7 +1736,19 @@ export default function ChatPage() {
             };
           });
         if (newFiles.length > 0) {
-          setCreatedFiles(prev => [...prev, ...newFiles]);
+          setCreatedFiles(prev => {
+            // Deduplicate: replace existing files with the same name (rewrites)
+            const updated = [...prev];
+            for (const nf of newFiles) {
+              const existingIdx = updated.findIndex(f => f.name === nf.name);
+              if (existingIdx >= 0) {
+                updated[existingIdx] = nf; // Replace old version
+              } else {
+                updated.push(nf); // New file
+              }
+            }
+            return updated;
+          });
           setShowProjectFiles(true);
         }
       }

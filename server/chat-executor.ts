@@ -3748,6 +3748,25 @@ async function execCreateFile(
     const pathParts = fileName.split("/");
     const derivedProjectName = pathParts.length > 1 ? pathParts[0] : "general";
     if (db) {
+      // ── DEDUPLICATION: delete any existing file with the same path in this conversation ──
+      // This ensures rewrites replace the old version instead of creating duplicates
+      if (conversationId) {
+        await db.delete(sandboxFiles).where(
+          and(
+            eq(sandboxFiles.sandboxId, sbId),
+            eq(sandboxFiles.filePath, fileName),
+            eq(sandboxFiles.conversationId, conversationId)
+          )
+        );
+      } else {
+        await db.delete(sandboxFiles).where(
+          and(
+            eq(sandboxFiles.sandboxId, sbId),
+            eq(sandboxFiles.filePath, fileName),
+            isNull(sandboxFiles.conversationId)
+          )
+        );
+      }
       await db.insert(sandboxFiles).values({
         sandboxId: sbId,
         filePath: fileName,
