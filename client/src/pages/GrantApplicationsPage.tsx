@@ -76,10 +76,12 @@ function SectionContent({ content, isMono }: { content: string; isMono?: boolean
   );
 }
 
-function ApplicationCard({ app, isExpanded, onToggle }: { app: any; isExpanded: boolean; onToggle: () => void }) {
+function ApplicationCard({ app, isExpanded, onToggle, onRegenerated }: { app: any; isExpanded: boolean; onToggle: () => void; onRegenerated?: () => void }) {
   const config = STATUS_CONFIG[app.status] || STATUS_CONFIG.draft;
   const StatusIcon = config.icon;
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const regenerateMutation = trpc.grantApplications.regenerateMissing.useMutation();
 
   // Count how many sections are filled
   const filledSections = SECTION_TABS.filter((tab) => app[tab.field]?.trim()).length;
@@ -192,9 +194,37 @@ function ApplicationCard({ app, isExpanded, onToggle }: { app: any; isExpanded: 
                 </span>
               </div>
             )}
-            <Button variant="outline" size="sm" onClick={handleExportAll} className="gap-2 text-xs">
-              <Download className="w-3.5 h-3.5" /> Export Full Application
-            </Button>
+            <div className="flex gap-2">
+              {filledSections < SECTION_TABS.length && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isRegenerating}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setIsRegenerating(true);
+                    try {
+                      const result = await regenerateMutation.mutateAsync({ applicationId: app.id });
+                      if (onRegenerated) onRegenerated();
+                    } catch (err) {
+                      console.error('Regeneration failed:', err);
+                    } finally {
+                      setIsRegenerating(false);
+                    }
+                  }}
+                  className="gap-2 text-xs border-amber-700/50 text-amber-400 hover:bg-amber-950/30"
+                >
+                  {isRegenerating ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Regenerating...</>
+                  ) : (
+                    <><Sparkles className="w-3.5 h-3.5" /> Fill Missing Sections ({SECTION_TABS.length - filledSections})</>
+                  )}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExportAll} className="gap-2 text-xs">
+                <Download className="w-3.5 h-3.5" /> Export Full Application
+              </Button>
+            </div>
           </div>
 
           <Tabs defaultValue="abstract" className="w-full">
@@ -390,6 +420,10 @@ export default function GrantApplicationsPage() {
               app={app}
               isExpanded={expandedId === app.id}
               onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
+              onRegenerated={() => {
+                // Refetch applications to get updated content
+                window.location.reload();
+              }}
             />
           ))}
         </div>

@@ -627,6 +627,106 @@ Be realistic — most first-time applications score 40-65. Strong applications w
 
     return db.createGrantApplication(application);
   }),
+  regenerateMissing: protectedProcedure.input(z.object({
+    applicationId: z.number(),
+  })).mutation(async ({ input, ctx }) => {
+    const app = await db.getGrantApplicationById(input.applicationId);
+    if (!app) throw new TRPCError({ code: "NOT_FOUND", message: "Application not found" });
+    const company = await db.getCompanyById(app.companyId);
+    if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
+    const grant = await db.getGrantOpportunityById(app.grantOpportunityId);
+    if (!grant) throw new TRPCError({ code: "NOT_FOUND", message: "Grant not found" });
+    const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
+
+    const systemPrompt = `You are an expert grant writer who has successfully secured over $50 million in government innovation funding. You write in a professional, compelling, evidence-based style that grant reviewers love. Write in plain English, avoid jargon, and be specific with numbers and timelines.`;
+
+    const companyCtx = `Company: ${company.name}\nIndustry: ${company.industry || 'Technology / AI'}\nTechnology Area: ${company.technologyArea || 'Artificial Intelligence'}\nLocation: ${company.location || 'Not specified'}\nCountry: ${company.country || 'United Kingdom'}\nEmployees: ${company.employeeCount || 'Startup (<10)'}\nDescription: ${company.description || company.name + ' is an innovative technology company.'}`;
+
+    const grantCtx = `Grant Agency: ${grant.agency}\nGrant Program: ${grant.programName}\nGrant Title: ${grant.title}\nFocus Areas: ${grant.focusAreas || 'Technology, Innovation, R&D'}\nFunding Range: ${grant.currency || '$'}${grant.minAmount?.toLocaleString() || '25,000'} - ${grant.currency || '$'}${grant.maxAmount?.toLocaleString() || '500,000'}\nRegion: ${grant.region || 'UK'}`;
+
+    async function genSection(sectionPrompt: string): Promise<string> {
+      try {
+        const response = await invokeLLM({
+          systemTag: "misc",
+          userApiKey,
+          model: "strong",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: sectionPrompt },
+          ],
+        });
+        return String(response.choices[0]?.message?.content || '').trim();
+      } catch (err) {
+        log.error(`[GrantRegen] Section failed: ${getErrorMessage(err)}`);
+        return '';
+      }
+    }
+
+    const updates: Record<string, string> = {};
+    let regenerated = 0;
+
+    // Check each section and regenerate if empty
+    if (!app.budgetJustification) {
+      log.info(`[GrantRegen] Regenerating budgetJustification`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nBased on this budget:\n${(app.budget || '').substring(0, 1500)}\n\nWrite a Budget Justification (300-500 words) explaining why each major cost category is necessary and represents value for money. For each category explain why the expenditure is essential, how costs were estimated (market rates, quotes, benchmarks), and why it represents good value for money. Also address how the company will provide match funding, any in-kind contributions, and how costs will be managed. Be specific and practical. Do NOT include any section labels — just start with the justification.`);
+      if (result) { updates.budgetJustification = result; regenerated++; }
+    }
+
+    if (!app.timeline) {
+      log.info(`[GrantRegen] Regenerating timeline`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nCreate a detailed Project Timeline with milestones for a 12-18 month project.\n\nFormat as:\n\n**Phase 1: [Name] (Months 1-3)**\n- Milestone 1.1: [Description] — Deliverable: [What]\n- Key Decision Point: [Go/No-Go criteria]\n\n**Phase 2: [Name] (Months 4-6)**\n\n**Phase 3: [Name] (Months 7-9)**\n\n**Phase 4: [Name] (Months 10-12)**\n\n**Phase 5: [Name] (Months 13-18)** (if applicable)\n\nInclude clear deliverables, Go/No-Go decision points, dependencies, and a final milestone for project completion. Make it realistic and achievable. Do NOT include any section labels — just start with Phase 1.`);
+      if (result) { updates.timeline = result; regenerated++; }
+    }
+
+    if (!app.technicalAbstract) {
+      log.info(`[GrantRegen] Regenerating technicalAbstract`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite a Technical Abstract (250 words maximum) for this grant application. Include: the problem (2-3 sentences), the solution and what makes it innovative (2-3 sentences), the technical approach (2-3 sentences), expected outcomes with specific numbers (2-3 sentences), and why this team is uniquely positioned (1-2 sentences). Write as a single flowing paragraph. Do NOT include headers — just the abstract text.`);
+      if (result) { updates.technicalAbstract = result; regenerated++; }
+    }
+
+    if (!app.projectDescription) {
+      log.info(`[GrantRegen] Regenerating projectDescription`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite a detailed Project Description (800-1200 words) with subheadings: ### The Problem, ### Our Solution, ### How It Works, ### Key Innovations, ### Target Users & Market, ### Expected Benefits & Impact. Use specific numbers. Do NOT include section labels like "Project Description" — just start with the content.`);
+      if (result) { updates.projectDescription = result; regenerated++; }
+    }
+
+    if (!app.specificAims) {
+      log.info(`[GrantRegen] Regenerating specificAims`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite 3-5 Specific Aims. Each must include: a numbered title, a clear measurable objective, a success metric, a timeline, and a brief rationale. Format each as **Aim N: [Title]** followed by Objective, Success Metric, Timeline, Rationale. Make aims progressive. Do NOT include section labels — just start with Aim 1.`);
+      if (result) { updates.specificAims = result; regenerated++; }
+    }
+
+    if (!app.innovation) {
+      log.info(`[GrantRegen] Regenerating innovation`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite an Innovation Statement (400-600 words). Address: what is genuinely new, current state of the art and its limitations, how this advances beyond it, intellectual property, why now, and risk mitigation. Be specific and technical. Do NOT include section labels — just start with the content.`);
+      if (result) { updates.innovation = result; regenerated++; }
+    }
+
+    if (!app.approach) {
+      log.info(`[GrantRegen] Regenerating approach`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite a Technical Approach / Methodology section (600-800 words). Include: R&D Methodology, 4-6 Work Packages with activities and deliverables, Technical Architecture, Testing & Validation plan, and Risk Management with 3-4 risks and mitigations. Do NOT include section labels — just start with the content.`);
+      if (result) { updates.approach = result; regenerated++; }
+    }
+
+    if (!app.commercializationPlan) {
+      log.info(`[GrantRegen] Regenerating commercializationPlan`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nWrite a Commercialization Plan (400-600 words). Cover: business model, pricing strategy, go-to-market strategy, revenue projections (Year 1-3), market validation, competitive advantage, job creation, and wider economic impact. Use specific numbers. Do NOT include section labels — just start with the content.`);
+      if (result) { updates.commercializationPlan = result; regenerated++; }
+    }
+
+    if (!app.budget) {
+      log.info(`[GrantRegen] Regenerating budget`);
+      const result = await genSection(`${companyCtx}\n\n${grantCtx}\n\nCreate a detailed Budget Breakdown. Include Personnel Costs (50-60%), Equipment & Software (5-10%), Subcontracting (10-15%), Travel (5%), and Overheads (15-20%). Show TOTAL PROJECT COST, GRANT FUNDING REQUESTED, and COMPANY MATCH FUNDING. Make numbers realistic. Do NOT include section labels — just start with the breakdown.`);
+      if (result) { updates.budget = result; regenerated++; }
+    }
+
+    if (regenerated > 0) {
+      await db.updateGrantApplication(input.applicationId, updates as any);
+      log.info(`[GrantRegen] Regenerated ${regenerated} sections for application ${input.applicationId}`);
+    }
+
+    return { success: true, regenerated, total: 9 };
+  }),
   updateStatus: protectedProcedure.input(z.object({
     id: z.number(),
     status: z.enum(["draft", "ready", "submitted", "under_review", "awarded", "rejected"]),
