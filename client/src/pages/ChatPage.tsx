@@ -1073,9 +1073,28 @@ export default function ChatPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showProjectFiles, setShowProjectFiles] = useState(false);
   const [showTokenInput, setShowTokenInput] = useState(false);
+
+  // Load saved tokens from database when panel opens
+  useEffect(() => {
+    if (!showTokenInput) return;
+    setLoadingTokens(true);
+    fetch('/api/trpc/userSecrets.listTokens', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        const tokens = data?.result?.data?.json || [];
+        setSavedTokens(tokens.map((t: any) => ({
+          id: t.id,
+          name: t.label?.split(' (')[0] || t.secretType,
+          preview: t.label?.match(/\((.+)\)/)?.[1] || t.secretType,
+        })));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTokens(false));
+  }, [showTokenInput]);
   const [tokenName, setTokenName] = useState('');
   const [tokenValue, setTokenValue] = useState('');
-  const [savedTokens, setSavedTokens] = useState<Array<{name: string; preview: string}>>([]); 
+  const [savedTokens, setSavedTokens] = useState<Array<{id: number; name: string; preview: string}>>([]); 
+  const [loadingTokens, setLoadingTokens] = useState(false);
   // ── Custom Instructions ──
   const [showCustomInstructions, setShowCustomInstructions] = useState(false);
   const [customInstructionsText, setCustomInstructionsText] = useState('');
@@ -2843,7 +2862,21 @@ export default function ChatPage() {
                     const preview = tokenValue.length > 10
                       ? tokenValue.substring(0, 6) + '...' + tokenValue.substring(tokenValue.length - 4)
                       : '••••••';
-                    setSavedTokens(prev => [...prev, { name: tokenName, preview }]);
+                    // Reload tokens from DB to get the real list with IDs
+                    fetch('/api/trpc/userSecrets.listTokens', { credentials: 'include' })
+                      .then(r => r.json())
+                      .then(data => {
+                        const tokens = data?.result?.data?.json || [];
+                        setSavedTokens(tokens.map((t: any) => ({
+                          id: t.id,
+                          name: t.label?.split(' (')[0] || t.secretType,
+                          preview: t.label?.match(/\((.+)\)/)?.[1] || t.secretType,
+                        })));
+                      })
+                      .catch(() => {
+                        // Fallback: add to local state
+                        setSavedTokens(prev => [...prev, { id: Date.now(), name: tokenName, preview }]);
+                      });
                     setTokenName('');
                     setTokenValue('');
                     toast.success(`Token "${tokenName}" saved to vault`);
@@ -2863,9 +2896,15 @@ export default function ChatPage() {
                 Save Token
               </Button>
             </div>
-            {savedTokens.length > 0 && (
+            {loadingTokens && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-amber-400 mr-2" />
+                <span className="text-xs text-muted-foreground">Loading saved tokens...</span>
+              </div>
+            )}
+            {!loadingTokens && savedTokens.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-border">
-                <h4 className="text-xs font-medium text-muted-foreground">Saved Tokens</h4>
+                <h4 className="text-xs font-medium text-muted-foreground">Saved Tokens ({savedTokens.length})</h4>
                 {savedTokens.map((t, i) => (
                   <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg border border-border/50 bg-card">
                     <div className="flex items-center gap-2">
@@ -2876,7 +2915,19 @@ export default function ChatPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setSavedTokens(prev => prev.filter((_, idx) => idx !== i))}
+                      onClick={async () => {
+                        const csrfTk = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+                        try {
+                          await fetch('/api/trpc/userSecrets.deleteToken', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfTk },
+                            credentials: 'include',
+                            body: JSON.stringify({ json: { id: t.id } }),
+                          });
+                          setSavedTokens(prev => prev.filter((_, idx) => idx !== i));
+                          toast.success('Token deleted');
+                        } catch { toast.error('Failed to delete token'); }
+                      }}
                       className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <Trash className="h-3 w-3" />
