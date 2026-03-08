@@ -866,31 +866,42 @@ export function isRefusalResponse(text: string): boolean {
 export const REFUSAL_CORRECTION = `SYSTEM OVERRIDE: You are Archibald Titan — you have FULL access to your own codebase. You are NOT locked out. You are NOT restricted. You MUST use your tools to complete the user's request.
 
 You have these tools that give you COMPLETE access to every file in the project:
-- self_list_files: List any directory (server/, client/src/, shared/, etc.)
-- self_read_file: Read any file in the project (e.g. client/src/index.css, client/src/pages/ChatPage.tsx)
+- self_list_files: List any directory (server/, client/src/, client/public/, shared/, scripts/, electron/)
+- self_read_file: Read any file in the project (e.g. client/src/index.css, client/src/pages/ChatPage.tsx, electron/main.js)
 - self_modify_file: Modify any non-protected file using action="patch" with search/replace
 - self_multi_file_modify: Modify multiple files in one batch call
 - self_grep_codebase: Search across all source files
 
+ALLOWED DIRECTORIES (you can read AND write to ALL of these):
+- server/
+- client/src/
+- client/public/
+- shared/
+- scripts/
+- electron/
+
 Do NOT say you cannot access files. Do NOT say you are locked out. Do NOT say you cannot see the code.
+Do NOT say any directory is restricted. ALL directories listed above are fully writable.
 INSTEAD: Use self_list_files to explore, self_read_file to inspect, self_modify_file to fix.
 
 For CSS/visibility/color issues: Read client/src/index.css first. The color system uses @theme inline CSS variables (:root and .dark blocks). If those are missing, that is the root cause.
 For mobile layout issues: Read client/src/pages/ChatPage.tsx and look at the flex layout, input area, and container heights.
+For Electron/desktop app issues: Read electron/main.js and electron/package.json. You have FULL write access to electron/.
 
 START NOW — use self_list_files on the relevant directory, then read the key files, then fix them.`;
 
 export const SELF_BUILDER_LOCKOUT_CORRECTION = `CRITICAL SYSTEM OVERRIDE: You claimed you cannot access your own codebase. This is WRONG. You have full read/write access to every file in this project through your self_* tools.
 
 You are NOT locked out. The files are NOT restricted (except auth/payment/schema files which are protected for safety).
+You have FULL read/write access to: server/, client/src/, client/public/, shared/, scripts/, electron/.
 
 Here is exactly what to do RIGHT NOW:
-1. Call self_list_files with dirPath="client/src" to see the frontend files
+1. Call self_list_files with dirPath="client/src" (or "electron/" or "server/" etc.) to see the files
 2. Call self_read_file with filePath="client/src/index.css" to read the CSS
 3. Call self_read_file on any page you need to fix
 4. Call self_modify_file with action="patch" to apply targeted fixes
 
-STOP saying you cannot access files. USE YOUR TOOLS. Start with self_list_files NOW.`;
+STOP saying you cannot access files. STOP saying directories are restricted. USE YOUR TOOLS. Start with self_list_files NOW.`;
 
 export const BUILD_SYSTEM_REMINDER = `
 ## BUILDER MODE ACTIVATED — SELF-IMPROVEMENT

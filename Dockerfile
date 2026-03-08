@@ -148,6 +148,11 @@ COPY --from=build /app/dist/drizzle ./drizzle
 RUN addgroup --system --gid 1001 titan && \
     adduser --system --uid 1001 titan
 
+# Give titan user write access to the entire /app directory
+# This is required for the self-improvement engine to create/modify source files
+# (server/, client/src/, client/public/, shared/, scripts/, electron/)
+RUN chown -R titan:titan /app
+
 # Give titan user access to Playwright browser cache
 RUN mkdir -p /home/titan/.cache && chown -R titan:titan /home/titan
 
