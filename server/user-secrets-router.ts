@@ -357,6 +357,121 @@ export const userSecretsRouter = router({
 
     return { success: true };
   }),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Generic Token Save — works for ALL plans (no subscription gate)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Save any API token/key to the user's personal vault.
+   * This is NOT gated by subscription — all users can store tokens.
+   */
+  saveToken: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(256),
+        value: z.string().min(1),
+        credentialType: z.string().optional().default("api_token"),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      }
+
+      // Derive a secretType from the name (sanitized, lowercase, underscored)
+      const secretType = input.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .substring(0, 64) || "custom_token";
+
+      const encrypted = encrypt(input.value);
+      const maskedValue = input.value.length > 10
+        ? `${input.value.substring(0, 6)}...${input.value.substring(input.value.length - 4)}`
+        : "••••••";
+      const label = `${input.name} (${maskedValue})`;
+
+      // Check if user already has a token with this secretType
+      const existing = await db
+        .select({ id: userSecrets.id })
+        .from(userSecrets)
+        .where(
+          and(
+            eq(userSecrets.userId, ctx.user.id),
+            eq(userSecrets.secretType, secretType)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing
+        await db
+          .update(userSecrets)
+          .set({ encryptedValue: encrypted, label })
+          .where(eq(userSecrets.id, existing[0].id));
+      } else {
+        // Insert new
+        await db.insert(userSecrets).values({
+          userId: ctx.user.id,
+          secretType,
+          encryptedValue: encrypted,
+          label,
+        });
+      }
+
+      return { success: true, name: input.name, maskedValue };
+    }),
+
+  /**
+   * List all saved tokens for the current user (masked values only).
+   */
+  listTokens: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+
+    const rows = await db
+      .select({
+        id: userSecrets.id,
+        secretType: userSecrets.secretType,
+        label: userSecrets.label,
+        lastUsedAt: userSecrets.lastUsedAt,
+        createdAt: userSecrets.createdAt,
+      })
+      .from(userSecrets)
+      .where(eq(userSecrets.userId, ctx.user.id));
+
+    return rows.map((r) => ({
+      id: r.id,
+      secretType: r.secretType,
+      label: r.label,
+      lastUsedAt: r.lastUsedAt?.toISOString() || null,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }),
+
+  /**
+   * Delete a specific token by ID (only if owned by current user).
+   */
+  deleteToken: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      await db
+        .delete(userSecrets)
+        .where(
+          and(
+            eq(userSecrets.id, input.id),
+            eq(userSecrets.userId, ctx.user.id)
+          )
+        );
+
+      return { success: true };
+    }),
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

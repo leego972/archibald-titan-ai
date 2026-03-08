@@ -2817,24 +2817,23 @@ export default function ChatPage() {
                     return;
                   }
                   try {
-                    // Save directly to encrypted vault via tRPC
-                    // Use fetch to call tRPC mutation directly (can't use hooks in event handlers)
-                    const resp = await fetch('/api/trpc/vault.add', {
+                    // Save to user's personal secrets vault via tRPC (works for ALL plans)
+                    const resp = await fetch('/api/trpc/userSecrets.saveToken', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       credentials: 'include',
                       body: JSON.stringify({
                         json: {
                           name: tokenName.trim(),
-                          credentialType: 'api_token',
                           value: tokenValue.trim(),
+                          credentialType: 'api_token',
                           notes: 'Manually added via Builder token input',
                         },
                       }),
                     });
                     if (!resp.ok) {
                       const errData = await resp.json().catch(() => ({}));
-                      throw new Error(errData?.error?.message || 'Failed to save token');
+                      throw new Error(errData?.error?.json?.message || errData?.error?.message || 'Failed to save token');
                     }
                     const preview = tokenValue.length > 10
                       ? tokenValue.substring(0, 6) + '...' + tokenValue.substring(tokenValue.length - 4)
