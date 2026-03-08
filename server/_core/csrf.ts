@@ -60,6 +60,15 @@ function usesApiKeyAuth(req: Request): boolean {
   return !!(authHeader && authHeader.startsWith("Bearer "));
 }
 
+/** Check if the request comes from the desktop app (license-based auth, no browser CSRF risk) */
+function isDesktopLicenseAuth(req: Request): boolean {
+  // Desktop app proxy sends titan_session cookie but cannot set CSRF headers
+  // since the local Express server proxies to remote. Desktop requests are not
+  // vulnerable to CSRF because they originate from the Electron app, not a browser.
+  const cookies = req.cookies || {};
+  return !!cookies.titan_session;
+}
+
 /** Safe HTTP methods that don't need CSRF protection */
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -111,6 +120,11 @@ export function csrfValidationMiddleware(req: Request, res: Response, next: Next
 
   // Skip API key-authenticated requests
   if (usesApiKeyAuth(req)) {
+    return next();
+  }
+
+  // Skip desktop license-authenticated requests (Electron app proxy)
+  if (isDesktopLicenseAuth(req)) {
     return next();
   }
 

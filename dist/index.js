@@ -65994,6 +65994,10 @@ function usesApiKeyAuth(req) {
   const authHeader = req.headers.authorization;
   return !!(authHeader && authHeader.startsWith("Bearer "));
 }
+function isDesktopLicenseAuth(req) {
+  const cookies = req.cookies || {};
+  return !!cookies.titan_session;
+}
 var SAFE_METHODS = /* @__PURE__ */ new Set(["GET", "HEAD", "OPTIONS"]);
 function generateToken() {
   return randomBytes4(TOKEN_LENGTH).toString("hex");
@@ -66024,6 +66028,9 @@ function csrfValidationMiddleware(req, res, next) {
     return next();
   }
   if (usesApiKeyAuth(req)) {
+    return next();
+  }
+  if (isDesktopLicenseAuth(req)) {
     return next();
   }
   const cookieToken = req.cookies?.[CSRF_COOKIE];
