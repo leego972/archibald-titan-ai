@@ -652,9 +652,123 @@ export function registerReleaseUploadRoute(app: Express) {
       return res.status(500).json({ error: getErrorMessage(err) || "Upload failed" });
     }
   });
+
+  // ─── CI Upload Endpoint (API Key Auth for GitHub Actions) ─────────
+  app.post("/api/releases/ci-upload", async (req: Request, res: Response) => {
+    try {
+      const apiKey = req.headers["x-ci-api-key"] as string;
+      const expectedKey = process.env.CI_RELEASE_API_KEY;
+      if (!expectedKey || apiKey !== expectedKey) {
+        return res.status(401).json({ error: "Invalid CI API key" });
+      }
+
+      const contentType = req.headers["content-type"] ?? "";
+      if (!contentType.includes("multipart/form-data")) {
+        return res.status(400).json({ error: "Content-Type must be multipart/form-data" });
+      }
+
+      const { default: Busboy } = await import("busboy");
+      const busboy = Busboy({
+        headers: req.headers,
+        limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+      });
+
+      let platform = "";
+      let version = "";
+      let fileBuffer: Buffer | null = null;
+      let fileName = "";
+
+      const result = await new Promise<{
+        platform: string;
+        version: string;
+        fileBuffer: Buffer;
+        fileName: string;
+      }>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+
+        busboy.on("field", (name: string, val: string) => {
+          if (name === "platform") platform = val;
+          if (name === "version") version = val;
+        });
+
+        busboy.on("file", (_fieldname: string, stream: any, info: any) => {
+          fileName = info.filename;
+          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+          stream.on("end", () => {
+            fileBuffer = Buffer.concat(chunks);
+          });
+        });
+
+        busboy.on("finish", () => {
+          if (!fileBuffer || !platform || !version) {
+            reject(new Error("Missing required fields: file, platform, version"));
+          } else {
+            resolve({ platform, version, fileBuffer, fileName });
+          }
+        });
+
+        busboy.on("error", reject);
+        req.pipe(busboy);
+      });
+
+      if (!["windows", "mac", "linux"].includes(result.platform)) {
+        return res.status(400).json({ error: "Platform must be windows, mac, or linux" });
+      }
+
+      const ext = result.fileName.toLowerCase().match(/\.(exe|msi|dmg|pkg|appimage|deb|rpm|tar\.gz|zip)$/)?.[0];
+      if (!ext) {
+        return res.status(400).json({ error: "Invalid file type" });
+      }
+
+      // Find or create the release by version
+      const db = await getDb();
+      if (!db) return res.status(503).json({ error: "Database unavailable" });
+
+      let [release] = await db.select().from(releases).where(eq(releases.version, result.version)).limit(1);
+      if (!release) {
+        const [newRelease] = await db.insert(releases).values({
+          version: result.version,
+          title: `Archibald Titan v${result.version}`,
+          changelog: `Auto-generated release for v${result.version}`,
+          isLatest: 1,
+          publishedAt: new Date(),
+        }).$returningId();
+        [release] = await db.select().from(releases).where(eq(releases.id, newRelease.id)).limit(1);
+      }
+
+      const hash = crypto.randomBytes(8).toString("hex");
+      const s3Key = `releases/${release.id}/${result.platform}/${hash}-${result.fileName}`;
+      const { url } = await storagePut(s3Key, result.fileBuffer, ALLOWED_EXTENSIONS[ext] || "application/octet-stream");
+
+      const urlField =
+        result.platform === "windows" ? "downloadUrlWindows" :
+        result.platform === "mac" ? "downloadUrlMac" : "downloadUrlLinux";
+
+      await db
+        .update(releases)
+        .set({
+          [urlField]: url,
+          fileSizeMb: Math.round(result.fileBuffer.length / (1024 * 1024)),
+        })
+        .where(eq(releases.id, release.id));
+
+      log.info(`[CI Upload] ${result.platform} binary uploaded for v${result.version}`);
+      return res.json({
+        success: true,
+        platform: result.platform,
+        version: result.version,
+        fileName: result.fileName,
+        fileSizeMb: Math.round(result.fileBuffer.length / (1024 * 1024)),
+        url,
+      });
+    } catch (err: unknown) {
+      log.error("[CI Upload Error]", { error: String(err) });
+      return res.status(500).json({ error: getErrorMessage(err) || "CI upload failed" });
+    }
+  });
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
+// ─── Helpers────────────────────────────────────────────────────────
 
 function compareVersions(a: string, b: string): number {
   const pa = a.replace(/[^0-9.]/g, "").split(".").map(Number);

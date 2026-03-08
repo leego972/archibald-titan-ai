@@ -1,0 +1,92 @@
+name: Desktop Build & Upload
+
+on:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-upload:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            build_cmd: build:linux
+            artifact: "ArchibaldTitan-*-linux-x86_64.AppImage"
+          - os: windows-latest
+            platform: windows
+            build_cmd: build:win
+            artifact: "ArchibaldTitan-*-win-x64.exe"
+          - os: macos-latest
+            platform: mac
+            build_cmd: build:mac
+            artifact: "ArchibaldTitan-*-mac-x64.zip"
+
+    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: Copy frontend to electron
+        run: |
+          mkdir -p electron/public
+          cp -r dist/public/* electron/public/
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build Electron app
+        working-directory: electron
+        run: npm run ${{ matrix.build_cmd }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p "require('./electron/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Upload binary to Titan release system
+        shell: bash
+        working-directory: electron/dist
+        run: |
+          FILE=$(ls ${{ matrix.artifact }} 2>/dev/null | head -1)
+          if [ -z "$FILE" ]; then
+            echo "No artifact found matching pattern: ${{ matrix.artifact }}"
+            ls -la
+            exit 1
+          fi
+          echo "Uploading $FILE for ${{ matrix.platform }}..."
+          curl -f -X POST "${{ secrets.TITAN_API_URL }}/api/releases/ci-upload" \
+            -H "x-ci-api-key: ${{ secrets.CI_RELEASE_API_KEY }}" \
+            -F "file=@$FILE" \
+            -F "platform=${{ matrix.platform }}" \
+            -F "version=${{ steps.version.outputs.version }}" \
+            --max-time 600
+          echo "Upload complete!"
+
+      - name: Upload artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: titan-${{ matrix.platform }}
+          path: electron/dist/${{ matrix.artifact }}
+          retention-days: 30
