@@ -2818,9 +2818,14 @@ export default function ChatPage() {
                   }
                   try {
                     // Save to user's personal secrets vault via tRPC (works for ALL plans)
+                    // Read CSRF token from cookie (double-submit cookie pattern)
+                    const csrfToken = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
                     const resp = await fetch('/api/trpc/userSecrets.saveToken', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-csrf-token': csrfToken,
+                      },
                       credentials: 'include',
                       body: JSON.stringify({
                         json: {
