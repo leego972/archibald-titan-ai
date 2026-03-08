@@ -155,10 +155,10 @@ export default function ReplicatePage() {
       {/* GitHub PAT Setup */}
       <Card className={`border ${hasGithubPat ? 'border-green-500/30 bg-green-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Github className={`h-5 w-5 ${hasGithubPat ? 'text-green-400' : 'text-yellow-400'}`} />
-              <div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Github className={`h-5 w-5 shrink-0 ${hasGithubPat ? 'text-green-400' : 'text-yellow-400'}`} />
+              <div className="min-w-0">
                 <p className="font-medium text-sm">
                   {hasGithubPat ? 'GitHub Connected' : 'Connect GitHub to Deploy'}
                 </p>
@@ -170,7 +170,7 @@ export default function ReplicatePage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {hasGithubPat ? (
                 <>
                   <Badge variant="outline" className="border-green-500/50 text-green-400">
