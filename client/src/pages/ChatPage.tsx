@@ -1385,20 +1385,20 @@ export default function ChatPage() {
           // Reconnect SSE stream
           const es = new EventSource(`/api/chat/stream/${activeConversationId}`, { withCredentials: true });
           eventSourceRef.current = es;
-          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message }]); setLoadingPhase(d.message || 'Thinking...'); } catch {} });
-          es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
-          es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary }]); } catch {} });
-          es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
+          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Thinking...'); } catch {} });
+          es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description, timestamp: Date.now() }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
+          es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary, timestamp: Date.now() }]); } catch {} });
+          es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
           es.addEventListener('done', () => {
             es.close(); eventSourceRef.current = null;
             setIsLoading(false); setStreamEvents([]);
-            utils.chat.getConversation.invalidate({ id: activeConversationId });
+            utils.chat.getConversation.invalidate({ conversationId: activeConversationId });
           });
           es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
           es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
         } else if (status.status === 'completed' && status.response) {
           // Build finished while we were away — refresh messages
-          utils.chat.getConversation.invalidate({ id: activeConversationId });
+          utils.chat.getConversation.invalidate({ conversationId: activeConversationId });
         }
       } catch {
         // Silently fail — not critical

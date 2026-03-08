@@ -4694,7 +4694,7 @@ Requirements:
 - Output ONLY the YARA rule, no explanation`;
 
   const ruleContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: prompt }],
     priority: "background",
   });
@@ -4733,7 +4733,7 @@ Requirements:
 - Output ONLY the Sigma YAML, no explanation`;
 
   const ruleContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: prompt }],
     priority: "background",
   });
@@ -6153,7 +6153,7 @@ The report MUST include:
 Format as clean Markdown. Be specific and professional.`;
 
   const reportContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: reportPrompt }],
     priority: "background",
   });
@@ -6161,7 +6161,7 @@ Format as clean Markdown. Be specific and professional.`;
   // Save report to sandbox
   const reportFile = `/tmp/pentest_report_${Date.now()}.md`;
   await executeCommand(sbId, userId,
-    `cat > ${reportFile} << 'REPORTEOF'\n${reportContent.substring(0, 10000)}\nREPORT_EOF`,
+    `cat > ${reportFile} << 'REPORTEOF'\n${String(typeof reportContent === 'string' ? reportContent : (reportContent?.choices?.[0]?.message?.content as string) || '').substring(0, 10000)}\nREPORT_EOF`,
     { timeoutMs: 10_000, triggeredBy: "ai" }
   );
 

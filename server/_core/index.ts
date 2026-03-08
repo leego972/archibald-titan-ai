@@ -572,7 +572,8 @@ async function startServer() {
 
         // Ensure the role enum includes 'head_admin' (safe ALTER — MySQL ignores if already correct)
         try {
-          await db.execute({ sql: "ALTER TABLE `users` MODIFY COLUMN `role` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'" });
+          const { sql: rawSql } = await import("drizzle-orm");
+          await db.execute(rawSql`ALTER TABLE \`users\` MODIFY COLUMN \`role\` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'`);
           log.info('Ensured head_admin role exists in users table');
         } catch (alterErr) {
           // Ignore if already correct or if column doesn't exist yet

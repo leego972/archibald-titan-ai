@@ -1194,7 +1194,7 @@ export async function executeBuild(
     for (const cmd of step.commands) {
       try {
         const result = await executeCommand(sandboxId, userId, cmd, {
-          timeoutMs: 120000,
+          timeoutMs: 300000, // 5 min — npm install and builds need time
           triggeredBy: "system",
           workingDirectory: `/home/sandbox/${plan.projectName}`,
         });
@@ -1351,9 +1351,118 @@ export async function executeBuild(
     // Non-critical — continue
   }
 
-  // Persist workspace to S3 so files survive server restarts
+  // ─── Build Verification & Auto-Fix ───────────────────────────────
   appendBuildLog(projectId, {
     step: plan.buildSteps.length + 2,
+    status: "running",
+    message: "Verifying build — running install and compile check...",
+    timestamp: new Date().toISOString(),
+  });
+
+  const projectDir = `/home/sandbox/${plan.projectName}`;
+  try {
+    // Run npm install first
+    const installResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm install --legacy-peer-deps 2>&1 | tail -20`, {
+      timeoutMs: 300000, // 5 min for npm install
+      triggeredBy: "system",
+      workingDirectory: projectDir,
+    });
+
+    // Try building
+    const buildResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm run build 2>&1 | tail -50`, {
+      timeoutMs: 180000, // 3 min for build
+      triggeredBy: "system",
+      workingDirectory: projectDir,
+    });
+
+    if (buildResult.exitCode !== 0) {
+      const buildErrors = buildResult.output;
+      appendBuildLog(projectId, {
+        step: plan.buildSteps.length + 2,
+        status: "running",
+        message: `Build errors detected — attempting auto-fix...`,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Ask LLM to fix the build errors
+      const userApiKey = await getUserOpenAIKey(userId) || undefined;
+      const fixResponse = await invokeLLM({
+        systemTag: "chat",
+        userApiKey,
+        model: "strong",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert developer. The project build failed. Analyze the errors and return a JSON array of file fixes.
+Return ONLY: [{"path": "file/path", "content": "complete fixed file content"}, ...]
+Fix ALL errors. Each file must be COMPLETE — not just the changed lines.`,
+          },
+          {
+            role: "user",
+            content: `Build failed with these errors:\n\n${buildErrors.substring(0, 4000)}\n\nProject: ${plan.projectName}\nTech: ${plan.techStack.frontend} / ${plan.techStack.backend}\nFile structure: ${plan.fileStructure.map(f => f.path).join(", ")}\n\nReturn the fixed files as JSON array.`,
+          },
+        ],
+        maxTokens: 16000,
+      });
+
+      const fixContent = fixResponse?.choices?.[0]?.message?.content;
+      if (typeof fixContent === "string") {
+        const fixes = parseLLMFileResponse(fixContent);
+        if (fixes.length > 0) {
+          for (const fix of fixes) {
+            await sandboxWriteFile(sandboxId, userId, fix.path, fix.content);
+          }
+          appendBuildLog(projectId, {
+            step: plan.buildSteps.length + 2,
+            status: "running",
+            message: `Applied ${fixes.length} auto-fixes. Re-checking build...`,
+            timestamp: new Date().toISOString(),
+          });
+
+          // Re-run build after fixes
+          const rebuildResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm run build 2>&1 | tail -20`, {
+            timeoutMs: 180000,
+            triggeredBy: "system",
+            workingDirectory: projectDir,
+          });
+
+          if (rebuildResult.exitCode === 0) {
+            appendBuildLog(projectId, {
+              step: plan.buildSteps.length + 2,
+              status: "success",
+              message: "Build verified — auto-fix successful!",
+              timestamp: new Date().toISOString(),
+            });
+          } else {
+            appendBuildLog(projectId, {
+              step: plan.buildSteps.length + 2,
+              status: "error",
+              message: `Build still has issues after auto-fix. Manual review may be needed.`,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } else {
+      appendBuildLog(projectId, {
+        step: plan.buildSteps.length + 2,
+        status: "success",
+        message: "Build verified — compiles cleanly!",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (err: unknown) {
+    appendBuildLog(projectId, {
+      step: plan.buildSteps.length + 2,
+      status: "error",
+      message: `Build verification skipped: ${getErrorMessage(err)}`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Persist workspace to S3 so files survive server restarts
+  appendBuildLog(projectId, {
+    step: plan.buildSteps.length + 3,
     status: "running",
     message: "Persisting project files to cloud storage...",
     timestamp: new Date().toISOString(),
@@ -1390,14 +1499,14 @@ export async function executeBuild(
     }
 
     appendBuildLog(projectId, {
-      step: plan.buildSteps.length + 2,
+      step: plan.buildSteps.length + 3,
       status: "success",
       message: `Persisted ${builtFiles.length} files to cloud storage`,
       timestamp: new Date().toISOString(),
     });
   } catch (err: unknown) {
     appendBuildLog(projectId, {
-      step: plan.buildSteps.length + 2,
+      step: plan.buildSteps.length + 3,
       status: "error",
       message: `Persistence warning: ${getErrorMessage(err)}`,
       timestamp: new Date().toISOString(),
@@ -1414,7 +1523,7 @@ export async function executeBuild(
   });
 
   appendBuildLog(projectId, {
-    step: plan.buildSteps.length + 3,
+    step: plan.buildSteps.length + 4,
     status: "success",
     message: "Build complete! Project is ready.",
     timestamp: new Date().toISOString(),
@@ -1513,6 +1622,202 @@ function extractStructuralHints(html: string): string {
   return hints.join("; ");
 }
 
+// ─── Helper: Get relevant context for a specific file ───────────────
+function getRelevantContext(
+  filePath: string,
+  research: ResearchResult,
+): string {
+  const lower = filePath.toLowerCase();
+  const catalogProducts = (research as any).catalogProducts || [];
+  const catalogListings = (research as any).catalogListings || [];
+  const catalogMenuItems = (research as any).catalogMenuItems || [];
+  const catalogJobs = (research as any).catalogJobs || [];
+  const catalogArticles = (research as any).catalogArticles || [];
+  const siteMetadataInfo = (research as any).siteMetadata;
+  const detectedSiteType = (research as any).siteType || "generic";
+  let ctx = "";
+
+  // Always include site metadata (small)
+  if (siteMetadataInfo) {
+    ctx += `\nSite Type: ${detectedSiteType.toUpperCase()} | Title: ${siteMetadataInfo.title || "N/A"} | Phone: ${siteMetadataInfo.phone || "N/A"} | Email: ${siteMetadataInfo.email || "N/A"}`;
+  }
+
+  // Include product data only for product-related files
+  if ((lower.includes("product") || lower.includes("shop") || lower.includes("store") || lower.includes("catalog") || lower.includes("seed") || lower.includes("data")) && catalogProducts.length > 0) {
+    ctx += `\n\nPRODUCT CATALOG (${catalogProducts.length} products):\n${catalogProducts.slice(0, 150).map((p: any, i: number) => 
+      `${i + 1}. "${p.name}" | ${p.price} ${p.currency} | Cat: ${p.category || "General"} | Images: ${(p.images || []).slice(0, 2).join(", ") || "placeholder"}`
+    ).join("\n")}`;
+    const cats = (research as any).catalogCategories || [];
+    if (cats.length > 0) ctx += `\nCategories: ${cats.map((c: any) => c.name).join(", ")}`;
+  }
+
+  // Include listings for real estate files
+  if ((lower.includes("listing") || lower.includes("property") || lower.includes("real") || lower.includes("seed") || lower.includes("data")) && catalogListings.length > 0) {
+    ctx += `\n\nPROPERTY LISTINGS (${catalogListings.length}):\n${catalogListings.slice(0, 100).map((l: any, i: number) => 
+      `${i + 1}. "${l.title}" | ${l.price} (${l.listingType || "sale"}) | ${l.bedrooms || "?"}bd/${l.bathrooms || "?"}ba | ${l.sqft || "?"}sqft | ${[l.address, l.city, l.state].filter(Boolean).join(", ")}`
+    ).join("\n")}`;
+  }
+
+  // Include menu items for restaurant files
+  if ((lower.includes("menu") || lower.includes("food") || lower.includes("restaurant") || lower.includes("seed") || lower.includes("data")) && catalogMenuItems.length > 0) {
+    ctx += `\n\nMENU ITEMS (${catalogMenuItems.length}):\n${catalogMenuItems.slice(0, 150).map((m: any, i: number) => 
+      `${i + 1}. "${m.name}" | ${m.price} | Cat: ${m.category || "General"} | ${m.description?.substring(0, 80) || ""}`
+    ).join("\n")}`;
+  }
+
+  // Include jobs for job board files
+  if ((lower.includes("job") || lower.includes("career") || lower.includes("seed") || lower.includes("data")) && catalogJobs.length > 0) {
+    ctx += `\n\nJOB LISTINGS (${catalogJobs.length}):\n${catalogJobs.slice(0, 100).map((j: any, i: number) => 
+      `${i + 1}. "${j.title}" | ${j.company} | ${j.location} | ${j.salary || "N/A"} | ${j.type || "Full-time"}`
+    ).join("\n")}`;
+  }
+
+  // Include articles for blog/content files
+  if ((lower.includes("article") || lower.includes("blog") || lower.includes("post") || lower.includes("news") || lower.includes("seed") || lower.includes("data")) && catalogArticles.length > 0) {
+    ctx += `\n\nARTICLES (${catalogArticles.length}):\n${catalogArticles.slice(0, 50).map((a: any, i: number) => 
+      `${i + 1}. "${a.title}" | ${a.author || "Staff"} | ${a.date || "Recent"} | ${a.excerpt?.substring(0, 100) || ""}`
+    ).join("\n")}`;
+  }
+
+  // Include image inventory for UI/component files
+  const imageInventory = (research as any).imageInventory || [];
+  if (imageInventory.length > 0 && (lower.includes("component") || lower.includes("page") || lower.includes("layout") || lower.includes("hero") || lower.includes("header") || lower.includes("footer") || lower.includes(".tsx") || lower.includes(".jsx"))) {
+    ctx += `\n\nAVAILABLE IMAGES:\n${imageInventory.slice(0, 50).map((i: any) => `- /public/${i.localPath}: ${i.alt || i.context}`).join("\n")}`;
+  }
+
+  return ctx;
+}
+
+// ─── Helper: Parse LLM JSON response with fallbacks ──────────────────
+function parseLLMFileResponse(rawContent: string): Array<{ path: string; content: string }> {
+  if (!rawContent || typeof rawContent !== "string") return [];
+
+  // Try direct JSON parse
+  try {
+    const jsonStr = rawContent.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    const parsed = JSON.parse(jsonStr);
+    if (Array.isArray(parsed)) return parsed.filter(f => f.path && f.content);
+    if (parsed.path && parsed.content) return [parsed];
+  } catch { /* continue */ }
+
+  // Try extracting JSON array
+  const arrayMatch = rawContent.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try {
+      const files = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(files)) return files.filter(f => f.path && f.content);
+    } catch { /* continue */ }
+  }
+
+  // Try extracting JSON object
+  const objMatch = rawContent.match(/\{[\s\S]*"path"[\s\S]*"content"[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      const file = JSON.parse(objMatch[0]);
+      if (file.path && file.content) return [file];
+    } catch { /* continue */ }
+  }
+
+  // Last resort: treat entire response as file content (for single-file generation)
+  return [];
+}
+
+// ─── Helper: Generate a single file with retry ───────────────────────
+async function generateSingleFile(
+  filePath: string,
+  plan: BuildPlan,
+  step: BuildPlan["buildSteps"][0],
+  research: ResearchResult,
+  branding: BrandConfig | undefined,
+  stripe: StripeConfig | undefined,
+  userApiKey: string | undefined,
+  previousFiles: Array<{ path: string; content: string }>,
+  maxRetries: number = 3
+): Promise<{ path: string; content: string } | null> {
+  const brandingInfo = branding?.brandName
+    ? `\nBranding: name="${branding.brandName}", tagline="${branding.brandTagline || ""}", colors=${branding.brandColors ? JSON.stringify(branding.brandColors) : "modern defaults"}`
+    : "";
+  const stripeInfo = stripe?.publishableKey
+    ? `\nStripe: Use env vars STRIPE_PUBLISHABLE_KEY="${stripe.publishableKey}" and STRIPE_SECRET_KEY for payments.`
+    : "";
+
+  const relevantContext = getRelevantContext(filePath, research);
+
+  // Include summaries of previously generated files in this step for coherence
+  const prevFileSummary = previousFiles.length > 0
+    ? `\n\nALREADY GENERATED FILES IN THIS STEP (reference for imports/consistency):\n${previousFiles.map(f => `- ${f.path} (${f.content.length} chars): ${f.content.substring(0, 200).replace(/\n/g, " ")}...`).join("\n")}`
+    : "";
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await invokeLLM({
+        systemTag: "chat",
+        userApiKey,
+        model: "strong",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert full-stack developer. Generate COMPLETE, WORKING code for a single file.
+
+RULES:
+- Return ONLY a JSON object: {"path": "${filePath}", "content": "full file content here"}
+- The file MUST be COMPLETE — NO placeholders, NO TODOs, NO "add more here", NO comments saying "rest of items..."
+- Include ALL data items (products, listings, menu items, etc.) — every single one
+- Use real downloaded images from /public/images/ directories, NEVER use placeholder URLs
+- Make it production-ready, responsive, and professional
+- Include proper error handling and loading states${brandingInfo}${stripeInfo}`,
+          },
+          {
+            role: "user",
+            content: `Generate the COMPLETE contents of: **${filePath}**
+
+Project: ${plan.projectName} — ${plan.description}
+Tech: ${plan.techStack.frontend} / ${plan.techStack.backend} / ${plan.techStack.database}
+Build step ${step.step}: "${step.description}"
+
+File structure:\n${plan.fileStructure.map(f => `- ${f.path}: ${f.description}`).join("\n")}
+
+Data models:\n${plan.dataModels.map(m => `- ${m.name}: ${m.fields.join(", ")}`).join("\n")}
+
+API routes:\n${plan.apiRoutes.map(r => `- ${r.method} ${r.path}: ${r.description}`).join("\n")}${relevantContext}${prevFileSummary}
+
+Return ONLY: {"path": "${filePath}", "content": "..."}`,
+          },
+        ],
+        maxTokens: 16000,
+      });
+
+      const rawContent = response?.choices?.[0]?.message?.content;
+      if (typeof rawContent === "string") {
+        const files = parseLLMFileResponse(rawContent);
+        if (files.length > 0) {
+          // Return the file matching the requested path, or the first one
+          const match = files.find(f => f.path === filePath) || files[0];
+          return { path: filePath, content: match.content };
+        }
+
+        // If JSON parsing failed but we got substantial content, use it as raw file content
+        const cleaned = rawContent.replace(/^```[a-z]*\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+        if (cleaned.length > 50) {
+          return { path: filePath, content: cleaned };
+        }
+      }
+    } catch (err: unknown) {
+      if (attempt === maxRetries) {
+        console.error(`[replicate] Failed to generate ${filePath} after ${maxRetries} attempts: ${getErrorMessage(err)}`);
+        return null;
+      }
+    }
+
+    // Exponential backoff between retries
+    if (attempt < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+    }
+  }
+
+  return null;
+}
+
 async function generateFileContents(
   plan: BuildPlan,
   step: BuildPlan["buildSteps"][0],
@@ -1521,160 +1826,32 @@ async function generateFileContents(
   stripe?: StripeConfig,
   userApiKey?: string
 ): Promise<Array<{ path: string; content: string }>> {
-  const brandingInfo = branding?.brandName
-    ? `\nBranding: name="${branding.brandName}", tagline="${branding.brandTagline || ""}", colors=${branding.brandColors ? JSON.stringify(branding.brandColors) : "modern defaults"}`
-    : "";
+  const allFiles: Array<{ path: string; content: string }> = [];
 
-  const stripeInfo = stripe?.publishableKey
-    ? `\nStripe Integration: The USER's own Stripe keys are provided. Use env vars STRIPE_PUBLISHABLE_KEY="${stripe.publishableKey}" and STRIPE_SECRET_KEY. Include complete checkout flow, product listing with prices, cart, and webhook handler. All payments go to the USER's Stripe account.`
-    : "";
-
-  // Include image inventory and product data from research
-  const imageInfo = (research as any).imageInventory?.length > 0
-    ? `\n\nAVAILABLE IMAGES:\n${(research as any).imageInventory.map((i: any) => `- /public/${i.localPath}: ${i.alt || i.context} [from ${i.originalSrc}]`).join("\n")}`
-    : "";
-  const productInfo = (research as any).productDataRaw
-    ? `\n\nPRODUCT/MENU DATA FROM ORIGINAL SITE:\n${(research as any).productDataRaw}`
-    : "";
-  const subpageInfo = (research as any).subpageUrls?.length > 0
-    ? `\n\nSUBPAGES FOUND:\n${(research as any).subpageUrls.map((p: any) => `- ${p.title}: ${p.url}`).join("\n")}`
-    : "";
-
-  // Include deep catalog data if available — all content types
-  const catalogProducts = (research as any).catalogProducts || [];
-  const catalogListings = (research as any).catalogListings || [];
-  const catalogMenuItems = (research as any).catalogMenuItems || [];
-  const catalogJobs = (research as any).catalogJobs || [];
-  const catalogArticles = (research as any).catalogArticles || [];
-  const detectedSiteType = (research as any).siteType || "generic";
-  const siteMetadataInfo = (research as any).siteMetadata;
-
-  let catalogInfo = "";
-
-  // Site metadata
-  if (siteMetadataInfo) {
-    catalogInfo += `\n\n═══ SITE METADATA ═══\nSite Type: ${detectedSiteType.toUpperCase()}\nTitle: ${siteMetadataInfo.title || "N/A"}\nDescription: ${siteMetadataInfo.description || "N/A"}\nPhone: ${siteMetadataInfo.phone || "N/A"}\nEmail: ${siteMetadataInfo.email || "N/A"}\nAddress: ${siteMetadataInfo.address || "N/A"}\nHours: ${siteMetadataInfo.hours || "N/A"}\nSocial: ${(siteMetadataInfo.socialLinks || []).join(", ") || "N/A"}`;
-  }
-
-  // Products (retail)
-  if (catalogProducts.length > 0) {
-    catalogInfo += `\n\n═══ FULL PRODUCT CATALOG (${catalogProducts.length} products) ═══\nYou MUST include ALL of these products in the database seed data and product listing pages.\n${catalogProducts.slice(0, 200).map((p: any, i: number) => 
-      `${i + 1}. "${p.name}" | Price: ${p.price} ${p.currency} | Category: ${p.category || "General"} | Brand: ${p.brand || ""} | Images: ${(p.images || []).slice(0, 2).join(", ") || "use placeholder"} | Sizes: ${(p.sizes || []).join(", ") || "N/A"} | Colors: ${(p.colors || []).join(", ") || "N/A"} | SKU: ${p.sku || ""}`
-    ).join("\n")}\n\n═══ PRODUCT CATEGORIES ═══\n${((research as any).catalogCategories || []).map((c: any) => `- ${c.name} (${c.productCount} products): ${c.url}`).join("\n") || "No categories extracted"}`;
-  }
-
-  // Real estate listings
-  if (catalogListings.length > 0) {
-    catalogInfo += `\n\n═══ PROPERTY LISTINGS (${catalogListings.length} listings) ═══\nYou MUST include ALL of these listings in the database seed data and listing pages. Include BOTH for-sale and for-rent properties.\n${catalogListings.slice(0, 200).map((l: any, i: number) => 
-      `${i + 1}. "${l.title}" | Price: ${l.price} (${l.listingType || "sale"}) | Type: ${l.propertyType || "house"} | Beds: ${l.bedrooms || "?"} | Baths: ${l.bathrooms || "?"} | SqFt: ${l.sqft || "?"} | Address: ${[l.address, l.city, l.state, l.zip].filter(Boolean).join(", ")} | Agent: ${l.agent || "N/A"} | Images: ${(l.images || []).slice(0, 2).join(", ") || "use placeholder"} | Amenities: ${(l.amenities || []).slice(0, 5).join(", ") || "N/A"}`
-    ).join("\n")}`;
-  }
-
-  // Restaurant menu items
-  if (catalogMenuItems.length > 0) {
-    catalogInfo += `\n\n═══ FULL MENU (${catalogMenuItems.length} items) ═══\nYou MUST include ALL of these menu items in the database seed data and menu pages.\n${catalogMenuItems.slice(0, 200).map((m: any, i: number) => 
-      `${i + 1}. "${m.name}" | Price: ${m.price} | Category: ${m.category || "General"} | Description: ${m.description || ""} | Dietary: ${(m.dietary || []).join(", ") || "none"} | ${m.spicy ? "SPICY" : ""} | Image: ${m.image || "use placeholder"}`
-    ).join("\n")}`;
-  }
-
-  // Job listings
-  if (catalogJobs.length > 0) {
-    catalogInfo += `\n\n═══ JOB LISTINGS (${catalogJobs.length} jobs) ═══\nYou MUST include ALL of these job listings in the database seed data and job board pages.\n${catalogJobs.slice(0, 200).map((j: any, i: number) => 
-      `${i + 1}. "${j.title}" | Company: ${j.company} | Location: ${j.location} | Salary: ${j.salary || "Not specified"} | Type: ${j.type || "Full-time"} | Posted: ${j.postedDate || "Recent"}`
-    ).join("\n")}`;
-  }
-
-  // Articles / blog posts
-  if (catalogArticles.length > 0) {
-    catalogInfo += `\n\n═══ ARTICLES / BLOG POSTS (${catalogArticles.length} articles) ═══\nYou MUST include ALL of these articles in the database seed data and blog/news pages.\n${catalogArticles.slice(0, 100).map((a: any, i: number) => 
-      `${i + 1}. "${a.title}" | Author: ${a.author || "Staff"} | Date: ${a.date || "Recent"} | Category: ${a.category || "General"} | Excerpt: ${a.excerpt?.substring(0, 150) || ""} | Image: ${a.image || "use placeholder"}`
-    ).join("\n")}`;
-  }
-
-  const response = await invokeLLM({
-    systemTag: "chat",
-    userApiKey,
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert full-stack developer building a COMPLETE MIMIC of a website. Generate the complete file contents for the given build step.
-
-CRITICAL RULES:
-- Return a JSON array of objects with "path" and "content" fields
-- Each file must be COMPLETE, WORKING code — NO placeholders, NO TODOs, NO "add more here"
-- Include ALL content from the original site: products, property listings, menu items, job listings, articles — with their EXACT names, descriptions, prices, images, and details
-- Include ALL pages found during research — not just the homepage
-- For real estate: include BOTH for-sale and for-rent listings with full property details (beds, baths, sqft, photos, amenities)
-- For restaurants: include the FULL menu with categories, prices, descriptions, dietary info
-- For retail: include ALL products with sizes, colors, prices, images, categories
-- For job boards: include ALL job listings with company, salary, location, type
-- Use the exact branding provided (colors, name, tagline) — this replaces the original branding
-- Wire up the payment system with the USER's Stripe keys (not the original site's)
-
-IMAGE RULES (CRITICAL — the clone MUST look identical to the original):
-- ALL images have been downloaded and are available at /public/images/{context}/ directories
-- Context folders: products/, hero/, logo/, general/, background/, team/, gallery/, icon/, testimonial/, product/
-- Use the LOCAL paths from the AVAILABLE IMAGES list below — these are REAL files on disk
-- For EVERY product, listing, menu item, or article: use the image path provided in the catalog data
-- For hero banners, logos, and backgrounds: use the local paths from the image inventory
-- If a local path is not available for a specific image, use the ORIGINAL URL as a direct fallback (hotlink)
-- NEVER use placeholder images (like via.placeholder.com or placehold.it) — always use real images
-- Include ALL product images in product cards, detail pages, and galleries
-- Make it production-ready, responsive, and SEO-optimized
-- Include proper meta tags, Open Graph tags, and structured data${brandingInfo}${stripeInfo}${imageInfo}`,
-      },
-      {
-        role: "user",
-        content: `Generate file contents for build step ${step.step}: "${step.description}"
-
-**Project:** ${plan.projectName} — ${plan.description}
-**Tech Stack:** Frontend: ${plan.techStack.frontend}, Backend: ${plan.techStack.backend}, DB: ${plan.techStack.database}
-**Files to create:** ${step.files.join(", ")}
-
-**Full file structure for context:**
-${plan.fileStructure.map(f => `- ${f.path}: ${f.description}`).join("\n")}
-
-**Data models:**
-${plan.dataModels.map(m => `- ${m.name}: ${m.fields.join(", ")}`).join("\n")}
-
-**API routes:**
-${plan.apiRoutes.map(r => `- ${r.method} ${r.path}: ${r.description}`).join("\n")}${productInfo}${subpageInfo}${catalogInfo}
-
-Return ONLY a JSON array: [{"path": "file/path", "content": "full file content"}, ...]`,
-      },
-    ],
-    maxTokens: 32000,
-  });
-
-  const rawContent = response?.choices?.[0]?.message?.content;
-  if (!rawContent || typeof rawContent !== "string") {
-    return [];
-  }
-
-  // Try to parse the JSON array from the response
-  try {
-    // The LLM might wrap it in markdown code blocks
-    const jsonStr = rawContent.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-    const files = JSON.parse(jsonStr);
-    if (Array.isArray(files)) {
-      return files.filter(f => f.path && f.content);
+  // Generate files individually for reliability, or in small batches for speed
+  if (step.files.length <= 2) {
+    // For 1-2 files, generate individually for maximum quality
+    for (const filePath of step.files) {
+      const result = await generateSingleFile(
+        filePath, plan, step, research, branding, stripe, userApiKey, allFiles
+      );
+      if (result) allFiles.push(result);
     }
-  } catch {
-    // Try to extract JSON array from the response
-    const match = rawContent.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        const files = JSON.parse(match[0]);
-        if (Array.isArray(files)) {
-          return files.filter(f => f.path && f.content);
-        }
-      } catch {
-        // Fall through
+  } else {
+    // For 3+ files, generate in batches of 2 for balance of speed and quality
+    for (let i = 0; i < step.files.length; i += 2) {
+      const batch = step.files.slice(i, i + 2);
+      const batchPromises = batch.map(filePath =>
+        generateSingleFile(filePath, plan, step, research, branding, stripe, userApiKey, allFiles)
+      );
+      const results = await Promise.all(batchPromises);
+      for (const result of results) {
+        if (result) allFiles.push(result);
       }
     }
   }
 
-  return [];
+  return allFiles;
 }
 
 

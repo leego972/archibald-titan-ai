@@ -16075,7 +16075,8 @@ async function executeBuild(projectId, userId) {
     for (const cmd of step.commands) {
       try {
         const result = await executeCommand(sandboxId, userId, cmd, {
-          timeoutMs: 12e4,
+          timeoutMs: 3e5,
+          // 5 min — npm install and builds need time
           triggeredBy: "system",
           workingDirectory: `/home/sandbox/${plan.projectName}`
         });
@@ -16216,6 +16217,112 @@ ${result.output.substring(0, 500)}`,
   appendBuildLog(projectId, {
     step: plan.buildSteps.length + 2,
     status: "running",
+    message: "Verifying build \u2014 running install and compile check...",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  const projectDir = `/home/sandbox/${plan.projectName}`;
+  try {
+    const installResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm install --legacy-peer-deps 2>&1 | tail -20`, {
+      timeoutMs: 3e5,
+      // 5 min for npm install
+      triggeredBy: "system",
+      workingDirectory: projectDir
+    });
+    const buildResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm run build 2>&1 | tail -50`, {
+      timeoutMs: 18e4,
+      // 3 min for build
+      triggeredBy: "system",
+      workingDirectory: projectDir
+    });
+    if (buildResult.exitCode !== 0) {
+      const buildErrors = buildResult.output;
+      appendBuildLog(projectId, {
+        step: plan.buildSteps.length + 2,
+        status: "running",
+        message: `Build errors detected \u2014 attempting auto-fix...`,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      const userApiKey2 = await getUserOpenAIKey(userId) || void 0;
+      const fixResponse = await invokeLLM({
+        systemTag: "chat",
+        userApiKey: userApiKey2,
+        model: "strong",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert developer. The project build failed. Analyze the errors and return a JSON array of file fixes.
+Return ONLY: [{"path": "file/path", "content": "complete fixed file content"}, ...]
+Fix ALL errors. Each file must be COMPLETE \u2014 not just the changed lines.`
+          },
+          {
+            role: "user",
+            content: `Build failed with these errors:
+
+${buildErrors.substring(0, 4e3)}
+
+Project: ${plan.projectName}
+Tech: ${plan.techStack.frontend} / ${plan.techStack.backend}
+File structure: ${plan.fileStructure.map((f) => f.path).join(", ")}
+
+Return the fixed files as JSON array.`
+          }
+        ],
+        maxTokens: 16e3
+      });
+      const fixContent = fixResponse?.choices?.[0]?.message?.content;
+      if (typeof fixContent === "string") {
+        const fixes = parseLLMFileResponse(fixContent);
+        if (fixes.length > 0) {
+          for (const fix of fixes) {
+            await writeFile(sandboxId, userId, fix.path, fix.content);
+          }
+          appendBuildLog(projectId, {
+            step: plan.buildSteps.length + 2,
+            status: "running",
+            message: `Applied ${fixes.length} auto-fixes. Re-checking build...`,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          });
+          const rebuildResult = await executeCommand(sandboxId, userId, `cd ${projectDir} && npm run build 2>&1 | tail -20`, {
+            timeoutMs: 18e4,
+            triggeredBy: "system",
+            workingDirectory: projectDir
+          });
+          if (rebuildResult.exitCode === 0) {
+            appendBuildLog(projectId, {
+              step: plan.buildSteps.length + 2,
+              status: "success",
+              message: "Build verified \u2014 auto-fix successful!",
+              timestamp: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          } else {
+            appendBuildLog(projectId, {
+              step: plan.buildSteps.length + 2,
+              status: "error",
+              message: `Build still has issues after auto-fix. Manual review may be needed.`,
+              timestamp: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        }
+      }
+    } else {
+      appendBuildLog(projectId, {
+        step: plan.buildSteps.length + 2,
+        status: "success",
+        message: "Build verified \u2014 compiles cleanly!",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    }
+  } catch (err) {
+    appendBuildLog(projectId, {
+      step: plan.buildSteps.length + 2,
+      status: "error",
+      message: `Build verification skipped: ${getErrorMessage(err)}`,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  appendBuildLog(projectId, {
+    step: plan.buildSteps.length + 3,
+    status: "running",
     message: "Persisting project files to cloud storage...",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
@@ -16246,14 +16353,14 @@ ${result.output.substring(0, 500)}`,
       }
     }
     appendBuildLog(projectId, {
-      step: plan.buildSteps.length + 2,
+      step: plan.buildSteps.length + 3,
       status: "success",
       message: `Persisted ${builtFiles.length} files to cloud storage`,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   } catch (err) {
     appendBuildLog(projectId, {
-      step: plan.buildSteps.length + 2,
+      step: plan.buildSteps.length + 3,
       status: "error",
       message: `Persistence warning: ${getErrorMessage(err)}`,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
@@ -16265,7 +16372,7 @@ ${result.output.substring(0, 500)}`,
     outputFiles: outputFileList
   });
   appendBuildLog(projectId, {
-    step: plan.buildSteps.length + 3,
+    step: plan.buildSteps.length + 4,
     status: "success",
     message: "Build complete! Project is ready.",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
@@ -16329,169 +16436,203 @@ function extractStructuralHints(html) {
   if (html.includes("chat") || html.includes("message")) hints.push("Feature: Chat/messaging detected");
   return hints.join("; ");
 }
-async function generateFileContents(plan, step, research, branding, stripe, userApiKey) {
-  const brandingInfo = branding?.brandName ? `
-Branding: name="${branding.brandName}", tagline="${branding.brandTagline || ""}", colors=${branding.brandColors ? JSON.stringify(branding.brandColors) : "modern defaults"}` : "";
-  const stripeInfo = stripe?.publishableKey ? `
-Stripe Integration: The USER's own Stripe keys are provided. Use env vars STRIPE_PUBLISHABLE_KEY="${stripe.publishableKey}" and STRIPE_SECRET_KEY. Include complete checkout flow, product listing with prices, cart, and webhook handler. All payments go to the USER's Stripe account.` : "";
-  const imageInfo = research.imageInventory?.length > 0 ? `
-
-AVAILABLE IMAGES:
-${research.imageInventory.map((i) => `- /public/${i.localPath}: ${i.alt || i.context} [from ${i.originalSrc}]`).join("\n")}` : "";
-  const productInfo = research.productDataRaw ? `
-
-PRODUCT/MENU DATA FROM ORIGINAL SITE:
-${research.productDataRaw}` : "";
-  const subpageInfo = research.subpageUrls?.length > 0 ? `
-
-SUBPAGES FOUND:
-${research.subpageUrls.map((p) => `- ${p.title}: ${p.url}`).join("\n")}` : "";
+function getRelevantContext(filePath, research) {
+  const lower = filePath.toLowerCase();
   const catalogProducts = research.catalogProducts || [];
   const catalogListings = research.catalogListings || [];
   const catalogMenuItems = research.catalogMenuItems || [];
   const catalogJobs = research.catalogJobs || [];
   const catalogArticles = research.catalogArticles || [];
-  const detectedSiteType = research.siteType || "generic";
   const siteMetadataInfo = research.siteMetadata;
-  let catalogInfo = "";
+  const detectedSiteType = research.siteType || "generic";
+  let ctx = "";
   if (siteMetadataInfo) {
-    catalogInfo += `
-
-\u2550\u2550\u2550 SITE METADATA \u2550\u2550\u2550
-Site Type: ${detectedSiteType.toUpperCase()}
-Title: ${siteMetadataInfo.title || "N/A"}
-Description: ${siteMetadataInfo.description || "N/A"}
-Phone: ${siteMetadataInfo.phone || "N/A"}
-Email: ${siteMetadataInfo.email || "N/A"}
-Address: ${siteMetadataInfo.address || "N/A"}
-Hours: ${siteMetadataInfo.hours || "N/A"}
-Social: ${(siteMetadataInfo.socialLinks || []).join(", ") || "N/A"}`;
+    ctx += `
+Site Type: ${detectedSiteType.toUpperCase()} | Title: ${siteMetadataInfo.title || "N/A"} | Phone: ${siteMetadataInfo.phone || "N/A"} | Email: ${siteMetadataInfo.email || "N/A"}`;
   }
-  if (catalogProducts.length > 0) {
-    catalogInfo += `
+  if ((lower.includes("product") || lower.includes("shop") || lower.includes("store") || lower.includes("catalog") || lower.includes("seed") || lower.includes("data")) && catalogProducts.length > 0) {
+    ctx += `
 
-\u2550\u2550\u2550 FULL PRODUCT CATALOG (${catalogProducts.length} products) \u2550\u2550\u2550
-You MUST include ALL of these products in the database seed data and product listing pages.
-${catalogProducts.slice(0, 200).map(
-      (p, i) => `${i + 1}. "${p.name}" | Price: ${p.price} ${p.currency} | Category: ${p.category || "General"} | Brand: ${p.brand || ""} | Images: ${(p.images || []).slice(0, 2).join(", ") || "use placeholder"} | Sizes: ${(p.sizes || []).join(", ") || "N/A"} | Colors: ${(p.colors || []).join(", ") || "N/A"} | SKU: ${p.sku || ""}`
-    ).join("\n")}
-
-\u2550\u2550\u2550 PRODUCT CATEGORIES \u2550\u2550\u2550
-${(research.catalogCategories || []).map((c) => `- ${c.name} (${c.productCount} products): ${c.url}`).join("\n") || "No categories extracted"}`;
+PRODUCT CATALOG (${catalogProducts.length} products):
+${catalogProducts.slice(0, 150).map(
+      (p, i) => `${i + 1}. "${p.name}" | ${p.price} ${p.currency} | Cat: ${p.category || "General"} | Images: ${(p.images || []).slice(0, 2).join(", ") || "placeholder"}`
+    ).join("\n")}`;
+    const cats = research.catalogCategories || [];
+    if (cats.length > 0) ctx += `
+Categories: ${cats.map((c) => c.name).join(", ")}`;
   }
-  if (catalogListings.length > 0) {
-    catalogInfo += `
+  if ((lower.includes("listing") || lower.includes("property") || lower.includes("real") || lower.includes("seed") || lower.includes("data")) && catalogListings.length > 0) {
+    ctx += `
 
-\u2550\u2550\u2550 PROPERTY LISTINGS (${catalogListings.length} listings) \u2550\u2550\u2550
-You MUST include ALL of these listings in the database seed data and listing pages. Include BOTH for-sale and for-rent properties.
-${catalogListings.slice(0, 200).map(
-      (l, i) => `${i + 1}. "${l.title}" | Price: ${l.price} (${l.listingType || "sale"}) | Type: ${l.propertyType || "house"} | Beds: ${l.bedrooms || "?"} | Baths: ${l.bathrooms || "?"} | SqFt: ${l.sqft || "?"} | Address: ${[l.address, l.city, l.state, l.zip].filter(Boolean).join(", ")} | Agent: ${l.agent || "N/A"} | Images: ${(l.images || []).slice(0, 2).join(", ") || "use placeholder"} | Amenities: ${(l.amenities || []).slice(0, 5).join(", ") || "N/A"}`
+PROPERTY LISTINGS (${catalogListings.length}):
+${catalogListings.slice(0, 100).map(
+      (l, i) => `${i + 1}. "${l.title}" | ${l.price} (${l.listingType || "sale"}) | ${l.bedrooms || "?"}bd/${l.bathrooms || "?"}ba | ${l.sqft || "?"}sqft | ${[l.address, l.city, l.state].filter(Boolean).join(", ")}`
     ).join("\n")}`;
   }
-  if (catalogMenuItems.length > 0) {
-    catalogInfo += `
+  if ((lower.includes("menu") || lower.includes("food") || lower.includes("restaurant") || lower.includes("seed") || lower.includes("data")) && catalogMenuItems.length > 0) {
+    ctx += `
 
-\u2550\u2550\u2550 FULL MENU (${catalogMenuItems.length} items) \u2550\u2550\u2550
-You MUST include ALL of these menu items in the database seed data and menu pages.
-${catalogMenuItems.slice(0, 200).map(
-      (m, i) => `${i + 1}. "${m.name}" | Price: ${m.price} | Category: ${m.category || "General"} | Description: ${m.description || ""} | Dietary: ${(m.dietary || []).join(", ") || "none"} | ${m.spicy ? "SPICY" : ""} | Image: ${m.image || "use placeholder"}`
+MENU ITEMS (${catalogMenuItems.length}):
+${catalogMenuItems.slice(0, 150).map(
+      (m, i) => `${i + 1}. "${m.name}" | ${m.price} | Cat: ${m.category || "General"} | ${m.description?.substring(0, 80) || ""}`
     ).join("\n")}`;
   }
-  if (catalogJobs.length > 0) {
-    catalogInfo += `
+  if ((lower.includes("job") || lower.includes("career") || lower.includes("seed") || lower.includes("data")) && catalogJobs.length > 0) {
+    ctx += `
 
-\u2550\u2550\u2550 JOB LISTINGS (${catalogJobs.length} jobs) \u2550\u2550\u2550
-You MUST include ALL of these job listings in the database seed data and job board pages.
-${catalogJobs.slice(0, 200).map(
-      (j, i) => `${i + 1}. "${j.title}" | Company: ${j.company} | Location: ${j.location} | Salary: ${j.salary || "Not specified"} | Type: ${j.type || "Full-time"} | Posted: ${j.postedDate || "Recent"}`
+JOB LISTINGS (${catalogJobs.length}):
+${catalogJobs.slice(0, 100).map(
+      (j, i) => `${i + 1}. "${j.title}" | ${j.company} | ${j.location} | ${j.salary || "N/A"} | ${j.type || "Full-time"}`
     ).join("\n")}`;
   }
-  if (catalogArticles.length > 0) {
-    catalogInfo += `
+  if ((lower.includes("article") || lower.includes("blog") || lower.includes("post") || lower.includes("news") || lower.includes("seed") || lower.includes("data")) && catalogArticles.length > 0) {
+    ctx += `
 
-\u2550\u2550\u2550 ARTICLES / BLOG POSTS (${catalogArticles.length} articles) \u2550\u2550\u2550
-You MUST include ALL of these articles in the database seed data and blog/news pages.
-${catalogArticles.slice(0, 100).map(
-      (a, i) => `${i + 1}. "${a.title}" | Author: ${a.author || "Staff"} | Date: ${a.date || "Recent"} | Category: ${a.category || "General"} | Excerpt: ${a.excerpt?.substring(0, 150) || ""} | Image: ${a.image || "use placeholder"}`
+ARTICLES (${catalogArticles.length}):
+${catalogArticles.slice(0, 50).map(
+      (a, i) => `${i + 1}. "${a.title}" | ${a.author || "Staff"} | ${a.date || "Recent"} | ${a.excerpt?.substring(0, 100) || ""}`
     ).join("\n")}`;
   }
-  const response = await invokeLLM({
-    systemTag: "chat",
-    userApiKey,
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert full-stack developer building a COMPLETE MIMIC of a website. Generate the complete file contents for the given build step.
+  const imageInventory = research.imageInventory || [];
+  if (imageInventory.length > 0 && (lower.includes("component") || lower.includes("page") || lower.includes("layout") || lower.includes("hero") || lower.includes("header") || lower.includes("footer") || lower.includes(".tsx") || lower.includes(".jsx"))) {
+    ctx += `
 
-CRITICAL RULES:
-- Return a JSON array of objects with "path" and "content" fields
-- Each file must be COMPLETE, WORKING code \u2014 NO placeholders, NO TODOs, NO "add more here"
-- Include ALL content from the original site: products, property listings, menu items, job listings, articles \u2014 with their EXACT names, descriptions, prices, images, and details
-- Include ALL pages found during research \u2014 not just the homepage
-- For real estate: include BOTH for-sale and for-rent listings with full property details (beds, baths, sqft, photos, amenities)
-- For restaurants: include the FULL menu with categories, prices, descriptions, dietary info
-- For retail: include ALL products with sizes, colors, prices, images, categories
-- For job boards: include ALL job listings with company, salary, location, type
-- Use the exact branding provided (colors, name, tagline) \u2014 this replaces the original branding
-- Wire up the payment system with the USER's Stripe keys (not the original site's)
-
-IMAGE RULES (CRITICAL \u2014 the clone MUST look identical to the original):
-- ALL images have been downloaded and are available at /public/images/{context}/ directories
-- Context folders: products/, hero/, logo/, general/, background/, team/, gallery/, icon/, testimonial/, product/
-- Use the LOCAL paths from the AVAILABLE IMAGES list below \u2014 these are REAL files on disk
-- For EVERY product, listing, menu item, or article: use the image path provided in the catalog data
-- For hero banners, logos, and backgrounds: use the local paths from the image inventory
-- If a local path is not available for a specific image, use the ORIGINAL URL as a direct fallback (hotlink)
-- NEVER use placeholder images (like via.placeholder.com or placehold.it) \u2014 always use real images
-- Include ALL product images in product cards, detail pages, and galleries
-- Make it production-ready, responsive, and SEO-optimized
-- Include proper meta tags, Open Graph tags, and structured data${brandingInfo}${stripeInfo}${imageInfo}`
-      },
-      {
-        role: "user",
-        content: `Generate file contents for build step ${step.step}: "${step.description}"
-
-**Project:** ${plan.projectName} \u2014 ${plan.description}
-**Tech Stack:** Frontend: ${plan.techStack.frontend}, Backend: ${plan.techStack.backend}, DB: ${plan.techStack.database}
-**Files to create:** ${step.files.join(", ")}
-
-**Full file structure for context:**
-${plan.fileStructure.map((f) => `- ${f.path}: ${f.description}`).join("\n")}
-
-**Data models:**
-${plan.dataModels.map((m) => `- ${m.name}: ${m.fields.join(", ")}`).join("\n")}
-
-**API routes:**
-${plan.apiRoutes.map((r) => `- ${r.method} ${r.path}: ${r.description}`).join("\n")}${productInfo}${subpageInfo}${catalogInfo}
-
-Return ONLY a JSON array: [{"path": "file/path", "content": "full file content"}, ...]`
-      }
-    ],
-    maxTokens: 32e3
-  });
-  const rawContent = response?.choices?.[0]?.message?.content;
-  if (!rawContent || typeof rawContent !== "string") {
-    return [];
+AVAILABLE IMAGES:
+${imageInventory.slice(0, 50).map((i) => `- /public/${i.localPath}: ${i.alt || i.context}`).join("\n")}`;
   }
+  return ctx;
+}
+function parseLLMFileResponse(rawContent) {
+  if (!rawContent || typeof rawContent !== "string") return [];
   try {
     const jsonStr = rawContent.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-    const files = JSON.parse(jsonStr);
-    if (Array.isArray(files)) {
-      return files.filter((f) => f.path && f.content);
-    }
+    const parsed = JSON.parse(jsonStr);
+    if (Array.isArray(parsed)) return parsed.filter((f) => f.path && f.content);
+    if (parsed.path && parsed.content) return [parsed];
   } catch {
-    const match = rawContent.match(/\[[\s\S]*\]/);
-    if (match) {
-      try {
-        const files = JSON.parse(match[0]);
-        if (Array.isArray(files)) {
-          return files.filter((f) => f.path && f.content);
-        }
-      } catch {
-      }
+  }
+  const arrayMatch = rawContent.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try {
+      const files = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(files)) return files.filter((f) => f.path && f.content);
+    } catch {
+    }
+  }
+  const objMatch = rawContent.match(/\{[\s\S]*"path"[\s\S]*"content"[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      const file = JSON.parse(objMatch[0]);
+      if (file.path && file.content) return [file];
+    } catch {
     }
   }
   return [];
+}
+async function generateSingleFile(filePath, plan, step, research, branding, stripe, userApiKey, previousFiles, maxRetries = 3) {
+  const brandingInfo = branding?.brandName ? `
+Branding: name="${branding.brandName}", tagline="${branding.brandTagline || ""}", colors=${branding.brandColors ? JSON.stringify(branding.brandColors) : "modern defaults"}` : "";
+  const stripeInfo = stripe?.publishableKey ? `
+Stripe: Use env vars STRIPE_PUBLISHABLE_KEY="${stripe.publishableKey}" and STRIPE_SECRET_KEY for payments.` : "";
+  const relevantContext = getRelevantContext(filePath, research);
+  const prevFileSummary = previousFiles.length > 0 ? `
+
+ALREADY GENERATED FILES IN THIS STEP (reference for imports/consistency):
+${previousFiles.map((f) => `- ${f.path} (${f.content.length} chars): ${f.content.substring(0, 200).replace(/\n/g, " ")}...`).join("\n")}` : "";
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await invokeLLM({
+        systemTag: "chat",
+        userApiKey,
+        model: "strong",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert full-stack developer. Generate COMPLETE, WORKING code for a single file.
+
+RULES:
+- Return ONLY a JSON object: {"path": "${filePath}", "content": "full file content here"}
+- The file MUST be COMPLETE \u2014 NO placeholders, NO TODOs, NO "add more here", NO comments saying "rest of items..."
+- Include ALL data items (products, listings, menu items, etc.) \u2014 every single one
+- Use real downloaded images from /public/images/ directories, NEVER use placeholder URLs
+- Make it production-ready, responsive, and professional
+- Include proper error handling and loading states${brandingInfo}${stripeInfo}`
+          },
+          {
+            role: "user",
+            content: `Generate the COMPLETE contents of: **${filePath}**
+
+Project: ${plan.projectName} \u2014 ${plan.description}
+Tech: ${plan.techStack.frontend} / ${plan.techStack.backend} / ${plan.techStack.database}
+Build step ${step.step}: "${step.description}"
+
+File structure:
+${plan.fileStructure.map((f) => `- ${f.path}: ${f.description}`).join("\n")}
+
+Data models:
+${plan.dataModels.map((m) => `- ${m.name}: ${m.fields.join(", ")}`).join("\n")}
+
+API routes:
+${plan.apiRoutes.map((r) => `- ${r.method} ${r.path}: ${r.description}`).join("\n")}${relevantContext}${prevFileSummary}
+
+Return ONLY: {"path": "${filePath}", "content": "..."}`
+          }
+        ],
+        maxTokens: 16e3
+      });
+      const rawContent = response?.choices?.[0]?.message?.content;
+      if (typeof rawContent === "string") {
+        const files = parseLLMFileResponse(rawContent);
+        if (files.length > 0) {
+          const match = files.find((f) => f.path === filePath) || files[0];
+          return { path: filePath, content: match.content };
+        }
+        const cleaned = rawContent.replace(/^```[a-z]*\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+        if (cleaned.length > 50) {
+          return { path: filePath, content: cleaned };
+        }
+      }
+    } catch (err) {
+      if (attempt === maxRetries) {
+        console.error(`[replicate] Failed to generate ${filePath} after ${maxRetries} attempts: ${getErrorMessage(err)}`);
+        return null;
+      }
+    }
+    if (attempt < maxRetries) {
+      await new Promise((resolve3) => setTimeout(resolve3, 1e3 * Math.pow(2, attempt - 1)));
+    }
+  }
+  return null;
+}
+async function generateFileContents(plan, step, research, branding, stripe, userApiKey) {
+  const allFiles = [];
+  if (step.files.length <= 2) {
+    for (const filePath of step.files) {
+      const result = await generateSingleFile(
+        filePath,
+        plan,
+        step,
+        research,
+        branding,
+        stripe,
+        userApiKey,
+        allFiles
+      );
+      if (result) allFiles.push(result);
+    }
+  } else {
+    for (let i = 0; i < step.files.length; i += 2) {
+      const batch = step.files.slice(i, i + 2);
+      const batchPromises = batch.map(
+        (filePath) => generateSingleFile(filePath, plan, step, research, branding, stripe, userApiKey, allFiles)
+      );
+      const results = await Promise.all(batchPromises);
+      for (const result of results) {
+        if (result) allFiles.push(result);
+      }
+    }
+  }
+  return allFiles;
 }
 async function pushToGithub(projectId, userId, repoName) {
   const project = await getProject(projectId, userId);
@@ -20388,7 +20529,7 @@ Requirements:
 - Add comments explaining the detection logic
 - Output ONLY the YARA rule, no explanation`;
   const ruleContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: prompt }],
     priority: "background"
   });
@@ -20420,7 +20561,7 @@ Requirements:
 - Include tags with ATT&CK mapping (infer technique if not provided)
 - Output ONLY the Sigma YAML, no explanation`;
   const ruleContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: prompt }],
     priority: "background"
   });
@@ -21735,7 +21876,7 @@ The report MUST include:
 
 Format as clean Markdown. Be specific and professional.`;
   const reportContent = await invokeLLM({
-    model: "gpt-4.1-mini",
+    model: "fast",
     messages: [{ role: "user", content: reportPrompt }],
     priority: "background"
   });
@@ -21744,7 +21885,7 @@ Format as clean Markdown. Be specific and professional.`;
     sbId,
     userId,
     `cat > ${reportFile} << 'REPORTEOF'
-${reportContent.substring(0, 1e4)}
+${String(typeof reportContent === "string" ? reportContent : reportContent?.choices?.[0]?.message?.content || "").substring(0, 1e4)}
 REPORT_EOF`,
     { timeoutMs: 1e4, triggeredBy: "ai" }
   );
@@ -65654,7 +65795,8 @@ async function startServer() {
         const db = await getDb2();
         if (!db) return;
         try {
-          await db.execute({ sql: "ALTER TABLE `users` MODIFY COLUMN `role` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'" });
+          const { sql: rawSql } = await import("drizzle-orm");
+          await db.execute(rawSql`ALTER TABLE \`users\` MODIFY COLUMN \`role\` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'`);
           log65.info("Ensured head_admin role exists in users table");
         } catch (alterErr) {
           log65.warn("ALTER TABLE for head_admin role (non-fatal):", { error: String(alterErr) });
