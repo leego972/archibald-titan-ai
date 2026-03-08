@@ -1819,12 +1819,17 @@ export default function ChatPage() {
       const isNetworkFailure = serverMessage === 'Load failed' ||
         serverMessage.toLowerCase().includes('load failed') ||
         serverMessage.toLowerCase().includes('network request failed') ||
-        serverMessage.toLowerCase().includes('failed to fetch');
+        serverMessage.toLowerCase().includes('failed to fetch') ||
+        serverMessage.toLowerCase().includes('aborted') ||
+        serverMessage.toLowerCase().includes('network error') ||
+        serverMessage.toLowerCase().includes('networkerror') ||
+        serverMessage.toLowerCase().includes('the operation couldn');
 
       if (isNetworkFailure && convIdForStream) {
-        // Poll build-status up to 12 times (60s total) waiting for completion
+        // Poll build-status up to 60 times (5 min total) waiting for completion
         let recovered = false;
-        for (let attempt = 0; attempt < 12; attempt++) {
+        toast.info('Connection interrupted — checking if Titan is still working...', { duration: 10000 });
+        for (let attempt = 0; attempt < 60; attempt++) {
           await new Promise(r => setTimeout(r, 5000));
           try {
             const statusRes = await fetch(`/api/chat/build-status/${convIdForStream}`, { credentials: 'include' });
@@ -1851,12 +1856,18 @@ export default function ChatPage() {
                 break; // Server-side failure — fall through to error display
               }
               // Still running — keep polling
+              if (attempt % 6 === 5) {
+                toast.info('Titan is still working — waiting for completion...', { duration: 5000 });
+              }
             }
           } catch {
             // Poll failed — keep trying
           }
         }
-        if (recovered) return; // Skip error display — response was recovered
+        if (recovered) {
+          toast.success('Titan finished! Response recovered successfully.');
+          return; // Skip error display — response was recovered
+        }
       }
       // ── Standard error display ──────────────────────────────────────────────
       let userFacingError = "Something went wrong. Please try again.";
@@ -1869,7 +1880,7 @@ export default function ChatPage() {
       } else if (serverMessage.toLowerCase().includes("timeout") || serverMessage.toLowerCase().includes("timed out")) {
         userFacingError = "The request timed out. This can happen with complex builds. Try again or break the request into smaller parts.";
       } else if (isNetworkFailure) {
-        userFacingError = "Connection dropped — the AI was still working. Please try again.";
+        userFacingError = "Connection dropped — Titan may still be working in the background. Refresh the page to check for a response.";
       } else if (serverMessage) {
         userFacingError = serverMessage;
       }

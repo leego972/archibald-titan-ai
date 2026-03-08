@@ -9,7 +9,18 @@ import { getLoginUrl } from "./const";
 import { LanguageProvider } from "./i18n";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      networkMode: 'always',
+    },
+    mutations: {
+      retry: false,
+      networkMode: 'always',
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -74,10 +85,20 @@ const trpcClient = trpc.createClient({
         return csrf ? { "x-csrf-token": csrf } : {};
       },
       fetch(input, init) {
+        // Use a 10-minute timeout for all tRPC requests (builder tasks can be long)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600_000);
+        // If the caller already provided a signal, chain them
+        const existingSignal = init?.signal;
+        if (existingSignal) {
+          existingSignal.addEventListener('abort', () => controller.abort());
+        }
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
-        });
+          signal: controller.signal,
+          keepalive: true,
+        }).finally(() => clearTimeout(timeoutId));
       },
     }),
   ],

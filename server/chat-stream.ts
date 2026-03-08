@@ -262,14 +262,16 @@ export function registerChatStreamRoutes(app: Express): void {
       actionsCompleted: buildStatus?.actionsCompleted || 0,
     })}\n\n`);
 
-    // Heartbeat every 30 seconds to keep connection alive
+    // Heartbeat every 15 seconds to keep Railway proxy + Safari alive
     const heartbeat = setInterval(() => {
       try {
-        res.write(`event: heartbeat\ndata: {}\n\n`);
+        res.write(`event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`);
+        // Flush the response to ensure data reaches the client through proxies
+        if (typeof (res as any).flush === 'function') (res as any).flush();
       } catch {
         clearInterval(heartbeat);
       }
-    }, 30000);
+    }, 15000);
 
     // Clean up on client disconnect — but DO NOT abort the build
     req.on("close", () => {

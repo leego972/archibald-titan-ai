@@ -9302,13 +9302,14 @@ data: ${JSON.stringify({
     const heartbeat = setInterval(() => {
       try {
         res.write(`event: heartbeat
-data: {}
+data: ${JSON.stringify({ ts: Date.now() })}
 
 `);
+        if (typeof res.flush === "function") res.flush();
       } catch {
         clearInterval(heartbeat);
       }
-    }, 3e4);
+    }, 15e3);
     req.on("close", () => {
       clearInterval(heartbeat);
       emitter.removeListener("event", onEvent);
