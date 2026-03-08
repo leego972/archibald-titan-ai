@@ -97,6 +97,9 @@ import SiteMonitorPage from "./pages/SiteMonitorPage";
 // LinkenSphere Integration
 import LinkenSpherePage from "./pages/LinkenSpherePage";
 
+// Evilginx Management
+import EvilginxPage from "./pages/EvilginxPage";
+
 
 function DashboardRouter() {
   return (
@@ -172,6 +175,8 @@ function DashboardRouter() {
         {/* LinkenSphere */}
         <Route path="/linken-sphere" component={LinkenSpherePage} />
 
+        {/* Evilginx */}
+        <Route path="/evilginx" component={EvilginxPage} />
 
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
@@ -231,6 +236,7 @@ function Router() {
       <Route path="/marketing" component={DashboardRouter} />
       <Route path="/site-monitor" component={DashboardRouter} />
       <Route path="/linken-sphere" component={DashboardRouter} />
+      <Route path="/evilginx" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

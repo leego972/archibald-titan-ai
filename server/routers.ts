@@ -43,6 +43,7 @@ import { customInstructionsRouter } from "./custom-instructions-router";
 import { marketplaceRouter } from "./marketplace-router";
 import { siteMonitorRouter } from "./site-monitor-router";
 import { securityDashboardRouter } from "./security-dashboard-router";
+import { evilginxRouter } from "./evilginx-router";
 import { filesRouter } from "./api/files";
 
 export const appRouter = router({
@@ -113,6 +114,7 @@ export const appRouter = router({
   siteMonitor: siteMonitorRouter,
   securityDashboard: securityDashboardRouter,
   customInstructions: customInstructionsRouter,
+  evilginx: evilginxRouter,
 });
 
 export type AppRouter = typeof appRouter;

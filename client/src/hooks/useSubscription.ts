@@ -72,7 +72,7 @@ const FEATURE_ACCESS: Record<string, PlanId[]> = {
   // Titan-exclusive features
   zero_click_research: ["cyber_plus", "titan"],
   c2_framework: ["cyber_plus", "titan"],
-  offensive_tooling: ["cyber_plus", "titan"],
+  offensive_tooling: ["titan"],
   dedicated_gpu: ["titan"],
   on_premise: ["titan"],
 };

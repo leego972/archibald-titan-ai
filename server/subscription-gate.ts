@@ -207,7 +207,7 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
     // Cyber+ exclusive features
     zero_click_research: ["cyber_plus", "titan"],
     c2_framework: ["cyber_plus", "titan"],
-    offensive_tooling: ["cyber_plus", "titan"],
+    offensive_tooling: ["titan"],
     custom_model_finetuning: ["cyber_plus", "titan"],
     multi_org: ["cyber_plus", "titan"],
     // Titan exclusive features
