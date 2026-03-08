@@ -94,6 +94,9 @@ import ProjectFilesViewer from "./pages/ProjectFilesViewer";
 // Site Monitor
 import SiteMonitorPage from "./pages/SiteMonitorPage";
 
+// LinkenSphere Integration
+import LinkenSpherePage from "./pages/LinkenSpherePage";
+
 
 function DashboardRouter() {
   return (
@@ -166,6 +169,9 @@ function DashboardRouter() {
         {/* Site Monitor */}
         <Route path="/site-monitor" component={SiteMonitorPage} />
 
+        {/* LinkenSphere */}
+        <Route path="/linken-sphere" component={LinkenSpherePage} />
+
 
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
@@ -224,6 +230,7 @@ function Router() {
       <Route path="/blog-admin" component={DashboardRouter} />
       <Route path="/marketing" component={DashboardRouter} />
       <Route path="/site-monitor" component={DashboardRouter} />
+      <Route path="/linken-sphere" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

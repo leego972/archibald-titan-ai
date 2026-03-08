@@ -138,6 +138,7 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_38_r5c6"), label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
       { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
       { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "LinkenSphere", path: "/linken-sphere", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
