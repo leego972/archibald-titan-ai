@@ -3719,12 +3719,26 @@ async function execCreateFile(
   args: Record<string, unknown>,
   conversationId?: number
 ): Promise<ToolExecutionResult> {
-  const fileName = args.fileName as string;
+  let fileName = args.fileName as string;
   const content = args.content as string;
   const language = (args.language as string) || detectLanguage(fileName);
 
   if (!fileName || content === undefined) {
     return { success: false, error: "fileName and content are required" };
+  }
+
+  // ── SERVER-SIDE ENFORCEMENT: Ensure fileName has a project root folder ──
+  // If the builder creates a file without a project folder prefix (e.g., "main.py" or "src/index.html"),
+  // auto-prefix it with "general-project/" so files are always grouped under a project folder.
+  const hasProjectFolder = fileName.includes("/") && ![
+    "src", "lib", "cmd", "pkg", "internal", "test", "tests", "config",
+    "utils", "helpers", "models", "views", "controllers", "routes",
+    "components", "pages", "styles", "assets", "public", "static",
+    "scripts", "docs", "bin", "dist", "build", "node_modules",
+  ].includes(fileName.split("/")[0]);
+  if (!hasProjectFolder) {
+    fileName = `general-project/${fileName}`;
+    log.info(`[CreateFile] Auto-prefixed project folder: ${fileName}`);
   }
 
   try {

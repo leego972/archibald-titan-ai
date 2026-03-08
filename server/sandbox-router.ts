@@ -705,4 +705,46 @@ export const sandboxRouter = router({
         return { success: false, deleted: 0, error: msg };
       }
     }),
+
+  // ── Delete ALL project files for the current user ──
+  deleteAllProjects: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      try {
+        const { getDb } = await import("./db");
+        const { sandboxFiles } = await import("../drizzle/schema");
+        const { eq, inArray } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
+        const sandboxes = await listSandboxes(ctx.user.id);
+        if (sandboxes.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
+
+        let totalDeleted = 0;
+        // Delete files from ALL sandboxes belonging to this user
+        for (const sb of sandboxes) {
+          const allFiles = await db
+            .select()
+            .from(sandboxFiles)
+            .where(eq(sandboxFiles.sandboxId, sb.id));
+          if (allFiles.length === 0) continue;
+          // Delete S3 objects (best-effort)
+          for (const file of allFiles) {
+            if (file.s3Key) {
+              try {
+                const { storageDelete } = await import("./storage");
+                await storageDelete(file.s3Key);
+              } catch {}
+            }
+          }
+          // Delete from DB
+          await db.delete(sandboxFiles).where(
+            inArray(sandboxFiles.id, allFiles.map(f => f.id))
+          );
+          totalDeleted += allFiles.length;
+        }
+        return { success: true, deleted: totalDeleted };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, deleted: 0, error: msg };
+      }
+    }),
 });

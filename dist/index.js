@@ -8790,13 +8790,13 @@ var init_chat_tools = __esm({
       type: "function",
       function: {
         name: "create_file",
-        description: "Create a file in the user's project. Files are stored in cloud (downloadable by user) AND automatically synced to the sandbox filesystem at /home/sandbox/projects/<fileName>. You do NOT need to also call sandbox_write_file \u2014 create_file handles both. ALWAYS use this for every file you build. Every file must contain COMPLETE, WORKING code \u2014 no stubs, no TODOs, no placeholders. There are NO directory restrictions \u2014 any file path works.",
+        description: "Create a file in the user's project. Files are stored in cloud (downloadable by user) AND automatically synced to the sandbox filesystem at /home/sandbox/projects/<fileName>. You do NOT need to also call sandbox_write_file \u2014 create_file handles both. ALWAYS use this for every file you build. Every file must contain COMPLETE, WORKING code \u2014 no stubs, no TODOs, no placeholders. CRITICAL: The fileName MUST always start with a project root folder name (e.g., 'my-project/main.py', NOT just 'main.py'). All files for a build MUST share the same project root folder so they are grouped together in the user's project list.",
         parameters: {
           type: "object",
           properties: {
             fileName: {
               type: "string",
-              description: "File name with path (e.g., 'src/index.html', 'package.json', 'styles/main.css')"
+              description: "File path that MUST start with the project name as the root folder. Format: '<project-name>/<path>'. Examples: 'port-scanner/main.py', 'my-landing-page/src/index.html', 'evilginx2/cmd/main.go', 'todo-app/package.json'. The project name should be a kebab-case slug derived from what you're building. NEVER create files without a project root folder \u2014 loose files like 'main.py' or 'src/index.html' are FORBIDDEN."
             },
             content: {
               type: "string",
@@ -8867,7 +8867,7 @@ var init_chat_tools = __esm({
           properties: {
             projectName: {
               type: "string",
-              description: "The project/folder name to include in the ZIP. Use the top-level directory name of the files you created (e.g., if you created 'calculator/main.py', use 'calculator'). STRONGLY RECOMMENDED to always provide this to avoid including files from other projects."
+              description: "The project root folder name to include in the ZIP. This is the top-level directory you used when creating files (e.g., if you created 'port-scanner/main.py', use 'port-scanner'). REQUIRED \u2014 always provide this to scope the ZIP to the current project only."
             }
           },
           required: []
@@ -19809,11 +19809,43 @@ async function execWebsiteReplicate(userId, args) {
   }
 }
 async function execCreateFile(userId, args, conversationId) {
-  const fileName = args.fileName;
+  let fileName = args.fileName;
   const content = args.content;
   const language = args.language || detectLanguage(fileName);
   if (!fileName || content === void 0) {
     return { success: false, error: "fileName and content are required" };
+  }
+  const hasProjectFolder = fileName.includes("/") && ![
+    "src",
+    "lib",
+    "cmd",
+    "pkg",
+    "internal",
+    "test",
+    "tests",
+    "config",
+    "utils",
+    "helpers",
+    "models",
+    "views",
+    "controllers",
+    "routes",
+    "components",
+    "pages",
+    "styles",
+    "assets",
+    "public",
+    "static",
+    "scripts",
+    "docs",
+    "bin",
+    "dist",
+    "build",
+    "node_modules"
+  ].includes(fileName.split("/")[0]);
+  if (!hasProjectFolder) {
+    fileName = `general-project/${fileName}`;
+    log27.info(`[CreateFile] Auto-prefixed project folder: ${fileName}`);
   }
   try {
     const timestamp2 = Date.now();
@@ -23443,6 +23475,15 @@ When building tools or projects, naturally integrate partner recommendations whe
 
 You are now in BUILDER MODE. The user wants you to build something. Quality is the #1 priority \u2014 the code MUST be complete, well-structured, and WORKING.
 
+### PROJECT FOLDER STRUCTURE (MANDATORY \u2014 NON-NEGOTIABLE)
+- EVERY file you create MUST be inside a project root folder. The project name is a kebab-case slug derived from what you're building.
+- Format: create_file with fileName = "<project-name>/path/to/file"
+- Example: If building a port scanner, ALL files go under "port-scanner/": "port-scanner/main.py", "port-scanner/scanner/tcp.py", "port-scanner/README.md", "port-scanner/requirements.txt"
+- NEVER create loose files like "main.py" or "src/index.html" without a project root folder \u2014 this is FORBIDDEN.
+- ALL files in a single build MUST share the SAME project root folder name.
+- The sandbox path becomes /home/sandbox/projects/<project-name>/... \u2014 cd to that folder when running commands.
+- When running sandbox commands: "cd /home/sandbox/projects/<project-name> && npm install" (NOT just /home/sandbox/projects/)
+
 ### SANDBOX EXECUTION
 - You have FULL access to sandbox_exec, sandbox_write_file, and create_file.
 - create_file automatically writes to both cloud storage AND the sandbox filesystem at /home/sandbox/projects/<fileName> \u2014 no need to double-write.
@@ -23450,7 +23491,7 @@ You are now in BUILDER MODE. The user wants you to build something. Quality is t
 - For Windows .exe: use sandbox_exec to run: apt-get install -y mingw-w64, then cross-compile.
 - For any tool or compiler: use sandbox_exec to install it \u2014 you have full sudo access.
 - NEVER tell the user you cannot run commands. ALWAYS just run the command with sandbox_exec.
-- ALWAYS run commands from /home/sandbox/projects/ \u2014 that's where create_file syncs files to.
+- ALWAYS run commands from /home/sandbox/projects/<project-name>/ \u2014 that's where create_file syncs files to.
 
 ### QUALITY RULES (CRITICAL \u2014 non-negotiable)
 1. **EVERY FILE must contain REAL, COMPLETE code** \u2014 no stubs, no TODOs, no placeholders, no empty functions.
@@ -23461,16 +23502,17 @@ You are now in BUILDER MODE. The user wants you to build something. Quality is t
 
 ### MANDATORY WORKFLOW
 1. **Round 1 \u2014 PLAN + START BUILDING**: Briefly state what you're building, then IMMEDIATELY start creating files. Do NOT waste a round just listing files or exploring \u2014 the sandbox starts EMPTY for new projects. Start with the entry point or config files.
-2. **Rounds 2-N \u2014 BUILD**: Create ALL files using create_file (one file per tool call). Files are AUTOMATICALLY synced to sandbox at /home/sandbox/projects/<fileName>.
-3. **Test Round**: Use sandbox_exec to install dependencies and run the code. The project files are at /home/sandbox/projects/ \u2014 cd there first. Fix any errors immediately.
+2. **Rounds 2-N \u2014 BUILD**: Create ALL files using create_file (one file per tool call). EVERY fileName MUST start with the project root folder (e.g., "my-project/main.py"). Files are AUTOMATICALLY synced to sandbox at /home/sandbox/projects/<project-name>/<path>.
+3. **Test Round**: Use sandbox_exec to install dependencies and run the code. The project files are at /home/sandbox/projects/<project-name>/ \u2014 cd there first. Fix any errors immediately.
 4. **Final Round \u2014 DELIVER**: Summarize what was built, show successful output, offer provide_project_zip.
 
 ### SANDBOX ENVIRONMENT
 - The sandbox starts EMPTY \u2014 do NOT call sandbox_list_files on directories like client/src/ or src/pages/ expecting files to exist.
-- All files created with create_file are synced to /home/sandbox/projects/<fileName>.
-- When running sandbox_exec commands (npm install, python, etc.), ALWAYS cd to /home/sandbox/projects/ first.
-- Example: sandbox_exec with command "cd /home/sandbox/projects && npm install && npm run dev"
-- If you need subdirectories, create_file with paths like "src/components/Button.tsx" \u2014 the directories are created automatically.
+- All files created with create_file are synced to /home/sandbox/projects/<fileName> (where fileName includes the project root folder).
+- When running sandbox_exec commands (npm install, python, etc.), ALWAYS cd to /home/sandbox/projects/<project-name>/ first.
+- Example: sandbox_exec with command "cd /home/sandbox/projects/my-web-app && npm install && npm run dev"
+- If you need subdirectories, create_file with paths like "my-project/src/components/Button.tsx" \u2014 the directories are created automatically.
+- REMINDER: EVERY fileName MUST start with the project root folder name. Never use bare paths like "src/components/Button.tsx".
 
 ### CORE PRINCIPLES
 1. **RESEARCH FIRST** \u2014 If building something unfamiliar, use web_search to study it before coding
@@ -23595,6 +23637,7 @@ The user is paying for working software. If it doesn't run, it's worthless.
 - Tell the user your plan briefly
 
 ### PHASE 2: BUILD (use as many rounds as needed)
+- EVERY file MUST be created inside a project root folder. Pick a kebab-case project name (e.g., "port-scanner", "todo-app", "evilginx2-clone") and prefix ALL fileNames with it: "<project-name>/path/to/file".
 - Create files using create_file in dependency order:
   1. Config files, types, constants (no project imports)
   2. Utility modules (import only from step 1)
@@ -23602,6 +23645,7 @@ The user is paying for working software. If it doesn't run, it's worthless.
   4. Entry points (import from all above)
 - EVERY file must be complete \u2014 no stubs, no TODOs, no placeholders
 - EVERY import must reference a real file you created or a package you'll install
+- NEVER create files without the project root folder prefix \u2014 loose files are FORBIDDEN
 
 ### PHASE 3: INSTALL DEPENDENCIES (1 round)
 - Use sandbox_exec to install ALL dependencies at once
@@ -23663,6 +23707,7 @@ IF YOU SKIP VERIFICATION, THE BUILD IS A FAILURE. Period.
 - You do NOT need to also call sandbox_write_file \u2014 it's already done
 - This saves you half your tool rounds \u2014 use them for testing instead
 - NEVER paste code in messages \u2014 always use create_file
+- EVERY fileName MUST start with a project root folder (e.g., "my-project/main.py"). Loose files without a project folder are FORBIDDEN.
 
 ### RULE 2: NO STUBS, NO PLACEHOLDERS, NO TODOS
 - NEVER write // TODO: implement this
@@ -49152,6 +49197,40 @@ var sandboxRouter = router({
         inArray3(sandboxFiles2.id, files.map((f) => f.id))
       );
       return { success: true, deleted: files.length };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, deleted: 0, error: msg };
+    }
+  }),
+  // ── Delete ALL project files for the current user ──
+  deleteAllProjects: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq63, inArray: inArray3 } = await import("drizzle-orm");
+      const db = await getDb2();
+      if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
+      const sandboxes3 = await listSandboxes(ctx.user.id);
+      if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
+      let totalDeleted = 0;
+      for (const sb of sandboxes3) {
+        const allFiles = await db.select().from(sandboxFiles2).where(eq63(sandboxFiles2.sandboxId, sb.id));
+        if (allFiles.length === 0) continue;
+        for (const file of allFiles) {
+          if (file.s3Key) {
+            try {
+              const { storageDelete: storageDelete2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+              await storageDelete2(file.s3Key);
+            } catch {
+            }
+          }
+        }
+        await db.delete(sandboxFiles2).where(
+          inArray3(sandboxFiles2.id, allFiles.map((f) => f.id))
+        );
+        totalDeleted += allFiles.length;
+      }
+      return { success: true, deleted: totalDeleted };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { success: false, deleted: 0, error: msg };

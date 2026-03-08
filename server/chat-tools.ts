@@ -2067,13 +2067,13 @@ const createProjectFile: Tool = {
   function: {
     name: "create_file",
     description:
-      "Create a file in the user's project. Files are stored in cloud (downloadable by user) AND automatically synced to the sandbox filesystem at /home/sandbox/projects/<fileName>. You do NOT need to also call sandbox_write_file — create_file handles both. ALWAYS use this for every file you build. Every file must contain COMPLETE, WORKING code — no stubs, no TODOs, no placeholders. There are NO directory restrictions — any file path works.",
+      "Create a file in the user's project. Files are stored in cloud (downloadable by user) AND automatically synced to the sandbox filesystem at /home/sandbox/projects/<fileName>. You do NOT need to also call sandbox_write_file — create_file handles both. ALWAYS use this for every file you build. Every file must contain COMPLETE, WORKING code — no stubs, no TODOs, no placeholders. CRITICAL: The fileName MUST always start with a project root folder name (e.g., 'my-project/main.py', NOT just 'main.py'). All files for a build MUST share the same project root folder so they are grouped together in the user's project list.",
     parameters: {
       type: "object",
       properties: {
         fileName: {
           type: "string",
-          description: "File name with path (e.g., 'src/index.html', 'package.json', 'styles/main.css')",
+          description: "File path that MUST start with the project name as the root folder. Format: '<project-name>/<path>'. Examples: 'port-scanner/main.py', 'my-landing-page/src/index.html', 'evilginx2/cmd/main.go', 'todo-app/package.json'. The project name should be a kebab-case slug derived from what you're building. NEVER create files without a project root folder — loose files like 'main.py' or 'src/index.html' are FORBIDDEN.",
         },
         content: {
           type: "string",
@@ -2147,7 +2147,7 @@ const provideProjectZip: Tool = {
       properties: {
         projectName: {
           type: "string",
-          description: "The project/folder name to include in the ZIP. Use the top-level directory name of the files you created (e.g., if you created 'calculator/main.py', use 'calculator'). STRONGLY RECOMMENDED to always provide this to avoid including files from other projects.",
+          description: "The project root folder name to include in the ZIP. This is the top-level directory you used when creating files (e.g., if you created 'port-scanner/main.py', use 'port-scanner'). REQUIRED — always provide this to scope the ZIP to the current project only.",
         },
       },
       required: [],

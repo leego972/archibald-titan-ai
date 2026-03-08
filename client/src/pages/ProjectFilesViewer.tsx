@@ -149,6 +149,7 @@ export default function ProjectFilesViewer() {
   const [selectMode, setSelectMode] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   // GitHub push state
   const [showGithubSetup, setShowGithubSetup] = useState(false);
@@ -207,6 +208,23 @@ export default function ProjectFilesViewer() {
     onError: (err) => {
       toast.error(err.message || "Failed to delete project");
       setProjectToDelete(null);
+    },
+  });
+
+  const deleteAllMut = trpc.sandbox.deleteAllProjects.useMutation({
+    onSuccess: (data) => {
+      if (data.success && data.deleted > 0) {
+        toast.success(`All projects deleted — ${data.deleted} file(s) removed`);
+        setShowDeleteAllConfirm(false);
+        filesQuery.refetch();
+      } else {
+        toast.error(data.error || "Delete all failed");
+        setShowDeleteAllConfirm(false);
+      }
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to delete all projects");
+      setShowDeleteAllConfirm(false);
     },
   });
 
@@ -810,6 +828,18 @@ export default function ProjectFilesViewer() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {allFiles.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteAllConfirm(true)}
+              disabled={deleteAllMut.isPending}
+              className="gap-1.5 h-8"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleteAllMut.isPending ? "Deleting..." : "Delete All"}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -938,6 +968,39 @@ export default function ProjectFilesViewer() {
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting...</>
               ) : (
                 <><Trash2 className="h-4 w-4 mr-2" /> Delete Project</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Projects Confirmation Dialog */}
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-full bg-red-500/10">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <AlertDialogTitle className="text-lg">Delete All Projects</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">ALL {allFiles.length} files</span> across
+              {" "}<span className="font-semibold text-foreground">{projects.length} projects</span>?
+              This will permanently remove everything from both the database and cloud storage. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteAllMut.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAllMut.mutate()}
+              disabled={deleteAllMut.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteAllMut.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting All...</>
+              ) : (
+                <><Trash2 className="h-4 w-4 mr-2" /> Delete All Projects</>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
