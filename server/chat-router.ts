@@ -1639,11 +1639,14 @@ Do NOT attempt any tool calls or builds.`;
             // ALL build requests use the stronger model — code quality matters
             // The cost difference is negligible vs. the cost of bad code output
             modelTier = "strong";
-          } else if (!activeTools || activeTools.length === 0) {
-            // No tools = simple text response → nano
+          } else {
+            // Non-build requests: use fast/cheap model to save credits
+            // This includes: simple text responses, tool-calling without build intent, research queries
+            // The free model is sufficient for conversational AI and credential management
             modelTier = "fast";
           }
-          // else: undefined → LLM module default (mini for tool-calling)
+          // Note: modelTier="fast" uses the cheapest available model (gpt-4.1-nano)
+          // which is cost-optimized for non-build requests and saves user credits
           if (isBuildRequest) {
             log.info(`[Chat] Round ${rounds}: model=${modelTier || 'default'} (build=${isSelfBuild ? 'self' : 'external'})`);
           }

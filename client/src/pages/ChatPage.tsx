@@ -474,8 +474,8 @@ function ConversationSidebar({
       refetch();
       toast.success("Conversation deleted");
       setConfirmDeleteId(null);
-      // Reset active conversation if the deleted one was active
-      if (variables.conversationId === activeId && onDelete) {
+      // Always notify parent of deletion
+      if (onDelete) {
         onDelete(variables.conversationId);
       }
     },
@@ -691,8 +691,8 @@ function MobileConversationDrawer({
       utils.chat.listConversations.invalidate();
       toast.success("Conversation deleted");
       setConfirmDeleteId(null);
-      // Reset active conversation if the deleted one was active
-      if (variables.conversationId === activeId && onDelete) {
+      // Always notify parent of deletion
+      if (onDelete) {
         onDelete(variables.conversationId);
       }
     },
@@ -2034,7 +2034,11 @@ export default function ChatPage() {
           open={mobileDrawerOpen}
           onClose={() => setMobileDrawerOpen(false)}
           activeId={activeConversationId}
-          onDelete={() => handleNewConversation()}
+          onDelete={(deletedId) => {
+            if (deletedId === activeConversationId) {
+              handleNewConversation();
+            }
+          }}
           onSelect={handleSelectConversation}
           onNew={handleNewConversation}
         />
@@ -2046,7 +2050,11 @@ export default function ChatPage() {
           activeId={activeConversationId}
           onSelect={handleSelectConversation}
           onNew={handleNewConversation}
-          onDelete={() => handleNewConversation()}
+          onDelete={(deletedId) => {
+            if (deletedId === activeConversationId) {
+              handleNewConversation();
+            }
+          }}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
