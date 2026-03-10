@@ -11,6 +11,7 @@ concurrency:
 jobs:
   build-and-upload:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -30,6 +31,10 @@ jobs:
     name: Build ${{ matrix.platform }}
 
     steps:
+      - name: Enable long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
@@ -47,10 +52,18 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Copy frontend to electron
+      - name: Copy frontend to electron (Linux/Mac)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p electron/public
           cp -r dist/public/* electron/public/
+
+      - name: Copy frontend to electron (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path electron/public | Out-Null
+          Copy-Item -Recurse -Force dist/public/* electron/public/
 
       - name: Install Electron dependencies
         working-directory: electron

@@ -77,6 +77,17 @@ const PROTECTED_PATHS: string[] = [
   "server/subscription-gate.ts",
   // Anti-self-replication — MUST NEVER be modified or disabled
   "server/anti-replication-guard.ts",
+  // API key routing and LLM config — admin-only, self-build must not touch
+  "server/_core/key-pool.ts",
+  "server/_core/llm.ts",
+  // User secrets / Save Token — previously broken by self-build regression
+  "server/user-secrets-router.ts",
+  // GitHub Actions CI/CD workflows — self-build must not break deployments
+  ".github/workflows/desktop-build.yml",
+  ".github/workflows/ci.yml",
+  ".github/workflows/sync-to-architabot.yml",
+  // Chat router core logic — self-build may only patch, never fully rewrite
+  // (Note: self_multi_file_modify with action="patch" is still allowed)
 ];
 
 /**
@@ -89,6 +100,7 @@ const ALLOWED_DIRECTORIES: string[] = [
   "shared/",
   "scripts/",
   "electron/",
+  ".github/",
 ];
 
 /**

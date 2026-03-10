@@ -14,6 +14,7 @@ import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
+import { encrypt, decrypt } from "./fetcher-db";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 
@@ -225,11 +226,11 @@ export const evilginxRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Store as encrypted user secret
-      const configJson = JSON.stringify(input);
+      const configJson = encrypt(JSON.stringify(input));
       const existing = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (existing.length > 0) {
@@ -240,7 +241,8 @@ export const evilginxRouter = router({
       } else {
         await db.insert(userSecrets).values({
           userId: ctx.user.id,
-          name: "__evilginx_ssh",
+          secretType: "__evilginx_ssh",
+          label: "Evilginx SSH Config",
           encryptedValue: configJson,
         });
       }
@@ -261,13 +263,13 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) return null;
 
     try {
-      const config = JSON.parse(result[0].encryptedValue);
+      const config = JSON.parse(decrypt(result[0].encryptedValue));
       return {
         host: config.host,
         port: config.port,
@@ -295,14 +297,14 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No Evilginx server configured. Please set up your SSH connection first." });
       }
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, input.command);
       return { output };
     }),
@@ -319,12 +321,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "config");
     return { output };
   }),
@@ -349,12 +351,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.domain) commands.push(`config domain ${input.domain}`);
       if (input.ipv4) commands.push(`config ipv4 ${input.ipv4}`);
@@ -382,12 +384,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "phishlets");
     return { raw: output, phishlets: parsePhishletList(output) };
   }),
@@ -404,12 +406,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.hostname) commands.push(`phishlets hostname ${input.name} ${input.hostname}`);
       commands.push(`phishlets enable ${input.name}`);
@@ -433,12 +435,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `phishlets disable ${input.name}`);
       return { output };
     }),
@@ -455,12 +457,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `phishlets hide ${input.name}`);
       return { output };
     }),
@@ -477,12 +479,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `phishlets hostname ${input.name} ${input.hostname}`);
       return { output };
     }),
@@ -499,12 +501,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `phishlets get-hosts ${input.name}`);
       return { output };
     }),
@@ -521,12 +523,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "lures");
     return { raw: output, lures: parseLureList(output) };
   }),
@@ -543,12 +545,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures create ${input.phishlet}`);
       return { output };
     }),
@@ -571,12 +573,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures edit ${input.id} ${input.field} ${input.value}`);
       return { output };
     }),
@@ -593,12 +595,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures delete ${input.id}`);
       return { output };
     }),
@@ -615,12 +617,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures pause ${input.id} ${input.duration}`);
       return { output };
     }),
@@ -637,12 +639,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures unpause ${input.id}`);
       return { output };
     }),
@@ -659,12 +661,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `lures get-url ${input.id}`);
       return { output };
     }),
@@ -681,12 +683,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "sessions");
     return { raw: output, sessions: parseSessionList(output) };
   }),
@@ -703,12 +705,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `sessions ${input.id}`);
       return { output };
     }),
@@ -725,12 +727,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `sessions delete ${input.id}`);
       return { output };
     }),
@@ -747,12 +749,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "proxy");
     return { output };
   }),
@@ -778,12 +780,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.type) commands.push(`proxy type ${input.type}`);
       if (input.address) commands.push(`proxy address ${input.address}`);
@@ -811,12 +813,12 @@ export const evilginxRouter = router({
     const result = await db
       .select()
       .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
       .limit(1);
 
     if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-    const sshConfig = JSON.parse(result[0].encryptedValue);
+    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
     const output = await execEvilginxCommand(sshConfig, "blacklist");
     return { output };
   }),
@@ -833,12 +835,12 @@ export const evilginxRouter = router({
       const result = await db
         .select()
         .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.name, "__evilginx_ssh")))
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
 
       if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
 
-      const sshConfig = JSON.parse(result[0].encryptedValue);
+      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, `blacklist ${input.mode}`);
       return { output };
     }),

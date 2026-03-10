@@ -913,8 +913,9 @@ You are now in BUILDER MODE. The user wants you to modify Archibald Titan's own 
 2. **MINIMIZE READS** — Only read files you actually need. Don't explore the entire codebase.
 3. **USE PATCH ACTION** — action="patch" with search/replace is faster than action="modify" with full content.
 4. **PLAN FIRST, EXECUTE FAST** — Spend 1 round planning, then execute in 2-3 rounds max. Don't iterate endlessly.
-5. **SKIP HEALTH CHECK** — Don't call self_health_check or self_type_check unless the user explicitly asks. It's slow.
-6. **NO UNNECESSARY VERIFICATION** — Don't re-read files after modifying them unless you suspect an error.
+5. **TYPE CHECK AFTER TS CHANGES** — After modifying any .ts or .tsx file, ALWAYS call self_type_check. If it fails, fix ALL errors before responding to the user. This prevents CI failures and broken deployments.
+6. **PATCH ONLY FOR LARGE FILES** — For files over 200 lines, ALWAYS use action="patch" with search/replace. NEVER use action="modify" with full content on large files — it risks accidentally deleting working code.
+7. **NO UNNECESSARY VERIFICATION** — Don't re-read files after modifying them unless you suspect an error.
 
 ### CORE PRINCIPLES
 1. **THINK BEFORE ACTING** — Plan your approach before making any changes

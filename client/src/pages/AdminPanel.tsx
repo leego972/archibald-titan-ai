@@ -407,6 +407,9 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* ─── Credential Vault ─────────────────────────────────── */}
+      <CredentialVaultSection />
+
       {/* ─── User Detail Dialog ─────────────────────────────────── */}
       <Dialog open={showUserDetail} onOpenChange={setShowUserDetail}>
         <DialogContent className="max-w-lg">
@@ -635,5 +638,148 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-medium truncate">{value}</p>
     </div>
+  );
+}
+
+// ─── Credential Vault Section ───────────────────────────────────────
+function CredentialVaultSection() {
+  const [credPage, setCredPage] = useState(1);
+  const [filterUserId, setFilterUserId] = useState<string>("");
+  const [filterType, setFilterType] = useState<string>("");
+  const [retrieveId, setRetrieveId] = useState<number | null>(null);
+  const [retrieveReason, setRetrieveReason] = useState("");
+  const [revealedValue, setRevealedValue] = useState<string | null>(null);
+  const [showRetrieveDialog, setShowRetrieveDialog] = useState(false);
+
+  const credsQuery = trpc.admin.listAllUserCredentials.useQuery({
+    page: credPage,
+    limit: 50,
+    userId: filterUserId ? parseInt(filterUserId) : undefined,
+    secretType: filterType || undefined,
+  });
+
+  const retrieveMutation = trpc.admin.retrieveCredentialValue.useMutation({
+    onSuccess: (data) => { setRevealedValue(data.value); },
+    onError: (err) => { toast.error("Failed to retrieve: " + err.message); },
+  });
+
+  const handleRetrieve = () => {
+    if (!retrieveId || !retrieveReason.trim()) return;
+    retrieveMutation.mutate({ credentialId: retrieveId, reason: retrieveReason });
+  };
+
+  const data = credsQuery.data;
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Key className="w-4 h-4 text-yellow-400" />
+          User Credential Vault
+          <Badge variant="outline" className="ml-auto text-xs">Admin Only</Badge>
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          All user API tokens and credentials stored encrypted. Retrievals are audit-logged.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          <Input placeholder="Filter by User ID..." value={filterUserId}
+            onChange={(e) => { setFilterUserId(e.target.value); setCredPage(1); }}
+            className="w-36 h-8 text-sm" />
+          <Input placeholder="Filter by type (e.g. github_pat)..." value={filterType}
+            onChange={(e) => { setFilterType(e.target.value); setCredPage(1); }}
+            className="w-52 h-8 text-sm" />
+          <Button variant="outline" size="sm" onClick={() => credsQuery.refetch()}>
+            <RotateCcw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+        </div>
+        {credsQuery.isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="rounded-md border border-border/50 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="text-xs">ID</TableHead>
+                  <TableHead className="text-xs">User</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
+                  <TableHead className="text-xs">Label</TableHead>
+                  <TableHead className="text-xs">Last Used</TableHead>
+                  <TableHead className="text-xs">Created</TableHead>
+                  <TableHead className="text-xs w-20">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(!data?.credentials.length) && (
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground text-sm py-6">No credentials found</TableCell></TableRow>
+                )}
+                {data?.credentials.map((cred) => (
+                  <TableRow key={cred.id} className="text-xs">
+                    <TableCell className="font-mono text-muted-foreground">{cred.id}</TableCell>
+                    <TableCell>
+                      <div className="font-medium truncate max-w-[120px]">{cred.userName}</div>
+                      <div className="text-muted-foreground truncate max-w-[120px]">{cred.userEmail}</div>
+                    </TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs font-mono">{cred.secretType}</Badge></TableCell>
+                    <TableCell className="text-muted-foreground truncate max-w-[100px]">{cred.label}</TableCell>
+                    <TableCell className="text-muted-foreground">{cred.lastUsedAt ? new Date(cred.lastUsedAt).toLocaleDateString() : "Never"}</TableCell>
+                    <TableCell className="text-muted-foreground">{new Date(cred.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                        onClick={() => { setRetrieveId(cred.id); setRetrieveReason(""); setRevealedValue(null); setShowRetrieveDialog(true); }}>
+                        <Eye className="w-3 h-3 mr-1" /> Reveal
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {data && data.total > 50 && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Page {credPage} · {data.total} total</span>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setCredPage(p => Math.max(1, p - 1))} disabled={credPage === 1}><ChevronLeft className="w-3 h-3" /></Button>
+              <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setCredPage(p => p + 1)} disabled={data.credentials.length < 50}><ChevronRight className="w-3 h-3" /></Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+      <Dialog open={showRetrieveDialog} onOpenChange={(o) => { setShowRetrieveDialog(o); if (!o) { setRevealedValue(null); setRetrieveReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Shield className="w-4 h-4 text-yellow-400" /> Retrieve Credential</DialogTitle>
+            <DialogDescription>This action is audit-logged. Provide a reason for retrieval.</DialogDescription>
+          </DialogHeader>
+          {revealedValue ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Credential value:</p>
+              <div className="flex gap-2 items-center">
+                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs font-mono break-all">{revealedValue}</code>
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(revealedValue); toast.success("Copied"); }}><Copy className="w-3 h-3" /></Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Reason for retrieval</label>
+                <Input placeholder="e.g. User requested account recovery" value={retrieveReason} onChange={(e) => setRetrieveReason(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRetrieveDialog(false)}>Close</Button>
+            {!revealedValue && (
+              <Button onClick={handleRetrieve} disabled={!retrieveReason.trim() || retrieveMutation.isPending}>
+                {retrieveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Reveal Value
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

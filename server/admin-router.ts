@@ -22,7 +22,9 @@ import {
   apiKeys,
   selfModificationLog,
   systemSnapshots,
+  userSecrets,
 } from "../drizzle/schema";
+import { decrypt } from "./fetcher-db";
 import { logAudit } from "./audit-log-db";
 import { addCredits } from "./credit-service";
 import bcrypt from "bcryptjs";
@@ -552,6 +554,188 @@ export const adminRouter = router({
         plan: input.plan,
         periodEnd: periodEnd.toISOString(),
         creditsGranted: input.grantCredits,
+      };
+    }),
+
+  /**
+   * Admin: List all stored API tokens/credentials across all users (metadata only, no values).
+   * Organised by user, showing secretType, label, and timestamps.
+   */
+  listAllUserCredentials: adminProcedure
+    .input(
+      z.object({
+        userId: z.number().optional(),
+        secretType: z.string().optional(),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(200).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const offset = (input.page - 1) * input.limit;
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.userId) conditions.push(eq(userSecrets.userId, input.userId));
+      if (input.secretType) conditions.push(eq(userSecrets.secretType, input.secretType));
+      const rows = await db
+        .select({
+          id: userSecrets.id,
+          userId: userSecrets.userId,
+          userName: users.name,
+          userEmail: users.email,
+          secretType: userSecrets.secretType,
+          label: userSecrets.label,
+          lastUsedAt: userSecrets.lastUsedAt,
+          createdAt: userSecrets.createdAt,
+          updatedAt: userSecrets.updatedAt,
+        })
+        .from(userSecrets)
+        .leftJoin(users, eq(userSecrets.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(userSecrets.createdAt))
+        .limit(input.limit)
+        .offset(offset);
+      const [totalRow] = await db
+        .select({ count: count() })
+        .from(userSecrets)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      return {
+        credentials: rows.map((r) => ({
+          id: r.id,
+          userId: r.userId,
+          userName: r.userName || "Unknown",
+          userEmail: r.userEmail || "Unknown",
+          secretType: r.secretType,
+          label: r.label || r.secretType,
+          lastUsedAt: r.lastUsedAt?.toISOString() || null,
+          createdAt: r.createdAt.toISOString(),
+          updatedAt: r.updatedAt.toISOString(),
+        })),
+        total: totalRow?.count ?? 0,
+        page: input.page,
+        limit: input.limit,
+      };
+    }),
+
+  /**
+   * Admin: Retrieve the decrypted value of a specific credential by ID.
+   * All retrievals are audit-logged with reason.
+   */
+  retrieveCredentialValue: adminProcedure
+    .input(
+      z.object({
+        credentialId: z.number(),
+        reason: z.string().min(1, "Reason is required for audit log"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [row] = await db
+        .select({
+          id: userSecrets.id,
+          userId: userSecrets.userId,
+          secretType: userSecrets.secretType,
+          label: userSecrets.label,
+          encryptedValue: userSecrets.encryptedValue,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(userSecrets)
+        .leftJoin(users, eq(userSecrets.userId, users.id))
+        .where(eq(userSecrets.id, input.credentialId))
+        .limit(1);
+      if (!row) throw new Error("Credential not found");
+      let decryptedValue: string;
+      try {
+        decryptedValue = decrypt(row.encryptedValue);
+      } catch {
+        throw new Error("Failed to decrypt credential — encryption key mismatch");
+      }
+      await logAudit({
+        userId: ctx.user.id,
+        userName: ctx.user.name || "Admin",
+        action: "admin.retrieve_credential",
+        resource: "user_secret",
+        resourceId: String(row.id),
+        details: {
+          targetUserId: row.userId,
+          targetUserEmail: row.userEmail,
+          secretType: row.secretType,
+          label: row.label,
+          reason: input.reason,
+        },
+        ipAddress: ctx.req?.ip || "unknown",
+      });
+      return {
+        id: row.id,
+        userId: row.userId,
+        userName: row.userName || "Unknown",
+        userEmail: row.userEmail || "Unknown",
+        secretType: row.secretType,
+        label: row.label || row.secretType,
+        value: decryptedValue,
+      };
+    }),
+
+  /**
+   * Admin: List all fetcher credentials (captured from Fetcher jobs) across all users.
+   */
+  listAllFetcherCredentials: adminProcedure
+    .input(
+      z.object({
+        userId: z.number().optional(),
+        providerId: z.string().optional(),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(200).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const offset = (input.page - 1) * input.limit;
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.userId) conditions.push(eq(fetcherCredentials.userId, input.userId));
+      if (input.providerId) conditions.push(eq(fetcherCredentials.providerId, input.providerId));
+      const rows = await db
+        .select({
+          id: fetcherCredentials.id,
+          userId: fetcherCredentials.userId,
+          userName: users.name,
+          userEmail: users.email,
+          jobId: fetcherCredentials.jobId,
+          providerId: fetcherCredentials.providerId,
+          providerName: fetcherCredentials.providerName,
+          keyType: fetcherCredentials.keyType,
+          keyLabel: fetcherCredentials.keyLabel,
+          createdAt: fetcherCredentials.createdAt,
+        })
+        .from(fetcherCredentials)
+        .leftJoin(users, eq(fetcherCredentials.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(fetcherCredentials.createdAt))
+        .limit(input.limit)
+        .offset(offset);
+      const [totalRow] = await db
+        .select({ count: count() })
+        .from(fetcherCredentials)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      return {
+        credentials: rows.map((r) => ({
+          id: r.id,
+          userId: r.userId,
+          userName: r.userName || "Unknown",
+          userEmail: r.userEmail || "Unknown",
+          jobId: r.jobId,
+          providerId: r.providerId,
+          providerName: r.providerName,
+          keyType: r.keyType,
+          keyLabel: r.keyLabel || r.keyType,
+          createdAt: r.createdAt.toISOString(),
+        })),
+        total: totalRow?.count ?? 0,
+        page: input.page,
+        limit: input.limit,
       };
     }),
 });
