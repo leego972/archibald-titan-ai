@@ -96,6 +96,7 @@ type MenuItem = {
   path: string;
   adminOnly?: boolean;
   premiumOnly?: boolean;
+  titanOnly?: boolean;
   isNew?: boolean;
   isCyber?: boolean;
 };
@@ -139,7 +140,7 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
       { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
       { icon: featureIcon("icon_16_r2c8"), label: "LinkenSphere", path: "/linken-sphere", isNew: true },
-      { icon: featureIcon("icon_15_r2c7"), label: "Evilginx", path: "/evilginx", premiumOnly: true, isNew: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "Evilginx", path: "/evilginx", titanOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -394,6 +395,10 @@ function FetcherLayoutContent({
               const visibleItems = group.items.filter(
                 (item) => {
                   if (item.adminOnly && user?.role !== "admin" && user?.role !== "head_admin") return false;
+                  if (item.titanOnly) {
+                    const plan = sub.planId;
+                    if (plan !== "titan" && user?.role !== "admin" && user?.role !== "head_admin") return false;
+                  }
                   if (item.premiumOnly) {
                     const plan = sub.planId;
                     if (plan !== "cyber_plus" && plan !== "titan" && user?.role !== "admin" && user?.role !== "head_admin") return false;
