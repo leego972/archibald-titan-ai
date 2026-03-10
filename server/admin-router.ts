@@ -26,6 +26,7 @@ import {
 } from "../drizzle/schema";
 import { decrypt } from "./fetcher-db";
 import { logAudit } from "./audit-log-db";
+import { logAdminAction } from "./admin-activity-log";
 import { addCredits } from "./credit-service";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";

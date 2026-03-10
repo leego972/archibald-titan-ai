@@ -19,6 +19,7 @@ import { webhookRouter, apiAnalyticsRouter } from "./v5-features-router";
 import { identityProviderRouter } from "./identity-provider-router";
 import { twoFactorRouter } from "./two-factor-router";
 import { adminRouter } from "./admin-router";
+import { adminActivityLogRouter } from "./admin-activity-log-router";
 import { onboardingWizardRouter } from "./onboarding-wizard-router";
 import { selfImprovementDashboardRouter } from "./self-improvement-dashboard-router";
 import { improvementBacklogRouter } from "./improvement-backlog-router";
@@ -44,6 +45,8 @@ import { marketplaceRouter } from "./marketplace-router";
 import { siteMonitorRouter } from "./site-monitor-router";
 import { securityDashboardRouter } from "./security-dashboard-router";
 import { evilginxRouter } from "./evilginx-router";
+import { blackeyeRouter } from "./blackeye-router";
+import { metasploitRouter } from "./metasploit-router";
 import { filesRouter } from "./api/files";
 
 export const appRouter = router({
@@ -84,6 +87,7 @@ export const appRouter = router({
   identityProviders: identityProviderRouter,
   twoFactor: twoFactorRouter,
   admin: adminRouter,
+  adminActivityLog: adminActivityLogRouter,
   onboardingWizard: onboardingWizardRouter,
   selfImprovement: selfImprovementDashboardRouter,
   improvementBacklog: improvementBacklogRouter,
@@ -115,6 +119,8 @@ export const appRouter = router({
   securityDashboard: securityDashboardRouter,
   customInstructions: customInstructionsRouter,
   evilginx: evilginxRouter,
+  blackeye: blackeyeRouter,
+  metasploit: metasploitRouter,
 });
 
 export type AppRouter = typeof appRouter;

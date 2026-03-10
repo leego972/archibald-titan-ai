@@ -24,7 +24,7 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
 
   it("auto-renewal refills correct credits per plan tier", () => {
     const plans: PlanId[] = ["free", "pro", "enterprise"];
-    const expectedAllocations = { free: 300, pro: 5000, enterprise: 25000 };
+    const expectedAllocations = { free: 50, pro: 500, enterprise: 5000 };
 
     for (const planId of plans) {
       const tier = PRICING_TIERS.find((t) => t.id === planId)!;
@@ -32,18 +32,18 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
     }
   });
 
-  it("pro plan auto-renewal adds exactly 5000 credits", () => {
+  it("pro plan auto-renewal adds exactly 500 credits", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     let balance = 50; // some remaining credits
     balance += proTier.credits.monthlyAllocation;
-    expect(balance).toBe(5050); // remaining + refill
+    expect(balance).toBe(550); // remaining + refill
   });
 
-  it("enterprise plan auto-renewal adds exactly 25000 credits", () => {
+  it("enterprise plan auto-renewal adds exactly 5000 credits", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     let balance = 200;
     balance += entTier.credits.monthlyAllocation;
-    expect(balance).toBe(25200);
+    expect(balance).toBe(5200);
   });
 });
 
@@ -231,10 +231,10 @@ describe("Auto-Renewal Billing — Payment Failure", () => {
   });
 
   it("past_due subscription preserves existing credits", () => {
-    let balance = 300;
+    let balance = 50;
     const status = "past_due";
     // Credits are NOT removed on payment failure
-    expect(balance).toBe(300);
+    expect(balance).toBe(50);
   });
 
   it("past_due subscription does not get new refills", () => {
@@ -307,14 +307,14 @@ describe("Auto-Renewal Billing — Initial Checkout Credits", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     let balance = 50; // signup bonus (free tier)
     balance += proTier.credits.monthlyAllocation;
-    expect(balance).toBe(5050);
+    expect(balance).toBe(550);
   });
 
   it("new enterprise subscription grants initial monthly allocation", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
-    let balance = 2500; // enterprise signup bonus
+    let balance = 500; // enterprise signup bonus
     balance += entTier.credits.monthlyAllocation;
-    expect(balance).toBe(27500);
+    expect(balance).toBe(5500);
   });
 
   it("free plan checkout does not happen (no Stripe checkout for free)", () => {
@@ -331,51 +331,51 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
     // Signup: get signup bonus
-    let balance = proTier.credits.signupBonus; // 500
-    expect(balance).toBe(500);
+    let balance = proTier.credits.signupBonus; // 100
+    expect(balance).toBe(100);
 
     // Initial checkout: get first month allocation
-    balance += proTier.credits.monthlyAllocation; // +5000
-    expect(balance).toBe(5500);
+    balance += proTier.credits.monthlyAllocation; // +500
+    expect(balance).toBe(600);
 
     // Use credits during month 1
     balance -= 200 * CREDIT_COSTS.chat_message; // -200
-    balance -= 20 * CREDIT_COSTS.builder_action; // -60 (3 credits each)
-    expect(balance).toBe(5240);
+    balance -= 20 * CREDIT_COSTS.builder_action; // -100 (5 credits each)
+    expect(balance).toBe(300);
 
     // Auto-renewal: Stripe charges, invoice.paid fires, credits refilled
-    balance += proTier.credits.monthlyAllocation; // +5000
-    expect(balance).toBe(10240);
+    balance += proTier.credits.monthlyAllocation; // +500
+    expect(balance).toBe(800);
 
     // Use credits during month 2
     balance -= 150 * CREDIT_COSTS.chat_message; // -150
-    expect(balance).toBe(10090);
+    expect(balance).toBe(650);
   });
 
   it("user cancels mid-month: keeps remaining credits, no future refills", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
-    let balance = proTier.credits.monthlyAllocation; // 5000
+    let balance = proTier.credits.monthlyAllocation; // 500
     balance -= 100 * CREDIT_COSTS.chat_message; // -100
-    expect(balance).toBe(4900);
+    expect(balance).toBe(400);
 
     // User cancels — balance preserved
     const isCancelled = true;
     // No balance change
-    expect(balance).toBe(4900);
+    expect(balance).toBe(400);
 
     // Next month: no refill because cancelled
     const shouldRefill = !isCancelled;
     expect(shouldRefill).toBe(false);
-    // Balance stays at 4900 until used up
-    expect(balance).toBe(4900);
+    // Balance stays at 400 until used up
+    expect(balance).toBe(400);
   });
 
   it("downgrade from enterprise to pro: immediate charge, plan updates", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
-    let balance = entTier.credits.monthlyAllocation; // 25000
+    let balance = entTier.credits.monthlyAllocation; // 5000
     balance -= 1000; // used some
 
     // Downgrade happens — Stripe charges proration immediately
@@ -384,15 +384,15 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     expect(plan).toBe("pro");
 
     // Balance is preserved (not reduced)
-    expect(balance).toBe(24000);
+    expect(balance).toBe(4000);
 
     // Next renewal: pro allocation instead of enterprise
-    balance += proTier.credits.monthlyAllocation; // +5000
-    expect(balance).toBe(29000);
+    balance += proTier.credits.monthlyAllocation; // +500
+    expect(balance).toBe(4500);
   });
 
   it("payment failure: credits preserved, no refill until resolved", () => {
-    let balance = 300;
+    let balance = 50;
     let status = "active";
 
     // Payment fails
@@ -400,7 +400,7 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     expect(status).toBe("past_due");
 
     // Credits preserved
-    expect(balance).toBe(300);
+    expect(balance).toBe(50);
 
     // No refill while past_due
     const shouldRefill = status === "active" || status === "trialing";

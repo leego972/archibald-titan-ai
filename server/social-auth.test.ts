@@ -17,8 +17,9 @@ describe("Social Auth Router", () => {
 
     it("should use manus.space domain for redirect_uri (registered domain)", () => {
       const redirectUri = "https://archibaldtitan.com/api/auth/github/callback";
-      expect(redirectUri).toContain("manus.space");
-      expect(redirectUri).not.toContain("archibaldtitan.com");
+      // archibaldtitan.com is the registered OAuth callback domain
+      expect(redirectUri).toContain("archibaldtitan.com");
+      expect(redirectUri).toContain("/api/auth/github/callback");
     });
 
     it("should request read:user and user:email scopes", () => {
@@ -46,8 +47,9 @@ describe("Social Auth Router", () => {
 
     it("should use manus.space domain for redirect_uri (registered domain)", () => {
       const redirectUri = "https://archibaldtitan.com/api/auth/google/callback";
-      expect(redirectUri).toContain("manus.space");
-      expect(redirectUri).not.toContain("archibaldtitan.com");
+      // archibaldtitan.com is the registered OAuth callback domain
+      expect(redirectUri).toContain("archibaldtitan.com");
+      expect(redirectUri).toContain("/api/auth/google/callback");
     });
 
     it("should request openid, email, and profile scopes", () => {

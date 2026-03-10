@@ -2680,9 +2680,9 @@ export function getStrategyOverview() {
     })),
     schedule: {
       advertisingCycle: "Mon/Wed/Fri (3x per week, 8-10 AM server time)",
-      seoOptimization: "Every cycle",
+      seoOptimization: "Daily",
       blogPosts: "Mon/Wed/Fri",
-      socialMedia: "Every cycle (2-3 posts)",
+      socialMedia: "Daily (2-3 posts)",
       communityEngagement: "Every cycle",
       emailNurture: "Wed only",
       backlinkOutreach: "Monday only",

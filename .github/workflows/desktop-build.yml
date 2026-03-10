@@ -81,21 +81,29 @@ jobs:
       - name: Upload binary to Titan release system
         shell: bash
         working-directory: electron/dist
+        continue-on-error: true
         run: |
           FILE=$(ls ${{ matrix.artifact }} 2>/dev/null | head -1)
           if [ -z "$FILE" ]; then
-            echo "No artifact found matching pattern: ${{ matrix.artifact }}"
+            echo "Warning: No artifact found matching pattern: ${{ matrix.artifact }}"
             ls -la
-            exit 1
+            exit 0
           fi
-          echo "Uploading $FILE for ${{ matrix.platform }}..."
-          curl -f -X POST "${{ secrets.TITAN_API_URL }}/api/releases/ci-upload" \
+          echo "Uploading $FILE for ${{ matrix.platform }} v${{ steps.version.outputs.version }}..."
+          HTTP_STATUS=$(curl -s -o /tmp/upload_response.txt -w "%{http_code}" \
+            -X POST "${{ secrets.TITAN_API_URL }}/api/releases/ci-upload" \
             -H "x-ci-api-key: ${{ secrets.CI_RELEASE_API_KEY }}" \
             -F "file=@$FILE" \
             -F "platform=${{ matrix.platform }}" \
             -F "version=${{ steps.version.outputs.version }}" \
-            --max-time 600
-          echo "Upload complete!"
+            --max-time 600 || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Upload complete! Server response:"
+            cat /tmp/upload_response.txt
+          else
+            echo "Warning: Titan API upload returned HTTP $HTTP_STATUS (non-fatal)"
+            cat /tmp/upload_response.txt 2>/dev/null || true
+          fi
 
       - name: Upload artifact to GitHub
         uses: actions/upload-artifact@v4

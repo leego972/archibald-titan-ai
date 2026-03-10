@@ -140,7 +140,17 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
       { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
       { icon: featureIcon("icon_16_r2c8"), label: "LinkenSphere", path: "/linken-sphere", isNew: true },
-      { icon: featureIcon("icon_15_r2c7"), label: "Evilginx", path: "/evilginx", titanOnly: true, isNew: true },
+    ],
+  },
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION 1c: SPECIALISED (Titan + Admin only — hidden from all other tiers)
+  // ═══════════════════════════════════════════════════════════════
+  {
+    title: "Specialised",
+    items: [
+      { icon: featureIcon("icon_15_r2c7"), label: "Evilginx 3", path: "/evilginx", titanOnly: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "BlackEye", path: "/blackeye", titanOnly: true },
+      { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

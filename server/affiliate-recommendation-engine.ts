@@ -285,6 +285,7 @@ export function generateRecommendationContext(
   parts.push(`- Maximum 1-2 recommendations per response — never more`);
   parts.push(`- If the user is asking a general question, don't force a recommendation`);
   parts.push(`- Make the recommendation feel like you're sharing insider knowledge, not selling`);
+  parts.push(`- Never be pushy — if the user doesn't need a tool, don't mention one`);
   parts.push(`- The recommendation should feel ESSENTIAL to the user's success, not optional`);
   parts.push(``);
 

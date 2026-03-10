@@ -2520,6 +2520,16 @@ export const BUILDER_TOOLS: Tool[] = [
   selfAnalyzeFile,
   selfFindDeadCode,
   selfApiMap,
+  // Sandbox tools — for running and testing code in the builder
+  sandboxExec,
+  sandboxWriteFile,
+  sandboxReadFile,
+  sandboxListFiles,
+  // Security tools — for code review and scanning
+  securityScan,
+  codeSecurityReview,
+  portScan,
+  sslCheck,
   // System
   getSystemStatus,
 ];

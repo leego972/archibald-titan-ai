@@ -9,7 +9,7 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { subscriptions, fetcherJobs, users } from "../drizzle/schema";
-import { PRICING_TIERS, type PlanId, type PricingTier } from "../shared/pricing";
+import { PRICING_TIERS, INTERNAL_TIERS, type PlanId, type PricingTier } from "../shared/pricing";
 import { isAdminRole } from '@shared/const';
 
 // ─── Types ─────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
     .limit(1);
 
   // Admin bypass: admins get full titan-level access (highest tier)
-  const titanTier = PRICING_TIERS.find((t) => t.id === "titan")!;
+  const titanTier = INTERNAL_TIERS.find((t) => t.id === "titan")!;
   if (userResult.length > 0 && isAdminRole(userResult[0].role)) {
     return { planId: "titan", tier: titanTier, status: "active", isActive: true };
   }
@@ -81,7 +81,7 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
   }
 
   const planId = sub[0].plan as PlanId;
-  const tier = PRICING_TIERS.find((t) => t.id === planId) || freeTier;
+  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId) || freeTier;
   const isActive = sub[0].status === "active" || sub[0].status === "trialing";
 
   // If subscription is past_due or incomplete, treat as free
@@ -185,6 +185,7 @@ export function getAllowedProviders(planId: PlanId): string[] | null {
 
 export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
   const featureMap: Record<string, PlanId[]> = {
+    kill_switch: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     captcha_solving: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     scheduled_fetches: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     proxy_pool: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
@@ -225,7 +226,7 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
 }
 
 export function getAllowedExportFormats(planId: PlanId): string[] {
-  const tier = PRICING_TIERS.find((t) => t.id === planId);
+  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
   return tier?.limits.exportFormats || ["json"];
 }
 
@@ -295,14 +296,14 @@ export function enforceExportFormat(planId: PlanId, format: string): void {
   if (!allowed.includes(format)) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `${format.toUpperCase()} export is not available on the ${PRICING_TIERS.find((t) => t.id === planId)?.name || "Free"} plan. Upgrade to access this export format.`,
+      message: `${format.toUpperCase()} export is not available on the ${(PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId))?.name || "Free"} plan. Upgrade to access this export format.`,
     });
   }
 }
 
 export function enforceFeature(planId: PlanId, feature: string, featureLabel: string): void {
   if (!isFeatureAllowed(planId, feature)) {
-    const tier = PRICING_TIERS.find((t) => t.id === planId);
+    const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `${featureLabel} is not available on the ${tier?.name || "Free"} plan. Upgrade to unlock this feature.`,

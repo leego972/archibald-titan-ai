@@ -2058,3 +2058,44 @@ export const repairLogs = mysqlTable("repair_logs", {
 });
 export type RepairLog = typeof repairLogs.$inferSelect;
 export type InsertRepairLog = typeof repairLogs.$inferInsert;
+
+// ─── Admin Activity Log ─────────────────────────────────────────────────────
+// Stores all actions performed by admin/head_admin users.
+// This table is ONLY accessible to admin and head_admin roles.
+// Regular users have zero visibility — it is not exposed via any
+// public-facing API endpoint and is never included in user-facing queries.
+export const adminActivityLog = mysqlTable("admin_activity_log", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull(),
+  adminEmail: varchar("adminEmail", { length: 320 }),
+  adminRole: varchar("adminRole", { length: 32 }).notNull(), // "admin" | "head_admin"
+  // What was done
+  action: varchar("action", { length: 128 }).notNull(),
+  // e.g. "user.ban", "user.plan_change", "specialised.evilginx_session",
+  //      "specialised.blackeye_launch", "specialised.metasploit_exec",
+  //      "release.deploy", "self_improvement.apply", "admin.impersonate"
+  category: mysqlEnum("category", [
+    "user_management",
+    "subscription",
+    "specialised_tools",
+    "releases",
+    "self_improvement",
+    "system",
+    "security",
+  ]).notNull(),
+  // Target of the action (optional)
+  targetUserId: int("targetUserId"),
+  targetUserEmail: varchar("targetUserEmail", { length: 320 }),
+  // Contextual data — stored as JSON, never exposed to non-admins
+  details: json("details").$type<Record<string, unknown>>(),
+  // Network context
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  userAgent: text("userAgent"),
+  // Outcome
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AdminActivityLog = typeof adminActivityLog.$inferSelect;
+export type InsertAdminActivityLog = typeof adminActivityLog.$inferInsert;

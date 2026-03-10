@@ -1521,7 +1521,51 @@ export function getSupportedCountries() {
     { code: "JP", name: "Japan", region: "Asia" },
     { code: "IN", name: "India", region: "Asia" },
     { code: "QA", name: "Qatar", region: "Middle East" },
+    { code: "INTL", name: "International", region: "Global" },
   ];
+}
+
+export async function getMatchingGrants(
+  userId: number,
+  countryCode: string,
+  industryFilter?: string
+): Promise<{ id: number; title: string; amount: string; deadline: string | null; countryCode: string }[]> {
+  try {
+    const { getDb } = await import("./db");
+    const db = await getDb();
+    if (!db) return [];
+    const { grantOpportunities } = await import("../drizzle/schema");
+    const { and, like, or } = await import("drizzle-orm");
+    const conditions = [];
+    if (countryCode) {
+      conditions.push(
+        or(
+          like(grantOpportunities.country, `%${countryCode}%`),
+          like(grantOpportunities.applicableCountries, `%${countryCode}%`)
+        )!
+      );
+    }
+    if (industryFilter) {
+      conditions.push(like(grantOpportunities.description, `%${industryFilter}%`));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const results = await db.select({
+      id: grantOpportunities.id,
+      title: grantOpportunities.title,
+      amount: grantOpportunities.maxAmount,
+      deadline: grantOpportunities.applicationDeadline,
+      countryCode: grantOpportunities.country,
+    }).from(grantOpportunities).where(whereClause).limit(20);
+    return results.map(r => ({
+      id: r.id,
+      title: r.title,
+      amount: r.amount ? String(r.amount) : "Varies",
+      deadline: r.deadline ? r.deadline.toISOString() : null,
+      countryCode: r.countryCode || countryCode,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function refreshGrantsForCountry(

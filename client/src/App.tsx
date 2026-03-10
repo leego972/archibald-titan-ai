@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { initAdTracking } from "@/lib/adTracking";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -86,6 +88,7 @@ import CliToolPage from "./pages/CliToolPage";
 // Admin
 import ReleaseManagementPage from "./pages/ReleaseManagementPage";
 import AdminPanel from "./pages/AdminPanel";
+import AdminActivityLogPage from "./pages/AdminActivityLogPage";
 import SelfImprovementDashboard from "./pages/SelfImprovementDashboard";
 
 // Project Files
@@ -99,6 +102,9 @@ import LinkenSpherePage from "./pages/LinkenSpherePage";
 
 // Evilginx Management
 import EvilginxPage from "./pages/EvilginxPage";
+// Specialised Tools
+import BlackEyePage from "./pages/BlackEyePage";
+import MetasploitPage from "./pages/MetasploitPage";
 
 
 function DashboardRouter() {
@@ -178,9 +184,14 @@ function DashboardRouter() {
         {/* Evilginx */}
         <Route path="/evilginx" component={EvilginxPage} />
 
+        {/* Specialised Tools */}
+        <Route path="/blackeye" component={BlackEyePage} />
+        <Route path="/metasploit" component={MetasploitPage} />
+
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
+        <Route path="/admin/activity-log" component={AdminActivityLogPage} />
         <Route path="/fetcher/self-improvement" component={SelfImprovementDashboard} />
 
         <Route component={NotFound} />
@@ -237,6 +248,8 @@ function Router() {
       <Route path="/site-monitor" component={DashboardRouter} />
       <Route path="/linken-sphere" component={DashboardRouter} />
       <Route path="/evilginx" component={DashboardRouter} />
+      <Route path="/blackeye" component={DashboardRouter} />
+      <Route path="/metasploit" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
@@ -245,6 +258,9 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    initAdTracking();
+  }, []);
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable={true}>

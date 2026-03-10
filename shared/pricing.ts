@@ -12,7 +12,8 @@
  *   upgrading the obvious better deal and drives conversions.
  *
  * TIER STRUCTURE:
- * Free → Pro → Enterprise → Cyber → Cyber+ → Titan
+ * Free → Pro → Enterprise → Cyber (public tiers)
+ * Cyber+ and Titan are internal/enterprise tiers, not shown in the public pricing UI.
  *
  * UPGRADE INCENTIVE MATH:
  * - Top-up 5,000 credits = $29.99 (same price as Pro monthly!)
@@ -79,8 +80,8 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "community",
     },
     credits: {
-      monthlyAllocation: 300,
-      signupBonus: 100,
+      monthlyAllocation: 50,
+      signupBonus: 25,
     },
   },
 
@@ -91,7 +92,7 @@ export const PRICING_TIERS: PricingTier[] = [
     tagline: "For power users and professionals",
     monthlyPrice: 29,
     yearlyPrice: 290,
-    highlighted: false,
+    highlighted: true,
     cta: "Upgrade to Pro",
     features: [
       "5,000 credits/month (~165 builder tasks)",
@@ -126,12 +127,12 @@ export const PRICING_TIERS: PricingTier[] = [
       providers: -1,
       credentialStorage: -1,
       proxySlots: 5,
-      exportFormats: ["json", "env", "csv"],
+      exportFormats: ["json", "env"],
       support: "priority_email",
     },
     credits: {
-      monthlyAllocation: 5000,
-      signupBonus: 500,
+      monthlyAllocation: 500,
+      signupBonus: 100,
     },
   },
 
@@ -177,8 +178,8 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "dedicated",
     },
     credits: {
-      monthlyAllocation: 25000,
-      signupBonus: 2500,
+      monthlyAllocation: 5000,
+      signupBonus: 500,
     },
   },
 
@@ -189,7 +190,7 @@ export const PRICING_TIERS: PricingTier[] = [
     tagline: "Elite cybersecurity arsenal for professionals",
     monthlyPrice: 199,
     yearlyPrice: 1990,
-    highlighted: true,
+    highlighted: false,
     cta: "Unlock Cyber",
     features: [
       "75,000 credits/month",
@@ -218,7 +219,15 @@ export const PRICING_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── CYBER+ ──────────────────────────────────────────────────────
+];
+
+/**
+ * Internal tiers (Cyber+, Titan) — used for admin/referral unlocks and feature gating.
+ * Not shown in the public pricing UI. The PRICING_TIERS array above is the source of truth
+ * for what users see on the pricing page.
+ */
+export const INTERNAL_TIERS: PricingTier[] = [
+  // ─── CYBER+ (internal tier — not shown in public pricing UI) ─────
   {
     id: "cyber_plus",
     name: "Cyber+",
@@ -256,7 +265,7 @@ export const PRICING_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── TITAN ───────────────────────────────────────────────────────
+  // ─── TITAN (internal tier — not shown in public pricing UI) ──────
   {
     id: "titan",
     name: "Titan",
@@ -312,9 +321,9 @@ export const PRICING_TIERS: PricingTier[] = [
 
 export const CREDIT_COSTS = {
   chat_message: 1,        // 1 credit per chat message — feels free
-  builder_action: 3,      // 3 credits per builder tool action
+  builder_action: 5,      // 5 credits per builder tool action
   voice_action: 3,        // 3 credits per voice transcription (covers Whisper API cost at all tiers)
-  fetch_action: 1,        // 1 credit per credential fetch — fetches should feel cheap
+  fetch_action: 2,        // 2 credits per credential fetch
   clone_action: 50,       // 50 credits per website clone — premium feature (Cyber+/Titan only)
   github_action: 5,       // 5 credits per GitHub repo create or push
   image_generation: 15,   // 15 credits per AI image generation (DALL-E ~$0.04/image — 15cr ensures profitability at all tiers)
@@ -372,7 +381,7 @@ export const CREDIT_PACKS: CreditPack[] = [
     id: "pack_10000",
     name: "Mega Top-Up",
     credits: 10000,
-    price: 59.99,
+    price: 54.99,
     upgradeNudge: "Enterprise gives 25,000 credits/mo for $99 — 4x more credits! Upgrading saves you money.",
   },
 ];

@@ -2,6 +2,56 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
+// Mock global fetch to avoid real network calls (GitHub PAT validation, etc.)
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
+// Default fetch mock: simulate a valid GitHub PAT response
+function mockValidGitHubPat() {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    headers: { get: (h: string) => h === "x-oauth-scopes" ? "repo, workflow, admin:repo_hook" : null },
+    json: async () => ({ login: "testuser" }),
+  } as unknown as Response);
+}
+
+// Mock credit-service so consumeCredits always succeeds in tests
+vi.mock(import("./credit-service"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    consumeCredits: vi.fn().mockResolvedValue({ success: true, remaining: 9999 }),
+  };
+});
+
+// Mock subscription-gate so canUseCloneWebsite returns true (Cyber+/Titan gate bypassed in tests)
+vi.mock(import("./subscription-gate"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    canUseCloneWebsite: vi.fn().mockResolvedValue(true),
+  };
+});
+
+// Mock rate-limiter so checkUserRateLimit always allows in tests
+vi.mock(import("./rate-limiter"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    checkUserRateLimit: vi.fn().mockResolvedValue({ allowed: true, retryAfterMs: 0 }),
+  };
+});
+
+// Mock user-secrets-router so getUserOpenAIKey returns a test key (no real DB needed)
+vi.mock(import("./user-secrets-router"), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getUserOpenAIKey: vi.fn().mockResolvedValue("sk-test-openai-key"),
+    getUserGithubPat: vi.fn().mockResolvedValue("ghp_test-github-pat"),
+  };
+});
+
 // Mock the replicate-engine module
 vi.mock("./replicate-engine", () => ({
   createProject: vi.fn(),
@@ -127,6 +177,8 @@ const mockBuildPlan = {
 describe("replicate router", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset fetch mock to simulate valid GitHub PAT by default
+    mockValidGitHubPat();
   });
 
   describe("replicate.list", () => {

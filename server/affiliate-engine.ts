@@ -91,6 +91,8 @@ export const KNOWN_AFFILIATE_PROGRAMS: InsertAffiliatePartner[] = [
 
 export const REFERRAL_CONFIG = {
   // ─── Deal 1: Volume Referral Reward ───
+  // 3 verified sign-ups = 1 free month for the referrer
+  referralsForFreeMonth: 3,
   // 5 verified sign-ups = 30% off the referrer's next month payment (one-time)
   referralsForDiscount: 5,
   discountPercent: 30,
@@ -128,11 +130,10 @@ export const REFERRAL_CONFIG = {
   // ─── Tiered Commission Structure ───
   // Top performers earn more — incentivizes serious promotion
   tiers: [
-    { name: "Starter", minReferrals: 0, commissionPercent: 10, badge: "\u26A1", perks: "10% recurring commission for 12 months" },
-    { name: "Advocate", minReferrals: 10, commissionPercent: 12, badge: "\uD83D\uDD25", perks: "12% commission + priority support" },
-    { name: "Champion", minReferrals: 25, commissionPercent: 15, badge: "\uD83C\uDFC6", perks: "15% commission + custom landing page" },
-    { name: "Ambassador", minReferrals: 50, commissionPercent: 18, badge: "\uD83D\uDC8E", perks: "18% commission + co-branded marketing" },
-    { name: "Titan Elite", minReferrals: 100, commissionPercent: 22, badge: "\uD83D\uDC51", perks: "22% commission + dedicated account manager + early access" },
+    { name: "Starter", minReferrals: 0, commissionPercent: 10, commissionMultiplier: 1.0, badge: "\u26A1", perks: "10% recurring commission for 12 months" },
+    { name: "Advocate", minReferrals: 10, commissionPercent: 12, commissionMultiplier: 1.2, badge: "\uD83D\uDD25", perks: "12% commission + priority support" },
+    { name: "Champion", minReferrals: 25, commissionPercent: 15, commissionMultiplier: 1.5, badge: "\uD83C\uDFC6", perks: "15% commission + custom landing page" },
+    { name: "Ambassador", minReferrals: 50, commissionPercent: 20, commissionMultiplier: 2.0, badge: "\uD83D\uDC8E", perks: "20% commission + co-branded marketing + dedicated account manager" },
   ],
 };
 
@@ -177,7 +178,7 @@ export const CONTEXTUAL_PLACEMENTS: Record<string, string[]> = {
   // VPN-specific context
   "vpn": ["nordvpn.com", "expressvpn.com", "surfshark.com", "cyberghostvpn.com"],
   // Hardware pentesting tools
-  "hardware": ["shop.hak5.org", "nordvpn.com"],
+  "hardware": ["shop.hak5.org", "nordvpn.com", "expressvpn.com"],
   // Marketing context
   "marketing": ["semrush.com", "ahrefs.com", "hubspot.com", "monday.com", "copy.ai"],
   // Crypto context

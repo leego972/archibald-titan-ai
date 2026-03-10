@@ -19,8 +19,8 @@ describe("CREDIT_COSTS", () => {
     expect(CREDIT_COSTS.chat_message).toBe(1);
   });
 
-  it("builder_action costs 3 credits", () => {
-    expect(CREDIT_COSTS.builder_action).toBe(3);
+  it("builder_action costs 5 credits", () => {
+    expect(CREDIT_COSTS.builder_action).toBe(5);
   });
 
   it("clone_action is the most expensive at 50 credits", () => {
