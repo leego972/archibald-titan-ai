@@ -2212,6 +2212,23 @@ Do NOT attempt any tool calls or builds.`;
               continue;
             }
 
+            // Guard: block create_github_repo unless user explicitly requested it
+            // This prevents the AI from auto-creating repos on every build
+            if (tc.function.name === 'create_github_repo') {
+              const userMsgLower = input.message.toLowerCase();
+              const explicitGithubIntent = /\b(push to github|create.*repo|github repo|upload to github|push.*github|create.*github|github.*create|new repo|open.*repo)\b/i.test(input.message);
+              if (!explicitGithubIntent) {
+                const denyGithub = {
+                  success: false,
+                  error: "GitHub repo creation blocked: user did not explicitly request it. Files have been saved to the local projects folder instead. Only call create_github_repo when the user explicitly says 'push to GitHub' or 'create a GitHub repo'.",
+                };
+                executedActions.push({ tool: tc.function.name, args, result: denyGithub, success: false, size: 0 });
+                llmMessages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(denyGithub) });
+                log.warn(`[Chat] Blocked auto create_github_repo for user ${userId} — no explicit GitHub intent in message`);
+                continue;
+              }
+            }
+
             let execResult: { success: boolean; data?: unknown; error?: string };
             try {
               execResult = await executeToolCall(

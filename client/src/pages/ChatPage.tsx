@@ -1078,18 +1078,23 @@ export default function ChatPage() {
   useEffect(() => {
     if (!showTokenInput) return;
     setLoadingTokens(true);
-    fetch('/api/trpc/userSecrets.listTokens', { credentials: 'include' })
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    fetch('/api/trpc/userSecrets.listTokens', { credentials: 'include', signal: controller.signal })
       .then(r => r.json())
       .then(data => {
-        const tokens = data?.result?.data?.json || [];
-        setSavedTokens(tokens.map((t: any) => ({
+        // tRPC v10 batch responses are arrays: [{result:{data:{json:[...]}}}]
+        const batchData = Array.isArray(data) ? data[0] : data;
+        const tokens = batchData?.result?.data?.json || [];
+        setSavedTokens(Array.isArray(tokens) ? tokens.map((t: any) => ({
           id: t.id,
           name: t.label?.split(' (')[0] || t.secretType,
           preview: t.label?.match(/\((.+)\)/)?.[1] || t.secretType,
-        })));
+        })) : []);
       })
-      .catch(() => {})
-      .finally(() => setLoadingTokens(false));
+      .catch(() => { setSavedTokens([]); })
+      .finally(() => { clearTimeout(timeoutId); setLoadingTokens(false); });
+    return () => { clearTimeout(timeoutId); controller.abort(); };
   }, [showTokenInput]);
   const [tokenName, setTokenName] = useState('');
   const [tokenValue, setTokenValue] = useState('');
@@ -2874,7 +2879,9 @@ export default function ChatPage() {
                     fetch('/api/trpc/userSecrets.listTokens', { credentials: 'include' })
                       .then(r => r.json())
                       .then(data => {
-                        const tokens = data?.result?.data?.json || [];
+                        // tRPC v10 batch responses are arrays: [{result:{data:{json:[...]}}}]
+                        const batchData = Array.isArray(data) ? data[0] : data;
+                        const tokens = batchData?.result?.data?.json || [];
                         setSavedTokens(tokens.map((t: any) => ({
                           id: t.id,
                           name: t.label?.split(' (')[0] || t.secretType,
