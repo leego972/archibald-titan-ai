@@ -23,8 +23,12 @@ describe("fetcher-engine/browser", () => {
     const validNames = [
       "Windows Chrome Desktop",
       "MacOS Chrome Desktop",
+      "Windows Edge Desktop",
       "Windows Firefox Desktop",
       "MacOS Safari Desktop",
+      "Linux Chrome Desktop",
+      "MacOS Chrome Laptop",
+      "Windows Chrome Laptop",
     ];
     const profile = getRandomProfile();
     expect(validNames).toContain(profile.name);
