@@ -93,4 +93,6 @@ export const ENV = {
   whatsappBusinessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? "",
   // Pollinations.ai - Free AI Video Generation
   pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "sk_KZ0EBVOHXycDd8YnvEZAvLDGnvhK33SP",
+  // ElevenLabs TTS — deep English male voice for Titan AI
+  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
 };

@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { createLogger } from "./_core/logger.js";
+import { ENV } from "./_core/env";
 const log = createLogger("VoiceRouter");
 
 // In-memory store for temporary audio files (id -> { filePath, mimeType, expires })
@@ -286,31 +287,76 @@ export function registerVoiceTTSRoute(app: Express) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const { text, voice, speed } = req.body || {};
+      const { text } = req.body || {};
       if (!text || typeof text !== "string" || text.trim().length === 0) {
         return res.status(400).json({ error: "Missing 'text' field" });
       }
 
       const trimmedText = text.slice(0, 4096);
-      const apiKey = process.env.OPENAI_API_KEY || "";
-      if (!apiKey) {
-        return res.status(503).json({ error: "TTS not configured" });
+
+      // ── ElevenLabs TTS (primary) — deep English male voice "George" ──────────
+      // Voice ID: JBFqnCBsd6RMkjVDRZzb = "George" (deep, authoritative British male)
+      // Fallback voice ID: pNInz6obpgDQGcFmaJgB = "Adam" (American deep male)
+      const elevenLabsKey = ENV.elevenLabsApiKey;
+      if (elevenLabsKey) {
+        try {
+          const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // George — deep British English male
+          const elRes = await fetch(
+            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+            {
+              method: "POST",
+              headers: {
+                "xi-api-key": elevenLabsKey,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+              },
+              body: JSON.stringify({
+                text: trimmedText,
+                model_id: "eleven_turbo_v2_5", // fastest + highest quality
+                voice_settings: {
+                  stability: 0.55,          // natural variation
+                  similarity_boost: 0.85,   // stay true to voice
+                  style: 0.35,              // expressive but controlled
+                  use_speaker_boost: true,  // enhanced presence
+                },
+              }),
+            }
+          );
+
+          if (elRes.ok) {
+            const audioBuffer = Buffer.from(await elRes.arrayBuffer());
+            res.setHeader("Content-Type", "audio/mpeg");
+            res.setHeader("Content-Length", audioBuffer.length.toString());
+            res.setHeader("Accept-Ranges", "bytes");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("X-TTS-Provider", "elevenlabs");
+            return res.end(audioBuffer);
+          } else {
+            const errText = await elRes.text().catch(() => "");
+            log.warn("[TTS] ElevenLabs failed, falling back to OpenAI:", { status: elRes.status, error: errText });
+          }
+        } catch (elErr) {
+          log.warn("[TTS] ElevenLabs error, falling back to OpenAI:", { error: String(elErr) });
+        }
       }
 
-      const ttsVoice = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"].includes(voice) ? voice : "onyx";
-      const ttsSpeed = typeof speed === "number" && speed >= 0.25 && speed <= 4.0 ? speed : 1.0;
+      // ── OpenAI TTS (fallback) — "onyx" is the deepest available male voice ──
+      const openAiKey = process.env.OPENAI_API_KEY || "";
+      if (!openAiKey) {
+        return res.status(503).json({ error: "TTS not configured" });
+      }
 
       const ttsRes = await fetch("https://api.openai.com/v1/audio/speech", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${openAiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "tts-1",
+          model: "tts-1-hd",
           input: trimmedText,
-          voice: ttsVoice,
-          speed: ttsSpeed,
+          voice: "onyx",   // deepest male voice in OpenAI
+          speed: 0.95,
           response_format: "mp3",
         }),
       });
@@ -328,6 +374,7 @@ export function registerVoiceTTSRoute(app: Express) {
       res.setHeader("Content-Length", audioBuffer.length.toString());
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("X-TTS-Provider", "openai-fallback");
       res.end(audioBuffer);
     } catch (err) {
       log.error("[TTS] Error:", { error: String(err) });
