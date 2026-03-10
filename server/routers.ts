@@ -48,6 +48,7 @@ import { evilginxRouter } from "./evilginx-router";
 import { blackeyeRouter } from "./blackeye-router";
 import { metasploitRouter } from "./metasploit-router";
 import { filesRouter } from "./api/files";
+import { contentCreatorRouter } from "./content-creator-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -121,6 +122,7 @@ export const appRouter = router({
   evilginx: evilginxRouter,
   blackeye: blackeyeRouter,
   metasploit: metasploitRouter,
+  contentCreator: contentCreatorRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -106,6 +106,9 @@ import EvilginxPage from "./pages/EvilginxPage";
 import BlackEyePage from "./pages/BlackEyePage";
 import MetasploitPage from "./pages/MetasploitPage";
 
+// Content Creator
+import ContentCreatorPage from "./pages/ContentCreatorPage";
+
 
 function DashboardRouter() {
   return (
@@ -188,6 +191,9 @@ function DashboardRouter() {
         <Route path="/blackeye" component={BlackEyePage} />
         <Route path="/metasploit" component={MetasploitPage} />
 
+        {/* Content Creator */}
+        <Route path="/content-creator" component={ContentCreatorPage} />
+
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
@@ -250,6 +256,7 @@ function Router() {
       <Route path="/evilginx" component={DashboardRouter} />
       <Route path="/blackeye" component={DashboardRouter} />
       <Route path="/metasploit" component={DashboardRouter} />
+      <Route path="/content-creator" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

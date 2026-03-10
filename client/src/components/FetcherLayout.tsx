@@ -171,6 +171,7 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_13_r2c5"), label: "SEO Command Center", path: "/seo", adminOnly: true, isNew: true },
       { icon: featureIcon("icon_33_r5c1"), label: "Blog Engine", path: "/blog-admin", adminOnly: true, isNew: true },
       { icon: featureIcon("icon_31_r4c7"), label: "Marketing Engine", path: "/marketing", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_12_r2c4"), label: "Content Creator", path: "/content-creator", adminOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

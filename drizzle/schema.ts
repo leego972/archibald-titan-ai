@@ -2099,3 +2099,136 @@ export const adminActivityLog = mysqlTable("admin_activity_log", {
 
 export type AdminActivityLog = typeof adminActivityLog.$inferSelect;
 export type InsertAdminActivityLog = typeof adminActivityLog.$inferInsert;
+
+// ─── Content Creator System ─────────────────────────────────────────────────
+// AI-powered content generation system integrated with SEO engine,
+// advertising orchestrator, and TikTok pipeline.
+
+/**
+ * Content Creator Campaigns — top-level grouping for content initiatives
+ */
+export const contentCreatorCampaigns = mysqlTable("content_creator_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  objective: varchar("objective", { length: 100 }).notNull().default("brand_awareness"),
+  description: text("description"),
+  targetAudience: text("targetAudience"),
+  brandVoice: varchar("brandVoice", { length: 100 }).notNull().default("confident"),
+  primaryKeywords: json("primaryKeywords").$type<string[]>(),
+  platforms: json("platforms").$type<string[]>().notNull(),
+  status: mysqlEnum("cc_campaign_status", ["draft", "active", "paused", "completed", "archived"]).notNull().default("draft"),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  totalPieces: int("totalPieces").notNull().default(0),
+  publishedPieces: int("publishedPieces").notNull().default(0),
+  totalImpressions: int("totalImpressions").notNull().default(0),
+  totalClicks: int("totalClicks").notNull().default(0),
+  totalEngagements: int("totalEngagements").notNull().default(0),
+  seoLinked: boolean("seoLinked").notNull().default(false),
+  advertisingLinked: boolean("advertisingLinked").notNull().default(false),
+  tiktokLinked: boolean("tiktokLinked").notNull().default(false),
+  aiStrategy: text("aiStrategy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ContentCreatorCampaign = typeof contentCreatorCampaigns.$inferSelect;
+export type InsertContentCreatorCampaign = typeof contentCreatorCampaigns.$inferInsert;
+
+/**
+ * Content Creator Pieces — individual AI-generated content items
+ */
+export const contentCreatorPieces = mysqlTable("content_creator_pieces", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId"),
+  platform: mysqlEnum("cc_platform", [
+    "tiktok", "instagram", "x_twitter", "linkedin", "reddit", "facebook",
+    "youtube_shorts", "blog", "email", "pinterest", "discord", "telegram",
+    "whatsapp", "medium", "hackernews",
+  ]).notNull(),
+  contentType: mysqlEnum("cc_content_type", [
+    "video_script", "photo_carousel", "social_post", "ad_copy",
+    "blog_article", "email_campaign", "story", "reel", "thread", "infographic",
+  ]).notNull(),
+  title: varchar("title", { length: 500 }),
+  body: text("body").notNull(),
+  headline: varchar("headline", { length: 500 }),
+  callToAction: varchar("callToAction", { length: 255 }),
+  hashtags: json("hashtags").$type<string[]>(),
+  mediaUrl: text("mediaUrl"),
+  imagePrompt: text("imagePrompt"),
+  videoScript: text("videoScript"),
+  hook: varchar("hook", { length: 500 }),
+  visualDirections: json("visualDirections").$type<string[]>(),
+  seoKeywords: json("seoKeywords").$type<string[]>(),
+  seoScore: int("seoScore").default(0),
+  qualityScore: int("qualityScore").default(0),
+  status: mysqlEnum("cc_piece_status", [
+    "draft", "review", "approved", "scheduled", "published", "failed", "archived",
+  ]).notNull().default("draft"),
+  scheduledAt: timestamp("scheduledAt"),
+  publishedAt: timestamp("publishedAt"),
+  externalPostId: varchar("externalPostId", { length: 255 }),
+  externalUrl: text("externalUrl"),
+  impressions: int("impressions").notNull().default(0),
+  clicks: int("clicks").notNull().default(0),
+  engagements: int("engagements").notNull().default(0),
+  shares: int("shares").notNull().default(0),
+  saves: int("saves").notNull().default(0),
+  comments: int("comments").notNull().default(0),
+  aiPrompt: text("aiPrompt"),
+  aiModel: varchar("aiModel", { length: 50 }),
+  generationMs: int("generationMs"),
+  tiktokPublishId: varchar("tiktokPublishId", { length: 255 }),
+  linkedMarketingContentId: int("linkedMarketingContentId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ContentCreatorPiece = typeof contentCreatorPieces.$inferSelect;
+export type InsertContentCreatorPiece = typeof contentCreatorPieces.$inferInsert;
+
+/**
+ * Content Creator Schedules — publishing schedule queue
+ */
+export const contentCreatorSchedules = mysqlTable("content_creator_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  pieceId: int("pieceId").notNull(),
+  campaignId: int("campaignId"),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  status: mysqlEnum("cc_schedule_status", [
+    "pending", "processing", "published", "failed", "cancelled",
+  ]).notNull().default("pending"),
+  publishedAt: timestamp("publishedAt"),
+  failReason: text("failReason"),
+  retryCount: int("retryCount").notNull().default(0),
+  maxRetries: int("maxRetries").notNull().default(3),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ContentCreatorSchedule = typeof contentCreatorSchedules.$inferSelect;
+export type InsertContentCreatorSchedule = typeof contentCreatorSchedules.$inferInsert;
+
+/**
+ * Content Creator Analytics — daily performance snapshots per piece
+ */
+export const contentCreatorAnalytics = mysqlTable("content_creator_analytics", {
+  id: int("id").autoincrement().primaryKey(),
+  pieceId: int("pieceId").notNull(),
+  campaignId: int("campaignId"),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  impressions: int("impressions").notNull().default(0),
+  clicks: int("clicks").notNull().default(0),
+  engagements: int("engagements").notNull().default(0),
+  shares: int("shares").notNull().default(0),
+  saves: int("saves").notNull().default(0),
+  comments: int("comments").notNull().default(0),
+  reach: int("reach").notNull().default(0),
+  videoViews: int("videoViews").notNull().default(0),
+  videoCompletionRate: varchar("videoCompletionRate", { length: 10 }).default("0"),
+  ctr: varchar("ctr", { length: 10 }).default("0"),
+  engagementRate: varchar("engagementRate", { length: 10 }).default("0"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ContentCreatorAnalytics = typeof contentCreatorAnalytics.$inferSelect;
+export type InsertContentCreatorAnalytics = typeof contentCreatorAnalytics.$inferInsert;
