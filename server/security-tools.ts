@@ -235,6 +235,18 @@ export async function analyzeCodeSecurity(
   userId?: number
 ): Promise<CodeReviewReport> {
   const userApiKey = userId ? (await getUserOpenAIKey(userId) || undefined) : undefined;
+
+  // Early return for empty file list — no LLM call needed
+  if (files.length === 0) {
+    return {
+      overallScore: 100,
+      issues: [],
+      summary: "No files provided for analysis.",
+      strengths: ["No code to review"],
+      recommendations: ["Provide code files for a full security analysis"],
+    };
+  }
+
   const codeContext = files
     .map((file) => `// File: ${file.filename}\n${file.content}`)
     .join("\n\n---\n\n");
