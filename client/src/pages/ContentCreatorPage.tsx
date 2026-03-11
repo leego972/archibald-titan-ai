@@ -1352,7 +1352,7 @@ export default function ContentCreatorPage() {
             ) : seoBriefs.data?.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No SEO briefs available</p>
             ) : (
-              seoBriefs.data?.map((brief, i) => (
+              seoBriefs.data?.map((brief: any, i: number) => (
                 <div key={i} className="p-4 rounded-lg bg-[#161b22] border border-[#21262d] space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -1370,14 +1370,14 @@ export default function ContentCreatorPage() {
                   <p className="text-xs text-gray-500">{brief.seoOpportunity}</p>
                   {brief.secondaryKeywords.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {brief.secondaryKeywords.map(kw => (
+                      {brief.secondaryKeywords.map((kw: string) => (
                         <Badge key={kw} variant="outline" className="text-xs text-gray-400 border-gray-600/30">{kw}</Badge>
                       ))}
                     </div>
                   )}
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      {brief.recommendedPlatforms.map(p => (
+                      {brief.recommendedPlatforms.map((p: string) => (
                         <span key={p} className="text-xs">{PLATFORM_ICONS[p]?.emoji || "•"}</span>
                       ))}
                     </div>

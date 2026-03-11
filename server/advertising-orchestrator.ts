@@ -2550,15 +2550,13 @@ export async function runAdvertisingCycle(): Promise<AdvertisingCycleResult> {
     const { runAutonomousContentCycle, processDueSchedules } = await import("./content-creator-engine");
     // Step 1: Run full autonomous content generation (generates, scores, auto-approves ≥75, schedules)
     const contentResult = await runAutonomousContentCycle({
-      maxPiecesPerPlatform: 2,
-      autoApproveThreshold: 75,
-      autoSchedule: true,
-      autoPublishTikTok: true,
+      maxPieces: 2,
+      forceGenerate: true,
     });
     log.info(
       `[AdvertisingOrchestrator] Autonomous content cycle complete: ` +
       `${contentResult.generated} generated, ${contentResult.autoApproved} auto-approved, ` +
-      `${contentResult.scheduled} scheduled, ${contentResult.tiktokPosted} TikTok posts`
+      `${contentResult.scheduled} scheduled, ${contentResult.published} published`
     );
     // Step 2: Publish any content that is due right now
     const dueResult = await processDueSchedules();

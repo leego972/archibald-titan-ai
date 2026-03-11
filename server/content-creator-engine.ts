@@ -568,7 +568,7 @@ export async function generateCreatorContent(
   try {
     const strategy = getStrategyOverview();
     if (strategy) {
-      adContext = `\nActive campaign budget: $${strategy.monthlyBudget}/month. Current focus: ${strategy.currentFocus || "brand awareness"}. Top performing channel: ${strategy.topChannel || "organic"}.`;
+      adContext = `\nActive campaign budget: $${strategy.monthlyBudget}/month. Current focus: ${strategy.strategies?.[0]?.channel || "brand awareness"}. Top performing channel: ${strategy.contentPillars?.[0]?.name || "organic"}.`;
     }
   } catch {}
 
@@ -754,6 +754,9 @@ export async function getSeoDrivenBriefs(count = 5): Promise<ContentCreatorBrief
   }
 }
 
+// Alias for backward compatibility
+export const generateSeoContentBriefs = getSeoDrivenBriefs;
+
 // ─── Optimal Posting Time Calculator ──────────────────────────────────────
 export function getOptimalPostingTime(platform: string, offsetDays = 0): Date {
   const hours = OPTIMAL_POSTING_HOURS[platform] || [12];
@@ -873,9 +876,9 @@ export async function runAutonomousContentCycle(options?: {
       objective: "brand_awareness",
       status: "active",
       platforms: platforms as any,
-      seoEnabled: true,
-      tiktokEnabled: isTikTokContentConfigured(),
-      advertisingEnabled: true,
+      seoLinked: true,
+      tiktokLinked: isTikTokContentConfigured(),
+      advertisingLinked: true,
     });
     const rows = await db.select().from(contentCreatorCampaigns)
       .where(eq(contentCreatorCampaigns.id, (ins as any).insertId)).limit(1);
@@ -995,7 +998,7 @@ export async function runAutonomousContentCycle(options?: {
     durationMs: Date.now() - startTime,
   };
 
-  log.info(`[ContentCreator] Autonomous cycle complete:`, result);
+  log.info(`[ContentCreator] Autonomous cycle complete:`, result as unknown as Record<string, unknown>);
   return result;
 }
 

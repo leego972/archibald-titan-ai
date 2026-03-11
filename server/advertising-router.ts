@@ -152,7 +152,7 @@ export const advertisingRouter = router({
     .input(
       z.object({
         id: z.number(),
-        status: z.enum(["approved", "published", "failed", "draft", "rejected"]),
+        status: z.enum(["approved", "published", "failed", "draft"]),
       })
     )
     .mutation(async ({ input }) => {
@@ -582,11 +582,9 @@ export const advertisingRouter = router({
     )
     .mutation(async ({ input }) => {
       const { runAutonomousContentCycle } = await import("./content-creator-engine");
-      return runAutonomousContentCycle(input ?? {
-        maxPiecesPerPlatform: 2,
-        autoApproveThreshold: 75,
-        autoSchedule: true,
-        autoPublishTikTok: true,
+      return runAutonomousContentCycle({
+        maxPieces: input?.maxPiecesPerPlatform ?? 2,
+        forceGenerate: true,
       });
     }),
 
@@ -597,6 +595,6 @@ export const advertisingRouter = router({
     .input(z.object({ threshold: z.number().min(0).max(100).default(75) }).optional())
     .mutation(async ({ input }) => {
       const { autoApproveHighQualityContent } = await import("./content-creator-engine");
-      return autoApproveHighQualityContent(input?.threshold ?? 75);
+      return autoApproveHighQualityContent();
     }),
 });
