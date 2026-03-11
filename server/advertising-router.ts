@@ -1,8 +1,23 @@
 /**
  * Advertising Router — tRPC procedures for the autonomous advertising system
- * 
+ *
  * All procedures are admin-only since this controls the advertising budget
  * and autonomous content generation.
+ *
+ * Endpoints:
+ *  Core Strategy:       getStrategy, getPerformance, getActivity, runCycle, getStrategies
+ *  Content Queue:       getContentQueue, updateContentStatus, getContentById, getPreviewableContent
+ *  Dashboard:           getDashboard
+ *  TikTok:              getTikTokStats, triggerTikTokPost, checkTikTokPostStatus
+ *  Video Generation:    getVideoStatus, generateVideo, generateShortVideo, generateAdVideo, generateSocialClip
+ *  Channel Statuses:    getChannelStatuses, getChannelPerformance
+ *  Budget:              getBudgetBreakdown
+ *  Attribution:         getCrossChannelAttribution
+ *  A/B Testing:         getABTests, createABTest, recordABTestResult
+ *  Scheduler Control:   startScheduler, stopScheduler
+ *  Blog Posts:          getBlogPosts
+ *  Campaign Data:       getCampaignPerformance
+ *  Autonomous Content:  triggerContentCycle, autoApproveContent
  */
 
 import { z } from "zod";
@@ -17,6 +32,11 @@ import {
   GROWTH_STRATEGIES,
   startAdvertisingScheduler,
   stopAdvertisingScheduler,
+  getChannelPerformanceReport,
+  getCrossChannelAttribution,
+  getActiveABTests,
+  createABTest,
+  recordABTestResult,
 } from "./advertising-orchestrator";
 import {
   runTikTokContentPipeline,
@@ -46,6 +66,11 @@ import {
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 
 export const advertisingRouter = router({
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CORE STRATEGY
+  // ══════════════════════════════════════════════════════════════════════════
+
   /**
    * Get the full advertising strategy overview
    */
@@ -88,6 +113,10 @@ export const advertisingRouter = router({
     return GROWTH_STRATEGIES;
   }),
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONTENT QUEUE
+  // ══════════════════════════════════════════════════════════════════════════
+
   /**
    * Get content queue — all generated content awaiting review/publishing
    */
@@ -123,7 +152,7 @@ export const advertisingRouter = router({
     .input(
       z.object({
         id: z.number(),
-        status: z.enum(["approved", "published", "failed", "draft"]),
+        status: z.enum(["approved", "published", "failed", "draft", "rejected"]),
       })
     )
     .mutation(async ({ input }) => {
@@ -182,6 +211,10 @@ export const advertisingRouter = router({
       return content;
     }),
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // DASHBOARD
+  // ══════════════════════════════════════════════════════════════════════════
+
   /**
    * Get a summary dashboard with key metrics
    */
@@ -193,6 +226,8 @@ export const advertisingRouter = router({
         performance: null,
         recentActivity: [],
         contentQueue: { draft: 0, approved: 0, published: 0, rejected: 0 },
+        channelPerformance: [],
+        abTests: [],
       };
     }
 
@@ -227,8 +262,14 @@ export const advertisingRouter = router({
       performance,
       recentActivity,
       contentQueue,
+      channelPerformance: getChannelPerformanceReport(),
+      abTests: getActiveABTests(),
     };
   }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TIKTOK
+  // ══════════════════════════════════════════════════════════════════════════
 
   /**
    * Get TikTok content posting stats and status
@@ -239,6 +280,7 @@ export const advertisingRouter = router({
     return {
       ...stats,
       creatorInfo,
+      configured: isTikTokContentConfigured(),
     };
   }),
 
@@ -260,9 +302,10 @@ export const advertisingRouter = router({
       return status;
     }),
 
-  /**
-   * Get budget breakdown and utilization
-   */
+  // ══════════════════════════════════════════════════════════════════════════
+  // VIDEO GENERATION
+  // ══════════════════════════════════════════════════════════════════════════
+
   /**
    * Get video generation status and availability
    */
@@ -337,6 +380,10 @@ export const advertisingRouter = router({
       return result;
     }),
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // CHANNEL STATUSES & PERFORMANCE
+  // ══════════════════════════════════════════════════════════════════════════
+
   /**
    * Get the connection status of all advertising channels (free + paid)
    */
@@ -359,10 +406,23 @@ export const advertisingRouter = router({
     };
   }),
 
+  /**
+   * Get detailed performance metrics per channel
+   */
+  getChannelPerformance: adminProcedure.query(() => {
+    return getChannelPerformanceReport();
+  }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BUDGET
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get budget breakdown and cost per channel
+   */
   getBudgetBreakdown: adminProcedure.query(async () => {
     const overview = getStrategyOverview();
     const performance = await getPerformanceMetrics(30);
-
     return {
       monthlyBudget: overview.monthlyBudget,
       currency: overview.currency,
@@ -379,4 +439,164 @@ export const advertisingRouter = router({
       })),
     };
   }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CROSS-CHANNEL ATTRIBUTION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get cross-channel attribution — which channels drive the most conversions
+   */
+  getCrossChannelAttribution: adminProcedure
+    .input(z.object({ days: z.number().min(1).max(365).default(30) }))
+    .query(async ({ input }) => {
+      return getCrossChannelAttribution(input.days);
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // A/B TESTING
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get all active A/B tests across channels
+   */
+  getABTests: adminProcedure.query(() => {
+    return getActiveABTests();
+  }),
+
+  /**
+   * Create a new A/B test for a specific channel
+   */
+  createABTest: adminProcedure
+    .input(
+      z.object({
+        channel: z.string(),
+        variantADesc: z.string().min(3).max(500),
+        variantBDesc: z.string().min(3).max(500),
+      })
+    )
+    .mutation(({ input }) => {
+      return createABTest(input.channel, input.variantADesc, input.variantBDesc);
+    }),
+
+  /**
+   * Record a result for an A/B test variant
+   */
+  recordABTestResult: adminProcedure
+    .input(
+      z.object({
+        testId: z.string(),
+        variant: z.enum(["A", "B"]),
+        success: z.boolean(),
+      })
+    )
+    .mutation(({ input }) => {
+      recordABTestResult(input.testId, input.variant, input.success);
+      return { success: true };
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SCHEDULER CONTROL
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Start the autonomous advertising + content scheduler
+   */
+  startScheduler: adminProcedure.mutation(() => {
+    startAdvertisingScheduler();
+    return { success: true, message: "Archibald Titan autonomous advertising scheduler started" };
+  }),
+
+  /**
+   * Stop the autonomous advertising + content scheduler
+   */
+  stopScheduler: adminProcedure.mutation(() => {
+    stopAdvertisingScheduler();
+    return { success: true, message: "Archibald Titan autonomous advertising scheduler stopped" };
+  }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BLOG POSTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get recent blog posts generated by the autonomous advertising orchestrator
+   */
+  getBlogPosts: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { items: [], total: 0 };
+      const [items, totalRows] = await Promise.all([
+        db
+          .select()
+          .from(blogPosts)
+          .orderBy(desc(blogPosts.createdAt))
+          .limit(input.limit)
+          .offset(input.offset),
+        db.select({ count: count() }).from(blogPosts),
+      ]);
+      return { items, total: Number(totalRows[0]?.count ?? 0) };
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CAMPAIGN PERFORMANCE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get marketing campaign performance data
+   */
+  getCampaignPerformance: adminProcedure
+    .input(z.object({ days: z.number().min(1).max(365).default(30) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db
+        .select()
+        .from(marketingPerformance)
+        .orderBy(desc(marketingPerformance.createdAt))
+        .limit(100);
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // AUTONOMOUS CONTENT CONTROL
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Manually trigger the full autonomous content generation cycle
+   * (generates content, scores it, auto-approves ≥ threshold, schedules, posts to TikTok)
+   */
+  triggerContentCycle: adminProcedure
+    .input(
+      z.object({
+        maxPiecesPerPlatform: z.number().min(1).max(10).default(2),
+        autoApproveThreshold: z.number().min(0).max(100).default(75),
+        autoSchedule: z.boolean().default(true),
+        autoPublishTikTok: z.boolean().default(true),
+      }).optional()
+    )
+    .mutation(async ({ input }) => {
+      const { runAutonomousContentCycle } = await import("./content-creator-engine");
+      return runAutonomousContentCycle(input ?? {
+        maxPiecesPerPlatform: 2,
+        autoApproveThreshold: 75,
+        autoSchedule: true,
+        autoPublishTikTok: true,
+      });
+    }),
+
+  /**
+   * Auto-approve all high-quality draft content pieces (score ≥ threshold)
+   */
+  autoApproveContent: adminProcedure
+    .input(z.object({ threshold: z.number().min(0).max(100).default(75) }).optional())
+    .mutation(async ({ input }) => {
+      const { autoApproveHighQualityContent } = await import("./content-creator-engine");
+      return autoApproveHighQualityContent(input?.threshold ?? 75);
+    }),
 });

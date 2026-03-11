@@ -2544,6 +2544,31 @@ export async function runAdvertisingCycle(): Promise<AdvertisingCycleResult> {
 
   log.info(`[AdvertisingOrchestrator] Cycle complete: ${successCount} success, ${failCount} failed, ${duration}ms`);
 
+  // ─── Content Creator: Full Autonomous Content Cycle ─────────────────────────
+  try {
+    // Dynamic import avoids circular dependency (content-creator-engine imports advertising-orchestrator)
+    const { runAutonomousContentCycle, processDueSchedules } = await import("./content-creator-engine");
+    // Step 1: Run full autonomous content generation (generates, scores, auto-approves ≥75, schedules)
+    const contentResult = await runAutonomousContentCycle({
+      maxPiecesPerPlatform: 2,
+      autoApproveThreshold: 75,
+      autoSchedule: true,
+      autoPublishTikTok: true,
+    });
+    log.info(
+      `[AdvertisingOrchestrator] Autonomous content cycle complete: ` +
+      `${contentResult.generated} generated, ${contentResult.autoApproved} auto-approved, ` +
+      `${contentResult.scheduled} scheduled, ${contentResult.tiktokPosted} TikTok posts`
+    );
+    // Step 2: Publish any content that is due right now
+    const dueResult = await processDueSchedules();
+    if (dueResult.processed > 0) {
+      log.info(`[AdvertisingOrchestrator] Content calendar: ${dueResult.published} posts published, ${dueResult.failed} failed`);
+    }
+  } catch (err: unknown) {
+    log.warn("[AdvertisingOrchestrator] Autonomous content cycle failed (non-critical):", { error: getErrorMessage(err) });
+  }
+
   // Next run is tomorrow at 9 AM AEST
   const nextRun = new Date();
   nextRun.setDate(nextRun.getDate() + 1);
