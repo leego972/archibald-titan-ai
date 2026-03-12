@@ -15,6 +15,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
+import { consumeCredits } from "./credit-service";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 
@@ -306,6 +307,7 @@ export const evilginxRouter = router({
 
       const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const output = await execEvilginxCommand(sshConfig, input.command);
+      await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: ${input.command.split(" ")[0]}`);
       return { output };
     }),
 

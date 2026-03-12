@@ -15,6 +15,7 @@ import { z } from "zod";
 import { eq, and, desc, sql, gte, lte, count, avg } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import {
   monitoredSites,
@@ -306,6 +307,7 @@ export const siteMonitorRouter = router({
         details: { message: `Added site "${input.name}" for monitoring` },
       });
 
+      await consumeCredits(ctx.user!.id, "site_monitor_add", "Site monitor: add site");
       return { id: result.insertId, message: "Site added for monitoring" };
     }),
 

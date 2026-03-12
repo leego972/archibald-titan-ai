@@ -24,6 +24,7 @@ import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { logAdminAction } from "./admin-activity-log";
+import { consumeCredits } from "./credit-service";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 interface SSHConfig {
@@ -286,6 +287,7 @@ export const argusRouter = router({
       const output = await execSSHCommand(ssh, argusCmd, (input.timeout + 15) * 1000);
       const duration = Date.now() - startTime;
 
+      await consumeCredits(ctx.user.id, "security_scan", `Argus module: ${moduleMeta.name}`);
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_run_module", category: "security", details: { moduleId: String(input.moduleId), moduleName: moduleMeta.name, target: input.target, duration: String(duration) }, ipAddress: ctx.req?.ip || "unknown" });
 
       return {
@@ -326,6 +328,7 @@ export const argusRouter = router({
         }
       }
 
+      await consumeCredits(ctx.user.id, "security_scan", `Argus batch scan: ${input.moduleIds.length} modules`);
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_batch_scan", category: "security", details: { moduleCount: String(input.moduleIds.length), target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, target: input.target, totalModules: results.length, scannedAt: new Date().toISOString() };
     }),
@@ -344,6 +347,7 @@ export const argusRouter = router({
       const argusCmd = `cd /opt/argus 2>/dev/null || true && echo -e "set target ${input.target}\\nset threads ${input.threads}\\nrunall ${input.category}\\nexit" | timeout 300 python3 -m argus 2>&1 || echo -e "set target ${input.target}\\nrunall ${input.category}\\nexit" | timeout 300 argus 2>&1 || echo 'Category scan failed'`;
       const start = Date.now();
       const output = await execSSHCommand(ssh, argusCmd, 320000);
+      await consumeCredits(ctx.user.id, "security_scan", `Argus category scan: ${input.category}`);
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_category_scan", category: "security", details: { category: input.category, target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { category: input.category, target: input.target, output, duration: Date.now() - start, scannedAt: new Date().toISOString() };
     }),
@@ -371,6 +375,7 @@ export const argusRouter = router({
         }
       }
 
+      await consumeCredits(ctx.user.id, "security_scan", "Argus quick recon");
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_quick_recon", category: "security", details: { target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, target: input.target, scannedAt: new Date().toISOString() };
     }),

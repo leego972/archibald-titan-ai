@@ -23,6 +23,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
+import { consumeCredits } from "./credit-service";
 import { logAdminAction } from "./admin-activity-log";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
@@ -398,6 +399,7 @@ export const metasploitRouter = router({
       const payloadCmd = input.payload ? `; set PAYLOAD ${input.payload}` : "";
       const cmd = `use ${input.module}; ${setCommands}${payloadCmd}; run`;
       const output = await execMsfConsole(sshConfig, cmd, 60000);
+      await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit run: ${input.module}`);
       await logAdminAction({
         adminId: ctx.user.id,
         adminEmail: ctx.user.email || undefined,
@@ -433,6 +435,7 @@ export const metasploitRouter = router({
       const outputFile = `${input.outputPath}.${input.format}`;
       const cmd = `msfvenom -p ${input.payload} LHOST=${input.lhost} LPORT=${input.lport} -f ${input.format} ${encoderFlag} -o ${outputFile} 2>&1 && echo "Payload saved to ${outputFile}"`;
       const output = await execSSHCommand(sshConfig, cmd, 30000);
+      await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit payload: ${input.payload}`);
       await logAdminAction({
         adminId: ctx.user.id,
         adminEmail: ctx.user.email || undefined,

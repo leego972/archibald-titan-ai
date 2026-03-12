@@ -18,6 +18,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
+import { consumeCredits } from "./credit-service";
 import { logAdminAction } from "./admin-activity-log";
 
 // ─── Available BlackEye Templates ────────────────────────────────
@@ -332,6 +333,7 @@ export const blackeyeRouter = router({
       const phishingUrl = input.customDomain
         ? `http://${input.customDomain}`
         : `http://${serverIp}`;
+      await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye launch: ${input.template}`);
       return {
         success: true,
         phishingUrl,

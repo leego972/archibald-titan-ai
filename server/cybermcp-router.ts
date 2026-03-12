@@ -15,6 +15,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { consumeCredits } from "./credit-service";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { logAdminAction } from "./admin-activity-log";
 
@@ -196,6 +197,7 @@ export const cybermcpRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const analysis = analyseJwt(input.token);
+      await consumeCredits(ctx.user.id, "security_scan", "CyberMCP JWT check");
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_jwt_check", category: "security", details: { risk: analysis.risk }, ipAddress: ctx.req?.ip || "unknown" });
       return {
         header: analysis.header,
@@ -246,6 +248,7 @@ export const cybermcpRouter = router({
       }
 
       const vulnerableCount = tests.filter(t => t.vulnerable).length;
+      await consumeCredits(ctx.user.id, "security_scan", "CyberMCP auth bypass check");
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_auth_bypass", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { tests, vulnerableCount, endpoint: input.endpoint, overallRisk: vulnerableCount >= 2 ? "critical" : vulnerableCount === 1 ? "high" : "pass" };
     }),
@@ -279,6 +282,7 @@ export const cybermcpRouter = router({
       }
 
       const vulnerableCount = results.filter(r => r.vulnerable).length;
+      await consumeCredits(ctx.user.id, "security_scan", "CyberMCP SQL injection check");
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_sql_injection", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, vulnerableCount, endpoint: input.endpoint, risk: vulnerableCount > 0 ? "critical" : "pass", summary: vulnerableCount > 0 ? `SQL injection vulnerability detected — ${vulnerableCount} payloads triggered errors` : "No SQL injection vulnerabilities detected" };
     }),
