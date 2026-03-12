@@ -74,6 +74,7 @@ import {
   Moon,
   FolderOpen,
   Globe,
+  UserPlus,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -89,6 +90,8 @@ import { isDesktop } from "@/lib/desktop";
 import { useArchibald } from "@/contexts/ArchibaldContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { LanguageSelector } from "@/i18n";
+import { AddAdminModal } from "./AddAdminModal";
+import { isAdminRole } from "@shared/const";
 
 type MenuItem = {
   icon: any;
@@ -335,6 +338,7 @@ function FetcherLayoutContent({
   const sub = useSubscription();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = allMenuItems.find(
     (item) => item.path === location || (item.path !== "/dashboard" && location.startsWith(item.path))
@@ -572,6 +576,15 @@ function FetcherLayoutContent({
                     <span>Upgrade Plan</span>
                   </DropdownMenuItem>
                 )}
+                {isAdminRole(user?.role) && (
+                  <DropdownMenuItem
+                    onClick={() => setShowAddAdminModal(true)}
+                    className="cursor-pointer text-blue-400 focus:text-blue-400"
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    <span>Manage Admins</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive h-10 sm:h-auto"
@@ -592,6 +605,15 @@ function FetcherLayoutContent({
           style={{ zIndex: 50 }}
         />
       </div>
+
+      {/* Add Admin Modal — only rendered for admins */}
+      {isAdminRole(user?.role) && (
+        <AddAdminModal
+          open={showAddAdminModal}
+          onClose={() => setShowAddAdminModal(false)}
+          currentUserRole={user?.role ?? "user"}
+        />
+      )}
 
       <SidebarInset>
         {isMobile && (
