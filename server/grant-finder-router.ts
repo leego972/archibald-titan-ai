@@ -19,6 +19,7 @@ import {
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { isAdminRole } from '@shared/const';
+import { consumeCredits } from "./credit-service";
 const log = createLogger("GrantFinderRouter");
 
 // ==========================================
@@ -104,6 +105,7 @@ export const businessPlanRouter = router({
     targetMarket: z.string().optional(),
     competitiveAdvantage: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
+    try { await consumeCredits(ctx.user.id, "grant_application", "Business plan generation"); } catch {}
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -173,6 +175,7 @@ export const grantRouter = router({
     return db.getGrantOpportunityById(input.id);
   }),
   match: protectedProcedure.input(z.object({ companyId: z.number() })).mutation(async ({ input, ctx }) => {
+    try { await consumeCredits(ctx.user.id, "grant_application", "Grant matching analysis"); } catch {}
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;

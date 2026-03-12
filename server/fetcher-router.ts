@@ -52,6 +52,7 @@ import {
   getAllowedProviders,
 } from "./subscription-gate";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits } from "./credit-service";
 const log = createLogger("FetcherRouter");
 
 export const fetcherRouter = router({
@@ -128,6 +129,11 @@ export const fetcherRouter = router({
       await enforceProviderAccess(ctx.user.id, providerCheck.valid);
 
       const job = await createJob(ctx.user.id, sanitizedEmail, input.password, providerCheck.valid);
+
+      // Deduct 1 credit per provider being fetched
+      for (const _p of providerCheck.valid) {
+        try { await consumeCredits(ctx.user.id, "fetch_action", `Credential fetch: ${_p}`); } catch {}
+      }
 
       // Start the real browser automation asynchronously
       executeJob(job.id, ctx.user.id).catch((err) => {

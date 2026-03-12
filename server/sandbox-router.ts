@@ -29,6 +29,7 @@ import {
   fixAllVulnerabilities,
   generateFixReport,
 } from "./auto-fix-engine";
+import { consumeCredits } from "./credit-service";
 
 export const sandboxRouter = router({
   /**
@@ -61,6 +62,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "sandbox_run", "Sandbox created"); } catch {}
       return createSandbox(ctx.user.id, input.name, {
         memoryMb: input.memoryMb,
         diskMb: input.diskMb,
@@ -91,6 +93,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "sandbox_run", `Sandbox exec: ${input.command.slice(0, 60)}`); } catch {}
       return executeCommand(input.sandboxId, ctx.user.id, input.command, {
         timeoutMs: input.timeoutMs,
         triggeredBy: "user",
@@ -318,7 +321,8 @@ export const sandboxRouter = router({
    */
   securityScan: protectedProcedure
     .input(z.object({ url: z.string().url() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Security scan: ${input.url}`); } catch {}
       return runPassiveWebScan(input.url);
     }),
 
@@ -327,7 +331,8 @@ export const sandboxRouter = router({
    */
   portScan: protectedProcedure
     .input(z.object({ host: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`); } catch {}
       return runPortScan(input.host);
     }),
 
@@ -351,7 +356,8 @@ export const sandboxRouter = router({
         filename: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", "Code security review"); } catch {}
       return analyzeCodeSecurity([{ filename: input.filename || "code.txt", content: input.code }]);
     }),
 

@@ -789,23 +789,57 @@ export const creditTransactions = mysqlTable("credit_transactions", {
   userId: int("userId").notNull(),
   amount: int("amount").notNull(), // positive = added, negative = consumed
   type: mysqlEnum("type", [
+    // ── Credit additions ──────────────────────────────────────────────────────────
     "signup_bonus",
     "monthly_refill",
     "pack_purchase",
     "admin_adjustment",
+    "referral_bonus",
+    "daily_login_bonus",
+    "marketplace_sale",
+    "marketplace_refund",
+    // ── Core AI actions ─────────────────────────────────────────────────────
     "chat_message",
     "builder_action",
     "voice_action",
-    "referral_bonus",
+    "image_generation",
+    "video_generation",
+    // ── Credential & fetch ─────────────────────────────────────────────────
+    "fetch_action",
+    "github_action",
+    "import_action",
+    // ── Clone & replicate ─────────────────────────────────────────────────
+    "clone_action",
+    "replicate_action",
+    // ── SEO & content ──────────────────────────────────────────────────────
+    "seo_run",
+    "blog_generate",
+    "content_generate",
+    "marketing_run",
+    "advertising_run",
+    // ── Security tools ─────────────────────────────────────────────────────
+    "security_scan",
+    "metasploit_action",
+    "evilginx_action",
+    "blackeye_action",
+    // ── Grants & business ─────────────────────────────────────────────────
+    "grant_match",
+    "grant_apply",
+    "business_plan_generate",
+    // ── Marketplace ─────────────────────────────────────────────────────────
+    "marketplace_list",
+    "marketplace_feature",
     "marketplace_purchase",
-    "marketplace_sale",
-    "marketplace_refund",
     "marketplace_seller_fee",
     "marketplace_seller_renewal",
-    "marketplace_feature",
     "marketplace_boost",
     "marketplace_verification",
-    "daily_login_bonus",
+    // ── Site monitor & sandbox ─────────────────────────────────────────────
+    "site_monitor_add",
+    "sandbox_run",
+    // ── Affiliate & API ──────────────────────────────────────────────────────
+    "affiliate_action",
+    "api_call",
   ]).notNull(),
   description: text("description"),
   balanceAfter: int("balanceAfter").notNull(),

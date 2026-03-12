@@ -320,13 +320,51 @@ export const INTERNAL_TIERS: PricingTier[] = [
 //   That's 5-8 builder requests per day — solid daily usage.
 
 export const CREDIT_COSTS = {
-  chat_message: 1,        // 1 credit per chat message — feels free
-  builder_action: 5,      // 5 credits per builder tool action
-  voice_action: 3,        // 3 credits per voice transcription (covers Whisper API cost at all tiers)
-  fetch_action: 2,        // 2 credits per credential fetch
-  clone_action: 50,       // 50 credits per website clone — premium feature (Cyber+/Titan only)
-  github_action: 5,       // 5 credits per GitHub repo create or push
-  image_generation: 15,   // 15 credits per AI image generation (DALL-E ~$0.04/image — 15cr ensures profitability at all tiers)
+  // ── Core AI ──────────────────────────────────────────────────────────
+  chat_message: 1,              // 1 credit per chat message — feels free
+  builder_action: 5,            // 5 credits per builder tool action (code gen, file write, etc.)
+  voice_action: 3,              // 3 credits per voice transcription (Whisper API)
+  image_generation: 15,         // 15 credits per AI image (DALL-E / Replicate)
+  video_generation: 40,         // 40 credits per AI video generation
+
+  // ── Credential & Fetch ───────────────────────────────────────────────
+  fetch_action: 2,              // 2 credits per credential fetch
+  github_action: 5,             // 5 credits per GitHub repo create or push
+  import_action: 3,             // 3 credits per credential import batch
+
+  // ── Clone & Replicate ────────────────────────────────────────────────
+  clone_action: 50,             // 50 credits per website clone (Cyber+ / Titan only)
+  replicate_action: 30,         // 30 credits per site replication job
+
+  // ── SEO & Content ────────────────────────────────────────────────────
+  seo_run: 10,                  // 10 credits per SEO optimisation run
+  blog_generate: 8,             // 8 credits per AI blog post generation
+  content_generate: 8,          // 8 credits per content piece (social, email, etc.)
+  marketing_run: 12,            // 12 credits per marketing engine cycle
+  advertising_run: 12,          // 12 credits per advertising cycle / campaign trigger
+
+  // ── Security Tools (Cyber tier) ──────────────────────────────────────
+  security_scan: 10,            // 10 credits per security scan / health check
+  metasploit_action: 20,        // 20 credits per Metasploit module run / exploit
+  evilginx_action: 20,          // 20 credits per Evilginx phishlet / lure / session action
+  blackeye_action: 15,          // 15 credits per Blackeye phishing page action
+
+  // ── Grants & Business ────────────────────────────────────────────────
+  grant_match: 5,               // 5 credits per AI grant matching run
+  grant_apply: 10,              // 10 credits per grant application submission
+  business_plan_generate: 15,   // 15 credits per AI business plan generation
+
+  // ── Marketplace ──────────────────────────────────────────────────────
+  marketplace_list: 5,          // 5 credits to list an item for sale
+  marketplace_feature: 10,      // 10 credits to feature / boost a listing
+
+  // ── Site Monitor & Sandbox ───────────────────────────────────────────
+  site_monitor_add: 3,          // 3 credits to add a new monitored site
+  sandbox_run: 5,               // 5 credits per sandbox environment execution
+
+  // ── Affiliate & API ──────────────────────────────────────────────────
+  affiliate_action: 2,          // 2 credits per affiliate link / campaign create
+  api_call: 1,                  // 1 credit per external API call via the platform
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

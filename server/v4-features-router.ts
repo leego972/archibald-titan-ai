@@ -23,6 +23,7 @@ import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { logAudit } from "./audit-log-db";
 import crypto from "crypto";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits } from "./credit-service";
 const log = createLogger("V4FeaturesRouter");
 
 // ─── Known credential patterns for leak scanning ─────────────────
@@ -103,6 +104,7 @@ export const leakScannerRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "leak_scanner", "Credential Leak Scanner");
+      try { await consumeCredits(ctx.user.id, "security_scan", `Credential leak scan: ${input.scanType}`); } catch {}
       const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
 
       const db = await getDb();
@@ -411,6 +413,7 @@ export const onboardingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "scheduled_fetches", "Provider Onboarding");
+      try { await consumeCredits(ctx.user.id, "ai_analysis", `Provider onboarding analysis: ${input.url}`); } catch {}
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });

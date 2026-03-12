@@ -11,6 +11,7 @@ import path from "path";
 import os from "os";
 import { createLogger } from "./_core/logger.js";
 import { ENV } from "./_core/env";
+import { consumeCredits } from "./credit-service";
 const log = createLogger("VoiceRouter");
 
 // In-memory store for temporary audio files (id -> { filePath, mimeType, expires })
@@ -82,7 +83,9 @@ export const voiceRouter = router({
             message: result.error,
           });
         }
-        return { text: result.text, language: result.language, duration: result.duration };
+        // Deduct credits for voice transcription
+      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
+      return { text: result.text, language: result.language, duration: result.duration };
       }
 
       // External URL path (S3, etc.)
@@ -100,6 +103,8 @@ export const voiceRouter = router({
         });
       }
 
+      // Deduct credits for voice transcription
+      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
       return {
         text: result.text,
         language: result.language,

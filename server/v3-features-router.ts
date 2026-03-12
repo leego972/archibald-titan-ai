@@ -16,6 +16,7 @@ import { PROVIDERS } from "../shared/fetcher";
 import { invokeLLM } from "./_core/llm";
 import { getUserOpenAIKey } from "./user-secrets-router";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits } from "./credit-service";
 const log = createLogger("V3FeaturesRouter");
 
 // ─── Feature 1: Scheduled Auto-Sync ────────────────────────────────
@@ -231,6 +232,7 @@ export const schedulerRouter = router({
   triggerNow: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try { await consumeCredits(ctx.user.id, "fetch_action", "Manual sync trigger"); } catch {}
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -322,6 +324,7 @@ export const recommendationsRouter = router({
    * Generate fresh recommendations using AI analysis of the user's credential data.
    */
   generate: protectedProcedure.mutation(async ({ ctx }) => {
+    try { await consumeCredits(ctx.user.id, "ai_analysis", "AI fetch recommendations"); } catch {}
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;

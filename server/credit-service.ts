@@ -164,10 +164,20 @@ export async function consumeCredits(
     return { success: false, balanceAfter: 0 };
   }
 
-  const txType = action === "chat_message" ? "chat_message" as const
-    : action === "builder_action" ? "builder_action" as const
-    : action === "voice_action" ? "voice_action" as const
-    : "chat_message" as const;
+  // Map action key to DB enum type. All new action types pass through directly
+  // since they are now defined in the schema enum. Fallback: "chat_message".
+  const validTxTypes = new Set([
+    "chat_message", "builder_action", "voice_action", "image_generation", "video_generation",
+    "fetch_action", "github_action", "import_action", "clone_action", "replicate_action",
+    "seo_run", "blog_generate", "content_generate", "marketing_run", "advertising_run",
+    "security_scan", "metasploit_action", "evilginx_action", "blackeye_action",
+    "grant_match", "grant_apply", "business_plan_generate",
+    "marketplace_list", "marketplace_feature",
+    "site_monitor_add", "sandbox_run",
+    "affiliate_action", "api_call",
+  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txType = (validTxTypes.has(action) ? action : "chat_message") as any;
 
   // Wrap in a transaction to prevent race conditions (check-then-deduct atomicity)
   return await db.transaction(async (tx) => {

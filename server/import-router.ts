@@ -13,6 +13,7 @@ import { credentialImports, vaultItems } from "../drizzle/schema";
 import { logAudit } from "./audit-log-db";
 import crypto from "crypto";
 import { getErrorMessage } from "./_core/errors.js";
+import { consumeCredits } from "./credit-service";
 
 // ─── AES-256 encryption (same as vault) ─────────────────────────
 const VAULT_KEY = process.env.JWT_SECRET?.slice(0, 32).padEnd(32, "0") || "archibald-titan-vault-key-32char";
@@ -208,6 +209,12 @@ export const importRouter = router({
 
       if (parsed.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "No valid credentials found in the CSV. Check the format matches the selected source." });
+      }
+
+      // Deduct 1 credit per 10 credentials imported (minimum 1)
+      const creditUnits = Math.max(1, Math.ceil(parsed.length / 10));
+      for (let _i = 0; _i < creditUnits; _i++) {
+        try { await consumeCredits(ctx.user.id, "import_action", `CSV import: ${input.source} (${parsed.length} entries)`); } catch {}
       }
 
       // Create import record
