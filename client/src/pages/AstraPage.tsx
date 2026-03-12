@@ -484,7 +484,7 @@ function StatusTab() {
                   { label: "Astra API", value: status.data.astraRunning ? "Running" : "Stopped", ok: status.data.astraRunning },
                   { label: "Host", value: status.data.host, ok: true },
                   { label: "API Port", value: String(status.data.astraPort), ok: true },
-                  { label: "RabbitMQ", value: status.data.rabbitmqStatus?.includes("active") || status.data.rabbitmqStatus?.includes("running") ? "Active" : "Check required", ok: status.data.rabbitmqStatus?.includes("active") || status.data.rabbitmqStatus?.includes("running") },
+                  { label: "RabbitMQ", value: status.data.rabbitmqStatus?.includes("active") || status.data.rabbitmqStatus?.includes("running") ? "Active" : "Check required", ok: !!(status.data.rabbitmqStatus?.includes("active") || status.data.rabbitmqStatus?.includes("running")) },
                 ].map(item => (
                   <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/40">
                     <span className="text-xs text-muted-foreground">{item.label}</span>

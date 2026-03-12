@@ -180,7 +180,7 @@ export const argusRouter = router({
       } else {
         await db.insert(userSecrets).values({ userId: ctx.user.id, secretType: "__argus_ssh", encryptedValue: encrypted });
       }
-      await logAdminAction(ctx.user.id, "argus_save_connection", "security_tools", { host: input.host }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_save_connection", category: "security", details: { host: input.host }, ipAddress: ctx.req?.ip || "unknown" });
       return { success: true, message: "Argus server credentials saved" };
     }),
 
@@ -214,7 +214,7 @@ export const argusRouter = router({
       }
 
       const output = await execSSHCommand(ssh, installCmd, 300000);
-      await logAdminAction(ctx.user.id, "argus_install", "security_tools", { host: ssh.host, method: input.method }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_install", category: "security", details: { host: ssh.host, method: input.method }, ipAddress: ctx.req?.ip || "unknown" });
       return { success: output.includes("complete"), output, method: input.method };
     }),
 
@@ -263,7 +263,7 @@ export const argusRouter = router({
       target: z.string().min(1),
       threads: z.number().min(1).max(50).default(10),
       timeout: z.number().min(10).max(300).default(60),
-      extraOptions: z.record(z.string()).optional(),
+      extraOptions: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -286,7 +286,7 @@ export const argusRouter = router({
       const output = await execSSHCommand(ssh, argusCmd, (input.timeout + 15) * 1000);
       const duration = Date.now() - startTime;
 
-      await logAdminAction(ctx.user.id, "argus_run_module", "security_tools", { moduleId: input.moduleId, moduleName: moduleMeta.name, target: input.target, duration }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_run_module", category: "security", details: { moduleId: String(input.moduleId), moduleName: moduleMeta.name, target: input.target, duration: String(duration) }, ipAddress: ctx.req?.ip || "unknown" });
 
       return {
         moduleId: input.moduleId,
@@ -326,7 +326,7 @@ export const argusRouter = router({
         }
       }
 
-      await logAdminAction(ctx.user.id, "argus_batch_scan", "security_tools", { moduleCount: input.moduleIds.length, target: input.target }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_batch_scan", category: "security", details: { moduleCount: String(input.moduleIds.length), target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, target: input.target, totalModules: results.length, scannedAt: new Date().toISOString() };
     }),
 
@@ -344,7 +344,7 @@ export const argusRouter = router({
       const argusCmd = `cd /opt/argus 2>/dev/null || true && echo -e "set target ${input.target}\\nset threads ${input.threads}\\nrunall ${input.category}\\nexit" | timeout 300 python3 -m argus 2>&1 || echo -e "set target ${input.target}\\nrunall ${input.category}\\nexit" | timeout 300 argus 2>&1 || echo 'Category scan failed'`;
       const start = Date.now();
       const output = await execSSHCommand(ssh, argusCmd, 320000);
-      await logAdminAction(ctx.user.id, "argus_category_scan", "security_tools", { category: input.category, target: input.target, duration: Date.now() - start }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_category_scan", category: "security", details: { category: input.category, target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { category: input.category, target: input.target, output, duration: Date.now() - start, scannedAt: new Date().toISOString() };
     }),
 
@@ -371,7 +371,7 @@ export const argusRouter = router({
         }
       }
 
-      await logAdminAction(ctx.user.id, "argus_quick_recon", "security_tools", { target: input.target }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_quick_recon", category: "security", details: { target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, target: input.target, scannedAt: new Date().toISOString() };
     }),
 

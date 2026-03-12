@@ -156,7 +156,7 @@ export const cybermcpRouter = router({
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const credentials = Buffer.from(`${input.username}:${input.password}`).toString("base64");
       const result = await httpRequest(input.endpoint, input.method, { Authorization: `Basic ${credentials}` });
-      await logAdminAction(ctx.user.id, "cybermcp_basic_auth", "security_tools", { endpoint: input.endpoint, status: result.status }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_basic_auth", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return {
         status: result.status,
         responseTime: result.responseTime,
@@ -196,7 +196,7 @@ export const cybermcpRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const analysis = analyseJwt(input.token);
-      await logAdminAction(ctx.user.id, "cybermcp_jwt_check", "security_tools", { risk: analysis.risk, issueCount: analysis.issues.length }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_jwt_check", category: "security", details: { risk: analysis.risk }, ipAddress: ctx.req?.ip || "unknown" });
       return {
         header: analysis.header,
         payload: analysis.payload ? { ...analysis.payload, sub: analysis.payload.sub ? "[REDACTED]" : undefined } : null,
@@ -246,7 +246,7 @@ export const cybermcpRouter = router({
       }
 
       const vulnerableCount = tests.filter(t => t.vulnerable).length;
-      await logAdminAction(ctx.user.id, "cybermcp_auth_bypass", "security_tools", { endpoint: input.endpoint, vulnerableCount }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_auth_bypass", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { tests, vulnerableCount, endpoint: input.endpoint, overallRisk: vulnerableCount >= 2 ? "critical" : vulnerableCount === 1 ? "high" : "pass" };
     }),
 
@@ -256,7 +256,7 @@ export const cybermcpRouter = router({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
       paramName: z.string().default("id"),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -279,7 +279,7 @@ export const cybermcpRouter = router({
       }
 
       const vulnerableCount = results.filter(r => r.vulnerable).length;
-      await logAdminAction(ctx.user.id, "cybermcp_sql_injection", "security_tools", { endpoint: input.endpoint, vulnerableCount }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_sql_injection", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, vulnerableCount, endpoint: input.endpoint, risk: vulnerableCount > 0 ? "critical" : "pass", summary: vulnerableCount > 0 ? `SQL injection vulnerability detected — ${vulnerableCount} payloads triggered errors` : "No SQL injection vulnerabilities detected" };
     }),
 
@@ -289,7 +289,7 @@ export const cybermcpRouter = router({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET",),
       paramName: z.string().default("q"),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -312,7 +312,7 @@ export const cybermcpRouter = router({
       }
 
       const reflectedCount = results.filter(r => r.reflected).length;
-      await logAdminAction(ctx.user.id, "cybermcp_xss_check", "security_tools", { endpoint: input.endpoint, reflectedCount }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_xss_check", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, reflectedCount, endpoint: input.endpoint, risk: reflectedCount > 0 ? "high" : "pass", summary: reflectedCount > 0 ? `XSS: ${reflectedCount} payload(s) reflected — review CSP headers` : "No XSS reflection detected" };
     }),
 
@@ -321,7 +321,7 @@ export const cybermcpRouter = router({
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
       body: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -343,7 +343,7 @@ export const cybermcpRouter = router({
         findings.push({ type: "Verbose Server Error", severity: "medium", evidence: `HTTP ${res.status} with ${res.body.length} byte response body` });
       }
 
-      await logAdminAction(ctx.user.id, "cybermcp_sensitive_data", "security_tools", { endpoint: input.endpoint, findingCount: findings.length }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_sensitive_data", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { findings, findingCount: findings.length, status: res.status, endpoint: input.endpoint, risk: findings.some(f => f.severity === "critical") ? "critical" : findings.some(f => f.severity === "high") ? "high" : findings.length > 0 ? "medium" : "pass" };
     }),
 
@@ -352,7 +352,7 @@ export const cybermcpRouter = router({
     .input(z.object({
       endpoint: z.string().url(),
       paramName: z.string().default("file"),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -372,7 +372,7 @@ export const cybermcpRouter = router({
       }
 
       const vulnerableCount = results.filter(r => r.vulnerable).length;
-      await logAdminAction(ctx.user.id, "cybermcp_path_traversal", "security_tools", { endpoint: input.endpoint, vulnerableCount }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_path_traversal", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { results, vulnerableCount, endpoint: input.endpoint, risk: vulnerableCount > 0 ? "critical" : "pass" };
     }),
 
@@ -382,7 +382,7 @@ export const cybermcpRouter = router({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
       requestCount: z.number().min(5).max(50).default(20),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -406,7 +406,7 @@ export const cybermcpRouter = router({
 
       const rateLimitHeaders = ["x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset", "ratelimit-limit", "ratelimit-remaining"];
       const firstResponse = responses[0];
-      await logAdminAction(ctx.user.id, "cybermcp_rate_limit", "security_tools", { endpoint: input.endpoint, rateLimitDetected }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_rate_limit", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return {
         responses,
         rateLimitDetected,
@@ -440,7 +440,7 @@ export const cybermcpRouter = router({
       const score = Math.round((present / analysis.length) * 100);
       const criticalMissing = missing.filter(h => h.severity === "High").length;
 
-      await logAdminAction(ctx.user.id, "cybermcp_security_headers", "security_tools", { endpoint: input.endpoint, score, criticalMissing }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_security_headers", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return {
         headers: analysis,
         score,
@@ -461,7 +461,7 @@ export const cybermcpRouter = router({
       method: z.enum(["GET", "POST"]).default("GET"),
       authToken: z.string().optional(),
       paramName: z.string().default("id"),
-      headers: z.record(z.string()).optional(),
+      headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -513,7 +513,7 @@ export const cybermcpRouter = router({
       const risks = Object.values(scanResults).map((r: any) => r.risk).filter(Boolean);
       const overallRisk = risks.includes("critical") ? "critical" : risks.includes("high") ? "high" : risks.includes("medium") ? "medium" : "pass";
 
-      await logAdminAction(ctx.user.id, "cybermcp_full_scan", "security_tools", { endpoint: input.endpoint, overallRisk, duration: Date.now() - startTime }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.cybermcp_full_scan", category: "security", details: { endpoint: input.endpoint }, ipAddress: ctx.req?.ip || "unknown" });
       return { endpoint: input.endpoint, scanResults, overallRisk, duration: Date.now() - startTime, scannedAt: new Date().toISOString() };
     }),
 });

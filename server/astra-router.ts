@@ -137,7 +137,7 @@ export const astraRouter = router({
       } else {
         await db.insert(userSecrets).values({ userId: ctx.user.id, secretType: "__astra_ssh", encryptedValue: encrypted });
       }
-      await logAdminAction(ctx.user.id, "astra_save_connection", "security_tools", { host: input.host }, ctx.req?.ip || "unknown");
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_save_connection", category: "security", details: { host: input.host }, ipAddress: ctx.req?.ip || "unknown" });
       return { success: true, message: "Astra server credentials saved" };
     }),
 
@@ -154,7 +154,7 @@ export const astraRouter = router({
       "echo 'Astra installation complete'",
     ].join(" && ");
     const output = await execSSHCommand(ssh, installCmd, 180000);
-    await logAdminAction(ctx.user.id, "astra_install", "security_tools", { host: ssh.host }, ctx.req?.ip || "unknown");
+    await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_install", category: "security", details: { host: ssh.host }, ipAddress: ctx.req?.ip || "unknown" });
     return { success: output.includes("installation complete"), output };
   }),
 
@@ -177,7 +177,7 @@ export const astraRouter = router({
     ].join(" && ");
     const output = await execSSHCommand(ssh, startCmd, 60000);
     const running = output.trim().endsWith("200") || output.trim().endsWith("302");
-    await logAdminAction(ctx.user.id, "astra_start", "security_tools", { host: ssh.host, running }, ctx.req?.ip || "unknown");
+    await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_start", category: "security", details: { host: ssh.host, running: String(running) }, ipAddress: ctx.req?.ip || "unknown" });
     return { success: running, output, message: running ? `Astra started on port ${astraPort}` : "Astra may not have started — check logs" };
   }),
 
@@ -228,7 +228,7 @@ export const astraRouter = router({
       };
       const result = await astraApiCall(ssh, "/scan/", "POST", payload, 30000);
       if (result.data?.status && result.data.status !== "Failed") {
-        await logAdminAction(ctx.user.id, "astra_start_scan", "security_tools", { appname: input.appname, url: input.url, scanid: result.data.status }, ctx.req?.ip || "unknown");
+        await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_start_scan", category: "security", details: { appname: input.appname, url: input.url }, ipAddress: ctx.req?.ip || "unknown" });
         return { success: true, scanId: result.data.status, message: `Scan started for ${input.url}` };
       }
       throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to start scan — ensure Astra is running and the target URL is reachable" });
@@ -278,7 +278,7 @@ export const astraRouter = router({
       const payload = { collection_url: input.collectionUrl, appname: input.appname, auth_header: input.authHeader || "" };
       const result = await astraApiCall(ssh, "/scan/postman/", "POST", payload, 30000);
       if (result.data?.status && result.data.status !== "Failed") {
-        await logAdminAction(ctx.user.id, "astra_postman_scan", "security_tools", { appname: input.appname, collectionUrl: input.collectionUrl }, ctx.req?.ip || "unknown");
+        await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_postman_scan", category: "security", details: { appname: input.appname, collectionUrl: input.collectionUrl }, ipAddress: ctx.req?.ip || "unknown" });
         return { success: true, scanId: result.data.status, message: "Postman collection scan started" };
       }
       throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to start Postman scan" });
