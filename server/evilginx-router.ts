@@ -1,9 +1,15 @@
 /**
- * Evilginx Router — Backend tRPC endpoints for managing Evilginx
- * instances via SSH. Titan-tier exclusive feature.
+ * Evilginx Router — Backend tRPC endpoints for managing Evilginx3
+ * running locally on the Titan server. Titan-tier exclusive feature.
  *
- * Executes Evilginx CLI commands on the user's configured VPS
- * and returns parsed results.
+ * Commands are executed directly on the server via child_process.exec —
+ * no external VPS or SSH connection required. Evilginx3 must be installed
+ * on the same machine as the Titan backend.
+ *
+ * Binary resolution order:
+ *   1. EVILGINX_BIN env var (e.g. /opt/evilginx/evilginx)
+ *   2. /usr/local/bin/evilginx
+ *   3. evilginx  (PATH lookup)
  */
 
 import { z } from "zod";
@@ -13,73 +19,63 @@ import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { consumeCredits } from "./credit-service";
+import { exec as execCb } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
 
-// ─── SSH Execution Helper ─────────────────────────────────────────
+const execAsync = promisify(execCb);
 
-interface SSHConfig {
-  host: string;
-  port: number;
-  username: string;
-  password?: string;
-  privateKey?: string;
+// ─── Local Exec Helper ────────────────────────────────────────────
+
+function getEvilginxBin(): string {
+  if (process.env.EVILGINX_BIN) return process.env.EVILGINX_BIN;
+  if (fs.existsSync("/usr/local/bin/evilginx")) return "/usr/local/bin/evilginx";
+  return "evilginx";
 }
 
+/**
+ * Run an Evilginx CLI command locally on the Titan server.
+ * Evilginx3 is invoked in -developer mode so it doesn't need root
+ * and won't try to bind ports on startup.
+ */
 async function execEvilginxCommand(
-  ssh: SSHConfig,
   command: string,
   timeoutMs = 10000
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const conn = new SSHClient();
-    let output = "";
-    let errorOutput = "";
-    const timer = setTimeout(() => {
-      conn.end();
-      reject(new Error("SSH command timed out"));
-    }, timeoutMs);
+  const bin = getEvilginxBin();
+  // Sanitise the command — strip shell metacharacters to prevent injection
+  const safeCmd = command.replace(/[`$\\|;&><]/g, "");
+  // Pipe the command into evilginx interactive mode
+  const shell = `echo '${safeCmd.replace(/'/g, "'\\''")}' | ${bin} -developer 2>&1`;
+  try {
+    const { stdout, stderr } = await execAsync(shell, { timeout: timeoutMs });
+    return (stdout + (stderr ? "\n" + stderr : "")).trim();
+  } catch (err: any) {
+    // exec rejects on non-zero exit; still return any output collected
+    const out = (err.stdout || "") + (err.stderr || "");
+    if (out.trim()) return out.trim();
+    throw new Error(err.message || "Evilginx command failed");
+  }
+}
 
-    conn
-      .on("ready", () => {
-        // Send command to evilginx via its interactive shell
-        // We pipe the command through the evilginx binary
-        const cmd = `echo '${command.replace(/'/g, "'\\''")}' | sudo evilginx -developer 2>/dev/null || echo '${command.replace(/'/g, "'\\''")}' | evilginx -developer 2>/dev/null`;
-        conn.exec(cmd, (err: Error | undefined, stream: import('ssh2').ClientChannel) => {
-          if (err) {
-            clearTimeout(timer);
-            conn.end();
-            reject(err);
-            return;
-          }
-          stream
-            .on("close", () => {
-              clearTimeout(timer);
-              conn.end();
-              resolve(output.trim());
-            })
-            .on("data", (data: Buffer) => {
-              output += data.toString();
-            })
-            .stderr.on("data", (data: Buffer) => {
-              errorOutput += data.toString();
-            });
-        });
-      })
-      .on("error", (err: Error) => {
-        clearTimeout(timer);
-        reject(err);
-      })
-      .connect({
-        host: ssh.host,
-        port: ssh.port,
-        username: ssh.username,
-        password: ssh.password || undefined,
-        privateKey: ssh.privateKey || undefined,
-        readyTimeout: 5000,
-      });
-  });
+/** Check that the evilginx binary is present and executable */
+async function checkEvilginxInstalled(): Promise<{ installed: boolean; version: string; path: string }> {
+  const bin = getEvilginxBin();
+  try {
+    const { stdout } = await execAsync(`${bin} -version 2>&1 || ${bin} --version 2>&1`, { timeout: 5000 });
+    const version = stdout.trim().split("\n")[0] || "unknown";
+    return { installed: true, version, path: bin };
+  } catch {
+    // Try `which` as a fallback
+    try {
+      const { stdout } = await execAsync(`which ${bin} 2>/dev/null`, { timeout: 3000 });
+      return { installed: !!stdout.trim(), version: "unknown", path: stdout.trim() || bin };
+    } catch {
+      return { installed: false, version: "", path: bin };
+    }
+  }
 }
 
 // ─── Parse Helpers ────────────────────────────────────────────────
@@ -93,9 +89,7 @@ function parsePhishletList(raw: string): Array<{
 }> {
   const lines = raw.split("\n").filter((l) => l.trim());
   const results: any[] = [];
-  // Parse tabular output from `phishlets` command
   for (const line of lines) {
-    // Skip header/separator lines
     if (line.includes("---") || line.includes("phishlet") || line.startsWith(":")) continue;
     const parts = line.trim().split(/\s{2,}/);
     if (parts.length >= 2) {
@@ -181,78 +175,63 @@ function parseSessionList(raw: string): Array<{
 // ─── Router ───────────────────────────────────────────────────────
 
 export const evilginxRouter = router({
-  /**
-   * Test SSH connection to the Evilginx server
-   */
-  testConnection: protectedProcedure
-    .input(
-      z.object({
-        host: z.string().min(1),
-        port: z.number().default(22),
-        username: z.string().min(1),
-        password: z.string().optional(),
-        privateKey: z.string().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      try {
-        const result = await execEvilginxCommand(input, "config", 8000);
-        return { success: true, message: "Connected successfully", raw: result };
-      } catch (err: any) {
-        return { success: false, message: err.message || "Connection failed" };
-      }
-    }),
 
   /**
-   * Save SSH connection details for the user's Evilginx server
+   * Check whether Evilginx3 is installed on this server and return
+   * the binary path + version. Used by the UI to show connection status.
    */
-  saveConnection: protectedProcedure
-    .input(
-      z.object({
-        host: z.string().min(1),
-        port: z.number().default(22),
-        username: z.string().min(1),
-        password: z.string().optional(),
-        privateKey: z.string().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+  checkInstall: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+    return checkEvilginxInstalled();
+  }),
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+  /**
+   * "Connect" to the local server — verifies the binary is present and
+   * saves a local-mode marker so the UI knows the server is configured.
+   */
+  connectLocal: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
 
-      // Store as encrypted user secret
-      const configJson = encrypt(JSON.stringify(input));
+    const check = await checkEvilginxInstalled();
+    if (!check.installed) {
+      return {
+        success: false,
+        message: `Evilginx binary not found at '${check.path}'. Install Evilginx3 on this server or set the EVILGINX_BIN environment variable.`,
+      };
+    }
+
+    // Persist a local-mode marker so getConnection returns a result
+    const db = await getDb();
+    if (db) {
+      const marker = encrypt(JSON.stringify({ mode: "local", path: check.path, version: check.version }));
       const existing = await db
         .select()
         .from(userSecrets)
         .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
         .limit(1);
-
       if (existing.length > 0) {
         await db
           .update(userSecrets)
-          .set({ encryptedValue: configJson, updatedAt: new Date() })
+          .set({ encryptedValue: marker, updatedAt: new Date() })
           .where(eq(userSecrets.id, existing[0].id));
       } else {
         await db.insert(userSecrets).values({
           userId: ctx.user.id,
           secretType: "__evilginx_ssh",
-          label: "Evilginx SSH Config",
-          encryptedValue: configJson,
+          label: "Evilginx Local Config",
+          encryptedValue: marker,
         });
       }
+    }
 
-      return { success: true };
-    }),
+    return { success: true, message: `Connected — Evilginx found at ${check.path} (${check.version})` };
+  }),
 
   /**
-   * Get saved SSH connection (masked)
+   * Get saved connection info (local mode).
+   * Returns host="localhost" so the UI badge shows something meaningful.
    */
   getConnection: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
@@ -271,12 +250,18 @@ export const evilginxRouter = router({
 
     try {
       const config = JSON.parse(decrypt(result[0].encryptedValue));
+      // Support both legacy SSH records and new local-mode records
+      if (config.mode === "local") {
+        return { host: "localhost (this server)", port: 0, username: "local", hasPassword: false, hasPrivateKey: false, isLocal: true, version: config.version || "" };
+      }
       return {
         host: config.host,
         port: config.port,
         username: config.username,
         hasPassword: !!config.password,
         hasPrivateKey: !!config.privateKey,
+        isLocal: false,
+        version: "",
       };
     } catch {
       return null;
@@ -284,7 +269,24 @@ export const evilginxRouter = router({
   }),
 
   /**
-   * Execute any Evilginx command via SSH
+   * Disconnect — removes the saved connection marker.
+   */
+  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
+
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    await db
+      .delete(userSecrets)
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")));
+
+    return { success: true };
+  }),
+
+  /**
+   * Execute any Evilginx command locally
    */
   exec: protectedProcedure
     .input(z.object({ command: z.string().min(1) }))
@@ -292,21 +294,7 @@ export const evilginxRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "No Evilginx server configured. Please set up your SSH connection first." });
-      }
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, input.command);
+      const output = await execEvilginxCommand(input.command);
       await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: ${input.command.split(" ")[0]}`);
       return { output };
     }),
@@ -316,20 +304,7 @@ export const evilginxRouter = router({
   getConfig: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "config");
+    const output = await execEvilginxCommand("config");
     return { output };
   }),
 
@@ -347,18 +322,6 @@ export const evilginxRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.domain) commands.push(`config domain ${input.domain}`);
       if (input.ipv4) commands.push(`config ipv4 ${input.ipv4}`);
@@ -368,8 +331,7 @@ export const evilginxRouter = router({
 
       const results: string[] = [];
       for (const cmd of commands) {
-        const out = await execEvilginxCommand(sshConfig, cmd);
-        results.push(out);
+        results.push(await execEvilginxCommand(cmd));
       }
       return { output: results.join("\n") };
     }),
@@ -379,20 +341,7 @@ export const evilginxRouter = router({
   listPhishlets: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "phishlets");
+    const output = await execEvilginxCommand("phishlets");
     return { raw: output, phishlets: parsePhishletList(output) };
   }),
 
@@ -402,25 +351,13 @@ export const evilginxRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.hostname) commands.push(`phishlets hostname ${input.name} ${input.hostname}`);
       commands.push(`phishlets enable ${input.name}`);
 
       const results: string[] = [];
       for (const cmd of commands) {
-        results.push(await execEvilginxCommand(sshConfig, cmd));
+        results.push(await execEvilginxCommand(cmd));
       }
       return { output: results.join("\n") };
     }),
@@ -430,20 +367,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `phishlets disable ${input.name}`);
+      const output = await execEvilginxCommand(`phishlets disable ${input.name}`);
       return { output };
     }),
 
@@ -452,20 +376,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `phishlets hide ${input.name}`);
+      const output = await execEvilginxCommand(`phishlets hide ${input.name}`);
       return { output };
     }),
 
@@ -474,20 +385,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `phishlets hostname ${input.name} ${input.hostname}`);
+      const output = await execEvilginxCommand(`phishlets hostname ${input.name} ${input.hostname}`);
       return { output };
     }),
 
@@ -496,20 +394,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `phishlets get-hosts ${input.name}`);
+      const output = await execEvilginxCommand(`phishlets get-hosts ${input.name}`);
       return { output };
     }),
 
@@ -518,20 +403,7 @@ export const evilginxRouter = router({
   listLures: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "lures");
+    const output = await execEvilginxCommand("lures");
     return { raw: output, lures: parseLureList(output) };
   }),
 
@@ -540,20 +412,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures create ${input.phishlet}`);
+      const output = await execEvilginxCommand(`lures create ${input.phishlet}`);
       return { output };
     }),
 
@@ -568,20 +427,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures edit ${input.id} ${input.field} ${input.value}`);
+      const output = await execEvilginxCommand(`lures edit ${input.id} ${input.field} ${input.value}`);
       return { output };
     }),
 
@@ -590,20 +436,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures delete ${input.id}`);
+      const output = await execEvilginxCommand(`lures delete ${input.id}`);
       return { output };
     }),
 
@@ -612,20 +445,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures pause ${input.id} ${input.duration}`);
+      const output = await execEvilginxCommand(`lures pause ${input.id} ${input.duration}`);
       return { output };
     }),
 
@@ -634,20 +454,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures unpause ${input.id}`);
+      const output = await execEvilginxCommand(`lures unpause ${input.id}`);
       return { output };
     }),
 
@@ -656,20 +463,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `lures get-url ${input.id}`);
+      const output = await execEvilginxCommand(`lures get-url ${input.id}`);
       return { output };
     }),
 
@@ -678,20 +472,7 @@ export const evilginxRouter = router({
   listSessions: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "sessions");
+    const output = await execEvilginxCommand("sessions");
     return { raw: output, sessions: parseSessionList(output) };
   }),
 
@@ -700,20 +481,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `sessions ${input.id}`);
+      const output = await execEvilginxCommand(`sessions ${input.id}`);
       return { output };
     }),
 
@@ -722,20 +490,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `sessions delete ${input.id}`);
+      const output = await execEvilginxCommand(`sessions delete ${input.id}`);
       return { output };
     }),
 
@@ -744,20 +499,7 @@ export const evilginxRouter = router({
   getProxy: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "proxy");
+    const output = await execEvilginxCommand("proxy");
     return { output };
   }),
 
@@ -776,18 +518,6 @@ export const evilginxRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
 
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
       const commands: string[] = [];
       if (input.type) commands.push(`proxy type ${input.type}`);
       if (input.address) commands.push(`proxy address ${input.address}`);
@@ -798,7 +528,7 @@ export const evilginxRouter = router({
 
       const results: string[] = [];
       for (const cmd of commands) {
-        results.push(await execEvilginxCommand(sshConfig, cmd));
+        results.push(await execEvilginxCommand(cmd));
       }
       return { output: results.join("\n") };
     }),
@@ -808,20 +538,7 @@ export const evilginxRouter = router({
   getBlacklist: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-      .limit(1);
-
-    if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-    const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-    const output = await execEvilginxCommand(sshConfig, "blacklist");
+    const output = await execEvilginxCommand("blacklist");
     return { output };
   }),
 
@@ -830,20 +547,7 @@ export const evilginxRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx Management");
-
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const result = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__evilginx_ssh")))
-        .limit(1);
-
-      if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No server configured" });
-
-      const sshConfig = JSON.parse(decrypt(result[0].encryptedValue));
-      const output = await execEvilginxCommand(sshConfig, `blacklist ${input.mode}`);
+      const output = await execEvilginxCommand(`blacklist ${input.mode}`);
       return { output };
     }),
 });

