@@ -358,8 +358,8 @@ export async function processMonthlyRefill(userId: number): Promise<boolean> {
 // - Only applies to free tier users. Paid users already get generous allocations.
 // - The bonus resets each calendar month along with loginBonusThisMonth counter.
 
-const DAILY_LOGIN_BONUS_AMOUNT = 5;
-const MONTHLY_LOGIN_BONUS_CAP = 150;
+const DAILY_LOGIN_BONUS_AMOUNT = 50;
+const MONTHLY_LOGIN_BONUS_CAP = 1500;
 
 export async function processDailyLoginBonus(userId: number): Promise<{ awarded: boolean; amount: number; monthlyTotal: number }> {
   const db = await getDb();
