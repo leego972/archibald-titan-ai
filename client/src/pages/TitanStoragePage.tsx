@@ -57,7 +57,7 @@ function PlanCard({
   onSelect,
   loading,
 }: {
-  plan: { id: string; label: string; bytes: number; price_monthly: number; features: string[] };
+  plan: { id: string; label: string; bytes: number; price_monthly: number; features: readonly string[] };
   isActive: boolean;
   onSelect: () => void;
   loading: boolean;

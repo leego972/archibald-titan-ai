@@ -2,6 +2,11 @@
  * Titan Storage Billing Router
  * Handles Stripe checkout, customer portal, and webhooks for storage subscriptions.
  * Registered as an Express route (not tRPC) for the Stripe webhook endpoint.
+ *
+ * Fixes applied:
+ *  - Stripe.CheckoutSession → Stripe.Checkout.Session (correct namespace)
+ *  - sub.current_period_end cast via (sub as any) — field exists at runtime
+ *    but is not on the TypeScript type in newer Stripe SDK versions
  */
 
 import Stripe from "stripe";
@@ -61,7 +66,9 @@ async function getOrCreateStoragePrice(planId: StoragePlanId): Promise<string> {
   }
 
   const prices = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
-  let price = prices.data.find(p => p.recurring?.interval === "month" && p.unit_amount === Math.round(plan.price_monthly * 100));
+  let price = prices.data.find(
+    p => p.recurring?.interval === "month" && p.unit_amount === Math.round(plan.price_monthly * 100)
+  );
   if (!price) {
     price = await stripe.prices.create({
       product: product.id,
@@ -78,10 +85,11 @@ async function getOrCreateStoragePrice(planId: StoragePlanId): Promise<string> {
 
 // ─── Get or create Stripe customer ───────────────────────────────────────
 
-async function getOrCreateStorageCustomer(userId: number, email: string, name?: string | null): Promise<string> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-
+async function getOrCreateStorageCustomer(
+  userId: number,
+  email: string,
+  name?: string | null
+): Promise<string> {
   const existing = await getStorageSubscription(userId);
   if (existing?.stripeCustomerId) return existing.stripeCustomerId;
 
@@ -111,10 +119,14 @@ export const storageBillingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const stripe = getStripe();
       const priceId = await getOrCreateStoragePrice(input.plan as StoragePlanId);
-      const customerId = await getOrCreateStorageCustomer(ctx.user.id, ctx.user.email ?? "", ctx.user.name);
+      const customerId = await getOrCreateStorageCustomer(
+        ctx.user.id,
+        ctx.user.email ?? "",
+        ctx.user.name
+      );
       const appUrl = process.env.APP_URL || "https://archibaldtitan.com";
 
-      // Check if user already has a storage subscription — if so, redirect to portal
+      // If user already has an active subscription, redirect to portal instead
       const existing = await getStorageSubscription(ctx.user.id);
       if (existing?.status === "active" && existing.stripeSubscriptionId) {
         const portal = await stripe.billingPortal.sessions.create({
@@ -175,8 +187,8 @@ const processedStorageEvents = new Set<string>();
 export function registerStorageWebhook(app: Express): void {
   app.post(
     "/api/storage/stripe-webhook",
-    // Note: body must be raw Buffer for Stripe signature verification
-    // Ensure this route is registered BEFORE express.json() middleware
+    // Note: body must be raw Buffer for Stripe signature verification.
+    // This route is registered BEFORE express.json() middleware in _core/index.ts
     async (req: Request, res: Response) => {
       const sig = req.headers["stripe-signature"];
       const webhookSecret = process.env.STRIPE_STORAGE_WEBHOOK_SECRET;
@@ -189,13 +201,17 @@ export function registerStorageWebhook(app: Express): void {
       let event: Stripe.Event;
       try {
         const stripe = getStripe();
-        event = stripe.webhooks.constructEvent(req.body as Buffer, sig as string, webhookSecret);
+        event = stripe.webhooks.constructEvent(
+          req.body as Buffer,
+          sig as string,
+          webhookSecret
+        );
       } catch (err) {
         log.error(`[StorageBilling] Webhook signature verification failed: ${err}`);
         return res.status(400).send(`Webhook Error: ${err}`);
       }
 
-      // Idempotency
+      // Idempotency guard
       if (processedStorageEvents.has(event.id)) {
         return res.json({ received: true, duplicate: true });
       }
@@ -223,7 +239,8 @@ async function handleStorageWebhookEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
 
     case "checkout.session.completed": {
-      const session = event.data.object as Stripe.CheckoutSession;
+      // Use Stripe.Checkout.Session (correct namespace — not Stripe.CheckoutSession)
+      const session = event.data.object as Stripe.Checkout.Session;
       const userId = parseInt(session.metadata?.titan_user_id ?? "0");
       const plan = session.metadata?.titan_storage_plan as StoragePlanId;
       if (!userId || !plan) break;
@@ -265,11 +282,15 @@ async function handleStorageWebhookEvent(event: Stripe.Event): Promise<void> {
       const status = sub.status as "active" | "canceled" | "past_due" | "incomplete" | "trialing";
       const planData = plan ? STORAGE_PLANS[plan] : null;
 
+      // current_period_end exists at runtime but may not be on the TS type in newer SDK
+      // versions — cast via any to avoid TS2339
+      const periodEnd = (sub as any).current_period_end as number | undefined;
+
       await db.update(storageSubscriptions)
         .set({
           status,
           ...(planData ? { plan, quotaBytes: planData.bytes } : {}),
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
           cancelAtPeriodEnd: sub.cancel_at_period_end,
         })
         .where(eq(storageSubscriptions.userId, userId));

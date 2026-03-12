@@ -3,15 +3,16 @@
  * Handles multipart file uploads and direct download URL generation.
  * Registered as Express routes alongside the tRPC middleware.
  *
+ * Uses busboy for multipart parsing (already in package.json + @types/busboy)
+ * instead of multer (not installed), matching the existing voice-router pattern.
+ *
  * Admin policy:
  *   - Admins bypass subscription checks entirely.
  *   - Admins can upload files without a storage plan.
  *   - Admins can download any user's file by ID.
- *   - Admin role is read from req.user.role (set by existing session middleware).
  */
 
 import type { Express, Request, Response } from "express";
-import multer from "multer";
 import { createLogger } from "./_core/logger.js";
 import {
   uploadFile,
@@ -22,17 +23,11 @@ import { isAdminRole } from "../shared/const";
 
 const log = createLogger("StorageUploadHandler");
 
-// ─── Multer (memory storage, 500 MB limit) ────────────────────────────────────
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB max per file
-});
+const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500 MB
 
 // ─── Auth Helper ──────────────────────────────────────────────────────────────
 
 function getUserFromRequest(req: Request): { id: number; role: string } | null {
-  // The existing Titan session middleware attaches the user to req.user
   const user = (req as any).user;
   if (user?.id) return { id: user.id, role: user.role ?? "" };
   return null;
@@ -44,13 +39,12 @@ export function registerStorageUploadRoutes(app: Express): void {
 
   /**
    * POST /api/storage/upload
-   * Multipart file upload.
+   * Multipart file upload using busboy.
    * - Regular users: require active storage subscription.
    * - Admins: bypass subscription check entirely.
    */
   app.post(
     "/api/storage/upload",
-    upload.single("file"),
     async (req: Request, res: Response) => {
       try {
         const user = getUserFromRequest(req);
@@ -70,42 +64,106 @@ export function registerStorageUploadRoutes(app: Express): void {
           }
         }
 
-        if (!req.file) {
-          return res.status(400).json({ message: "No file provided" });
+        const contentType = req.headers["content-type"] || "";
+        if (!contentType.includes("multipart/form-data")) {
+          return res.status(400).json({ message: "Expected multipart/form-data" });
         }
 
-        const feature = (req.body.feature as string) || "generic";
-        const featureResourceId = req.body.featureResourceId as string | undefined;
-        const tags = req.body.tags ? JSON.parse(req.body.tags) : undefined;
-
-        const file = await uploadFile(
-          user.id,
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype,
-          { feature: feature as any, featureResourceId, tags },
-          user.role
-        );
-
-        log.info(
-          `[StorageUpload] ${isAdmin ? "[ADMIN]" : ""} User ${user.id} uploaded ` +
-          `${req.file.originalname} (${req.file.size} bytes)`
-        );
-
-        return res.json({
-          success: true,
-          file: {
-            id: file.id,
-            originalName: file.originalName,
-            mimeType: file.mimeType,
-            sizeBytes: file.sizeBytes,
-            feature: file.feature,
-            createdAt: file.createdAt,
-          },
+        // Parse multipart with busboy (same pattern as voice-router.ts)
+        const busboy = await import("busboy");
+        const bb = busboy.default({
+          headers: req.headers,
+          limits: { fileSize: MAX_UPLOAD_SIZE },
         });
+
+        return new Promise<void>((resolve) => {
+          let fileBuffer: Buffer | null = null;
+          let fileName = "upload";
+          let fileMimeType = "application/octet-stream";
+          let feature = "generic";
+          let featureResourceId: string | undefined;
+          let tags: string[] | undefined;
+
+          // Collect field values
+          bb.on("field", (name: string, value: string) => {
+            if (name === "feature") feature = value;
+            if (name === "featureResourceId") featureResourceId = value;
+            if (name === "tags") {
+              try { tags = JSON.parse(value); } catch { /* ignore */ }
+            }
+          });
+
+          // Collect file bytes
+          bb.on(
+            "file",
+            (
+              _fieldname: string,
+              file: NodeJS.ReadableStream,
+              info: { filename: string; encoding: string; mimeType: string }
+            ) => {
+              const chunks: Buffer[] = [];
+              fileMimeType = info.mimeType || "application/octet-stream";
+              fileName = info.filename || "upload";
+              file.on("data", (chunk: Buffer) => chunks.push(chunk));
+              file.on("end", () => { fileBuffer = Buffer.concat(chunks); });
+            }
+          );
+
+          bb.on("finish", async () => {
+            if (!fileBuffer) {
+              res.status(400).json({ message: "No file provided" });
+              return resolve();
+            }
+            if (fileBuffer.length > MAX_UPLOAD_SIZE) {
+              res.status(413).json({ message: "File exceeds 500 MB limit" });
+              return resolve();
+            }
+
+            try {
+              const file = await uploadFile(
+                user.id,
+                fileBuffer,
+                fileName,
+                fileMimeType,
+                { feature: feature as any, featureResourceId, tags },
+                user.role
+              );
+
+              log.info(
+                `[StorageUpload] ${isAdmin ? "[ADMIN]" : ""} User ${user.id} uploaded ` +
+                `${fileName} (${fileBuffer.length} bytes)`
+              );
+
+              res.json({
+                success: true,
+                file: {
+                  id: file.id,
+                  originalName: file.originalName,
+                  mimeType: file.mimeType,
+                  sizeBytes: file.sizeBytes,
+                  feature: file.feature,
+                  createdAt: file.createdAt,
+                },
+              });
+            } catch (err: any) {
+              log.error(`[StorageUpload] Upload error: ${err.message}`);
+              res.status(400).json({ message: err.message || "Upload failed" });
+            }
+            resolve();
+          });
+
+          bb.on("error", (err: Error) => {
+            log.error(`[StorageUpload] Busboy error: ${err.message}`);
+            res.status(500).json({ message: "Failed to process upload" });
+            resolve();
+          });
+
+          req.pipe(bb);
+        });
+
       } catch (err: any) {
-        log.error(`[StorageUpload] Upload error: ${err.message}`);
-        return res.status(400).json({ message: err.message || "Upload failed" });
+        log.error(`[StorageUpload] Unexpected error: ${err.message}`);
+        return res.status(500).json({ message: err.message || "Internal error" });
       }
     }
   );
@@ -162,7 +220,7 @@ export function registerStorageUploadRoutes(app: Express): void {
         const limit = Math.min(parseInt(req.query.limit as string) || 200, 500);
         const offset = parseInt(req.query.offset as string) || 0;
 
-        const conditions: any[] = [eq(storageFiles.isDeleted, false)];
+        const conditions: ReturnType<typeof eq>[] = [eq(storageFiles.isDeleted, false)];
         if (userId && !isNaN(userId)) conditions.push(eq(storageFiles.userId, userId));
 
         const files = await db

@@ -22,7 +22,7 @@
  * - This pricing structure naturally pushes heavy users toward upgrading.
  */
 
-export type PlanId = "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
+export type PlanId = "free" | "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
 
 export interface PricingTier {
   id: PlanId;
@@ -494,6 +494,7 @@ export function detectCloneComplexity(pageCount: number, hasPayments: boolean, h
 export interface ComparisonFeature {
   name: string;
   category: string;
+  free?: string | boolean;
   pro: string | boolean;
   enterprise: string | boolean;
   cyber: string | boolean;

@@ -42,7 +42,7 @@ interface TierLimits {
   maxConcurrentBuilds: number;
 }
 
-const TIER_LIMITS: Record<PlanId, TierLimits> = {
+const TIER_LIMITS: Record<string, TierLimits> = {
   free:        { rpm: 6,   maxConcurrentBuilds: 1  },
   pro:         { rpm: 20,  maxConcurrentBuilds: 3  },
   enterprise:  { rpm: 60,  maxConcurrentBuilds: 5  },
@@ -217,6 +217,6 @@ export function getRateLimiterStatus(): {
 /**
  * Get the tier limits configuration (for frontend display).
  */
-export function getTierLimits(): Record<PlanId, TierLimits> {
+export function getTierLimits(): Record<string, TierLimits> {
   return { ...TIER_LIMITS };
 }
