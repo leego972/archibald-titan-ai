@@ -17,10 +17,10 @@ describe("CREDIT_COSTS", () => {
   it("builder_action costs 50 credits", () => {
     expect(CREDIT_COSTS.builder_action).toBe(50);
   });
-  it("clone_action is the most expensive at 500 credits", () => {
+  it("clone_action is the most expensive at 1000 credits", () => {
     const maxCost = Math.max(...Object.values(CREDIT_COSTS));
     expect(CREDIT_COSTS.clone_action).toBe(maxCost);
-    expect(maxCost).toBe(500);
+    expect(maxCost).toBe(1000);
   });
   it("all credit costs are positive integers", () => {
     for (const [action, cost] of Object.entries(CREDIT_COSTS)) {

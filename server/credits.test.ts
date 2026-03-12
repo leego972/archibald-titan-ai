@@ -14,8 +14,8 @@ describe("Credit System — Pricing Configuration", () => {
   });
   it("pro tier has correct credit allocations", () => {
     const pro = PRICING_TIERS.find((t) => t.id === "pro")!;
-    expect(pro.credits.monthlyAllocation).toBe(500);
-    expect(pro.credits.signupBonus).toBe(100);
+    expect(pro.credits.monthlyAllocation).toBe(50000);
+    expect(pro.credits.signupBonus).toBe(1000);
     expect(pro.monthlyPrice).toBe(29);
   });
   it("enterprise tier has higher credit allocations than pro", () => {
@@ -56,11 +56,11 @@ describe("Credit System — Credit Costs", () => {
     expect(CREDIT_COSTS.builder_action).toBe(50);
     expect(CREDIT_COSTS.builder_action).toBeGreaterThan(CREDIT_COSTS.chat_message);
   });
-  it("voice action costs 30 credits", () => {
-    expect(CREDIT_COSTS.voice_action).toBe(30);
+  it("voice action costs 25 credits", () => {
+    expect(CREDIT_COSTS.voice_action).toBe(25);
   });
-  it("fetch action costs 20 credits", () => {
-    expect(CREDIT_COSTS.fetch_action).toBe(20);
+  it("fetch action costs 5 credits", () => {
+    expect(CREDIT_COSTS.fetch_action).toBe(5);
   });
   it("all costs are positive integers", () => {
     for (const [, cost] of Object.entries(CREDIT_COSTS)) {
@@ -131,16 +131,16 @@ describe("Credit System — Balance Logic", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     let proBalance = 10;
     proBalance += proTier.credits.monthlyAllocation;
-    expect(proBalance).toBe(510);
+    expect(proBalance).toBe(50010);
     let entBalance = 10;
     entBalance += entTier.credits.monthlyAllocation;
-    expect(entBalance).toBe(5010);
+    expect(entBalance).toBe(250010);
   });
   it("signup bonus is applied correctly per tier", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
-    expect(proTier.credits.signupBonus).toBe(100);
-    expect(entTier.credits.signupBonus).toBe(500);
+    expect(proTier.credits.signupBonus).toBe(1000);
+    expect(entTier.credits.signupBonus).toBe(5000);
   });
 });
 // ─── Desktop License Logic Tests ─────────────────────────────────────
@@ -185,23 +185,23 @@ describe("Credit System — Desktop License Logic", () => {
 });
 // ─── Integration-style Tests ─────────────────────────────────────────
 describe("Credit System — Integration Scenarios", () => {
-  it("pro user can send ~50 chat messages per month", () => {
+  it("pro user can send ~5000 chat messages per month", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     const chatCost = CREDIT_COSTS.chat_message;
     const messagesPerMonth = Math.floor(proTier.credits.monthlyAllocation / chatCost);
-    expect(messagesPerMonth).toBe(50);
+    expect(messagesPerMonth).toBe(5000);
   });
-  it("enterprise user can send ~500 chat messages per month", () => {
+  it("enterprise user can send ~25000 chat messages per month", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     const chatCost = CREDIT_COSTS.chat_message;
     const messagesPerMonth = Math.floor(entTier.credits.monthlyAllocation / chatCost);
-    expect(messagesPerMonth).toBe(500);
+    expect(messagesPerMonth).toBe(25000);
   });
-  it("pro user can do ~10 builder actions per month", () => {
+  it("pro user can do ~1000 builder actions per month", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     const builderCost = CREDIT_COSTS.builder_action;
     const actionsPerMonth = Math.floor(proTier.credits.monthlyAllocation / builderCost);
-    expect(actionsPerMonth).toBe(10);
+    expect(actionsPerMonth).toBe(1000);
   });
   it("credit pack purchase adds correct amount", () => {
     const pack = CREDIT_PACKS.find((p) => p.id === "pack_500")!;
@@ -211,13 +211,14 @@ describe("Credit System — Integration Scenarios", () => {
   });
   it("mixed usage scenario: chat + builder within pro tier", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
-    let balance = proTier.credits.monthlyAllocation; // 500
-    balance -= 10 * CREDIT_COSTS.chat_message; // -100
-    expect(balance).toBe(400);
-    balance -= 4 * CREDIT_COSTS.builder_action; // -200
-    expect(balance).toBe(200);
-    balance -= 3 * CREDIT_COSTS.voice_action; // -90
-    expect(balance).toBe(110);
+    // Pro = 50,000 credits/month
+    let balance = proTier.credits.monthlyAllocation; // 50,000
+    balance -= 10 * CREDIT_COSTS.chat_message;       // -100  → 49,900
+    expect(balance).toBe(49900);
+    balance -= 4 * CREDIT_COSTS.builder_action;      // -200  → 49,700
+    expect(balance).toBe(49700);
+    balance -= 3 * CREDIT_COSTS.voice_action;        // -75   → 49,625
+    expect(balance).toBe(49625);
     expect(balance >= CREDIT_COSTS.builder_action).toBe(true);
     expect(balance >= CREDIT_COSTS.chat_message).toBe(true);
   });
