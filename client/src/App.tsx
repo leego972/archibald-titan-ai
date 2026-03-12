@@ -109,6 +109,11 @@ import MetasploitPage from "./pages/MetasploitPage";
 // Content Creator
 import ContentCreatorPage from "./pages/ContentCreatorPage";
 
+// Security Tools
+import CyberMCPPage from "./pages/CyberMCPPage";
+import AstraPage from "./pages/AstraPage";
+import ArgusPage from "./pages/ArgusPage";
+
 
 function DashboardRouter() {
   return (
@@ -194,6 +199,11 @@ function DashboardRouter() {
         {/* Content Creator */}
         <Route path="/content-creator" component={ContentCreatorPage} />
 
+        {/* Security Tools */}
+        <Route path="/cybermcp" component={CyberMCPPage} />
+        <Route path="/astra" component={AstraPage} />
+        <Route path="/argus" component={ArgusPage} />
+
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
@@ -257,6 +267,9 @@ function Router() {
       <Route path="/blackeye" component={DashboardRouter} />
       <Route path="/metasploit" component={DashboardRouter} />
       <Route path="/content-creator" component={DashboardRouter} />
+      <Route path="/cybermcp" component={DashboardRouter} />
+      <Route path="/astra" component={DashboardRouter} />
+      <Route path="/argus" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

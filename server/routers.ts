@@ -49,6 +49,9 @@ import { blackeyeRouter } from "./blackeye-router";
 import { metasploitRouter } from "./metasploit-router";
 import { filesRouter } from "./api/files";
 import { contentCreatorRouter } from "./content-creator-router";
+import { cybermcpRouter } from "./cybermcp-router";
+import { astraRouter } from "./astra-router";
+import { argusRouter } from "./argus-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -123,6 +126,9 @@ export const appRouter = router({
   blackeye: blackeyeRouter,
   metasploit: metasploitRouter,
   contentCreator: contentCreatorRouter,
+  cyberMcp: cybermcpRouter,
+  astra: astraRouter,
+  argus: argusRouter,
 });
 
 export type AppRouter = typeof appRouter;

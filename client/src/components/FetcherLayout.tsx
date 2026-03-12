@@ -139,6 +139,9 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
       { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
       { icon: featureIcon("icon_16_r2c8"), label: "LinkenSphere", path: "/linken-sphere", isNew: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "CyberMCP", path: "/cybermcp", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_18_r3c2"), label: "Astra API Scanner", path: "/astra", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "Argus OSINT", path: "/argus", isCyber: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
