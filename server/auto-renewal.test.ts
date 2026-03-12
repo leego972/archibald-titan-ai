@@ -24,26 +24,32 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
 
   it("auto-renewal refills correct credits per plan tier", () => {
     const plans: PlanId[] = ["pro", "enterprise", "cyber"];
-    const expectedAllocations: Record<string, number> = { free: 50, pro: 500, enterprise: 5000, cyber: 75000 };
-
+    // Use actual values from PRICING_TIERS — no hardcoding
     for (const planId of plans) {
       const tier = PRICING_TIERS.find((t) => t.id === planId)!;
-      expect(tier.credits.monthlyAllocation).toBe(expectedAllocations[planId]);
+      expect(tier.credits.monthlyAllocation).toBeGreaterThan(0);
+      // Pro >= 50000, Enterprise >= 250000, Cyber >= 750000
     }
+    const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
+    const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
+    const cyberTier = PRICING_TIERS.find((t) => t.id === "cyber")!;
+    expect(proTier.credits.monthlyAllocation).toBe(50000);
+    expect(entTier.credits.monthlyAllocation).toBe(250000);
+    expect(cyberTier.credits.monthlyAllocation).toBe(750000);
   });
 
-  it("pro plan auto-renewal adds exactly 500 credits", () => {
+  it("pro plan auto-renewal adds exactly 50000 credits", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
     let balance = 50; // some remaining credits
     balance += proTier.credits.monthlyAllocation;
-    expect(balance).toBe(550); // remaining + refill
+    expect(balance).toBe(50050); // remaining + refill
   });
 
-  it("enterprise plan auto-renewal adds exactly 5000 credits", () => {
+  it("enterprise plan auto-renewal adds exactly 250000 credits", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     let balance = 200;
     balance += entTier.credits.monthlyAllocation;
-    expect(balance).toBe(5200);
+    expect(balance).toBe(250200);
   });
 });
 
@@ -305,16 +311,16 @@ describe("Desktop Login — Authentication Flow", () => {
 describe("Auto-Renewal Billing — Initial Checkout Credits", () => {
   it("new pro subscription grants initial monthly allocation", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
-    let balance = proTier.credits.signupBonus; // signup bonus (pro tier)
-    balance += proTier.credits.monthlyAllocation;
-    expect(balance).toBe(600);
+    let balance = proTier.credits.signupBonus; // signup bonus (pro tier = 1000)
+    balance += proTier.credits.monthlyAllocation; // + 50000
+    expect(balance).toBe(51000);
   });
 
   it("new enterprise subscription grants initial monthly allocation", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
-    let balance = 500; // enterprise signup bonus
-    balance += entTier.credits.monthlyAllocation;
-    expect(balance).toBe(5500);
+    let balance = entTier.credits.signupBonus; // enterprise signup bonus = 5000
+    balance += entTier.credits.monthlyAllocation; // + 250000
+    expect(balance).toBe(255000);
   });
 
   it("free plan checkout does not happen (no Stripe checkout for free)", () => {
@@ -331,51 +337,51 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
     // Signup: get signup bonus
-    let balance = proTier.credits.signupBonus; // 100
-    expect(balance).toBe(100);
+    let balance = proTier.credits.signupBonus; // 1000
+    expect(balance).toBe(1000);
 
     // Initial checkout: get first month allocation
-    balance += proTier.credits.monthlyAllocation; // +500
-    expect(balance).toBe(600);
+    balance += proTier.credits.monthlyAllocation; // +50000
+    expect(balance).toBe(51000);
 
     // Use credits during month 1
     balance -= 20 * CREDIT_COSTS.chat_message; // -200
     balance -= 4 * CREDIT_COSTS.builder_action; // -200
-    expect(balance).toBe(200);
+    expect(balance).toBe(50600);
 
     // Auto-renewal: Stripe charges, invoice.paid fires, credits refilled
-    balance += proTier.credits.monthlyAllocation; // +500
-    expect(balance).toBe(700);
+    balance += proTier.credits.monthlyAllocation; // +50000
+    expect(balance).toBe(100600);
 
     // Use credits during month 2
     balance -= 15 * CREDIT_COSTS.chat_message; // -150
-    expect(balance).toBe(550);
+    expect(balance).toBe(100450);
   });
 
   it("user cancels mid-month: keeps remaining credits, no future refills", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
-    let balance = proTier.credits.monthlyAllocation; // 500
+    let balance = proTier.credits.monthlyAllocation; // 50000
     balance -= 10 * CREDIT_COSTS.chat_message; // -100
-    expect(balance).toBe(400);
+    expect(balance).toBe(49900);
 
     // User cancels — balance preserved
     const isCancelled = true;
     // No balance change
-    expect(balance).toBe(400);
+    expect(balance).toBe(49900);
 
     // Next month: no refill because cancelled
     const shouldRefill = !isCancelled;
     expect(shouldRefill).toBe(false);
-    // Balance stays at 400 until used up
-    expect(balance).toBe(400);
+    // Balance stays at 49900 until used up
+    expect(balance).toBe(49900);
   });
 
   it("downgrade from enterprise to pro: immediate charge, plan updates", () => {
     const entTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
-    let balance = entTier.credits.monthlyAllocation; // 5000
+    let balance = entTier.credits.monthlyAllocation; // 250000
     balance -= 1000; // used some
 
     // Downgrade happens — Stripe charges proration immediately
@@ -384,11 +390,11 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     expect(plan).toBe("pro");
 
     // Balance is preserved (not reduced)
-    expect(balance).toBe(4000);
+    expect(balance).toBe(249000);
 
     // Next renewal: pro allocation instead of enterprise
-    balance += proTier.credits.monthlyAllocation; // +500
-    expect(balance).toBe(4500);
+    balance += proTier.credits.monthlyAllocation; // +50000
+    expect(balance).toBe(299000);
   });
 
   it("payment failure: credits preserved, no refill until resolved", () => {

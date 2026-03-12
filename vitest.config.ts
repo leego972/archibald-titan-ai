@@ -10,6 +10,8 @@ export default defineConfig({
       "@": path.resolve(templateRoot, "client", "src"),
       "@shared": path.resolve(templateRoot, "shared"),
       "@assets": path.resolve(templateRoot, "attached_assets"),
+      // Mock ssh2 (native addon used by evilginx-router, not installed in CI)
+      "ssh2": path.resolve(templateRoot, "server/__mocks__/ssh2.ts"),
     },
   },
   test: {
