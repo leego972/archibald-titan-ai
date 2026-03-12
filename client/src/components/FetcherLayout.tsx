@@ -114,7 +114,6 @@ const menuGroups: MenuGroup[] = [
     title: "Developer Tools",
     items: [
       { icon: () => <TitanLogo size="sm" />, label: "Titan Builder", path: "/dashboard" },
-      { icon: featureIcon("icon_02_r1c2"), label: "Clone Website", path: "/replicate", isNew: true, premiumOnly: true },
       { icon: featureIcon("icon_41_r6c1"), label: "Sandbox", path: "/sandbox", isNew: true },
       { icon: featureIcon("icon_04_r1c4"), label: "My Projects", path: "/project-files", isNew: true },
       { icon: featureIcon("icon_05_r1c5"), label: "Smart Fetch AI", path: "/fetcher/smart-fetch" },
@@ -148,6 +147,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Specialised",
     items: [
+      { icon: featureIcon("icon_02_r1c2"), label: "Clone Website", path: "/replicate", isNew: true, premiumOnly: true },
       { icon: featureIcon("icon_15_r2c7"), label: "Evilginx 3", path: "/evilginx", titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "BlackEye", path: "/blackeye", titanOnly: true },
       { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
