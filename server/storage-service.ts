@@ -2,6 +2,12 @@
  * Titan Storage Service
  * Core business logic for per-user cloud storage.
  * Integrates with the existing storage.ts S3 utilities.
+ *
+ * Admin policy:
+ *   - Admins (role === 'admin' | 'head_admin') have UNLIMITED storage.
+ *   - No subscription is required for admins.
+ *   - Quota checks are completely bypassed for admins.
+ *   - Admins can access, download, and delete any user's files.
  */
 
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -15,12 +21,37 @@ import {
   type StorageSubscription,
   type StorageFile,
 } from "../drizzle/storage-schema";
+import { isAdminRole } from "../shared/const";
 import crypto from "crypto";
 import { createLogger } from "./_core/logger.js";
 
 const log = createLogger("StorageService");
 
-// ─── Plan Definitions ────────────────────────────────────────────────────
+// ─── Admin Sentinel ──────────────────────────────────────────────────────────
+// A virtual subscription returned for admin users — unlimited quota, always active.
+
+const ADMIN_UNLIMITED_QUOTA = Number.MAX_SAFE_INTEGER; // ~9 PB effective limit
+
+export function buildAdminSubscription(userId: number): StorageSubscription {
+  return {
+    id: -1,
+    userId,
+    plan: "admin_unlimited" as any,
+    quotaBytes: ADMIN_UNLIMITED_QUOTA,
+    usedBytes: 0,
+    status: "active",
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripePriceId: null,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as StorageSubscription;
+}
+
+// ─── Plan Definitions ────────────────────────────────────────────────────────
 
 export const STORAGE_PLANS = {
   "10gb": {
@@ -88,9 +119,21 @@ export const STORAGE_PLANS = {
 
 export type StoragePlanId = keyof typeof STORAGE_PLANS;
 
-// ─── Subscription Helpers ────────────────────────────────────────────────
+// ─── Subscription Helpers ────────────────────────────────────────────────────
 
-export async function getStorageSubscription(userId: number): Promise<StorageSubscription | null> {
+/**
+ * Returns the user's storage subscription.
+ * For admins, returns a virtual unlimited subscription without a DB lookup.
+ */
+export async function getStorageSubscription(
+  userId: number,
+  userRole?: string | null
+): Promise<StorageSubscription | null> {
+  // Admin bypass — unlimited, always active
+  if (isAdminRole(userRole)) {
+    return buildAdminSubscription(userId);
+  }
+
   const db = await getDb();
   if (!db) return null;
   const rows = await db
@@ -101,12 +144,37 @@ export async function getStorageSubscription(userId: number): Promise<StorageSub
   return rows[0] ?? null;
 }
 
-export async function hasActiveStorageSubscription(userId: number): Promise<boolean> {
+/**
+ * Returns true if the user has an active storage subscription.
+ * Admins always return true.
+ */
+export async function hasActiveStorageSubscription(
+  userId: number,
+  userRole?: string | null
+): Promise<boolean> {
+  if (isAdminRole(userRole)) return true;
   const sub = await getStorageSubscription(userId);
   return sub?.status === "active" || sub?.status === "trialing";
 }
 
-export async function getStorageQuota(userId: number): Promise<{ used: number; quota: number; available: number }> {
+export async function getStorageQuota(
+  userId: number,
+  userRole?: string | null
+): Promise<{ used: number; quota: number; available: number }> {
+  if (isAdminRole(userRole)) {
+    // Admins: show real used bytes but unlimited quota
+    const db = await getDb();
+    let usedBytes = 0;
+    if (db) {
+      const [row] = await db
+        .select({ total: sql<number>`COALESCE(SUM(sizeBytes), 0)` })
+        .from(storageFiles)
+        .where(and(eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false)));
+      usedBytes = Number(row?.total ?? 0);
+    }
+    return { used: usedBytes, quota: ADMIN_UNLIMITED_QUOTA, available: ADMIN_UNLIMITED_QUOTA };
+  }
+
   const sub = await getStorageSubscription(userId);
   if (!sub) return { used: 0, quota: 0, available: 0 };
   return {
@@ -116,42 +184,55 @@ export async function getStorageQuota(userId: number): Promise<{ used: number; q
   };
 }
 
-// ─── File Operations ─────────────────────────────────────────────────────
+// ─── File Operations ──────────────────────────────────────────────────────────
 
 export interface UploadOptions {
-  feature?: keyof typeof STORAGE_PLANS extends never ? string : "vault" | "builder" | "fetcher" | "scanner" | "webhook" | "export" | "generic";
+  feature?: "vault" | "builder" | "fetcher" | "scanner" | "webhook" | "export" | "generic";
   featureResourceId?: string;
   tags?: string[];
   originalName?: string;
 }
 
+/**
+ * Upload a file to S3 and record it in the database.
+ * Admins bypass all subscription and quota checks.
+ */
 export async function uploadFile(
   userId: number,
   data: Buffer | Uint8Array | string,
   filename: string,
   mimeType: string,
-  options: UploadOptions = {}
+  options: UploadOptions = {},
+  userRole?: string | null
 ): Promise<StorageFile> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  // Check subscription
-  const sub = await getStorageSubscription(userId);
-  if (!sub || sub.status !== "active") {
-    throw new Error("No active storage subscription. Please purchase a Titan Storage plan.");
+  const isAdmin = isAdminRole(userRole);
+
+  if (!isAdmin) {
+    // Regular user: require active subscription
+    const sub = await getStorageSubscription(userId);
+    if (!sub || sub.status !== "active") {
+      throw new Error("No active storage subscription. Please purchase a Titan Storage plan.");
+    }
+
+    const sizeBytes = typeof data === "string"
+      ? Buffer.byteLength(data, "utf8")
+      : (data as Buffer).length;
+
+    // Quota check
+    if (sub.usedBytes + sizeBytes > sub.quotaBytes) {
+      const available = sub.quotaBytes - sub.usedBytes;
+      throw new Error(
+        `Storage quota exceeded. Available: ${formatBytes(available)}, Required: ${formatBytes(sizeBytes)}`
+      );
+    }
   }
 
   const sizeBytes = typeof data === "string"
     ? Buffer.byteLength(data, "utf8")
     : (data as Buffer).length;
-
-  // Check quota
-  if (sub.usedBytes + sizeBytes > sub.quotaBytes) {
-    const available = sub.quotaBytes - sub.usedBytes;
-    throw new Error(
-      `Storage quota exceeded. Available: ${formatBytes(available)}, Required: ${formatBytes(sizeBytes)}`
-    );
-  }
 
   // Build S3 key: users/{userId}/{feature}/{timestamp}-{filename}
   const feature = options.feature || "generic";
@@ -161,7 +242,7 @@ export async function uploadFile(
 
   // Upload to S3
   const { url } = await storagePut(s3Key, data, mimeType, filename);
-  log.info(`[StorageService] Uploaded ${s3Key} (${formatBytes(sizeBytes)}) for user ${userId}`);
+  log.info(`[StorageService] ${isAdmin ? "[ADMIN]" : ""} Uploaded ${s3Key} (${formatBytes(sizeBytes)}) for user ${userId}`);
 
   // Insert file record
   const [result] = await db.insert(storageFiles).values({
@@ -176,11 +257,13 @@ export async function uploadFile(
     tags: options.tags ?? null,
   });
 
-  // Update used bytes
-  await db
-    .update(storageSubscriptions)
-    .set({ usedBytes: sql`usedBytes + ${sizeBytes}` })
-    .where(eq(storageSubscriptions.userId, userId));
+  // Update used bytes for regular users only (admin usage is not quota-tracked)
+  if (!isAdmin) {
+    await db
+      .update(storageSubscriptions)
+      .set({ usedBytes: sql`usedBytes + ${sizeBytes}` })
+      .where(eq(storageSubscriptions.userId, userId));
+  }
 
   // Fetch and return the created record
   const [file] = await db
@@ -192,14 +275,30 @@ export async function uploadFile(
   return file;
 }
 
-export async function getDownloadUrl(userId: number, fileId: number, expiresIn = 3600): Promise<{ url: string; file: StorageFile }> {
+/**
+ * Get a pre-signed download URL for a file.
+ * Admins can download any user's file (ownership check bypassed).
+ */
+export async function getDownloadUrl(
+  userId: number,
+  fileId: number,
+  expiresIn = 3600,
+  userRole?: string | null
+): Promise<{ url: string; file: StorageFile }> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  const isAdmin = isAdminRole(userRole);
+
+  // Admins can access any file; regular users only their own
+  const conditions = isAdmin
+    ? and(eq(storageFiles.id, fileId), eq(storageFiles.isDeleted, false))
+    : and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false));
 
   const [file] = await db
     .select()
     .from(storageFiles)
-    .where(and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false)))
+    .where(conditions)
     .limit(1);
 
   if (!file) throw new Error("File not found");
@@ -208,46 +307,73 @@ export async function getDownloadUrl(userId: number, fileId: number, expiresIn =
   return { url, file };
 }
 
+/**
+ * List files for a user.
+ * Admins can list any user's files, or all files across the platform.
+ */
 export async function listFiles(
   userId: number,
-  options: { feature?: string; limit?: number; offset?: number } = {}
+  options: { feature?: string; limit?: number; offset?: number; allUsers?: boolean } = {},
+  userRole?: string | null
 ): Promise<StorageFile[]> {
   const db = await getDb();
   if (!db) return [];
 
-  let query = db
-    .select()
-    .from(storageFiles)
-    .where(and(eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false)))
-    .orderBy(desc(storageFiles.createdAt))
-    .limit(options.limit ?? 100)
-    .offset(options.offset ?? 0);
+  const isAdmin = isAdminRole(userRole);
 
-  if (options.feature) {
-    query = db
+  // If admin requests all users' files (platform-wide view)
+  if (isAdmin && options.allUsers) {
+    const baseCondition = eq(storageFiles.isDeleted, false);
+    const condition = options.feature
+      ? and(baseCondition, eq(storageFiles.feature, options.feature as any))
+      : baseCondition;
+    return db
       .select()
       .from(storageFiles)
-      .where(and(
-        eq(storageFiles.userId, userId),
-        eq(storageFiles.isDeleted, false),
-        eq(storageFiles.feature, options.feature as any)
-      ))
+      .where(condition)
       .orderBy(desc(storageFiles.createdAt))
-      .limit(options.limit ?? 100)
+      .limit(options.limit ?? 500)
       .offset(options.offset ?? 0);
   }
 
-  return query;
+  // Normal per-user listing
+  const userCondition = and(eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false));
+  const condition = options.feature
+    ? and(userCondition, eq(storageFiles.feature, options.feature as any))
+    : userCondition;
+
+  return db
+    .select()
+    .from(storageFiles)
+    .where(condition)
+    .orderBy(desc(storageFiles.createdAt))
+    .limit(options.limit ?? 100)
+    .offset(options.offset ?? 0);
 }
 
-export async function deleteFile(userId: number, fileId: number): Promise<void> {
+/**
+ * Delete a file.
+ * Admins can delete any user's file (ownership check bypassed).
+ */
+export async function deleteFile(
+  userId: number,
+  fileId: number,
+  userRole?: string | null
+): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  const isAdmin = isAdminRole(userRole);
+
+  // Admins can delete any file; regular users only their own
+  const conditions = isAdmin
+    ? eq(storageFiles.id, fileId)
+    : and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId));
 
   const [file] = await db
     .select()
     .from(storageFiles)
-    .where(and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId)))
+    .where(conditions)
     .limit(1);
 
   if (!file) throw new Error("File not found");
@@ -259,11 +385,20 @@ export async function deleteFile(userId: number, fileId: number): Promise<void> 
     .set({ isDeleted: true, deletedAt: new Date() })
     .where(eq(storageFiles.id, fileId));
 
-  // Free up quota
-  await db
-    .update(storageSubscriptions)
-    .set({ usedBytes: sql`GREATEST(0, usedBytes - ${file.sizeBytes})` })
-    .where(eq(storageSubscriptions.userId, userId));
+  // Free up quota for the file's owner (not admin)
+  if (!isAdmin) {
+    await db
+      .update(storageSubscriptions)
+      .set({ usedBytes: sql`GREATEST(0, usedBytes - ${file.sizeBytes})` })
+      .where(eq(storageSubscriptions.userId, file.userId));
+  } else {
+    // Admin deleted a user's file — still reclaim quota from the owner's subscription
+    await db
+      .update(storageSubscriptions)
+      .set({ usedBytes: sql`GREATEST(0, usedBytes - ${file.sizeBytes})` })
+      .where(eq(storageSubscriptions.userId, file.userId));
+    log.info(`[StorageService] [ADMIN] Admin ${userId} deleted file ${fileId} (owner: ${file.userId})`);
+  }
 
   // Try to delete from S3 (best-effort)
   try {
@@ -273,21 +408,28 @@ export async function deleteFile(userId: number, fileId: number): Promise<void> 
   }
 }
 
-// ─── Share Links ─────────────────────────────────────────────────────────
+// ─── Share Links ──────────────────────────────────────────────────────────────
 
 export async function createShareLink(
   userId: number,
   fileId: number,
-  options: { expiresHours?: number; maxDownloads?: number; password?: string } = {}
+  options: { expiresHours?: number; maxDownloads?: number; password?: string } = {},
+  userRole?: string | null
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  // Verify file ownership
+  const isAdmin = isAdminRole(userRole);
+
+  // Admins can share any file; regular users only their own
+  const conditions = isAdmin
+    ? and(eq(storageFiles.id, fileId), eq(storageFiles.isDeleted, false))
+    : and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false));
+
   const [file] = await db
     .select()
     .from(storageFiles)
-    .where(and(eq(storageFiles.id, fileId), eq(storageFiles.userId, userId), eq(storageFiles.isDeleted, false)))
+    .where(conditions)
     .limit(1);
   if (!file) throw new Error("File not found");
 
@@ -300,7 +442,7 @@ export async function createShareLink(
     : null;
 
   await db.insert(storageShareLinks).values({
-    userId,
+    userId: file.userId, // always attribute to the file owner
     fileId,
     token,
     expiresAt,
@@ -312,15 +454,22 @@ export async function createShareLink(
   return { token, url: shareUrl, expires_at: expiresAt };
 }
 
-// ─── API Keys ────────────────────────────────────────────────────────────
+// ─── API Keys ─────────────────────────────────────────────────────────────────
 
 export async function createApiKey(
   userId: number,
   name: string,
-  scopes: string[]
+  scopes: string[],
+  userRole?: string | null
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  // Admins can create API keys without a subscription
+  if (!isAdminRole(userRole)) {
+    const active = await hasActiveStorageSubscription(userId);
+    if (!active) throw new Error("No active storage subscription.");
+  }
 
   const rawKey = `tsk_${crypto.randomBytes(32).toString("hex")}`;
   const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
@@ -360,10 +509,11 @@ export async function validateApiKey(rawKey: string): Promise<{ userId: number; 
   return { userId: apiKey.userId, scopes: (apiKey.scopes as string[]) };
 }
 
-// ─── Utility ─────────────────────────────────────────────────────────────
+// ─── Utility ──────────────────────────────────────────────────────────────────
 
 export function formatBytes(bytes: number): string {
   if (!bytes || bytes === 0) return "0 B";
+  if (bytes >= Number.MAX_SAFE_INTEGER - 1) return "Unlimited";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
