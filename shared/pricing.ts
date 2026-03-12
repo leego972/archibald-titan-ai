@@ -12,7 +12,7 @@
  *   upgrading the obvious better deal and drives conversions.
  *
  * TIER STRUCTURE:
- * Free → Pro → Enterprise → Cyber (public tiers)
+ * Pro → Enterprise → Cyber (public tiers)
  * Cyber+ and Titan are internal/enterprise tiers, not shown in the public pricing UI.
  *
  * UPGRADE INCENTIVE MATH:
@@ -22,7 +22,7 @@
  * - This pricing structure naturally pushes heavy users toward upgrading.
  */
 
-export type PlanId = "free" | "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
+export type PlanId = "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
 
 export interface PricingTier {
   id: PlanId;
@@ -48,43 +48,6 @@ export interface PricingTier {
 }
 
 export const PRICING_TIERS: PricingTier[] = [
-  // ─── STARTER ─────────────────────────────────────────────────────
-  {
-    id: "free",
-    name: "Starter",
-    tagline: "Everything you need to hit the ground running",
-    monthlyPrice: 500,
-    yearlyPrice: 5000,
-    highlighted: false,
-    cta: "Get Started",
-    features: [
-      "500 credits/month",
-      "Titan Builder (AI chat & code)",
-      "50 fetches per month",
-      "5 providers (AWS, Azure, GCP, DigitalOcean, Cloudflare)",
-      "AES-256 encrypted vault (100 credentials)",
-      "Basic stealth browser",
-      "JSON & .ENV export",
-      "Sandbox environment",
-      "My Projects (10 projects)",
-      "Grand Bazaar (browse only)",
-      "Browse Grants",
-      "Priority email support",
-    ],
-    limits: {
-      fetchesPerMonth: 50,
-      providers: 5,
-      credentialStorage: 100,
-      proxySlots: 1,
-      exportFormats: ["json", "env"],
-      support: "priority_email",
-    },
-    credits: {
-      monthlyAllocation: 500,
-      signupBonus: 250,
-    },
-  },
-
   // ─── PRO ─────────────────────────────────────────────────────────
   {
     id: "pro",
@@ -531,7 +494,6 @@ export function detectCloneComplexity(pageCount: number, hasPayments: boolean, h
 export interface ComparisonFeature {
   name: string;
   category: string;
-  free: string | boolean;
   pro: string | boolean;
   enterprise: string | boolean;
   cyber: string | boolean;
@@ -541,76 +503,76 @@ export interface ComparisonFeature {
 
 export const COMPARISON_FEATURES: ComparisonFeature[] = [
   // ── AI & Builder ─────────────────────────────────────────────
-  { name: "Monthly credits", category: "AI & Builder", free: "500", pro: "50,000", enterprise: "250,000", cyber: "750,000", cyber_plus: "3,000,000", titan: "10,000,000" },
-  { name: "Titan Builder (AI chat & code)", category: "AI & Builder", free: "Basic", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "Sandbox environment", category: "AI & Builder", free: true, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "My Projects", category: "AI & Builder", free: "3 projects", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "Clone Website", category: "AI & Builder", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "Custom AI model fine-tuning", category: "AI & Builder", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "Monthly credits", category: "AI & Builder", pro: "50,000", enterprise: "250,000", cyber: "750,000", cyber_plus: "3,000,000", titan: "10,000,000" },
+  { name: "Titan Builder (AI chat & code)", category: "AI & Builder", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "Sandbox environment", category: "AI & Builder", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "My Projects", category: "AI & Builder", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "Clone Website", category: "AI & Builder", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "Custom AI model fine-tuning", category: "AI & Builder", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
 
   // ── Credential Management ────────────────────────────────────
-  { name: "Fetches per month", category: "Credential Management", free: "5", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "Providers", category: "Credential Management", free: "3", pro: "15+", enterprise: "15+ & custom", cyber: "15+ & custom", cyber_plus: "15+ & custom", titan: "15+ & custom" },
-  { name: "Credential storage", category: "Credential Management", free: "25", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "Smart Fetch AI", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Proxy slots", category: "Credential Management", free: "0", pro: "5", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "CAPTCHA auto-solving", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Scheduled fetches & Auto-Sync", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Bulk Sync", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Credential History", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Expiry Watchdog", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Provider Health monitoring", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Provider Onboarding wizard", category: "Credential Management", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Export formats", category: "Credential Management", free: "JSON", pro: "JSON, .ENV, CSV", enterprise: "JSON, .ENV, CSV, API", cyber: "JSON, .ENV, CSV, API", cyber_plus: "JSON, .ENV, CSV, API", titan: "JSON, .ENV, CSV, API" },
-  { name: "Import credentials", category: "Credential Management", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Fetches per month", category: "Credential Management", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "Providers", category: "Credential Management", pro: "15+", enterprise: "15+ & custom", cyber: "15+ & custom", cyber_plus: "15+ & custom", titan: "15+ & custom" },
+  { name: "Credential storage", category: "Credential Management", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "Smart Fetch AI", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Proxy slots", category: "Credential Management", pro: "5", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "CAPTCHA auto-solving", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Scheduled fetches & Auto-Sync", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Bulk Sync", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Credential History", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Expiry Watchdog", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Provider Health monitoring", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Provider Onboarding wizard", category: "Credential Management", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Export formats", category: "Credential Management", pro: "JSON, .ENV, CSV", enterprise: "JSON, .ENV, CSV, API", cyber: "JSON, .ENV, CSV, API", cyber_plus: "JSON, .ENV, CSV, API", titan: "JSON, .ENV, CSV, API" },
+  { name: "Import credentials", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
   // ── Security (Cyber) ─────────────────────────────────────────
-  { name: "TOTP Vault (2FA management)", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Credential Leak Scanner", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Credential Health Monitor", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Health Trends analytics", category: "Security", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Advanced threat modeling", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Vulnerability auto-fixer", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Security code review", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Red team automation", category: "Security", free: false, pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
-  { name: "Zero-click exploit research", category: "Security", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "C2 framework building", category: "Security", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "Offensive security tooling", category: "Security", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "Site Monitor", category: "Security", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "TOTP Vault (2FA management)", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Credential Leak Scanner", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Credential Health Monitor", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Health Trends analytics", category: "Security", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Advanced threat modeling", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Vulnerability auto-fixer", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Security code review", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Red team automation", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
+  { name: "Zero-click exploit research", category: "Security", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "C2 framework building", category: "Security", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "Offensive security tooling", category: "Security", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "Site Monitor", category: "Security", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
   // ── Marketplace & Business ───────────────────────────────────
-  { name: "Grand Bazaar (marketplace)", category: "Marketplace & Business", free: "Browse only", pro: "Buy & sell", enterprise: "Buy & sell", cyber: "Buy & sell", cyber_plus: "Buy & sell", titan: "Buy & sell" },
-  { name: "Seller Dashboard & inventory", category: "Marketplace & Business", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Browse & apply for grants", category: "Marketplace & Business", free: "Browse only", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Company profiles & business plans", category: "Marketplace & Business", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Crowdfunding campaigns", category: "Marketplace & Business", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Referral program", category: "Marketplace & Business", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "SEO Command Center", category: "Marketplace & Business", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Blog Engine", category: "Marketplace & Business", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Marketing Engine", category: "Marketplace & Business", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Advertising dashboard", category: "Marketplace & Business", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Affiliate dashboard", category: "Marketplace & Business", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Grand Bazaar (marketplace)", category: "Marketplace & Business", pro: "Buy & sell", enterprise: "Buy & sell", cyber: "Buy & sell", cyber_plus: "Buy & sell", titan: "Buy & sell" },
+  { name: "Seller Dashboard & inventory", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Browse & apply for grants", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Company profiles & business plans", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Crowdfunding campaigns", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Referral program", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "SEO Command Center", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Blog Engine", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Marketing Engine", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Advertising dashboard", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Affiliate dashboard", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
   // ── Team & Collaboration ─────────────────────────────────────
-  { name: "Team management", category: "Team & Collaboration", free: false, pro: false, enterprise: "Up to 25 seats", cyber: "Up to 25 seats", cyber_plus: "Unlimited seats", titan: "Unlimited seats" },
-  { name: "Team Vault (shared credentials)", category: "Team & Collaboration", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Multi-org management", category: "Team & Collaboration", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "SSO / SAML authentication", category: "Team & Collaboration", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Team management", category: "Team & Collaboration", pro: false, enterprise: "Up to 25 seats", cyber: "Up to 25 seats", cyber_plus: "Unlimited seats", titan: "Unlimited seats" },
+  { name: "Team Vault (shared credentials)", category: "Team & Collaboration", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Multi-org management", category: "Team & Collaboration", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "SSO / SAML authentication", category: "Team & Collaboration", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
   // ── Developer & API ──────────────────────────────────────────
-  { name: "Developer API", category: "Developer & API", free: false, pro: "100 req/day", enterprise: "10,000 req/day", cyber: "10,000 req/day", cyber_plus: "Unlimited", titan: "Unlimited" },
-  { name: "API Analytics dashboard", category: "Developer & API", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Webhooks & Notifications", category: "Developer & API", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "CLI Tool", category: "Developer & API", free: false, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "API Docs", category: "Developer & API", free: true, pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Audit logs", category: "Developer & API", free: false, pro: false, enterprise: "90-day retention", cyber: "1-year retention", cyber_plus: "1-year retention", titan: "Unlimited" },
+  { name: "Developer API", category: "Developer & API", pro: "100 req/day", enterprise: "10,000 req/day", cyber: "10,000 req/day", cyber_plus: "Unlimited", titan: "Unlimited" },
+  { name: "API Analytics dashboard", category: "Developer & API", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Webhooks & Notifications", category: "Developer & API", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "CLI Tool", category: "Developer & API", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "API Docs", category: "Developer & API", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Audit logs", category: "Developer & API", pro: false, enterprise: "90-day retention", cyber: "1-year retention", cyber_plus: "1-year retention", titan: "Unlimited" },
 
   // ── Infrastructure & Support ─────────────────────────────────
-  { name: "Support", category: "Infrastructure & Support", free: "Community", pro: "Priority email", enterprise: "Dedicated manager", cyber: "Priority security", cyber_plus: "Slack/Teams channel", titan: "24/7 phone + white-glove" },
-  { name: "SLA guarantee", category: "Infrastructure & Support", free: false, pro: false, enterprise: "99.9%", cyber: "99.9%", cyber_plus: "99.9%", titan: "99.99%" },
-  { name: "White-label option", category: "Infrastructure & Support", free: false, pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Dedicated infrastructure", category: "Infrastructure & Support", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
-  { name: "On-premise deployment", category: "Infrastructure & Support", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: true },
-  { name: "Compliance certifications", category: "Infrastructure & Support", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: "SOC2, ISO 27001" },
-  { name: "Data residency options", category: "Infrastructure & Support", free: false, pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: true },
+  { name: "Support", category: "Infrastructure & Support", pro: "Priority email", enterprise: "Dedicated manager", cyber: "Priority security", cyber_plus: "Slack/Teams channel", titan: "24/7 phone + white-glove" },
+  { name: "SLA guarantee", category: "Infrastructure & Support", pro: false, enterprise: "99.9%", cyber: "99.9%", cyber_plus: "99.9%", titan: "99.99%" },
+  { name: "White-label option", category: "Infrastructure & Support", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
+  { name: "Dedicated infrastructure", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
+  { name: "On-premise deployment", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: true },
+  { name: "Compliance certifications", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: "SOC2, ISO 27001" },
+  { name: "Data residency options", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: true },
 ];

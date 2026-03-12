@@ -384,7 +384,7 @@ export async function processDailyLoginBonus(userId: number): Promise<{ awarded:
 
   // Only award to free tier users
   const plan = await getUserPlan(userId);
-  if (plan.planId !== "free") {
+  if (plan.planId !== "pro") {
     return { awarded: false, amount: 0, monthlyTotal: bal[0].loginBonusThisMonth };
   }
 

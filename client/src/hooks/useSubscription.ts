@@ -97,7 +97,7 @@ export function useSubscription(): SubscriptionState {
     const loading = usageQuery.isLoading || subQuery.isLoading;
     const usage = usageQuery.data;
     // Admin users always resolve to titan (highest tier, unlimited)
-    const planId: PlanId = isAdmin ? "titan" : (usage?.plan?.planId || "free");
+    const planId: PlanId = isAdmin ? "titan" : (usage?.plan?.planId || "pro");
     const tier = usage?.plan?.tier;
 
     const canUse = (feature: string): boolean => {
@@ -111,8 +111,8 @@ export function useSubscription(): SubscriptionState {
       planId,
       planName: isAdmin ? "Admin (Unlimited)" : (tier?.name || "Free"),
       loading,
-      isPaid: isAdmin || planId !== "free",
-      isFree: !isAdmin && planId === "free",
+      isPaid: isAdmin || planId !== "pro",
+      isFree: !isAdmin && planId === "pro",
       isPro: planId === "pro",
       isEnterprise: isAdmin || ["enterprise", "cyber", "cyber_plus", "titan"].includes(planId),
       isCyber: isAdmin || ["cyber", "cyber_plus", "titan"].includes(planId),

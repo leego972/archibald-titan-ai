@@ -251,10 +251,10 @@ describe("Subscription Gate - New Features", () => {
   it("isFeatureAllowed returns false for free plan on enterprise features", async () => {
     const { isFeatureAllowed } = await import("./subscription-gate");
 
-    expect(isFeatureAllowed("free", "api_access")).toBe(false);
-    expect(isFeatureAllowed("free", "team_management")).toBe(false);
-    expect(isFeatureAllowed("free", "audit_logs")).toBe(false);
-    expect(isFeatureAllowed("free", "csv_export")).toBe(false);
+    expect(isFeatureAllowed("pro", "api_access")).toBe(false);
+    expect(isFeatureAllowed("pro", "team_management")).toBe(false);
+    expect(isFeatureAllowed("pro", "audit_logs")).toBe(false);
+    expect(isFeatureAllowed("pro", "csv_export")).toBe(false);
   });
 
   it("isFeatureAllowed returns true for enterprise plan on all features", async () => {

@@ -43,7 +43,7 @@ export default function TrialBanner() {
   if (dismissed || trialError || subError || !trialStatus) return null;
 
   // Don't show if user has an active paid subscription (not in trial)
-  if (subscription && subscription.plan !== "free" && subscription.status === "active" && !trialStatus.inTrial) return null;
+  if (subscription && subscription.plan !== "pro" && subscription.status === "active" && !trialStatus.inTrial) return null;
 
   const { inTrial, hasPaymentMethod, daysRemaining, trialExpired } = trialStatus;
 

@@ -35,11 +35,11 @@ export interface PlanUsage {
 
 export async function getUserPlan(userId: number): Promise<UserPlan> {
   const db = await getDb();
-  const freeTier = PRICING_TIERS.find((t) => t.id === "free")!;
+  const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
   const enterpriseTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
 
   if (!db) {
-    return { planId: "free", tier: freeTier, status: "active", isActive: true };
+    return { planId: "pro", tier: proTier, status: "active", isActive: true };
   }
 
   // ─── Admin Bypass: admins always get full enterprise access ───
@@ -77,16 +77,16 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
     .limit(1);
 
   if (sub.length === 0 || sub[0].status === "canceled") {
-    return { planId: "free", tier: freeTier, status: "active", isActive: true };
+    return { planId: "pro", tier: proTier, status: "active", isActive: true };
   }
 
   const planId = sub[0].plan as PlanId;
-  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId) || freeTier;
+  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId) || proTier;
   const isActive = sub[0].status === "active" || sub[0].status === "trialing";
 
   // If subscription is past_due or incomplete, treat as free
   if (!isActive) {
-    return { planId: "free", tier: freeTier, status: sub[0].status, isActive: false };
+    return { planId: "pro", tier: proTier, status: sub[0].status, isActive: false };
   }
 
   return { planId, tier, status: sub[0].status, isActive };
@@ -179,8 +179,7 @@ const FREE_PROVIDER_IDS = ["aws", "azure", "gcp"];
 
 export function getAllowedProviders(planId: PlanId): string[] | null {
   // null means all providers allowed
-  if (planId === "free") return FREE_PROVIDER_IDS;
-  return null; // pro & enterprise get all
+  return null; // all plans get all providers
 }
 
 export function isFeatureAllowed(planId: PlanId, feature: string): boolean {

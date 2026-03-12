@@ -93,7 +93,7 @@ export const desktopLicenseRouter = router({
         .from(subscriptions)
         .where(eq(subscriptions.userId, user.id))
         .limit(1);
-      const plan = subRows[0]?.plan || "free";
+      const plan = subRows[0]?.plan || "pro";
 
       // Generate license JWT
       const { jwt, expiresAt } = await generateLicenseJWT(
@@ -218,7 +218,7 @@ export const desktopLicenseRouter = router({
         .from(subscriptions)
         .where(eq(subscriptions.userId, user.id))
         .limit(1);
-      const plan = subRows[0]?.plan || "free";
+      const plan = subRows[0]?.plan || "pro";
 
       // Get credit balance
       const balanceRows = await db

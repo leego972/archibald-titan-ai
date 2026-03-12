@@ -23,7 +23,7 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
   });
 
   it("auto-renewal refills correct credits per plan tier", () => {
-    const plans: PlanId[] = ["free", "pro", "enterprise"];
+    const plans: PlanId[] = ["pro", "enterprise", "cyber"];
     const expectedAllocations = { free: 50, pro: 500, enterprise: 5000 };
 
     for (const planId of plans) {
@@ -274,7 +274,7 @@ describe("Desktop Login — Authentication Flow", () => {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       user: { id: 1, name: "Test User", email: "test@example.com", role: "user" },
       credits: { balance: 50, isUnlimited: false },
-      plan: "free",
+      plan: "pro",
     };
 
     expect(loginResult.licenseKey).toBeTruthy();
@@ -305,7 +305,7 @@ describe("Desktop Login — Authentication Flow", () => {
 describe("Auto-Renewal Billing — Initial Checkout Credits", () => {
   it("new pro subscription grants initial monthly allocation", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
-    let balance = 50; // signup bonus (free tier)
+    let balance = 100; // signup bonus (pro tier)
     balance += proTier.credits.monthlyAllocation;
     expect(balance).toBe(550);
   });
@@ -318,8 +318,8 @@ describe("Auto-Renewal Billing — Initial Checkout Credits", () => {
   });
 
   it("free plan checkout does not happen (no Stripe checkout for free)", () => {
-    const freeTier = PRICING_TIERS.find((t) => t.id === "free")!;
-    expect(freeTier.monthlyPrice).toBe(0);
+    const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
+    expect(proTier.monthlyPrice).toBe(29);
     // Free users get credits via signup bonus and monthly refill, not checkout
   });
 });

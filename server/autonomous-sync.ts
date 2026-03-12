@@ -739,7 +739,7 @@ async function grantBetaTesters(): Promise<void> {
         .where(eq(subscriptions.userId, user.id))
         .limit(1);
 
-      if (existing && existing.status === "active" && existing.plan !== "free") {
+      if (existing && existing.status === "active" && existing.plan !== "pro") {
         log.info(`[BetaGrant] ${tester.email} already has ${existing.plan} — skipping`);
         continue;
       }

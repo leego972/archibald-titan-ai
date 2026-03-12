@@ -71,7 +71,7 @@ export default function FetcherExport() {
       icon: FileJson,
       description: "Structured JSON format with provider names, key types, and values. Ideal for programmatic use.",
       available: true,
-      plan: "free" as const,
+      plan: "pro" as const,
     },
     {
       id: "env" as const,
@@ -129,7 +129,7 @@ export default function FetcherExport() {
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <CardTitle className="text-lg">{fmt.name}</CardTitle>
-                  {fmt.plan !== "free" && (
+                  {fmt.plan !== "pro" && (
                     <PlanBadge planId={fmt.plan} />
                   )}
                 </div>

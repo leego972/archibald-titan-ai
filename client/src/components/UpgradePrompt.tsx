@@ -226,7 +226,7 @@ export function PlanBadge({ planId, className = "" }: PlanBadgeProps) {
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${colors[planId] || colors.free} ${className}`}
     >
-      {planId !== "free" && <Crown className="h-3 w-3" />}
+      {planId !== "pro" && <Crown className="h-3 w-3" />}
       {labels[planId] || planId}
     </span>
   );

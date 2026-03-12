@@ -65,7 +65,7 @@ describe("Developer REST API", () => {
         pro: 100,
         enterprise: 10000,
       };
-      expect(RATE_LIMITS["free"]).toBe(0);
+      expect(RATE_LIMITS["pro"]).toBeGreaterThan(0);
       expect(RATE_LIMITS["pro"]).toBe(100);
       expect(RATE_LIMITS["enterprise"]).toBe(10000);
     });
@@ -485,8 +485,8 @@ describe("Paywall Gating", () => {
         };
         return (access[plan] || []).includes(feature);
       };
-      expect(canUseFeature("free", "developer_api")).toBe(false);
-      expect(canUseFeature("free", "webhooks")).toBe(false);
+      expect(canUseFeature("pro", "developer_api")).toBe(false);
+      expect(canUseFeature("pro", "webhooks")).toBe(false);
       expect(canUseFeature("pro", "developer_api")).toBe(true);
       expect(canUseFeature("enterprise", "webhooks")).toBe(true);
     });

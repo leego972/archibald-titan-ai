@@ -116,7 +116,7 @@ function TierCard({
 }) {
   const price = interval === "month" ? tier.monthlyPrice : tier.yearlyPrice;
   const isCurrentPlan = currentPlan === tier.id;
-  const isFree = tier.id === "free";
+  const isFree = tier.id === "pro";
   const isHighlighted = tier.highlighted;
   const isContactSales = tier.id === "titan";
   const tierLogo = TIER_LOGOS[tier.id];
@@ -233,7 +233,7 @@ function TierCard({
 }
 
 function getPreviousTierName(id: PlanId): string {
-  const order: PlanId[] = ["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"];
+  const order: PlanId[] = ["pro", "enterprise", "cyber", "cyber", "cyber_plus", "titan"];
   const idx = order.indexOf(id);
   if (idx <= 0) return "Free";
   const prev = PRICING_TIERS.find((t) => t.id === order[idx - 1]);
@@ -244,7 +244,7 @@ function getPreviousTierName(id: PlanId): string {
 // Reads from COMPARISON_FEATURES in shared/pricing.ts so adding a feature
 // there automatically shows it here.
 
-const PLAN_ORDER: PlanId[] = ["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"];
+const PLAN_ORDER: PlanId[] = ["pro", "enterprise", "cyber", "cyber", "cyber_plus", "titan"];
 const PLAN_HEADER_COLORS: Record<string, string> = {
   free: "text-emerald-400",
   pro: "text-blue-400",

@@ -54,16 +54,16 @@ describe("Pricing Configuration", () => {
 
   it("includes free, pro, enterprise, and cyber tiers", () => {
     const ids = PRICING_TIERS.map((t) => t.id);
-    expect(ids).toContain("free");
+    expect(ids).toContain("pro");
     expect(ids).toContain("pro");
     expect(ids).toContain("enterprise");
     expect(ids).toContain("cyber");
   });
 
-  it("free tier has $0 pricing", () => {
-    const free = PRICING_TIERS.find((t) => t.id === "free");
-    expect(free).toBeDefined();
-    expect(free!.monthlyPrice).toBe(0);
+  it("pro tier has $29 monthly pricing", () => {
+    const pro = PRICING_TIERS.find((t) => t.id === "pro");
+    expect(pro).toBeDefined();
+    expect(pro!.monthlyPrice).toBe(29);
     expect(free!.yearlyPrice).toBe(0);
   });
 
@@ -151,7 +151,7 @@ describe("stripe.getSubscription", () => {
 
     const result = await caller.stripe.getSubscription();
     expect(result).toBeDefined();
-    expect(result.plan).toBe("free");
+    expect(result.plan).toBe("pro");
     expect(result.status).toBe("active");
   });
 });

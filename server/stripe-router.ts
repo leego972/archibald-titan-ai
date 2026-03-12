@@ -163,7 +163,7 @@ export const stripeRouter = router({
   // Get current user's subscription status
   getSubscription: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return { plan: "free" as PlanId, status: "active" };
+    if (!db) return { plan: "pro" as PlanId, status: "active" };
 
     const sub = await db
       .select()
@@ -172,7 +172,7 @@ export const stripeRouter = router({
       .limit(1);
 
     if (sub.length === 0) {
-      return { plan: "free" as PlanId, status: "active" };
+      return { plan: "pro" as PlanId, status: "active" };
     }
 
     return {
@@ -918,7 +918,7 @@ export function registerStripeWebhook(app: Express) {
           if ((err as any)?.statusCode === 404 || (err as any)?.code === "resource_missing") {
             await db
               .update(subscriptions)
-              .set({ status: "canceled", plan: "free", stripeSubscriptionId: null, currentPeriodEnd: new Date() })
+              .set({ status: "canceled", plan: "pro", stripeSubscriptionId: null, currentPeriodEnd: new Date() })
               .where(eq(subscriptions.userId, localSub.userId));
             changes.push(`user=${localSub.userId}: Stripe sub not found, marked canceled`);
             log.warn(`[Stripe Sync] Subscription ${localSub.stripeSubscriptionId} not found in Stripe, marked user ${localSub.userId} as canceled`);
@@ -1494,7 +1494,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   await db
     .update(subscriptions)
     .set({
-      plan: "free",
+      plan: "pro",
       status: "canceled",
       stripeSubscriptionId: null,
       currentPeriodEnd: new Date(), // Clear stale period end date
