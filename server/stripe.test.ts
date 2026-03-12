@@ -54,7 +54,7 @@ describe("Pricing Configuration", () => {
 
   it("includes free, pro, enterprise, and cyber tiers", () => {
     const ids = PRICING_TIERS.map((t) => t.id);
-    expect(ids).toContain("pro");
+    expect(ids).toContain("free");
     expect(ids).toContain("pro");
     expect(ids).toContain("enterprise");
     expect(ids).toContain("cyber");
@@ -64,7 +64,7 @@ describe("Pricing Configuration", () => {
     const pro = PRICING_TIERS.find((t) => t.id === "pro");
     expect(pro).toBeDefined();
     expect(pro!.monthlyPrice).toBe(29);
-    expect(free!.yearlyPrice).toBe(0);
+    expect(pro!.yearlyPrice).toBe(290);
   });
 
   it("pro tier has correct pricing", () => {
