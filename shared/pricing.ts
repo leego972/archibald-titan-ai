@@ -15,10 +15,18 @@
  * Pro → Enterprise → Cyber (public tiers)
  * Cyber+ and Titan are internal/enterprise tiers, not shown in the public pricing UI.
  *
+ * CREDIT ALLOCATION (aligned with pricing page advertising):
+ * - Free:       500 credits/mo  (50 signup bonus)
+ * - Pro:        50,000 credits/mo  (1,000 signup bonus)   — ~1,000 builder tasks/mo
+ * - Enterprise: 250,000 credits/mo (5,000 signup bonus)   — ~5,000 builder tasks/mo
+ * - Cyber:      750,000 credits/mo (25,000 signup bonus)  — heavy security usage
+ * - Cyber+:     3,000,000 credits/mo (100,000 signup bonus)
+ * - Titan:      10,000,000 credits/mo (500,000 signup bonus)
+ *
  * UPGRADE INCENTIVE MATH:
- * - Top-up 5,000 credits = $29.99 (same price as Pro monthly!)
- * - Pro gives 5,000 credits/mo for $29/mo — clearly better value than buying a top-up
- * - Top-up 10,000 credits = $59.99 — Enterprise gives 25,000 for $99/mo (4x more credits)
+ * - Top-up 50,000 credits = $29.99 (same price as Pro monthly!)
+ * - Pro gives 50,000 credits/mo for $29/mo — clearly better value than buying a top-up
+ * - Top-up 100,000 credits = $54.99 — Enterprise gives 250,000 for $99/mo (5x more credits)
  * - This pricing structure naturally pushes heavy users toward upgrading.
  */
 
@@ -58,7 +66,7 @@ export const PRICING_TIERS: PricingTier[] = [
     highlighted: false,
     cta: "Get Started",
     features: [
-      "50 credits/month",
+      "500 credits/month",
       "Basic credential fetching (3 providers)",
       "JSON export only",
       "Community support",
@@ -72,7 +80,7 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "community",
     },
     credits: {
-      monthlyAllocation: 50,
+      monthlyAllocation: 500,
       signupBonus: 50,
     },
   },
@@ -87,7 +95,7 @@ export const PRICING_TIERS: PricingTier[] = [
     highlighted: true,
     cta: "Upgrade to Pro",
     features: [
-      "50,000 credits/month (~1,000 builder tasks)",
+      "50,000 credits/month (~1,000 builder tasks/mo)",
       "Titan Builder (unlimited chat & code)",
       "Unlimited fetches & all 15+ providers",
       "Unlimited credential storage",
@@ -123,8 +131,8 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "priority_email",
     },
     credits: {
-      monthlyAllocation: 500,
-      signupBonus: 100,
+      monthlyAllocation: 50000,
+      signupBonus: 1000,
     },
   },
 
@@ -170,8 +178,8 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "dedicated",
     },
     credits: {
-      monthlyAllocation: 5000,
-      signupBonus: 500,
+      monthlyAllocation: 250000,
+      signupBonus: 5000,
     },
   },
 
@@ -206,8 +214,8 @@ export const PRICING_TIERS: PricingTier[] = [
       support: "priority_security",
     },
     credits: {
-      monthlyAllocation: 75000,
-      signupBonus: 5000,
+      monthlyAllocation: 750000,
+      signupBonus: 25000,
     },
   },
 
@@ -252,8 +260,8 @@ export const INTERNAL_TIERS: PricingTier[] = [
       support: "dedicated_slack",
     },
     credits: {
-      monthlyAllocation: 300000,
-      signupBonus: 25000,
+      monthlyAllocation: 3000000,
+      signupBonus: 100000,
     },
   },
 
@@ -290,8 +298,8 @@ export const INTERNAL_TIERS: PricingTier[] = [
       support: "white_glove",
     },
     credits: {
-      monthlyAllocation: 1000000,
-      signupBonus: 100000,
+      monthlyAllocation: 10000000,
+      signupBonus: 500000,
     },
   },
 ];
@@ -303,60 +311,60 @@ export const INTERNAL_TIERS: PricingTier[] = [
  */
 // ─── Credit Costs ──────────────────────────────────────────────────
 //
-// COST PHILOSOPHY:
-// - Chat messages should feel free — users should never hesitate to ask a question.
-// - Builder actions cost more because they consume LLM tokens and modify code.
-// - Fetches and voice are moderate — they use external APIs.
-// - A typical builder request (7-12 tool calls) should cost ~20-35 credits total.
-// - A Pro user with 5000 credits should get ~150-250 builder requests per month.
-//   That's 5-8 builder requests per day — solid daily usage.
+// COST PHILOSOPHY (rebalanced to match actual allocations):
+// - Pro user (50,000 credits/mo) should get ~1,000 builder tasks/mo = 50 credits/task.
+// - A typical builder request (7-12 tool calls) costs ~350-600 credits total.
+// - Chat messages are cheap so users never hesitate to ask questions.
+// - Heavy compute (image, video, security exploits) costs proportionally more.
+// - A Pro user can send ~5,000 chat messages OR ~1,000 builder tasks per month.
+// - Enterprise (250,000 credits/mo) = ~5,000 builder tasks — power user territory.
 
 export const CREDIT_COSTS = {
   // ── Core AI ──────────────────────────────────────────────────────────
-  chat_message: 10,              // 1 credit per chat message — feels free
-  builder_action: 50,            // 5 credits per builder tool action (code gen, file write, etc.)
-  voice_action: 30,              // 3 credits per voice transcription (Whisper API)
-  image_generation: 150,         // 15 credits per AI image (DALL-E / Replicate)
-  video_generation: 400,         // 40 credits per AI video generation
+  chat_message: 10,              // 10 credits per chat message (~5,000 chats/mo on Pro)
+  builder_action: 50,            // 50 credits per builder tool action (~1,000 tasks/mo on Pro)
+  voice_action: 25,              // 25 credits per voice transcription (Whisper API)
+  image_generation: 200,         // 200 credits per AI image (DALL-E / Replicate)
+  video_generation: 500,         // 500 credits per AI video generation
 
   // ── Credential & Fetch ───────────────────────────────────────────────
-  fetch_action: 20,              // 2 credits per credential fetch
-  github_action: 50,             // 5 credits per GitHub repo create or push
-  import_action: 30,             // 3 credits per credential import batch
+  fetch_action: 5,               // 5 credits per credential fetch (very cheap — core feature)
+  github_action: 30,             // 30 credits per GitHub repo create or push
+  import_action: 15,             // 15 credits per credential import batch
 
   // ── Clone & Replicate ────────────────────────────────────────────────
-  clone_action: 500,             // 50 credits per website clone (Cyber+ / Titan only)
-  replicate_action: 300,         // 30 credits per site replication job
+  clone_action: 1000,            // 1,000 credits per website clone (Cyber+ / Titan only)
+  replicate_action: 500,         // 500 credits per site replication job
 
   // ── SEO & Content ────────────────────────────────────────────────────
-  seo_run: 100,                  // 10 credits per SEO optimisation run
-  blog_generate: 80,             // 8 credits per AI blog post generation
-  content_generate: 80,          // 8 credits per content piece (social, email, etc.)
-  marketing_run: 120,            // 12 credits per marketing engine cycle
-  advertising_run: 120,          // 12 credits per advertising cycle / campaign trigger
+  seo_run: 150,                  // 150 credits per SEO optimisation run
+  blog_generate: 100,            // 100 credits per AI blog post generation
+  content_generate: 100,         // 100 credits per content piece (social, email, etc.)
+  marketing_run: 200,            // 200 credits per marketing engine cycle
+  advertising_run: 200,          // 200 credits per advertising cycle / campaign trigger
 
   // ── Security Tools (Cyber tier) ──────────────────────────────────────
-  security_scan: 100,            // 10 credits per security scan / health check
-  metasploit_action: 200,        // 20 credits per Metasploit module run / exploit
-  evilginx_action: 200,          // 20 credits per Evilginx phishlet / lure / session action
-  blackeye_action: 150,          // 15 credits per Blackeye phishing page action
+  security_scan: 100,            // 100 credits per security scan / health check
+  metasploit_action: 500,        // 500 credits per Metasploit module run / exploit
+  evilginx_action: 400,          // 400 credits per Evilginx phishlet / lure / session action
+  blackeye_action: 300,          // 300 credits per Blackeye phishing page action
 
   // ── Grants & Business ────────────────────────────────────────────────
-  grant_match: 50,               // 5 credits per AI grant matching run
-  grant_apply: 100,              // 10 credits per grant application submission
-  business_plan_generate: 150,   // 15 credits per AI business plan generation
+  grant_match: 50,               // 50 credits per AI grant matching run
+  grant_apply: 150,              // 150 credits per grant application submission
+  business_plan_generate: 300,   // 300 credits per AI business plan generation
 
   // ── Marketplace ──────────────────────────────────────────────────────
-  marketplace_list: 50,          // 5 credits to list an item for sale
-  marketplace_feature: 100,      // 10 credits to feature / boost a listing
+  marketplace_list: 50,          // 50 credits to list an item for sale
+  marketplace_feature: 200,      // 200 credits to feature / boost a listing
 
   // ── Site Monitor & Sandbox ───────────────────────────────────────────
-  site_monitor_add: 30,          // 3 credits to add a new monitored site
-  sandbox_run: 50,               // 5 credits per sandbox environment execution
+  site_monitor_add: 50,          // 50 credits to add a new monitored site
+  sandbox_run: 50,               // 50 credits per sandbox environment execution
 
   // ── Affiliate & API ──────────────────────────────────────────────────
-  affiliate_action: 20,          // 2 credits per affiliate link / campaign create
-  api_call: 10,                  // 1 credit per external API call via the platform
+  affiliate_action: 20,          // 20 credits per affiliate link / campaign create
+  api_call: 5,                   // 5 credits per external API call via the platform
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;
@@ -388,7 +396,7 @@ export const CREDIT_PACKS: CreditPack[] = [
   {
     id: "pack_500",
     name: "Quick Top-Up",
-    credits: 50000,
+    credits: 10000,
     price: 4.99,
     upgradeNudge: undefined, // too small to nudge
   },
@@ -396,23 +404,23 @@ export const CREDIT_PACKS: CreditPack[] = [
     id: "pack_2500",
     name: "Boost Pack",
     credits: 25000,
-    price: 17.99,
+    price: 9.99,
     popular: true,
-    upgradeNudge: "Pro gives 50,000 credits/mo for just $29 — 2x the credits at 24% less per credit!",
+    upgradeNudge: "Pro gives 50,000 credits/mo for just $29 — 2x the credits every month!",
   },
   {
     id: "pack_5000",
     name: "Power Top-Up",
     credits: 50000,
-    price: 29.99,
+    price: 17.99,
     upgradeNudge: "Pro gives the same 50,000 credits every month for $29/mo — upgrade and save!",
   },
   {
     id: "pack_10000",
     name: "Mega Top-Up",
-    credits: 100000,
-    price: 54.99,
-    upgradeNudge: "Enterprise gives 25,000 credits/mo for $99 — 4x more credits! Upgrading saves you money.",
+    credits: 150000,
+    price: 49.99,
+    upgradeNudge: "Enterprise gives 250,000 credits/mo for $99 — 5x more credits! Upgrading saves you money.",
   },
 ];
 
@@ -533,7 +541,7 @@ export interface ComparisonFeature {
 
 export const COMPARISON_FEATURES: ComparisonFeature[] = [
   // ── AI & Builder ─────────────────────────────────────────────
-  { name: "Monthly credits", category: "AI & Builder", pro: "50,000", enterprise: "250,000", cyber: "750,000", cyber_plus: "3,000,000", titan: "10,000,000" },
+  { name: "Monthly credits", category: "AI & Builder", free: "500", pro: "50,000", enterprise: "250,000", cyber: "750,000", cyber_plus: "3,000,000", titan: "10,000,000" },
   { name: "Titan Builder (AI chat & code)", category: "AI & Builder", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
   { name: "Sandbox environment", category: "AI & Builder", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "My Projects", category: "AI & Builder", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
