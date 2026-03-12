@@ -531,6 +531,16 @@ function FetcherLayoutContent({
                 )}
               </div>
             )}
+            {/* Standalone Logout Button — always visible in sidebar footer */}
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="flex items-center gap-2 w-full rounded-xl px-3 py-2 mb-1 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Sign out</span>
+            </button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-white/[0.04] transition-all w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
