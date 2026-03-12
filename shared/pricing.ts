@@ -48,6 +48,35 @@ export interface PricingTier {
 }
 
 export const PRICING_TIERS: PricingTier[] = [
+  // ─── FREE ────────────────────────────────────────────────────────
+  {
+    id: "free",
+    name: "Free",
+    tagline: "Get started with the basics",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    highlighted: false,
+    cta: "Get Started",
+    features: [
+      "50 credits/month",
+      "Basic credential fetching (3 providers)",
+      "JSON export only",
+      "Community support",
+    ],
+    limits: {
+      fetchesPerMonth: 10,
+      providers: 3,
+      credentialStorage: 5,
+      proxySlots: 0,
+      exportFormats: ["json"],
+      support: "community",
+    },
+    credits: {
+      monthlyAllocation: 50,
+      signupBonus: 50,
+    },
+  },
+
   // ─── PRO ─────────────────────────────────────────────────────────
   {
     id: "pro",

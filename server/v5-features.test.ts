@@ -485,8 +485,8 @@ describe("Paywall Gating", () => {
         };
         return (access[plan] || []).includes(feature);
       };
-      expect(canUseFeature("pro", "developer_api")).toBe(false);
-      expect(canUseFeature("pro", "webhooks")).toBe(false);
+      expect(canUseFeature("free", "developer_api")).toBe(false);
+      expect(canUseFeature("free", "webhooks")).toBe(false);
       expect(canUseFeature("pro", "developer_api")).toBe(true);
       expect(canUseFeature("enterprise", "webhooks")).toBe(true);
     });

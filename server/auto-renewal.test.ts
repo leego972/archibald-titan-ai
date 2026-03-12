@@ -24,7 +24,7 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
 
   it("auto-renewal refills correct credits per plan tier", () => {
     const plans: PlanId[] = ["pro", "enterprise", "cyber"];
-    const expectedAllocations = { free: 50, pro: 500, enterprise: 5000 };
+    const expectedAllocations: Record<string, number> = { free: 50, pro: 500, enterprise: 5000, cyber: 75000 };
 
     for (const planId of plans) {
       const tier = PRICING_TIERS.find((t) => t.id === planId)!;
@@ -305,9 +305,9 @@ describe("Desktop Login — Authentication Flow", () => {
 describe("Auto-Renewal Billing — Initial Checkout Credits", () => {
   it("new pro subscription grants initial monthly allocation", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
-    let balance = 100; // signup bonus (pro tier)
+    let balance = proTier.credits.signupBonus; // signup bonus (pro tier)
     balance += proTier.credits.monthlyAllocation;
-    expect(balance).toBe(550);
+    expect(balance).toBe(600);
   });
 
   it("new enterprise subscription grants initial monthly allocation", () => {
@@ -339,24 +339,24 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
     expect(balance).toBe(600);
 
     // Use credits during month 1
-    balance -= 200 * CREDIT_COSTS.chat_message; // -200
-    balance -= 20 * CREDIT_COSTS.builder_action; // -100 (5 credits each)
-    expect(balance).toBe(300);
+    balance -= 20 * CREDIT_COSTS.chat_message; // -200
+    balance -= 4 * CREDIT_COSTS.builder_action; // -200
+    expect(balance).toBe(200);
 
     // Auto-renewal: Stripe charges, invoice.paid fires, credits refilled
     balance += proTier.credits.monthlyAllocation; // +500
-    expect(balance).toBe(800);
+    expect(balance).toBe(700);
 
     // Use credits during month 2
-    balance -= 150 * CREDIT_COSTS.chat_message; // -150
-    expect(balance).toBe(650);
+    balance -= 15 * CREDIT_COSTS.chat_message; // -150
+    expect(balance).toBe(550);
   });
 
   it("user cancels mid-month: keeps remaining credits, no future refills", () => {
     const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
 
     let balance = proTier.credits.monthlyAllocation; // 500
-    balance -= 100 * CREDIT_COSTS.chat_message; // -100
+    balance -= 10 * CREDIT_COSTS.chat_message; // -100
     expect(balance).toBe(400);
 
     // User cancels — balance preserved

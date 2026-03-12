@@ -289,10 +289,10 @@ describe("Plan hierarchy enforcement", () => {
   });
 
   it("pro has strictly more export formats than free", () => {
+    const freeFormats = getAllowedExportFormats("free");
     const proFormats = getAllowedExportFormats("pro");
-    const proFormats = getAllowedExportFormats("pro");
-    expect(proFormats.length).toBeGreaterThan(proFormats.length);
-    for (const fmt of proFormats) {
+    expect(proFormats.length).toBeGreaterThan(freeFormats.length);
+    for (const fmt of freeFormats) {
       expect(proFormats).toContain(fmt);
     }
   });
