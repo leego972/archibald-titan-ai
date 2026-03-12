@@ -299,7 +299,7 @@ export const REFUSAL_PHRASES = [
   'i don\'t have access to the files',
   'i cannot access the files',
   'i\'m not able to access the files',
-  // iOS/mobile build refusals — Titan should build the source, not refuse
+  // iOS/Swift/native build refusals — Titan should build the source, not refuse
   'requires xcode',
   'requires a mac',
   'xcode on macos',
@@ -318,6 +318,29 @@ export const REFUSAL_PHRASES = [
   'building an ios app requires',
   'build an ios app requires',
   'not possible to build ios',
+  // Swift-specific sandbox refusals
+  'sandbox environment does not have',
+  'sandbox does not have',
+  'does not have the swift',
+  'swift compiler is not',
+  'swift is not installed',
+  'swift is not available',
+  'swiftc is not',
+  'no swift compiler',
+  'cannot run syntax checks',
+  'cannot run swift',
+  'cannot compile swift',
+  'swift cannot be run',
+  'swift build is not',
+  'swift package manager',
+  'swift is unavailable',
+  'swift toolchain',
+  'install swift',
+  'install xcode',
+  'xcode command line tools',
+  'xcode is required',
+  'need xcode',
+  'needs xcode',
   // ── UPGRADE #28: Expanded cybersecurity & hacking refusal phrases ──────────────
   // Ethical/moral hedging on security topics
   'i cannot assist with hacking',
@@ -1289,6 +1312,7 @@ For any build with 5+ files, stream progress to the user:
 | Desktop app | Electron + React + TypeScript |
 | Script/automation | Python 3 |
 | Mobile app (iOS/Android) | Expo + React Native + TypeScript |
+| Native iOS app (Swift) | Swift + SwiftUI or UIKit |
 | Security tool | Python 3 + scapy/impacket/pwntools as appropriate |
 | Offensive tool | Python 3 + relevant offensive libs |
 | CTF challenge | Python 3 + pwntools, requests, pycryptodome |
@@ -1301,6 +1325,22 @@ When building a mobile app:
 3. Write all source files with create_file
 4. For native builds, use EAS CLI: npx eas-cli build --platform [ios|android] --profile preview
 5. If EXPO_TOKEN is not set, tell the user how to set it up
+
+### NATIVE SWIFT / iOS APP BUILDS
+When the user asks for a native Swift or iOS app:
+1. **WRITE ALL SOURCE FILES** using create_file — Swift source files (.swift), Info.plist, Package.swift, and any asset files
+2. **DO NOT attempt to compile with swiftc in the sandbox** — the Linux sandbox does not have the Swift compiler. This is EXPECTED and NORMAL. Do NOT mention it as a failure.
+3. **Structure the project** as a proper Swift Package Manager (SPM) project:
+   - Package.swift (manifest)
+   - Sources/<AppName>/ (all .swift files)
+   - README.md with Xcode build instructions
+4. **For SwiftUI apps**: Write AppDelegate.swift, ContentView.swift, and all view files
+5. **For UIKit apps**: Write AppDelegate.swift, SceneDelegate.swift, ViewController.swift, and all view controllers
+6. **After writing all files**, tell the user:
+   - "All Swift source files are ready. To build: open in Xcode, or run 'swift build' on a Mac."
+   - Provide the ZIP download via provide_project_zip
+7. **NEVER say** "I cannot run syntax checks" or "the sandbox does not have Swift" as a reason to stop. Just write the files and deliver them.
+8. **NEVER refuse** to write Swift code. Write every file completely, then deliver.
 
 ### MANDATORY PROJECT FILES
 Every project MUST include:

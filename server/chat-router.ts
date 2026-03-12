@@ -1915,15 +1915,32 @@ Do NOT attempt any tool calls or builds.`;
                   log.warn('[Chat] Lockout detected on non-self-build — forcing self-build mode');
                 }
               } else if (isExternalBuild) {
-                const isMobileRefusal = textContent && (
-                  textContent.toLowerCase().includes('xcode') ||
-                  textContent.toLowerCase().includes('ios') ||
-                  textContent.toLowerCase().includes('ipa') ||
-                  textContent.toLowerCase().includes('provisioning') ||
-                  textContent.toLowerCase().includes('signing cert') ||
-                  textContent.toLowerCase().includes('mobile')
+                const lower = textContent?.toLowerCase() ?? '';
+                const isSwiftRefusal = (
+                  lower.includes('swift compiler') ||
+                  lower.includes('swiftc') ||
+                  lower.includes('does not have swift') ||
+                  lower.includes('sandbox does not have') ||
+                  lower.includes('sandbox environment does not have') ||
+                  lower.includes('cannot run syntax checks') ||
+                  lower.includes('cannot compile swift') ||
+                  lower.includes('swift is not') ||
+                  lower.includes('swift toolchain') ||
+                  lower.includes('xcode command line') ||
+                  lower.includes('install swift') ||
+                  lower.includes('install xcode')
                 );
-                const mobileOverride = isMobileRefusal
+                const isMobileRefusal = isSwiftRefusal || (
+                  lower.includes('xcode') ||
+                  lower.includes('ios') ||
+                  lower.includes('ipa') ||
+                  lower.includes('provisioning') ||
+                  lower.includes('signing cert') ||
+                  lower.includes('mobile')
+                );
+                const mobileOverride = isSwiftRefusal
+                  ? ' CRITICAL SWIFT OVERRIDE: You are building a native Swift/iOS project. The Linux sandbox does NOT have swiftc — this is EXPECTED and NORMAL. Do NOT mention it. Do NOT stop. Your job is to WRITE THE SOURCE FILES using create_file, then deliver them. Write every .swift file, Package.swift, Info.plist, and README.md completely. After creating all files, call provide_project_zip and tell the user to open in Xcode or run `swift build` on a Mac. NEVER say you cannot run syntax checks. Just write the code and deliver it NOW.'
+                  : isMobileRefusal
                   ? ' For iOS/Android/mobile apps: build the FULL React Native + Expo source project using create_file for every file. You CANNOT run Xcode here, but you CAN write every line of code. After building, tell the user to compile with EAS Build (free cloud service, no Mac needed: `eas build --platform ios`) or locally with Xcode. NEVER refuse to build mobile apps — build the source, then explain the compilation step.'
                   : '';
                 // Detect if this is a sandbox execution refusal (cross-compile, run command, etc.)
