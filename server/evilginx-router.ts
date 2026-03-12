@@ -45,7 +45,7 @@ async function execEvilginxCommand(
         // Send command to evilginx via its interactive shell
         // We pipe the command through the evilginx binary
         const cmd = `echo '${command.replace(/'/g, "'\\''")}' | sudo evilginx -developer 2>/dev/null || echo '${command.replace(/'/g, "'\\''")}' | evilginx -developer 2>/dev/null`;
-        conn.exec(cmd, (err, stream) => {
+        conn.exec(cmd, (err: Error | undefined, stream: import('ssh2').ClientChannel) => {
           if (err) {
             clearTimeout(timer);
             conn.end();
@@ -66,7 +66,7 @@ async function execEvilginxCommand(
             });
         });
       })
-      .on("error", (err) => {
+      .on("error", (err: Error) => {
         clearTimeout(timer);
         reject(err);
       })

@@ -49,7 +49,7 @@ async function execSSHCommand(
     }, timeoutMs);
     conn
       .on("ready", () => {
-        conn.exec(command, (err, stream) => {
+        conn.exec(command, (err: Error | undefined, stream: import('ssh2').ClientChannel) => {
           if (err) {
             clearTimeout(timer);
             conn.end();
@@ -70,7 +70,7 @@ async function execSSHCommand(
             });
         });
       })
-      .on("error", (err) => {
+      .on("error", (err: Error) => {
         clearTimeout(timer);
         reject(err);
       })

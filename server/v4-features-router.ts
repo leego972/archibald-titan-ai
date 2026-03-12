@@ -413,7 +413,7 @@ export const onboardingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "scheduled_fetches", "Provider Onboarding");
-      try { await consumeCredits(ctx.user.id, "ai_analysis", `Provider onboarding analysis: ${input.url}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "builder_action", `Provider onboarding analysis: ${input.url}`); } catch {}
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });

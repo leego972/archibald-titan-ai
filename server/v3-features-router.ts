@@ -324,7 +324,7 @@ export const recommendationsRouter = router({
    * Generate fresh recommendations using AI analysis of the user's credential data.
    */
   generate: protectedProcedure.mutation(async ({ ctx }) => {
-    try { await consumeCredits(ctx.user.id, "ai_analysis", "AI fetch recommendations"); } catch {}
+    try { await consumeCredits(ctx.user.id, "builder_action", "AI fetch recommendations"); } catch {}
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
