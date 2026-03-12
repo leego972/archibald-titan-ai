@@ -52,6 +52,8 @@ import { contentCreatorRouter } from "./content-creator-router";
 import { cybermcpRouter } from "./cybermcp-router";
 import { astraRouter } from "./astra-router";
 import { argusRouter } from "./argus-router";
+import { storageRouter } from "./storage-router";
+import { storageBillingRouter } from "./storage-billing-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -129,6 +131,9 @@ export const appRouter = router({
   cyberMcp: cybermcpRouter,
   astra: astraRouter,
   argus: argusRouter,
+  // ── Titan Storage Add-on ──────────────────────────────────────────────
+  titanStorage: storageRouter,
+  titanStorageBilling: storageBillingRouter,
 });
 
 export type AppRouter = typeof appRouter;

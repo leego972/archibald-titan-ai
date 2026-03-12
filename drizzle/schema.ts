@@ -2266,3 +2266,22 @@ export const contentCreatorAnalytics = mysqlTable("content_creator_analytics", {
 });
 export type ContentCreatorAnalytics = typeof contentCreatorAnalytics.$inferSelect;
 export type InsertContentCreatorAnalytics = typeof contentCreatorAnalytics.$inferInsert;
+
+// ─── Titan Storage Add-on ─────────────────────────────────────────────────
+// Re-export all storage tables so they are available via the main schema import.
+export {
+  storageSubscriptions,
+  storageFiles,
+  storageShareLinks,
+  storageApiKeys,
+} from "./storage-schema";
+export type {
+  StorageSubscription,
+  InsertStorageSubscription,
+  StorageFile,
+  InsertStorageFile,
+  StorageShareLink,
+  InsertStorageShareLink,
+  StorageApiKey,
+  InsertStorageApiKey,
+} from "./storage-schema";

@@ -30,6 +30,8 @@ import { startBusinessModuleGeneratorScheduler } from "../business-module-genera
 import { startSecuritySweepScheduler } from "../security-hardening";
 import { startFortressSweepScheduler } from "../security-fortress";
 import { registerBinancePayWebhook } from "../binance-pay-webhook";
+import { registerStorageWebhook } from "../storage-billing-router";
+import { registerStorageUploadRoutes } from "../storage-upload-handler";
 import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerSeoV4Routes, runGeoOptimization } from "../seo-engine-v4";
 import { runStartupDiagnostic, registerIndexNowRoute, patchIndexNowKey, startPeriodicSync } from "../autonomous-sync";
@@ -194,6 +196,8 @@ async function startServer() {
   registerStripeWebhook(app);
   // Binance Pay webhook (also before express.json for raw body)
   registerBinancePayWebhook(app);
+  // Titan Storage billing webhook (also before express.json for raw body)
+  registerStorageWebhook(app);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -375,6 +379,8 @@ async function startServer() {
   registerMarketplaceFileRoutes(app);
   // Chat file upload endpoint
   registerChatUploadRoute(app);
+  // Titan Storage — file upload and download endpoints
+  registerStorageUploadRoutes(app);
   // Project file download (single + ZIP batch)
   registerProjectDownloadRoutes(app);
   // Chat SSE streaming and abort endpoints
@@ -518,6 +524,11 @@ async function startServer() {
         `CREATE TABLE IF NOT EXISTS \`content_creator_pieces\` (\`id\` int AUTO_INCREMENT NOT NULL, \`campaignId\` int, \`platform\` varchar(64) NOT NULL, \`contentType\` varchar(64) NOT NULL, \`title\` varchar(500), \`headline\` varchar(500), \`body\` text NOT NULL, \`callToAction\` varchar(500), \`hashtags\` json, \`hook\` text, \`videoScript\` text, \`visualDirections\` json, \`seoKeywords\` json, \`imagePrompt\` text, \`mediaUrl\` text, \`seoScore\` int NOT NULL DEFAULT 0, \`qualityScore\` int NOT NULL DEFAULT 0, \`status\` enum('draft','review','approved','scheduled','published','failed','archived') NOT NULL DEFAULT 'draft', \`scheduledAt\` timestamp NULL, \`publishedAt\` timestamp NULL, \`tiktokPublishId\` varchar(255), \`externalPostId\` varchar(255), \`impressions\` int NOT NULL DEFAULT 0, \`clicks\` int NOT NULL DEFAULT 0, \`engagements\` int NOT NULL DEFAULT 0, \`shares\` int NOT NULL DEFAULT 0, \`saves\` int NOT NULL DEFAULT 0, \`videoViews\` int NOT NULL DEFAULT 0, \`aiPrompt\` text, \`aiModel\` varchar(64), \`generationMs\` int, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`content_creator_pieces_id\` PRIMARY KEY(\`id\`))`,
         `CREATE TABLE IF NOT EXISTS \`content_creator_schedules\` (\`id\` int AUTO_INCREMENT NOT NULL, \`pieceId\` int NOT NULL, \`campaignId\` int, \`platform\` varchar(64) NOT NULL DEFAULT 'tiktok', \`scheduledAt\` timestamp NOT NULL, \`status\` enum('pending','processing','published','failed','cancelled') NOT NULL DEFAULT 'pending', \`publishedAt\` timestamp NULL, \`error\` text, \`retryCount\` int NOT NULL DEFAULT 0, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`content_creator_schedules_id\` PRIMARY KEY(\`id\`))`,
         `CREATE TABLE IF NOT EXISTS \`content_creator_analytics\` (\`id\` int AUTO_INCREMENT NOT NULL, \`pieceId\` int NOT NULL, \`campaignId\` int, \`platform\` varchar(64) NOT NULL, \`date\` varchar(10) NOT NULL, \`impressions\` int NOT NULL DEFAULT 0, \`clicks\` int NOT NULL DEFAULT 0, \`engagements\` int NOT NULL DEFAULT 0, \`shares\` int NOT NULL DEFAULT 0, \`saves\` int NOT NULL DEFAULT 0, \`videoViews\` int NOT NULL DEFAULT 0, \`profileVisits\` int NOT NULL DEFAULT 0, \`follows\` int NOT NULL DEFAULT 0, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`content_creator_analytics_id\` PRIMARY KEY(\`id\`))`,
+        // ── Titan Storage Add-on ──────────────────────────────────────────────
+        `CREATE TABLE IF NOT EXISTS \`storage_subscriptions\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`stripeCustomerId\` varchar(128), \`stripeSubscriptionId\` varchar(128), \`stripePriceId\` varchar(128), \`plan\` enum('10gb','50gb','100gb','500gb','1tb') NOT NULL, \`status\` enum('active','canceled','past_due','incomplete','trialing') NOT NULL DEFAULT 'active', \`quotaBytes\` bigint NOT NULL, \`usedBytes\` bigint NOT NULL DEFAULT 0, \`currentPeriodEnd\` timestamp NULL, \`cancelAtPeriodEnd\` boolean NOT NULL DEFAULT false, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`storage_subscriptions_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_subscriptions_userId_unique\` UNIQUE(\`userId\`))`,
+        `CREATE TABLE IF NOT EXISTS \`storage_files\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`s3Key\` varchar(512) NOT NULL, \`s3Url\` text, \`originalName\` varchar(512) NOT NULL, \`mimeType\` varchar(128) NOT NULL, \`sizeBytes\` bigint NOT NULL, \`feature\` enum('vault','builder','fetcher','scanner','webhook','export','generic') NOT NULL DEFAULT 'generic', \`featureResourceId\` varchar(128), \`tags\` json, \`isDeleted\` boolean NOT NULL DEFAULT false, \`deletedAt\` timestamp NULL, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`storage_files_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_files_s3Key_unique\` UNIQUE(\`s3Key\`))`,
+        `CREATE TABLE IF NOT EXISTS \`storage_share_links\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`fileId\` int NOT NULL, \`token\` varchar(64) NOT NULL, \`expiresAt\` timestamp NULL, \`maxDownloads\` int NOT NULL DEFAULT 0, \`downloadCount\` int NOT NULL DEFAULT 0, \`passwordHash\` varchar(64), \`isActive\` boolean NOT NULL DEFAULT true, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`storage_share_links_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_share_links_token_unique\` UNIQUE(\`token\`))`,
+        `CREATE TABLE IF NOT EXISTS \`storage_api_keys\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`name\` varchar(128) NOT NULL, \`keyHash\` varchar(64) NOT NULL, \`keyPrefix\` varchar(12) NOT NULL, \`scopes\` json NOT NULL, \`lastUsedAt\` timestamp NULL, \`expiresAt\` timestamp NULL, \`isActive\` boolean NOT NULL DEFAULT true, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`storage_api_keys_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_api_keys_keyHash_unique\` UNIQUE(\`keyHash\`))`,
       ];
       for (const ddl of createTables) {
         try {

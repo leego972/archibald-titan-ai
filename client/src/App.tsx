@@ -114,6 +114,9 @@ import CyberMCPPage from "./pages/CyberMCPPage";
 import AstraPage from "./pages/AstraPage";
 import ArgusPage from "./pages/ArgusPage";
 
+// Titan Storage Add-on
+import TitanStoragePage from "./pages/TitanStoragePage";
+
 
 function DashboardRouter() {
   return (
@@ -203,6 +206,9 @@ function DashboardRouter() {
         <Route path="/cybermcp" component={CyberMCPPage} />
         <Route path="/astra" component={AstraPage} />
         <Route path="/argus" component={ArgusPage} />
+
+        {/* Titan Storage Add-on */}
+        <Route path="/storage" component={TitanStoragePage} />
 
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />

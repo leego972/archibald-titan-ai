@@ -154,6 +154,8 @@ const menuGroups: MenuGroup[] = [
       { icon: featureIcon("icon_15_r2c7"), label: "Evilginx 3", path: "/evilginx", titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "BlackEye", path: "/blackeye", titanOnly: true },
       { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
+      // ── Titan Storage Add-on ──────────────────────────────────────────────
+      { icon: featureIcon("icon_31_r4c7"), label: "Titan Storage", path: "/storage", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
