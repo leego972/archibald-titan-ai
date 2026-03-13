@@ -420,7 +420,18 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
                       </div>
                     )}
 
-                    {/* Stats */}
+                    {/* Verified Delivery + Stats */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {item.fileUrl ? (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                          <CheckCircle2 className="w-3 h-3" /> Verified Delivery
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-400/60">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Preparing...
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {item.viewCount}</span>
                       <span className="flex items-center gap-1"><Download className="w-3 h-3" /> {item.totalSales}</span>
@@ -596,6 +607,25 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                 </div>
               )}
 
+              {/* Code Preview — shows a teaser snippet of what's inside the package */}
+              {listing.previewUrl && (
+                <div className="mt-4 rounded-lg border border-border/30 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-slate-900/80 border-b border-border/20">
+                    <div className="flex items-center gap-2">
+                      <Code2 className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-mono text-muted-foreground">preview.{listing.language?.toLowerCase() || 'py'}</span>
+                    </div>
+                    <Badge className="bg-cyan-600/20 text-cyan-400 text-[10px]">Preview</Badge>
+                  </div>
+                  <div className="bg-slate-950/80 p-3 overflow-x-auto max-h-48">
+                    <pre className="text-xs font-mono text-slate-300 whitespace-pre">
+                      {`# Preview of ${listing.title}\n# Full source code available after purchase\n\n`}
+                      {listing.description.slice(0, 200)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
               {tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-4">
                   {tags.map((tag: string) => (
@@ -734,6 +764,24 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
           <Card className="border-border/30 bg-card/50">
             <CardContent className="p-4 space-y-2">
               <h3 className="text-sm font-medium mb-2">Details</h3>
+              {/* Verified Delivery Badge */}
+              {listing.fileUrl ? (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-600/10 border border-emerald-600/30 mb-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-emerald-400">Verified Delivery</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {listing.fileType?.toUpperCase() || "ZIP"} package ready
+                      {listing.fileSize ? ` · ${(listing.fileSize / 1024).toFixed(0)} KB` : ""}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-600/10 border border-amber-600/30 mb-2">
+                  <Loader2 className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
+                  <div className="text-xs text-amber-400">File package being prepared...</div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="text-muted-foreground">Category</span>
                 <span className="text-right capitalize">{listing.category}</span>
@@ -745,6 +793,12 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                 <span className="text-right">{listing.version || "1.0.0"}</span>
                 <span className="text-muted-foreground">Risk Level</span>
                 <span className="text-right capitalize">{listing.riskCategory.replace("_", " ")}</span>
+                {listing.fileSize ? (
+                  <>
+                    <span className="text-muted-foreground">File Size</span>
+                    <span className="text-right">{(listing.fileSize / 1024).toFixed(0)} KB</span>
+                  </>
+                ) : null}
                 <span className="text-muted-foreground">Item ID</span>
                 <span className="text-right font-mono text-amber-400/80">{listing.uid}</span>
               </div>

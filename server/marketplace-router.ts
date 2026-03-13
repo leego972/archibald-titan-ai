@@ -12,6 +12,7 @@ import * as db from "./db";
 import { consumeCredits, addCredits, getCreditBalance } from "./credit-service";
 import { randomUUID } from "crypto";
 import { seedMarketplaceWithMerchants } from "./marketplace-seed";
+import { generateAndUploadPayloads } from "./marketplace-payload-generator";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { safeDDLStatement } from "./_core/sql-sanitize.js";
@@ -1364,7 +1365,14 @@ export const marketplaceRouter = router({
     // Step 2: Seed data
     try {
       const result = await seedMarketplaceWithMerchants();
-      return result;
+      
+      // Step 3: Generate and upload real file payloads for all listings
+      const payloadResult = await generateAndUploadPayloads();
+      
+      return {
+        ...result,
+        payloads: payloadResult
+      };
     } catch (e: unknown) {
       log.error("[Marketplace] Seed failed:", { error: String(getErrorMessage(e)) });
       throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Seed failed: " + getErrorMessage(e) });
