@@ -18,8 +18,8 @@ import PricingPage from "./pages/PricingPage";
 import BlogPage from "./pages/BlogPage";
 
 // Auth pages
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -229,8 +229,8 @@ function Router() {
       <Route path="/" component={LandingPage} />
 
       {/* Auth pages */}
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
+      <Route path="/login" component={() => <LoginPage />} />
+      <Route path="/register" component={() => <RegisterPage />} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />

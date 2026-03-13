@@ -3,10 +3,10 @@ import { useAuth } from "../hooks/useAuth";
 import { toast } from "sonner";
 
 interface LoginPageProps {
-  onLoginSuccess: (username: string, masterPassword: string) => void;
+  onLoginSuccess?: (username: string, masterPassword: string) => void;
 }
 
-export function LoginPage({ onLoginSuccess }: LoginPageProps) {
+export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +19,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setLoading(false);
     if (success) {
       toast.success("Logged in successfully");
-      onLoginSuccess(username, password);
+      onLoginSuccess?.(username, password);
     } else {
       toast.error("Invalid username or password");
     }

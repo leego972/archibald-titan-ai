@@ -3,10 +3,10 @@ import { useAuth } from "../hooks/useAuth";
 import { toast } from "sonner";
 
 interface RegisterPageProps {
-  onRegisterSuccess: (username: string, masterPassword: string) => void;
+  onRegisterSuccess?: (username: string, masterPassword: string) => void;
 }
 
-export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
+export function RegisterPage({ onRegisterSuccess }: RegisterPageProps = {}) {
   const { register } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +24,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
     setLoading(false);
     if (success) {
       toast.success("Registered successfully");
-      onRegisterSuccess(username, password);
+      onRegisterSuccess?.(username, password);
     } else {
       toast.error("Username already exists");
     }
