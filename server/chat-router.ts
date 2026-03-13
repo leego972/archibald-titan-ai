@@ -1587,6 +1587,20 @@ Do NOT attempt any tool calls or builds.`;
             await new Promise(r => setTimeout(r, 800));
           }
 
+          // EXTERNAL BUILD OVERRIDE: If we're at round 3+ and no files have been created yet,
+          // inject a hard override to stop researching and start building immediately.
+          if (isExternalBuild && rounds >= 3) {
+            const filesCreatedSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success).length;
+            if (filesCreatedSoFar === 0) {
+              log.warn(`[Chat] External build round ${rounds} — NO files created yet. Injecting FORCE BUILD override.`);
+              llmMessages.push({
+                role: 'user',
+                content: `SYSTEM OVERRIDE — CRITICAL: You have spent ${rounds - 1} rounds without creating a single file. This is a BUILD task. You MUST call create_file RIGHT NOW. Stop researching. Stop planning. Stop listing files. Call create_file with the FIRST file of the project immediately. The user is waiting. Every round without a create_file call is a failure.`,
+              });
+              forceFirstTool = 'create_file';
+            }
+          }
+
           // PROACTIVE CONTEXT COMPRESSION: After round 15, compress old tool results to free tokens
           // NEVER compress create_file results — the LLM needs to know what files exist
           // For build requests, preserve more context to avoid losing critical build state
