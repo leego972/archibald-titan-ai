@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     jq \
     unzip \
-    golang \
     ruby \
     ruby-dev \
     build-essential \
@@ -30,8 +29,8 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir /var/run/sshd
 RUN echo 'root:titan123' | chpasswd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 RUN sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # SSH login fix
@@ -40,19 +39,18 @@ RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 
-# Install Metasploit Framework via gem (lighter than omnibus)
-RUN gem install bundler && \
-    gem install metasploit-framework --no-document 2>/dev/null || \
-    (curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > /tmp/msfinstall && \
-     chmod 755 /tmp/msfinstall && \
-     /tmp/msfinstall)
+# Install Metasploit Framework via official installer
+RUN curl -fsSL https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > /tmp/msfinstall && \
+    chmod 755 /tmp/msfinstall && \
+    /tmp/msfinstall
 
-# Install Evilginx3 (download binary)
+# Install Evilginx3 (correct release URL - zip format)
 RUN mkdir -p /opt/evilginx && \
     cd /opt/evilginx && \
-    wget -q https://github.com/kgretzky/evilginx2/releases/download/3.3.0/evilginx-linux-amd64.tar.gz && \
-    tar -xf evilginx-linux-amd64.tar.gz && \
-    rm evilginx-linux-amd64.tar.gz && \
+    wget -q https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip && \
+    unzip -q evilginx-v3.3.0-linux-64bit.zip && \
+    rm evilginx-v3.3.0-linux-64bit.zip && \
+    chmod +x /opt/evilginx/evilginx && \
     ln -sf /opt/evilginx/evilginx /usr/local/bin/evilginx
 
 # Create base directory for Titan users
