@@ -43,6 +43,7 @@ import {
   getStagedChangeCount,
   pushToGitHub,
   isGitHubIntegrationAvailable,
+  listFiles as selfListFiles,
 } from "./self-improvement-engine";
 import {
   detectSelfBuildIntent,
@@ -1505,6 +1506,22 @@ Do NOT attempt any tool calls or builds.`;
           role: 'system',
           content: BUILD_SYSTEM_REMINDER,
         });
+        // PRE-FLIGHT: Inject directory listings so Titan always knows the codebase structure
+        // This prevents Titan from guessing wrong file paths on the live server.
+        try {
+          const serverListing = selfListFiles('server');
+          const pagesListing = selfListFiles('client/src/pages');
+          const serverFiles = serverListing.success ? (serverListing.files || []).join('\n') : 'unavailable';
+          const pagesFiles = pagesListing.success ? (pagesListing.files || []).join('\n') : 'unavailable';
+          const preflightContent = `## CODEBASE DIRECTORY MAP (pre-loaded for you)\n\n### server/ directory:\n${serverFiles}\n\n### client/src/pages/ directory:\n${pagesFiles}\n\nUse these exact filenames when calling self_read_file or self_modify_file. Do NOT guess paths.`;
+          llmMessages.splice(userMsgIdx, 0, {
+            role: 'system',
+            content: preflightContent,
+          });
+          log.info('[Chat] Pre-flight directory listings injected for self-build');
+        } catch (preflightErr) {
+          log.warn('[Chat] Pre-flight directory listing failed (non-fatal):', { error: getErrorMessage(preflightErr) });
+        }
       } else if (isExternalBuild) {
         forceFirstTool = getForceFirstTool(input.message, false);
         // Detect if this is a security-specific build to conditionally inject security templates

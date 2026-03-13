@@ -32,6 +32,12 @@ import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { eq, desc, sql } from "drizzle-orm";
+import { execSync } from "child_process";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+
+const log = createLogger("SelfImprovementEngine");
+
 import { getDb } from "./db";
 import {
   systemSnapshots,
@@ -46,6 +52,82 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────
 
+/**
+ * Dynamic project root resolution.
+ *
+ * In development: process.cwd() is the repo root and source files exist there.
+ * In production (Railway): the container only has dist/ — source files are NOT
+ * present. We clone the repo into /tmp/titan-src on first use so that
+ * self_list_files / self_read_file / self_modify_file all work correctly.
+ */
+const CLONE_DIR = "/tmp/titan-src";
+let _resolvedProjectRoot: string | null = null;
+
+function sourceFilesExist(dir: string): boolean {
+  try {
+    return (
+      fs.existsSync(path.join(dir, "server")) &&
+      fs.existsSync(path.join(dir, "client", "src"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns the project root where source files can be read and written.
+ * Clones the repo into /tmp/titan-src if source files are not present at cwd.
+ * Result is cached after the first call.
+ */
+function getProjectRoot(): string {
+  if (_resolvedProjectRoot) return _resolvedProjectRoot;
+  const cwd = process.cwd();
+  if (sourceFilesExist(cwd)) {
+    _resolvedProjectRoot = cwd;
+    return cwd;
+  }
+  // Source files not present — clone the repo
+  const pat = process.env.GITHUB_PAT;
+  if (!pat) {
+    _resolvedProjectRoot = cwd;
+    return cwd;
+  }
+  try {
+    if (!fs.existsSync(CLONE_DIR) || !sourceFilesExist(CLONE_DIR)) {
+      if (fs.existsSync(CLONE_DIR)) {
+        execSync(`rm -rf ${CLONE_DIR}`, { timeout: 30000 });
+      }
+      log.info("[SelfImprovement] Source files not found — cloning repo into /tmp/titan-src");
+      execSync(
+        `git clone --depth=1 https://${pat}@github.com/leego972/archibald-titan-ai.git ${CLONE_DIR}`,
+        { timeout: 120000, encoding: "utf-8" }
+      );
+      execSync('git config user.email "archibaldtitan@gmail.com"', { cwd: CLONE_DIR, encoding: "utf-8" });
+      execSync('git config user.name "Archibald Titan"', { cwd: CLONE_DIR, encoding: "utf-8" });
+      log.info("[SelfImprovement] Repo cloned successfully — self-improvement enabled");
+    } else {
+      try {
+        execSync("git pull --ff-only origin main", { cwd: CLONE_DIR, timeout: 30000, encoding: "utf-8" });
+        log.info("[SelfImprovement] Repo pulled latest changes");
+      } catch {
+        log.warn("[SelfImprovement] Could not pull latest — using existing clone");
+      }
+    }
+    _resolvedProjectRoot = CLONE_DIR;
+    return CLONE_DIR;
+  } catch (err) {
+    log.error("[SelfImprovement] Failed to clone repo: " + String(err));
+    _resolvedProjectRoot = cwd;
+    return cwd;
+  }
+}
+
+/** Reset the cached project root (called after a successful push to force re-pull next time) */
+export function resetProjectRootCache(): void {
+  _resolvedProjectRoot = null;
+}
+
+// PROJECT_ROOT kept for non-source paths (dist/ health checks use process.cwd() directly)
 const PROJECT_ROOT = process.cwd();
 
 /**
@@ -300,7 +382,7 @@ function isProtected(filePath: string): boolean {
 
   // Anti-Self-Break: Resolve symlinks to prevent bypass via symlinked paths
   try {
-    const fullPath = path.join(PROJECT_ROOT, normalized);
+    const fullPath = path.join(getProjectRoot(), normalized);
     if (fs.existsSync(fullPath)) {
       const realPath = fs.realpathSync(fullPath);
       const realRelative = path.relative(PROJECT_ROOT, realPath);
@@ -363,7 +445,7 @@ export async function createSnapshot(
     let savedCount = 0;
     for (const fp of filePaths) {
       const normalized = normalizePath(fp);
-      const fullPath = path.join(PROJECT_ROOT, normalized);
+      const fullPath = path.join(getProjectRoot(), normalized);
 
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath, "utf-8");
@@ -510,7 +592,7 @@ export function validateModifications(
 
       // ── Anti-Self-Break: Content delta guard ──
       if (mod.action === "modify") {
-        const fullPath = path.join(PROJECT_ROOT, normalized);
+        const fullPath = path.join(getProjectRoot(), normalized);
         if (fs.existsSync(fullPath)) {
           const currentContent = fs.readFileSync(fullPath, "utf-8");
           const currentLen = currentContent.length;
@@ -526,7 +608,7 @@ export function validateModifications(
 
       // ── Anti-Self-Break: Export preservation guard ──
       if (mod.action === "modify") {
-        const fullPath = path.join(PROJECT_ROOT, normalized);
+        const fullPath = path.join(getProjectRoot(), normalized);
         if (fs.existsSync(fullPath)) {
           const currentContent = fs.readFileSync(fullPath, "utf-8");
           // Extract exported function/class/const names from current file
@@ -567,7 +649,7 @@ export function validateModifications(
 
     // Delete checks
     if (mod.action === "delete") {
-      const fullPath = path.join(PROJECT_ROOT, normalized);
+      const fullPath = path.join(getProjectRoot(), normalized);
       if (!fs.existsSync(fullPath)) {
         warnings.push(`WARNING: ${normalized} does not exist (delete is a no-op).`);
       }
@@ -707,9 +789,9 @@ export async function applyModifications(
 
   // Step 3: Pre-check write permissions on target directories
   for (const mod of modifications) {
-    if (mod.action === "delete" && !fs.existsSync(path.join(PROJECT_ROOT, normalizePath(mod.filePath)))) continue;
+    if (mod.action === "delete" && !fs.existsSync(path.join(getProjectRoot(), normalizePath(mod.filePath)))) continue;
     const normalized = normalizePath(mod.filePath);
-    const fullPath = path.join(PROJECT_ROOT, normalized);
+    const fullPath = path.join(getProjectRoot(), normalized);
     const dir = path.dirname(fullPath);
     try {
       if (!fs.existsSync(dir)) {
@@ -732,7 +814,7 @@ export async function applyModifications(
 
   for (const mod of modifications) {
     const normalized = normalizePath(mod.filePath);
-    const fullPath = path.join(PROJECT_ROOT, normalized);
+    const fullPath = path.join(getProjectRoot(), normalized);
 
     try {
       switch (mod.action) {
@@ -885,7 +967,7 @@ export async function rollbackToSnapshot(
 
     let restored = 0;
     for (const file of files) {
-      const fullPath = path.join(PROJECT_ROOT, file.filePath);
+      const fullPath = path.join(getProjectRoot(), file.filePath);
       const dir = path.dirname(fullPath);
 
       if (!fs.existsSync(dir)) {
@@ -974,13 +1056,13 @@ function collectAllSourceFiles(): string[] {
   }
 
   for (const dir of ALLOWED) {
-    walk(path.join(PROJECT_ROOT, dir));
+    walk(path.join(getProjectRoot(), dir));
   }
 
   // Also include root config files
   const rootConfigs = ["package.json", "tsconfig.json", "vite.config.ts", "tailwind.config.ts", "drizzle.config.ts"];
   for (const cfg of rootConfigs) {
-    const full = path.join(PROJECT_ROOT, cfg);
+    const full = path.join(getProjectRoot(), cfg);
     if (fs.existsSync(full)) result.push(cfg);
   }
 
@@ -1019,7 +1101,7 @@ export async function saveCheckpoint(
     let savedCount = 0;
     for (const fp of files) {
       try {
-        const fullPath = path.join(PROJECT_ROOT, fp);
+        const fullPath = path.join(getProjectRoot(), fp);
         const content = fs.readFileSync(fullPath, "utf-8");
         await db.insert(snapshotFiles).values({
           snapshotId,
@@ -1159,7 +1241,7 @@ export async function runHealthCheck(): Promise<HealthCheckResult> {
       { path: "dist/public/index.html", label: "Client build (dist/public/index.html)" },
     ];
     for (const pf of productionFiles) {
-      const fullPath = path.join(PROJECT_ROOT, pf.path);
+      const fullPath = path.join(process.cwd(), pf.path);
       const exists = fs.existsSync(fullPath);
       checks.push({
         name: `file_exists:${pf.path}`,
@@ -1168,7 +1250,7 @@ export async function runHealthCheck(): Promise<HealthCheckResult> {
       });
     }
     // Also check source files if they were copied into the image
-    const sourceDir = path.join(PROJECT_ROOT, "server");
+    const sourceDir = path.join(getProjectRoot(), "server");
     const sourceAvailable = fs.existsSync(sourceDir) && fs.readdirSync(sourceDir).some(f => f.endsWith(".ts"));
     checks.push({
       name: "source_files",
@@ -1189,7 +1271,7 @@ export async function runHealthCheck(): Promise<HealthCheckResult> {
       "client/src/main.tsx",
     ];
     for (const cf of criticalFiles) {
-      const fullPath = path.join(PROJECT_ROOT, cf);
+      const fullPath = path.join(getProjectRoot(), cf);
       const exists = fs.existsSync(fullPath);
       checks.push({
         name: `file_exists:${cf}`,
@@ -1207,7 +1289,7 @@ export async function runHealthCheck(): Promise<HealthCheckResult> {
       "server/chat-executor.ts",
     ];
     for (const sf of serverFiles) {
-      const fullPath = path.join(PROJECT_ROOT, sf);
+      const fullPath = path.join(getProjectRoot(), sf);
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath, "utf-8");
         const openBraces = (content.match(/\{/g) || []).length;
@@ -1264,7 +1346,7 @@ export async function runHealthCheck(): Promise<HealthCheckResult> {
       message: "Self-improvement engine loaded (compiled into server bundle)",
     });
   } else {
-    const selfPath = path.join(PROJECT_ROOT, "server/self-improvement-engine.ts");
+    const selfPath = path.join(getProjectRoot(), "server/self-improvement-engine.ts");
     const selfExists = fs.existsSync(selfPath);
     checks.push({
       name: "self_improvement_engine",
@@ -1335,7 +1417,7 @@ export async function requestRestart(
       };
     } else {
       // In development, tsx watch mode auto-restarts on file changes.
-      const triggerFile = path.join(PROJECT_ROOT, "server/routers.ts");
+      const triggerFile = path.join(getProjectRoot(), "server/routers.ts");
       if (fs.existsSync(triggerFile)) {
         const now = new Date();
         fs.utimesSync(triggerFile, now, now);
@@ -1371,7 +1453,7 @@ export function readFile(
       };
     }
 
-    const fullPath = path.join(PROJECT_ROOT, normalized);
+    const fullPath = path.join(getProjectRoot(), normalized);
     if (!fs.existsSync(fullPath)) {
       return { success: false, error: `File not found: ${normalized}` };
     }
@@ -1405,7 +1487,7 @@ export function listFiles(
 ): { success: boolean; files?: string[]; error?: string } {
   try {
     const normalized = normalizePath(dirPath);
-    const fullPath = path.join(PROJECT_ROOT, normalized);
+    const fullPath = path.join(getProjectRoot(), normalized);
 
     if (!fs.existsSync(fullPath)) {
       return { success: false, error: `Directory not found: ${normalized}` };
@@ -1486,10 +1568,6 @@ export function getAllowedDirectories(): string[] {
 
 // ─── TypeScript Type Checking ───────────────────────────────────────
 
-import { execSync } from "child_process";
-import { createLogger } from "./_core/logger.js";
-import { getErrorMessage } from "./_core/errors.js";
-const log = createLogger("SelfImprovementEngine");
 
 /**
  * Run the TypeScript compiler in check-only mode (tsc --noEmit).
@@ -1510,7 +1588,7 @@ export async function runTypeCheck(): Promise<{
   }
   try {
     const output = execSync("npx tsc --noEmit 2>&1", {
-      cwd: PROJECT_ROOT,
+      cwd: getProjectRoot(),
       encoding: "utf-8",
       timeout: 60000,
     });
@@ -1552,7 +1630,7 @@ export async function runTests(testPattern?: string): Promise<{
       ? `pnpm test -- ${testPattern} 2>&1`
       : "pnpm test 2>&1";
     const output = execSync(cmd, {
-      cwd: PROJECT_ROOT,
+      cwd: getProjectRoot(),
       encoding: "utf-8",
       timeout: 120000,
     });
@@ -1743,7 +1821,7 @@ export async function flushStagedChanges(): Promise<{
   const flushedFiles: string[] = [];
 
   for (const change of _stagedChanges) {
-    const fullPath = path.join(PROJECT_ROOT, change.filePath);
+    const fullPath = path.join(getProjectRoot(), change.filePath);
     try {
       switch (change.action) {
         case "create":
@@ -2015,40 +2093,40 @@ export async function pushToGitHub(
 
   try {
     // Ensure git repo exists (production containers don't have .git)
-    const gitDir = path.join(PROJECT_ROOT, ".git");
+    const gitDir = path.join(getProjectRoot(), ".git");
     if (!fs.existsSync(gitDir)) {
       log.info("[SelfImprovement] No .git directory found — initializing fresh repo");
-      execSync("git init", { cwd: PROJECT_ROOT, encoding: "utf-8" });
-      execSync('git config user.email "archibaldtitan@gmail.com"', { cwd: PROJECT_ROOT, encoding: "utf-8" });
-      execSync('git config user.name "Archibald Titan"', { cwd: PROJECT_ROOT, encoding: "utf-8" });
+      execSync("git init", { cwd: getProjectRoot(), encoding: "utf-8" });
+      execSync('git config user.email "archibaldtitan@gmail.com"', { cwd: getProjectRoot(), encoding: "utf-8" });
+      execSync('git config user.name "Archibald Titan"', { cwd: getProjectRoot(), encoding: "utf-8" });
       // Add all existing files as the initial state
-      execSync("git add -A", { cwd: PROJECT_ROOT, encoding: "utf-8" });
-      execSync('git commit -m "Initial production state" --allow-empty', { cwd: PROJECT_ROOT, encoding: "utf-8" });
+      execSync("git add -A", { cwd: getProjectRoot(), encoding: "utf-8" });
+      execSync('git commit -m "Initial production state" --allow-empty', { cwd: getProjectRoot(), encoding: "utf-8" });
       // Fetch the latest from the primary repo so we have a proper history
       try {
-        execSync(`git remote add origin https://${GITHUB_PAT}@github.com/leego972/architabot.git`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
-        execSync("git fetch origin main --depth=1 2>&1", { cwd: PROJECT_ROOT, encoding: "utf-8", timeout: 30000 });
+        execSync(`git remote add origin https://${GITHUB_PAT}@github.com/leego972/architabot.git`, { cwd: getProjectRoot(), encoding: "utf-8" });
+        execSync("git fetch origin main --depth=1 2>&1", { cwd: getProjectRoot(), encoding: "utf-8", timeout: 30000 });
         // Reset to the fetched state but keep our working tree changes
-        execSync("git reset --soft origin/main 2>&1", { cwd: PROJECT_ROOT, encoding: "utf-8" });
+        execSync("git reset --soft origin/main 2>&1", { cwd: getProjectRoot(), encoding: "utf-8" });
       } catch (fetchErr: unknown) {
         log.warn(`[SelfImprovement] Could not fetch from origin: ${getErrorMessage(fetchErr)}`);
       }
       log.info("[SelfImprovement] Git repo initialized successfully");
     } else {
       // Configure git user (repo already exists)
-      execSync('git config user.email "archibaldtitan@gmail.com"', { cwd: PROJECT_ROOT, encoding: "utf-8" });
-      execSync('git config user.name "Archibald Titan"', { cwd: PROJECT_ROOT, encoding: "utf-8" });
+      execSync('git config user.email "archibaldtitan@gmail.com"', { cwd: getProjectRoot(), encoding: "utf-8" });
+      execSync('git config user.name "Archibald Titan"', { cwd: getProjectRoot(), encoding: "utf-8" });
     }
 
     // Stage the modified files
     for (const file of files) {
       const normalized = normalizePath(file);
       try {
-        execSync(`git add "${normalized}"`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
+        execSync(`git add "${normalized}"`, { cwd: getProjectRoot(), encoding: "utf-8" });
       } catch {
         // File might not exist (deleted), try git rm
         try {
-          execSync(`git rm --cached "${normalized}" 2>/dev/null || true`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
+          execSync(`git rm --cached "${normalized}" 2>/dev/null || true`, { cwd: getProjectRoot(), encoding: "utf-8" });
         } catch { /* ignore */ }
       }
     }
@@ -2056,7 +2134,7 @@ export async function pushToGitHub(
     // Commit
     const sanitizedMessage = commitMessage.replace(/"/g, '\\"');
     try {
-      execSync(`git commit -m "${sanitizedMessage}"`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
+      execSync(`git commit -m "${sanitizedMessage}"`, { cwd: getProjectRoot(), encoding: "utf-8" });
     } catch (commitErr: unknown) {
       // If nothing to commit, that's OK
       if ((commitErr as any).stdout?.includes("nothing to commit") || (commitErr as any).stderr?.includes("nothing to commit")) {
@@ -2070,7 +2148,7 @@ export async function pushToGitHub(
     }
 
     // Get commit hash
-    const commitHash = execSync("git rev-parse --short HEAD", { cwd: PROJECT_ROOT, encoding: "utf-8" }).trim();
+    const commitHash = execSync("git rev-parse --short HEAD", { cwd: getProjectRoot(), encoding: "utf-8" }).trim();
 
     // Push to each repository
     const pushedRepos: string[] = [];
@@ -2079,19 +2157,20 @@ export async function pushToGitHub(
         // Ensure remote exists or update it
         try {
           execSync(`git remote add ${repo.name} ${repo.remote} 2>/dev/null || git remote set-url ${repo.name} ${repo.remote}`, {
-            cwd: PROJECT_ROOT,
+            cwd: getProjectRoot(),
             encoding: "utf-8",
           });
         } catch { /* remote might already exist */ }
 
         // Push — use force to handle divergent histories in production container
         execSync(`git push ${repo.name} HEAD:main --force 2>&1`, {
-          cwd: PROJECT_ROOT,
+          cwd: getProjectRoot(),
           encoding: "utf-8",
           timeout: 30000,
         });
         pushedRepos.push(repo.name);
         log.info(`[SelfImprovement] Pushed to ${repo.name} (${commitHash})`);
+        resetProjectRootCache(); // Force re-pull on next access
       } catch (pushErr: unknown) {
         log.error(`[SelfImprovement] Failed to push to ${repo.name}: ${getErrorMessage(pushErr)}`);
       }

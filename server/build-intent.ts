@@ -949,10 +949,20 @@ You are now in BUILDER MODE. The user wants you to modify Archibald Titan's own 
 6. **ANTI-BREAK GUARANTEE** — Never delete or overwrite existing functionality unless explicitly asked
 
 ### OPTIMAL WORKFLOW (3-4 rounds max)
-1. **Round 1 — EXPLORE + READ**: Use self_list_files on the relevant directory, then self_read_file on 1-2 key files
-2. **Round 2 — BUILD**: Use self_multi_file_modify to create/modify ALL files in one batch call
-3. **Round 3 — INTEGRATE**: If needed, patch App.tsx routes and FetcherLayout sidebar in one self_multi_file_modify call
-4. **Round 4 — RESPOND**: Tell the user what you built and how to use it
+
+**MANDATORY FIRST STEP — do this before ANYTHING else:**
+Your very first action MUST be calling self_list_files with dirPath="server" AND self_list_files with dirPath="client/src/pages". These two calls give you the complete map of the codebase. NEVER guess or assume file paths — always discover them first. If you skip this step, you WILL reference wrong paths and fail.
+
+1. **Round 1 — DISCOVER**: Call self_list_files("server") and self_list_files("client/src/pages") to see ALL existing files. Then self_read_file on 1-2 key integration files (e.g. client/src/App.tsx for routes, client/src/components/FetcherLayout.tsx for sidebar, server/routers.ts for API registration).
+2. **Round 2 — BUILD**: Use self_multi_file_modify to create/modify ALL files in one batch call.
+3. **Round 3 — INTEGRATE**: Patch App.tsx routes and FetcherLayout sidebar in one self_multi_file_modify call.
+4. **Round 4 — RESPOND**: Tell the user what you built and how to use it.
+
+**PATH RULES (non-negotiable):**
+- Pages live in client/src/pages/ — ALWAYS verify exact filenames with self_list_files("client/src/pages") first
+- Backend routers live in server/ — ALWAYS verify with self_list_files("server") first
+- NEVER construct a path like client/src/pages/SomePage/index.tsx without first confirming the directory structure
+- If a directory listing returns empty or an error, try the parent directory (e.g. client/src instead of client/src/pages)
 
 ### PATCH ACTION (preferred for existing files)
 Use action="patch" with patches array: [{"search": "exact text to find", "replace": "replacement text"}]
