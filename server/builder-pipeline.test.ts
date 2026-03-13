@@ -37,8 +37,8 @@ describe("Builder Tool Definitions", () => {
     expect(toolNames).toContain("self_multi_file_modify");
   });
 
-  it("should have exactly 85 tools total", () => {
-    expect(TITAN_TOOLS.length).toBe(85);
+  it("should have exactly 102 tools total", () => {
+    expect(TITAN_TOOLS.length).toBe(102);
   });
 
   it("self_type_check should have no required parameters", () => {

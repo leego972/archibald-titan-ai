@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { toast } from "sonner";
+import { trackSignup } from "@/lib/adTracking";
 
 interface RegisterPageProps {
   onRegisterSuccess?: (username: string, masterPassword: string) => void;
@@ -24,6 +25,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps = {}) {
     setLoading(false);
     if (success) {
       toast.success("Registered successfully");
+      trackSignup(username);
       onRegisterSuccess?.(username, password);
     } else {
       toast.error("Username already exists");
