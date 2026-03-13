@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies and SSH server
+# Install all dependencies and SSH server in one layer
 RUN apt-get update && apt-get install -y \
     openssh-server \
     sudo \
@@ -26,39 +26,33 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure SSH
-RUN mkdir /var/run/sshd
-RUN echo 'root:titan123' | chpasswd
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-RUN sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
-# SSH login fix
-RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+RUN mkdir /var/run/sshd && \
+    echo 'root:titan123' | chpasswd && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 
-# Install Metasploit Framework via official installer
-RUN curl -fsSL https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > /tmp/msfinstall && \
-    chmod 755 /tmp/msfinstall && \
-    /tmp/msfinstall
-
-# Install Evilginx3 (correct release URL - zip format)
+# Install Evilginx3 v3.3.0
 RUN mkdir -p /opt/evilginx && \
-    cd /opt/evilginx && \
-    wget -q https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip && \
-    unzip -q evilginx-v3.3.0-linux-64bit.zip && \
-    rm evilginx-v3.3.0-linux-64bit.zip && \
+    wget -q https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip \
+        -O /tmp/evilginx.zip && \
+    unzip -q /tmp/evilginx.zip -d /opt/evilginx && \
+    rm /tmp/evilginx.zip && \
     chmod +x /opt/evilginx/evilginx && \
     ln -sf /opt/evilginx/evilginx /usr/local/bin/evilginx
 
 # Create base directory for Titan users
 RUN mkdir -p /opt/titan/users
 
-# Startup script
+# Copy startup and Metasploit installer scripts
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY install-metasploit.sh /opt/titan/install-metasploit.sh
+RUN chmod +x /start.sh /opt/titan/install-metasploit.sh
 
 EXPOSE 22
 

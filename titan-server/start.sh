@@ -12,5 +12,8 @@ ssh-keygen -A
 # Create user directories base
 mkdir -p /opt/titan/users
 
+# Install Metasploit in background (does not block SSH startup)
+/opt/titan/install-metasploit.sh > /var/log/metasploit-install.log 2>&1 &
+
 # Start SSH daemon
 exec /usr/sbin/sshd -D
