@@ -25,6 +25,7 @@ import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { logAdminAction } from "./admin-activity-log";
 import { consumeCredits } from "./credit-service";
+import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 interface SSHConfig {

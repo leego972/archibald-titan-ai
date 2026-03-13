@@ -95,4 +95,10 @@ export const ENV = {
   pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "sk_KZ0EBVOHXycDd8YnvEZAvLDGnvhK33SP",
   // ElevenLabs TTS — deep English male voice for Titan AI
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
+  // Titan Server (Shared infrastructure for Metasploit, Argus, Astra, BlackEye, Evilginx)
+  titanServerHost: process.env.TITAN_SERVER_HOST ?? "",
+  titanServerPort: parseInt(process.env.TITAN_SERVER_PORT ?? "22", 10),
+  titanServerUser: process.env.TITAN_SERVER_USER ?? "root",
+  titanServerPassword: process.env.TITAN_SERVER_PASSWORD ?? "",
+  titanServerKey: process.env.TITAN_SERVER_KEY ?? "",
 };

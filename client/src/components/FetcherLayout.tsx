@@ -229,6 +229,8 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: featureIcon("icon_10_r2c2"), label: "Releases", path: "/fetcher/releases", adminOnly: true },
       { icon: featureIcon("icon_44_r6c4"), label: "User Management", path: "/fetcher/admin", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Activity Log", path: "/admin/activity-log", adminOnly: true },
+      { icon: featureIcon("icon_41_r6c1"), label: "Titan Server", path: "/admin/titan-server", adminOnly: true, isNew: true },
       { icon: featureIcon("icon_06_r1c6"), label: "Self-Improvement", path: "/fetcher/self-improvement", adminOnly: true, isNew: true },
     ],
   },

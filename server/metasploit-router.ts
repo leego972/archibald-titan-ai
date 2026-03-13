@@ -24,6 +24,7 @@ import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { consumeCredits } from "./credit-service";
+import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
 import { logAdminAction } from "./admin-activity-log";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
@@ -95,7 +96,13 @@ async function getSshConfig(userId: number) {
     .from(userSecrets)
     .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__metasploit_ssh")))
     .limit(1);
+  
   if (result.length === 0) {
+    // Fallback to shared Titan Server if configured
+    const titanConfig = getTitanServerConfig();
+    if (titanConfig) {
+      return titanConfig;
+    }
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "No Metasploit server configured. Please set up your SSH connection first.",
@@ -105,10 +112,14 @@ async function getSshConfig(userId: number) {
 }
 
 // ─── Execute msfconsole command ───────────────────────────────────
-async function execMsfConsole(ssh: SSHConfig, command: string, timeoutMs = 30000): Promise<string> {
+async function execMsfConsole(ssh: SSHConfig, command: string, timeoutMs = 30000, userId?: number): Promise<string> {
   // Run a single msfconsole command non-interactively using -x flag
   const safeCmd = command.replace(/'/g, "'\\''");
   const msfCmd = `msfconsole -q -x '${safeCmd}; exit' 2>/dev/null`;
+  
+  if ((ssh as any).isTitanServer && userId) {
+    return execTitanSSH(ssh as any, msfCmd, timeoutMs, userId);
+  }
   return execSSHCommand(ssh, msfCmd, timeoutMs);
 }
 
@@ -275,10 +286,8 @@ export const metasploitRouter = router({
       const sshConfig = await getSshConfig(ctx.user.id);
       const typeFilter = input.type !== "all" ? ` type:${input.type}` : "";
       const output = await execMsfConsole(
-        sshConfig,
-        `search ${input.query}${typeFilter}`,
-        30000
-      );
+        sshConfig, `search ${input.query}${typeFilter}`, 30000
+      , ctx.user.id);
       // Parse module list from output
       const modules = output
         .split("\n")
@@ -307,10 +316,8 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const sshConfig = await getSshConfig(ctx.user.id);
       const output = await execMsfConsole(
-        sshConfig,
-        `use ${input.module}; info`,
-        30000
-      );
+        sshConfig, `use ${input.module}; info`, 30000
+      , ctx.user.id);
       return { output };
     }),
 
@@ -321,7 +328,7 @@ export const metasploitRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execMsfConsole(sshConfig, "sessions -l", 20000);
+    const output = await execMsfConsole(sshConfig, "sessions -l", 20000, ctx.user.id);
     // Parse sessions from output
     const sessions = output
       .split("\n")
@@ -354,10 +361,8 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const sshConfig = await getSshConfig(ctx.user.id);
       const output = await execMsfConsole(
-        sshConfig,
-        `sessions -i ${input.sessionId}; ${input.command}`,
-        30000
-      );
+        sshConfig, `sessions -i ${input.sessionId}; ${input.command}`, 30000
+      , ctx.user.id);
       return { output };
     }),
 
@@ -371,10 +376,8 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const sshConfig = await getSshConfig(ctx.user.id);
       const output = await execMsfConsole(
-        sshConfig,
-        `sessions -k ${input.sessionId}`,
-        15000
-      );
+        sshConfig, `sessions -k ${input.sessionId}`, 15000
+      , ctx.user.id);
       return { output };
     }),
 
@@ -398,7 +401,7 @@ export const metasploitRouter = router({
         .join("; ");
       const payloadCmd = input.payload ? `; set PAYLOAD ${input.payload}` : "";
       const cmd = `use ${input.module}; ${setCommands}${payloadCmd}; run`;
-      const output = await execMsfConsole(sshConfig, cmd, 60000);
+      const output = await execMsfConsole(sshConfig, cmd, 60000, ctx.user.id);
       await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit run: ${input.module}`);
       await logAdminAction({
         adminId: ctx.user.id,
@@ -455,7 +458,7 @@ export const metasploitRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execMsfConsole(sshConfig, "workspace", 15000);
+    const output = await execMsfConsole(sshConfig, "workspace", 15000, ctx.user.id);
     const workspaces = output
       .split("\n")
       .filter(line => line.trim() && !line.includes("Workspaces"))
@@ -476,7 +479,7 @@ export const metasploitRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const sshConfig = await getSshConfig(ctx.user.id);
-      const output = await execMsfConsole(sshConfig, `workspace -a ${input.name}; workspace ${input.name}`, 15000);
+      const output = await execMsfConsole(sshConfig, `workspace -a ${input.name}; workspace ${input.name}`, 15000, ctx.user.id);
       return { output };
     }),
 
@@ -487,7 +490,7 @@ export const metasploitRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execMsfConsole(sshConfig, "hosts", 15000);
+    const output = await execMsfConsole(sshConfig, "hosts", 15000, ctx.user.id);
     return { output };
   }),
 
@@ -498,7 +501,7 @@ export const metasploitRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execMsfConsole(sshConfig, "services", 15000);
+    const output = await execMsfConsole(sshConfig, "services", 15000, ctx.user.id);
     return { output };
   }),
 
@@ -509,7 +512,7 @@ export const metasploitRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execMsfConsole(sshConfig, "vulns", 15000);
+    const output = await execMsfConsole(sshConfig, "vulns", 15000, ctx.user.id);
     return { output };
   }),
 
@@ -522,7 +525,7 @@ export const metasploitRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const sshConfig = await getSshConfig(ctx.user.id);
-      const output = await execMsfConsole(sshConfig, input.command, 30000);
+      const output = await execMsfConsole(sshConfig, input.command, 30000, ctx.user.id);
       return { output };
     }),
 

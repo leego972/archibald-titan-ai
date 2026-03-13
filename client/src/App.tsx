@@ -89,6 +89,7 @@ import CliToolPage from "./pages/CliToolPage";
 import ReleaseManagementPage from "./pages/ReleaseManagementPage";
 import AdminPanel from "./pages/AdminPanel";
 import AdminActivityLogPage from "./pages/AdminActivityLogPage";
+import TitanServerAdminPage from "./pages/TitanServerAdminPage";
 import SelfImprovementDashboard from "./pages/SelfImprovementDashboard";
 
 // Project Files
@@ -214,6 +215,7 @@ function DashboardRouter() {
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
         <Route path="/admin/activity-log" component={AdminActivityLogPage} />
+        <Route path="/admin/titan-server" component={TitanServerAdminPage} />
         <Route path="/fetcher/self-improvement" component={SelfImprovementDashboard} />
 
         <Route component={NotFound} />
@@ -276,6 +278,8 @@ function Router() {
       <Route path="/cybermcp" component={DashboardRouter} />
       <Route path="/astra" component={DashboardRouter} />
       <Route path="/argus" component={DashboardRouter} />
+      <Route path="/storage" component={DashboardRouter} />
+      <Route path="/admin/titan-server" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

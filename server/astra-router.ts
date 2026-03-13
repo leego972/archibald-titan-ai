@@ -24,6 +24,7 @@ import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { logAdminAction } from "./admin-activity-log";
+import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 interface SSHConfig {
@@ -59,7 +60,8 @@ async function astraApiCall(
   path: string,
   method: "GET" | "POST",
   body?: object,
-  timeoutMs = 60000
+  timeoutMs = 60000,
+  userId?: number
 ): Promise<{ status: number; data: any }> {
   const astraPort = ssh.astraPort || 8094;
   const bodyJson = body ? JSON.stringify(body) : "";
@@ -67,7 +69,9 @@ async function astraApiCall(
     ? `curl -s -w "\\n__STATUS__%{http_code}" -X POST -H "Content-Type: application/json" -d '${bodyJson.replace(/'/g, "'\\''")}' http://127.0.0.1:${astraPort}${path} 2>/dev/null`
     : `curl -s -w "\\n__STATUS__%{http_code}" http://127.0.0.1:${astraPort}${path} 2>/dev/null`;
 
-  const raw = await execSSHCommand(ssh, curlCmd, timeoutMs);
+  const raw = (ssh as any).isTitanServer && userId 
+    ? await execTitanSSH(ssh as any, curlCmd, timeoutMs, userId)
+    : await execSSHCommand(ssh, curlCmd, timeoutMs);
   const statusMatch = raw.match(/__STATUS__(\d+)$/);
   const status = statusMatch ? parseInt(statusMatch[1]) : 0;
   const responseBody = raw.replace(/__STATUS__\d+$/, "").trim();
@@ -84,7 +88,15 @@ async function getSshConfig(userId: number): Promise<SSHConfig> {
   const result = await db.select().from(userSecrets)
     .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__astra_ssh")))
     .limit(1);
-  if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No Astra server configured. Please set up your SSH connection first." });
+  
+  if (result.length === 0) {
+    // Fallback to shared Titan Server if configured
+    const titanConfig = getTitanServerConfig();
+    if (titanConfig) {
+      return { ...titanConfig, astraPort: 8094 };
+    }
+    throw new TRPCError({ code: "BAD_REQUEST", message: "No Astra server configured. Please set up your SSH connection first." });
+  }
   const cfg = JSON.parse(decrypt(result[0].encryptedValue));
   return { host: cfg.host, port: cfg.port || 22, username: cfg.username, password: cfg.password || undefined, privateKey: cfg.privateKey || undefined, astraPort: cfg.astraPort || 8094 };
 }

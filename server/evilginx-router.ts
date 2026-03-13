@@ -21,6 +21,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
 import { consumeCredits } from "./credit-service";
+import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
 import { exec as execCb } from "child_process";
 import { promisify } from "util";
 import fs from "fs";

