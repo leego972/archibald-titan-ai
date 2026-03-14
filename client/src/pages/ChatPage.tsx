@@ -1385,13 +1385,46 @@ export default function ChatPage() {
     });
   }, [convDetail, activeConversationId]);
 
-  // Clear local messages when switching to new conversation
+  // Clear local messages and file panel when switching to new conversation
   useEffect(() => {
     if (!activeConversationId) {
       setLocalMessages([]);
+      setCreatedFiles([]);
+      setExpandedFileIdx(null);
+      setFilePreviewContent({});
       optimisticIdsRef.current.clear();
     }
   }, [activeConversationId]);
+
+  // Restore createdFiles from DB toolCalls when loading a past conversation.
+  // This ensures the Project Files panel repopulates when switching back to a
+  // conversation where files were previously created.
+  useEffect(() => {
+    if (!localMessages.length) return;
+    const restored: Array<{name: string; url: string; size: number; language: string; content?: string}> = [];
+    for (const msg of localMessages) {
+      if (!msg.toolCalls) continue;
+      for (const tc of msg.toolCalls) {
+        if ((tc.name === 'create_file' || tc.name === 'sandbox_write_file') && tc.result) {
+          const d = tc.result as any;
+          const name = d.fileName || (tc.args as any)?.fileName || (tc.args as any)?.filePath || 'unknown';
+          const url = d.url || '';
+          const size = d.size || 0;
+          const language = d.language || 'text';
+          // Deduplicate by name — keep last version
+          const existingIdx = restored.findIndex(f => f.name === name);
+          if (existingIdx >= 0) {
+            restored[existingIdx] = { name, url, size, language };
+          } else {
+            restored.push({ name, url, size, language });
+          }
+        }
+      }
+    }
+    if (restored.length > 0) {
+      setCreatedFiles(restored);
+    }
+  }, [localMessages]);
 
   // ── Auto-reconnect to active builds on page load / conversation switch ──
   // If the user logged out, closed the tab, or refreshed while Titan was working,
