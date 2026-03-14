@@ -46,6 +46,32 @@ export interface BuildStatus {
 
 const activeBuilds = new Map<number, BuildStatus>();
 
+// ── Mid-Run Message Injection ────────────────────────────────────
+// Allows users to send messages to Titan while he is actively processing.
+// Messages are queued here and consumed by the agent loop between rounds,
+// injected into llmMessages so Titan reads them without stopping.
+const pendingInjections = new Map<number, string[]>();
+
+/**
+ * Queue a mid-run message for injection into the active agent loop.
+ * The agent loop will pick this up between tool-call rounds.
+ */
+export function injectMidRunMessage(conversationId: number, message: string): void {
+  const queue = pendingInjections.get(conversationId) ?? [];
+  queue.push(message);
+  pendingInjections.set(conversationId, queue);
+}
+
+/**
+ * Drain and return all pending mid-run injections for a conversation.
+ * Called by the agent loop between rounds — clears the queue.
+ */
+export function consumePendingInjections(conversationId: number): string[] {
+  const queue = pendingInjections.get(conversationId) ?? [];
+  if (queue.length > 0) pendingInjections.delete(conversationId);
+  return queue;
+}
+
 /**
  * Register a new background build for a conversation.
  */
@@ -164,7 +190,7 @@ export function cleanupRequest(conversationId: number): void {
 export function emitChatEvent(
   conversationId: number,
   event: {
-    type: "thinking" | "tool_start" | "tool_result" | "text_chunk" | "done" | "error" | "status" | "verification";
+    type: "thinking" | "tool_start" | "tool_result" | "text_chunk" | "done" | "error" | "status" | "verification" | "mid_run_acknowledged";
     data: Record<string, unknown>;
   }
 ): void {
@@ -299,6 +325,37 @@ export function registerChatStreamRoutes(app: Express): void {
     res.json({ success: aborted, message: aborted ? "Request cancelled" : "No active request found" });
   });
 
+  // ── Mid-Run Injection Endpoint ─────────────────────────────
+  // POST /api/chat/inject/:conversationId — inject a message into an active run
+  // The message is queued and picked up by the agent loop between rounds.
+  // Titan reads it and can adjust his current work without stopping.
+  app.post("/api/chat/inject/:conversationId", (req: Request, res: Response) => {
+    const conversationId = parseInt(req.params.conversationId, 10);
+    if (isNaN(conversationId)) {
+      res.status(400).json({ error: "Invalid conversation ID" });
+      return;
+    }
+    const { message } = req.body as { message?: string };
+    if (!message || typeof message !== "string" || !message.trim()) {
+      res.status(400).json({ error: "Message is required" });
+      return;
+    }
+    const build = activeBuilds.get(conversationId);
+    if (!build || build.status !== "running") {
+      res.status(409).json({ error: "No active build for this conversation", active: false });
+      return;
+    }
+    injectMidRunMessage(conversationId, message.trim());
+    // Emit a streaming event so the client can show confirmation
+    const emitter = activeStreams.get(conversationId);
+    if (emitter) {
+      emitter.emit("event", {
+        type: "mid_run_injection",
+        data: { message: message.trim(), timestamp: Date.now() },
+      });
+    }
+    res.json({ success: true, queued: true, message: "Message will be read by Titan on next round" });
+  });
   // ── Build Status Endpoint ──────────────────────────────────
   // GET /api/chat/build-status/:conversationId — check if a build is running
   // Used by the client to reconnect and see progress after page reload/navigation

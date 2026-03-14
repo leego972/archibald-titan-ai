@@ -1545,16 +1545,28 @@ export default function ChatPage() {
     const messageText = text || input.trim();
     if (!messageText) return;
 
-    // Non-blocking chat: if a build is running, queue the message
-    // instead of blocking. The user can keep chatting.
+    // Mid-run injection: if Titan is processing, inject the message directly
+    // into his active context so he reads it on his next loop iteration.
+    // The message also appears in chat immediately with an amber indicator.
     if (isLoading) {
-      // Add the user message to the chat immediately (optimistic)
-      const queuedMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
-      optimisticIdsRef.current.add(queuedMsg.id);
-      setLocalMessages((prev) => [...prev, queuedMsg]);
-      setMessageQueue((prev) => [...prev, messageText]);
+      const midRunMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
+      optimisticIdsRef.current.add(midRunMsg.id);
+      setLocalMessages((prev) => [...prev, { ...midRunMsg, content: `⚡ [Mid-run note] ${messageText}` }]);
       setInput('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      // Fire-and-forget: inject into Titan's active context
+      if (activeConversationId) {
+        const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+        fetch(`/api/chat/inject/${activeConversationId}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...(csrfTkn ? { 'x-csrf-token': csrfTkn } : {}) },
+          body: JSON.stringify({ message: messageText }),
+        }).then(r => {
+          if (r.ok) toast.success('Titan will read this mid-task', { duration: 2000 });
+          else toast.error('Could not inject message — queued instead');
+        }).catch(() => toast.error('Could not inject message'));
+      }
       return;
     }
 
@@ -2208,7 +2220,7 @@ export default function ChatPage() {
             data-chat-scroll
             className={`absolute inset-0 overflow-y-auto ${isMobile ? 'px-3 py-3' : 'px-4 py-4 scroll-smooth'}`}
           >
-            <div className="max-w-3xl mx-auto space-y-4">
+            <div className="max-w-5xl mx-auto space-y-4">
               {showEmptyState ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center px-2">
                   <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -2785,7 +2797,7 @@ export default function ChatPage() {
                       ? 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-400'
                       : ''
                   } ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
-                  title={isLoading ? 'Queue this message — sends after current build' : 'Send message'}
+                  title={isLoading ? 'Inject mid-task — Titan reads this immediately' : 'Send message'}
                 >
                   {isLoading ? <Clock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                 </Button>
@@ -2820,41 +2832,13 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Queued messages indicator — shows each pending message as a dismissible chip */}
-          {messageQueue.length > 0 && (
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center gap-1.5 px-1">
-                <Hourglass className="h-3 w-3 text-amber-400 shrink-0" />
-                <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide">
-                  {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued
-                </span>
-                <span className="text-[10px] text-muted-foreground">— will send automatically when Titan finishes</span>
-                <button
-                  onClick={() => setMessageQueue([])}
-                  className="ml-auto text-[10px] text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-0.5"
-                  title="Clear all queued messages"
-                >
-                  <ListX className="h-3 w-3" /> Clear all
-                </button>
-              </div>
-              <div className="flex flex-col gap-1">
-                {messageQueue.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 px-2.5 py-1.5 bg-amber-500/8 border border-amber-500/20 rounded-lg group"
-                  >
-                    <Clock className="h-3 w-3 text-amber-400/60 shrink-0" />
-                    <span className="text-[11px] text-muted-foreground truncate flex-1">{msg}</span>
-                    <button
-                      onClick={() => setMessageQueue((prev) => prev.filter((_, i) => i !== idx))}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 shrink-0"
-                      title="Remove this queued message"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+          {/* Mid-run injection hint — shown while Titan is processing */}
+          {isLoading && (
+            <div className="mt-1.5 flex items-center gap-1.5 px-1">
+              <Zap className="h-3 w-3 text-amber-400 shrink-0" />
+              <span className="text-[10px] text-amber-400">
+                Titan is working — type a message and he’ll read it mid-task without stopping
+              </span>
             </div>
           )}
 

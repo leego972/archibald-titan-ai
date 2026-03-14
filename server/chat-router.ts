@@ -28,7 +28,7 @@ import {
 import { PROVIDERS } from "../shared/fetcher";
 import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
 // NOTE: EXTERNAL_BUILD_TOOLS is the focused toolset for user-facing project builds
-import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild } from "./chat-stream";
+import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild, consumePendingInjections } from "./chat-stream";
 import { executeToolCall } from "./chat-executor";
 import {
   listSandboxes as sbListSandboxes,
@@ -2430,6 +2430,27 @@ Do NOT attempt any tool calls or builds.`;
             log.info(`[Chat] Injected ${deferredSystemHints.length} deferred system hint(s) after tool responses`);
           }
 
+          // ── MID-RUN USER INJECTION ──
+          // Check for messages the user sent while Titan was processing.
+          // These are injected here (after tool responses, before next LLM call)
+          // so Titan reads them and can adjust course without stopping.
+          if (conversationId) {
+            const midRunMessages = consumePendingInjections(conversationId);
+            if (midRunMessages.length > 0) {
+              for (const midMsg of midRunMessages) {
+                llmMessages.push({
+                  role: 'user',
+                  content: `[Mid-run note from user — read this and adjust your current work if relevant]: ${midMsg}`,
+                });
+                log.info(`[Chat] Mid-run injection consumed: "${midMsg.slice(0, 80)}..."`);
+              }
+              // Emit confirmation event so the client can update the UI
+              emitChatEvent(conversationId, {
+                type: 'mid_run_acknowledged',
+                data: { count: midRunMessages.length, round: rounds },
+              });
+            }
+          }
           // ── ACTION PADDING DETECTION ──
           // Detect when the LLM is wasting rounds by repeatedly calling list_files
           // or read_file without actually creating any files. This is a lazy pattern
