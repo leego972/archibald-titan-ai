@@ -40,6 +40,7 @@ import { registerChatUploadRoute } from "../chat-upload";
 import { registerProjectDownloadRoutes } from "../project-download-router";
 import { registerMarketplaceFileRoutes } from "../marketplace-files";
 import { registerBundleSyncRoutes } from "../bundle-sync";
+import { runHealthCheck, createSnapshot } from "../self-improvement-engine";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import { csrfCookieMiddleware, csrfValidationMiddleware } from "./csrf";
@@ -813,7 +814,7 @@ async function startServer() {
     // counters, prunes geo-history, and validates 2FA sessions.
     startFortressSweepScheduler();
 
-    // ─── Autonomous System Sync ──────────────────────────────────
+       // ─── Autonomous System Sync ──────────────────────────────
     // Runs startup diagnostic (logs all system statuses, patches
     // IndexNow key, auto-enables marketing engine), then starts
     // periodic sync check every 6 hours.
@@ -825,6 +826,48 @@ async function startServer() {
         log.error('[AutonomousSync] Startup diagnostic failed:', { error: String(err) });
       }
     }, 15_000); // 15 seconds after startup — let DB settle
+
+    // ─── Autonomous Self-Improvement Cycle ───────────────────────
+    // Runs daily at 3 AM (offset from deploy): creates a snapshot,
+    // runs a health check, and logs the system state. Full code
+    // modifications are triggered by Titan via chat when asked.
+    // This ensures the engine is always warm and ready.
+    const SELF_IMPROVE_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    const SELF_IMPROVE_INITIAL_DELAY = 3 * 60 * 60 * 1000; // 3 hours after deploy
+    setTimeout(async () => {
+      const runSelfImproveCycle = async () => {
+        try {
+          log.info('[SelfImprove] Starting daily self-improvement health cycle...');
+          const health = await runHealthCheck();
+          if (health.healthy) {
+            log.info('[SelfImprove] Health check passed. System is healthy.', {
+              checks: health.checks.filter((c: any) => c.passed).length + '/' + health.checks.length,
+            });
+            // Create a daily snapshot of key server files so rollback is always available
+            const keyFiles = [
+              'server/chat-router.ts',
+              'server/chat-tools.ts',
+              'server/chat-executor.ts',
+              'server/build-intent.ts',
+              'server/titan-memory.ts',
+            ];
+            const snapResult = await createSnapshot(keyFiles, 'Daily automated snapshot', 'autonomous_scheduler');
+            if (snapResult.success) {
+              log.info('[SelfImprove] Daily snapshot created successfully.');
+            } else {
+              log.warn('[SelfImprove] Snapshot skipped (likely no DB):', { reason: snapResult.error });
+            }
+          } else {
+            const failed = health.checks.filter((c: any) => !c.passed).map((c: any) => c.name);
+            log.warn('[SelfImprove] Health check found issues:', { failedChecks: failed });
+          }
+        } catch (err: unknown) {
+          log.error('[SelfImprove] Daily cycle failed:', { error: String(err) });
+        }
+      };
+      await runSelfImproveCycle();
+      setInterval(runSelfImproveCycle, SELF_IMPROVE_INTERVAL);
+    }, SELF_IMPROVE_INITIAL_DELAY);
   });
 }
 

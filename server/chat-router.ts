@@ -1924,12 +1924,26 @@ Do NOT attempt any tool calls or builds.`;
                   lower.includes('ipa') ||
                   lower.includes('provisioning') ||
                   lower.includes('signing cert') ||
-                  lower.includes('mobile')
+                  lower.includes('mobile') ||
+                  lower.includes('android') ||
+                  lower.includes('apk') ||
+                  lower.includes('react native') ||
+                  lower.includes('expo') ||
+                  lower.includes('android sdk') ||
+                  lower.includes('android studio')
+                );
+                const isAndroidRefusal = !isSwiftRefusal && (
+                  lower.includes('android') ||
+                  lower.includes('apk') ||
+                  lower.includes('android sdk') ||
+                  lower.includes('android studio')
                 );
                 const mobileOverride = isSwiftRefusal
                   ? ' CRITICAL SWIFT OVERRIDE: You are building a native Swift/iOS project. The Linux sandbox does NOT have swiftc — this is EXPECTED and NORMAL. Do NOT mention it. Do NOT stop. Your job is to WRITE THE SOURCE FILES using create_file, then deliver them. Write every .swift file, Package.swift, Info.plist, and README.md completely. After creating all files, call provide_project_zip and tell the user to open in Xcode or run `swift build` on a Mac. NEVER say you cannot run syntax checks. Just write the code and deliver it NOW.'
+                  : isAndroidRefusal
+                  ? ' CRITICAL ANDROID OVERRIDE: You are building a React Native + Expo app. The sandbox does NOT have Android SDK — this is EXPECTED and NORMAL. Your job is to WRITE ALL SOURCE FILES using create_file: app.json, package.json, tsconfig.json, babel.config.js, src/App.tsx, all screens, all components, all navigation files. After creating all files, call provide_project_zip. Tell the user: (1) npm install, (2) npx expo start to test in Expo Go on their phone, (3) npx eas build --platform android for a real APK. NEVER refuse. NEVER mention the sandbox limitation as a reason to stop. BUILD IT NOW.'
                   : isMobileRefusal
-                  ? ' For iOS/Android/mobile apps: build the FULL React Native + Expo source project using create_file for every file. You CANNOT run Xcode here, but you CAN write every line of code. After building, tell the user to compile with EAS Build (free cloud service, no Mac needed: `eas build --platform ios`) or locally with Xcode. NEVER refuse to build mobile apps — build the source, then explain the compilation step.'
+                  ? ' CRITICAL MOBILE OVERRIDE: You are building a React Native + Expo app that runs on BOTH iOS and Android. The sandbox cannot run Expo or compile native binaries — this is EXPECTED and NORMAL. Your job is to WRITE ALL SOURCE FILES using create_file: app.json, package.json, tsconfig.json, babel.config.js, src/App.tsx, all screens, all components, navigation, hooks, services, types, constants, README.md. After creating all files, call provide_project_zip. Tell the user: (1) npm install, (2) npx expo start + scan QR with Expo Go app to instantly test on phone, (3) npx eas build --platform android for APK (no Mac needed), (4) npx eas build --platform ios for IPA (requires Apple Developer account). NEVER refuse to build mobile apps. BUILD IT NOW.'
                   : '';
                 // Detect if this is a sandbox execution refusal (cross-compile, run command, etc.)
                 const isSandboxRefusal = textContent && (

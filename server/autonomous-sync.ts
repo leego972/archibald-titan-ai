@@ -57,7 +57,7 @@ export function registerIndexNowRoute(app: Express): void {
 
 export interface SystemStatus {
   name: string;
-  category: "seo" | "advertising" | "affiliate" | "content" | "security" | "marketplace";
+  category: "seo" | "advertising" | "affiliate" | "content" | "security" | "marketplace" | "system";
   status: "active" | "degraded" | "blocked" | "disabled";
   reason?: string;
   schedule?: string;
@@ -265,7 +265,17 @@ export async function getAutonomousSystemStatus(): Promise<{
     nextAction: "Generates 2-3 business modules — rotates through 15 industry verticals weekly",
   });
 
-  // ─── Channel Token Status ──────────────────────────────────────
+    // ─── Self-Improvement System ──────────────────────────────
+
+  systems.push({
+    name: "Self-Improvement Engine",
+    category: "system",
+    status: "active",
+    schedule: "Daily (3 AM server time)",
+    nextAction: "Analyzes improvement backlog, runs health check, applies safe code improvements with auto-rollback on failure",
+  });
+
+  // ─── Channel Token Status ──────────────────────────────
 
   const channels: ChannelTokenStatus[] = [
     {

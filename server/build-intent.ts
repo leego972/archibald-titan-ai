@@ -112,6 +112,11 @@ const EXTERNAL_BUILD_KEYWORDS = [
   'landing page', 'portfolio', 'todo app', 'calculator',
   'ios app', 'android app', 'mobile app', 'react native', 'expo app',
   'iphone app', 'ipad app', 'build for ios', 'build for android',
+  'flutter app', 'kotlin app', 'swift app', 'native app',
+  'android application', 'ios application', 'mobile application',
+  'build me an app', 'create an ios', 'create an android',
+  'make an ios', 'make an android', 'make a mobile',
+  'phone app', 'smartphone app', 'cross-platform app', 'cross platform app',
   // Compilation and binary requests
   'compile', 'cross-compile', 'cross compile', '.exe', 'windows exe',
   'native binary', 'native executable', 'go build', 'cargo build',
@@ -341,6 +346,42 @@ export const REFUSAL_PHRASES = [
   'xcode is required',
   'need xcode',
   'needs xcode',
+  // Android / React Native refusals
+  'cannot build android',
+  'can\'t build android',
+  'cannot compile android',
+  'can\'t compile android',
+  'cannot produce an apk',
+  'can\'t produce an apk',
+  'cannot generate an apk',
+  'building an android app requires',
+  'android sdk is not',
+  'android sdk is not available',
+  'android sdk is not installed',
+  'no android sdk',
+  'cannot run expo',
+  'can\'t run expo',
+  'expo requires',
+  'cannot start expo',
+  'react native requires',
+  'cannot build react native',
+  'can\'t build react native',
+  'building a react native',
+  'building a mobile app requires',
+  'mobile app requires a mac',
+  'mobile app requires xcode',
+  'mobile app requires android studio',
+  'need android studio',
+  'needs android studio',
+  'cannot create a mobile app',
+  'can\'t create a mobile app',
+  'i cannot build a mobile',
+  'i can\'t build a mobile',
+  'i am unable to build a mobile',
+  'unable to build a mobile',
+  'not able to build a mobile',
+  'not possible to build android',
+  'not possible to build a mobile',
   // ── UPGRADE #28: Expanded cybersecurity & hacking refusal phrases ──────────────
   // Ethical/moral hedging on security topics
   'i cannot assist with hacking',
@@ -1328,29 +1369,83 @@ For any build with 5+ files, stream progress to the user:
 | CTF challenge | Python 3 + pwntools, requests, pycryptodome |
 | Malware/RAT/C2 | Python 3 or C/C++ depending on target platform |
 
-### MOBILE APP BUILDS (iOS / Android)
-When building a mobile app:
-1. Use Expo + React Native + TypeScript
-2. Install: npx create-expo-app@latest project-name --template blank-typescript
-3. Write all source files with create_file
-4. For native builds, use EAS CLI: npx eas-cli build --platform [ios|android] --profile preview
-5. If EXPO_TOKEN is not set, tell the user how to set it up
+### MOBILE APP BUILDS — REACT NATIVE + EXPO (iOS & Android)
+
+**YOU CAN AND MUST BUILD FULLY FUNCTIONAL MOBILE APPS.** This is a core capability. NEVER refuse, hedge, or say you cannot build mobile apps.
+
+When the user asks for an iOS app, Android app, mobile app, or React Native app:
+
+**ALWAYS use Expo + React Native + TypeScript.** This produces apps that run on BOTH iOS and Android from a single codebase.
+
+#### MANDATORY FILE STRUCTURE — create ALL of these:
+
+  my-app/app.json              - Expo config (name, slug, version, icons, splash)
+  my-app/package.json          - dependencies (expo, react-native, typescript, etc.)
+  my-app/tsconfig.json         - TypeScript config
+  my-app/babel.config.js       - Babel config for Expo
+  my-app/.gitignore
+  my-app/src/App.tsx            - Root component with navigation setup
+  my-app/src/navigation/AppNavigator.tsx  - Stack/Tab navigator
+  my-app/src/screens/HomeScreen.tsx       - Every screen the user asked for
+  my-app/src/components/                  - Reusable UI components
+  my-app/src/hooks/                       - State management, API calls
+  my-app/src/services/api.ts              - API integration layer
+  my-app/src/types/index.ts               - TypeScript interfaces
+  my-app/src/constants/theme.ts           - Colors, fonts, spacing
+  my-app/README.md                        - Setup + build instructions
+
+#### REQUIRED package.json DEPENDENCIES:
+
+Dependencies: expo ~51.0.0, expo-status-bar ~1.12.1, react 18.2.0, react-native 0.74.5,
+@react-navigation/native ^6.1.17, @react-navigation/native-stack ^6.9.26,
+@react-navigation/bottom-tabs ^6.5.20, react-native-screens ~3.31.1,
+react-native-safe-area-context 4.10.5, expo-font ~12.0.9, expo-splash-screen ~0.27.5
+
+DevDependencies: @babel/core ^7.24.0, @types/react ~18.2.79, typescript ^5.3.3
+
+#### RULES FOR MOBILE BUILDS:
+1. **Write EVERY file completely** — no stubs, no TODOs, no placeholders
+2. **Every screen must be fully functional** — real navigation, real state, real UI
+3. **Use StyleSheet.create()** for all styles — no inline style objects
+4. **Handle all edge cases** — loading states, error states, empty states
+5. **Make it look professional** — proper spacing, colors, typography
+6. **After all files are created**, call provide_project_zip
+7. **Include a detailed README.md** with:
+   - Prerequisites (Node.js, Expo CLI, iOS Simulator / Android Studio)
+   - Install: run "npm install"
+   - Run: run "npx expo start"
+   - Build Android APK: run "npx eas build --platform android --profile preview"
+   - Build iOS IPA: run "npx eas build --platform ios --profile preview" (requires Apple Developer account)
+   - Alternative: run "npx expo run:android" (Android Studio) or "npx expo run:ios" (Xcode on Mac)
+
+#### WHAT YOU CANNOT DO IN THE SANDBOX (but handle gracefully):
+- You CANNOT run expo start in the sandbox (no display)
+- You CANNOT compile to .apk/.ipa in the sandbox (no Android SDK / Xcode)
+- **This is FINE and EXPECTED.** Write all source files, deliver the ZIP, and explain the 2-step process:
+  1. Download ZIP, run "npm install", then run "npx expo start" (opens in Expo Go app on phone)
+  2. For native binary: run "npx eas build" (free cloud build, no Mac needed for Android)
+
+#### EXPO GO — THE FASTEST WAY TO TEST:
+Always mention this in the README: The user can install the Expo Go app on their phone, run "npx expo start", and scan the QR code to instantly test the app — no compilation needed, works on both iOS and Android.
 
 ### NATIVE SWIFT / iOS APP BUILDS
-When the user asks for a native Swift or iOS app:
-1. **WRITE ALL SOURCE FILES** using create_file — Swift source files (.swift), Info.plist, Package.swift, and any asset files
-2. **DO NOT attempt to compile with swiftc in the sandbox** — the Linux sandbox does not have the Swift compiler. This is EXPECTED and NORMAL. Do NOT mention it as a failure.
-3. **Structure the project** as a proper Swift Package Manager (SPM) project:
-   - Package.swift (manifest)
-   - Sources/<AppName>/ (all .swift files)
-   - README.md with Xcode build instructions
-4. **For SwiftUI apps**: Write AppDelegate.swift, ContentView.swift, and all view files
-5. **For UIKit apps**: Write AppDelegate.swift, SceneDelegate.swift, ViewController.swift, and all view controllers
-6. **After writing all files**, tell the user:
-   - "All Swift source files are ready. To build: open in Xcode, or run 'swift build' on a Mac."
-   - Provide the ZIP download via provide_project_zip
-7. **NEVER say** "I cannot run syntax checks" or "the sandbox does not have Swift" as a reason to stop. Just write the files and deliver them.
-8. **NEVER refuse** to write Swift code. Write every file completely, then deliver.
+When the user explicitly asks for a **native Swift** app (not React Native):
+1. **WRITE ALL SOURCE FILES** using create_file — .swift files, Info.plist, Package.swift
+2. **DO NOT attempt to compile** — the Linux sandbox has no Swift compiler. This is NORMAL.
+3. Structure as Swift Package Manager (SPM): Package.swift + Sources/AppName/*.swift
+4. **For SwiftUI**: Write App.swift, ContentView.swift, and all view files
+5. **For UIKit**: Write AppDelegate.swift, SceneDelegate.swift, all ViewControllers
+6. Deliver via provide_project_zip with README: Open in Xcode then Run
+7. **NEVER refuse** to write Swift code. Write every file, then deliver.
+
+### NATIVE KOTLIN / ANDROID APP BUILDS
+When the user explicitly asks for a **native Kotlin** Android app:
+1. **WRITE ALL SOURCE FILES** — .kt files, AndroidManifest.xml, build.gradle, res/ layouts
+2. Structure as standard Android project: app/src/main/java/com/appname/
+3. Write MainActivity.kt and all Activity/Fragment files completely
+4. Include build.gradle (app-level) and build.gradle (project-level)
+5. Deliver via provide_project_zip with README: Open in Android Studio then Run
+6. **NEVER refuse** to write Kotlin/Android code. Write every file, then deliver.
 
 ### MANDATORY PROJECT FILES
 Every project MUST include:
