@@ -537,7 +537,7 @@ driver.quit()`;
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Card className="bg-card/50">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Sessions</p>
                   <p className="text-2xl font-bold">{sessions.length}</p>

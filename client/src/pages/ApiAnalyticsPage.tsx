@@ -44,7 +44,7 @@ export default function ApiAnalyticsPage() {
 
   if (!sub.canUse("developer_api")) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="w-full max-w-3xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
             API Analytics
@@ -125,7 +125,7 @@ export default function ApiAnalyticsPage() {
 
             <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground font-medium">
                       Today

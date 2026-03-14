@@ -389,7 +389,7 @@ function ActionBadges({
 // ─── Help Panel ─────────────────────────────────────────────────────
 function HelpPanel({ onTryCommand }: { onTryCommand: (cmd: string) => void }) {
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="w-full max-w-2xl space-y-4">
       <div className="flex items-center gap-2 mb-3">
         <HelpCircle className="h-5 w-5 text-primary" />
         <h3 className="text-base font-semibold">Welcome to Titan — What I Can Do</h3>
@@ -2220,7 +2220,7 @@ export default function ChatPage() {
             data-chat-scroll
             className={`absolute inset-0 overflow-y-auto ${isMobile ? 'px-3 py-3' : 'px-4 py-4 scroll-smooth'}`}
           >
-            <div className="max-w-5xl mx-auto space-y-4">
+            <div className="w-full max-w-5xl space-y-4">
               {showEmptyState ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center px-2">
                   <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">

@@ -274,7 +274,7 @@ export default function DeveloperDocsPage() {
 
   if (!sub.canUse("developer_api")) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="w-full max-w-3xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Developer API
@@ -328,7 +328,7 @@ export default function DeveloperDocsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="w-full max-w-5xl space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">

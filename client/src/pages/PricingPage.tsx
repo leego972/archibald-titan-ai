@@ -636,7 +636,7 @@ export default function PricingPage() {
       {/* Advanced Tier Cards (Cyber, Cyber+, Titan) */}
       {advancedTiers.length > 0 && (
         <section className="px-6 pb-16">
-          <div className="max-w-6xl mx-auto">
+          <div className="w-full max-w-6xl">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-white mb-2">Enterprise, Cyber+, & Titan Tiers</h2>
               <p className="text-white/40 text-sm">Team management, offensive security tools, and dedicated infrastructure for organizations at scale</p>
@@ -667,7 +667,7 @@ export default function PricingPage() {
 
       {/* Partner Recommendations */}
       <section className="px-6 pb-16">
-        <div className="max-w-4xl mx-auto">
+        <div className="w-full max-w-4xl">
           <AffiliateRecommendations context="subscription" variant="card" limit={3} />
         </div>
       </section>

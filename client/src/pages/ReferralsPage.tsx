@@ -161,7 +161,7 @@ export default function ReferralsPage() {
 
         <Card className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border-purple-500/20">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Referrals</p>
                 <p className="text-2xl font-bold text-purple-400">

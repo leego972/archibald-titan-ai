@@ -238,7 +238,7 @@ export default function SiteMonitorPage() {
   if (!canAccess) {
     return (
       <div className="min-h-screen bg-zinc-950 p-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="w-full max-w-4xl">
           <div className="flex items-center gap-3 mb-6">
             <Activity className="h-8 w-8 text-blue-400" />
             <h1 className="text-2xl font-bold text-white">Website Health Monitor</h1>
@@ -295,7 +295,7 @@ export default function SiteMonitorPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full max-w-7xl space-y-6">
         {/* ─── Header ─────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

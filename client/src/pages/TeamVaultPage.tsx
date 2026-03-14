@@ -253,7 +253,7 @@ export default function TeamVaultPage() {
           <Card key={stat.label} className="relative overflow-hidden">
             <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-50`} />
             <CardContent className="pt-6 relative">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{stat.label}</p>
                   <p className={`text-3xl font-bold mt-1 ${stat.valueColor || ""}`}>{stat.value}</p>
