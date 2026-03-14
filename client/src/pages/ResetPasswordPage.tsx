@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useNoIndex } from "@/hooks/useNoIndex";
+
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +12,7 @@ import { FULL_LOGO_DARK_512 } from "@/lib/logos";
 
 export default function ResetPasswordPage() {
   const [, navigate] = useLocation();
+  useNoIndex();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const token = params.get("token") || "";

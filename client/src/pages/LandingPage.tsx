@@ -147,11 +147,11 @@ export default function LandingPage() {
             </div>
             <div className="hidden md:flex items-center gap-6">
               <Link href="/builder" className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors">Titan Builder</Link>
-              <a href="#what-you-can-build" className="text-sm text-white/60 hover:text-white transition-colors">Use Cases</a>
-              <a href="#how-it-works" className="text-sm text-white/60 hover:text-white transition-colors">How It Works</a>
-              <a href="#security-trust" className="text-sm text-white/60 hover:text-white transition-colors">Security</a>
+              <Link href="/use-cases" className="text-sm text-white/60 hover:text-white transition-colors">Use Cases</Link>
+              <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
               <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
               <Link href="/blog" className="text-sm text-white/60 hover:text-white transition-colors">Blog</Link>
+              <Link href="/about" className="text-sm text-white/60 hover:text-white transition-colors">About</Link>
               <Link href="/contact" className="text-sm text-white/60 hover:text-white transition-colors">Contact</Link>
             </div>
             <div className="flex items-center gap-2">
@@ -175,9 +175,8 @@ export default function LandingPage() {
           <div className="md:hidden border-t border-white/5 bg-[#060611]/95 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-1">
               <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/5 transition-colors">Titan Builder</Link>
-              <a href="#what-you-can-build" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Use Cases</a>
-              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">How It Works</a>
-              <a href="#security-trust" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Security</a>
+              <Link href="/use-cases" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Use Cases</Link>
+              <Link href="/security" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Security</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Pricing</Link>
               <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Blog</Link>
               <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Contact</Link>
@@ -718,17 +717,17 @@ export default function LandingPage() {
               <div className="space-y-2.5">
                 <Link href="/builder" className="block text-sm text-blue-400/80 hover:text-blue-300 transition-colors font-medium">Titan Builder</Link>
                 <Link href="/pricing" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Pricing</Link>
-                <a href="#updates" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Changelog</a>
-                <a href="#faq" className="block text-sm text-white/40 hover:text-white/70 transition-colors">FAQ</a>
+                <Link href="/examples" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Examples</Link>
+                <Link href="/changelog" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Changelog</Link>
               </div>
             </div>
             <div>
               <h4 className="text-sm font-semibold text-white/80 mb-4">Resources</h4>
               <div className="space-y-2.5">
-                <a href="#how-it-works" className="block text-sm text-white/40 hover:text-white/70 transition-colors">How It Works</a>
-                <a href="#testimonials" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Testimonials</a>
+                <Link href="/use-cases" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Use Cases</Link>
+                <Link href="/security" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Security</Link>
                 <Link href="/blog" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Blog</Link>
-                <button onClick={() => { if (user) setLocation("/dashboard"); else window.location.href = getLoginUrl(); }} className="block text-sm text-white/40 hover:text-white/70 transition-colors text-left">Dashboard</button>
+                <Link href="/about" className="block text-sm text-white/40 hover:text-white/70 transition-colors">About</Link>
               </div>
             </div>
             <div>

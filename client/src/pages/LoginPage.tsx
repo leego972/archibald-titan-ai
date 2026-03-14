@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useNoIndex } from "@/hooks/useNoIndex";
+
 import { useAuth } from "../hooks/useAuth";
 import { toast } from "sonner";
 
@@ -8,6 +10,7 @@ interface LoginPageProps {
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps = {}) {
   const { login } = useAuth();
+  useNoIndex();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

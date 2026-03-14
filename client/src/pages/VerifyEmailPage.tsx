@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useNoIndex } from "@/hooks/useNoIndex";
+
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +10,7 @@ import { toast } from "sonner";
 
 export default function VerifyEmailPage() {
   const [, navigate] = useLocation();
+  useNoIndex();
   const [status, setStatus] = useState<"loading" | "success" | "already" | "error" | "no-token">("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [resendEmail, setResendEmail] = useState("");

@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useNoIndex } from "@/hooks/useNoIndex";
+
 import { useAuth } from "../hooks/useAuth";
 import { toast } from "sonner";
 import { trackSignup } from "@/lib/adTracking";
@@ -9,6 +11,7 @@ interface RegisterPageProps {
 
 export function RegisterPage({ onRegisterSuccess }: RegisterPageProps = {}) {
   const { register } = useAuth();
+  useNoIndex();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

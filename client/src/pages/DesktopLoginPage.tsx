@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNoIndex } from "@/hooks/useNoIndex";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +19,8 @@ import { isDesktop, getDesktopVersion } from "@/lib/desktop";
  * On success, the license is saved locally and the user is redirected to /dashboard.
  */
 export default function DesktopLoginPage() {
+  useNoIndex();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

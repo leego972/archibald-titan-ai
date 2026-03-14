@@ -17,6 +17,11 @@ import PrivacyPage from "./pages/PrivacyPage";
 import ContactPage from "./pages/ContactPage";
 import PricingPage from "./pages/PricingPage";
 import BlogPage from "./pages/BlogPage";
+import SecurityPage from "./pages/SecurityPage";
+import UseCasesPage from "./pages/UseCasesPage";
+import ExamplesPage from "./pages/ExamplesPage";
+import AboutPage from "./pages/AboutPage";
+import ChangelogPage from "./pages/ChangelogPage";
 
 // Auth pages
 import { LoginPage } from "./pages/LoginPage";
@@ -247,6 +252,11 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:rest*" component={BlogPage} />
+      <Route path="/security" component={SecurityPage} />
+      <Route path="/use-cases" component={UseCasesPage} />
+      <Route path="/examples" component={ExamplesPage} />
+      <Route path="/about" component={AboutPage} />
+      <Route path="/changelog" component={ChangelogPage} />
 
       {/* Dashboard routes — wrapped in FetcherLayout with sidebar + auth */}
       <Route path="/dashboard/:rest*" component={DashboardRouter} />
