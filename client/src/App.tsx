@@ -22,6 +22,13 @@ import UseCasesPage from "./pages/UseCasesPage";
 import ExamplesPage from "./pages/ExamplesPage";
 import AboutPage from "./pages/AboutPage";
 import ChangelogPage from "./pages/ChangelogPage";
+import VsCopilotPage from "./pages/VsCopilotPage";
+import VsNoCodePage from "./pages/VsNoCodePage";
+import VsCloudAiPage from "./pages/VsCloudAiPage";
+import DocsPage from "./pages/DocsPage";
+import HowItWorksPage from "./pages/HowItWorksPage";
+import CustomersPage from "./pages/CustomersPage";
+import DemoPage from "./pages/DemoPage";
 
 // Auth pages
 import { LoginPage } from "./pages/LoginPage";
@@ -257,6 +264,13 @@ function Router() {
       <Route path="/examples" component={ExamplesPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/changelog" component={ChangelogPage} />
+      <Route path="/vs-copilot" component={VsCopilotPage} />
+      <Route path="/vs-no-code" component={VsNoCodePage} />
+      <Route path="/vs-cloud-ai" component={VsCloudAiPage} />
+      <Route path="/docs" component={DocsPage} />
+      <Route path="/how-it-works" component={HowItWorksPage} />
+      <Route path="/customers" component={CustomersPage} />
+      <Route path="/demo" component={DemoPage} />
 
       {/* Dashboard routes — wrapped in FetcherLayout with sidebar + auth */}
       <Route path="/dashboard/:rest*" component={DashboardRouter} />

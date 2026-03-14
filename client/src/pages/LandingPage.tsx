@@ -151,6 +151,8 @@ export default function LandingPage() {
               <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
               <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
               <Link href="/blog" className="text-sm text-white/60 hover:text-white transition-colors">Blog</Link>
+              <Link href="/docs" className="text-sm text-white/60 hover:text-white transition-colors">Docs</Link>
+              <Link href="/demo" className="text-sm text-white/60 hover:text-white transition-colors">Demo</Link>
               <Link href="/about" className="text-sm text-white/60 hover:text-white transition-colors">About</Link>
               <Link href="/contact" className="text-sm text-white/60 hover:text-white transition-colors">Contact</Link>
             </div>
@@ -179,6 +181,9 @@ export default function LandingPage() {
               <Link href="/security" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Security</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Pricing</Link>
               <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Blog</Link>
+              <Link href="/docs" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Docs</Link>
+              <Link href="/demo" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Demo</Link>
+              <Link href="/customers" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Customers</Link>
               <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Contact</Link>
               <div className="pt-2 border-t border-white/5 mt-1">
                 <Button onClick={() => { setMobileMenuOpen(false); window.location.href = getLoginUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0" size="sm">Start Building Free</Button>
@@ -719,12 +724,16 @@ export default function LandingPage() {
                 <Link href="/pricing" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Pricing</Link>
                 <Link href="/examples" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Examples</Link>
                 <Link href="/changelog" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Changelog</Link>
+                <Link href="/demo" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Demo</Link>
+                <Link href="/docs" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Documentation</Link>
               </div>
             </div>
             <div>
               <h4 className="text-sm font-semibold text-white/80 mb-4">Resources</h4>
               <div className="space-y-2.5">
                 <Link href="/use-cases" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Use Cases</Link>
+                <Link href="/how-it-works" className="block text-sm text-white/40 hover:text-white/70 transition-colors">How It Works</Link>
+                <Link href="/customers" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Customers</Link>
                 <Link href="/security" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Security</Link>
                 <Link href="/blog" className="block text-sm text-white/40 hover:text-white/70 transition-colors">Blog</Link>
                 <Link href="/about" className="block text-sm text-white/40 hover:text-white/70 transition-colors">About</Link>
