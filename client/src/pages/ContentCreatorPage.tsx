@@ -450,13 +450,15 @@ export default function ContentCreatorPage() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="bg-[#161b22] border border-[#21262d]">
-          <TabsTrigger value="studio" className="gap-2"><PenTool className="w-4 h-4" /> Studio</TabsTrigger>
-          <TabsTrigger value="queue" className="gap-2"><Layers className="w-4 h-4" /> Content Queue</TabsTrigger>
-          <TabsTrigger value="campaigns" className="gap-2"><Megaphone className="w-4 h-4" /> Campaigns</TabsTrigger>
-          <TabsTrigger value="tiktok" className="gap-2"><Music2 className="w-4 h-4" /> TikTok Hub</TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="w-4 h-4" /> Analytics</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+          <TabsList className="bg-[#161b22] border border-[#21262d] w-max">
+            <TabsTrigger value="studio" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><PenTool className="w-3.5 h-3.5" /> Studio</TabsTrigger>
+            <TabsTrigger value="queue" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Layers className="w-3.5 h-3.5" /> Content Queue</TabsTrigger>
+            <TabsTrigger value="campaigns" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Megaphone className="w-3.5 h-3.5" /> Campaigns</TabsTrigger>
+            <TabsTrigger value="tiktok" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Music2 className="w-3.5 h-3.5" /> TikTok Hub</TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><BarChart3 className="w-3.5 h-3.5" /> Analytics</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ═══ STUDIO TAB ═══ */}
         <TabsContent value="studio" className="space-y-4 mt-4">
@@ -485,14 +487,14 @@ export default function ContentCreatorPage() {
                             const cfgData = platformConfig.data?.find(p => p.id === platform);
                             if (cfgData?.contentTypes?.[0]) setSelectedContentType(cfgData.contentTypes[0]);
                           }}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs transition-all ${
+                          className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
                             selectedPlatform === platform
                               ? "border-pink-500/50 bg-pink-500/10 text-pink-300"
                               : "border-[#21262d] bg-[#161b22] text-gray-400 hover:border-gray-600"
                           }`}
                         >
-                          <Icon className="w-4 h-4" />
-                          <span className="truncate w-full text-center">{cfg.label.split(" ")[0]}</span>
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span className="text-[10px] leading-tight text-center w-full" style={{ wordBreak: "break-word" }}>{cfg.label.split(" ")[0]}</span>
                         </button>
                       );
                     })}
