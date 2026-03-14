@@ -411,7 +411,7 @@ export default function ContentCreatorPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <StatCard label="Campaigns" value={statsData?.totalCampaigns || 0} icon={Megaphone} color="text-purple-400" />
         <StatCard label="Active" value={statsData?.activeCampaigns || 0} icon={Activity} color="text-emerald-400" />
         <StatCard label="Total Pieces" value={statsData?.totalPieces || 0} icon={Layers} color="text-blue-400" />
@@ -422,7 +422,7 @@ export default function ContentCreatorPage() {
       </div>
 
       {/* Integration Status */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "SEO Engine", connected: true, icon: Search, color: "text-blue-400", desc: "Keyword briefs active" },
           { label: "Advertising", connected: dashData?.advertisingLinked, icon: Target, color: "text-orange-400", desc: "Campaign sync active" },
@@ -430,18 +430,18 @@ export default function ContentCreatorPage() {
         ].map(({ label, connected, icon: Icon, color, desc }) => (
           <Card key={label} className="bg-[#0d1117] border-[#21262d]">
             <CardContent className="p-3 flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${connected ? "bg-current/10" : "bg-zinc-500/10"} ${connected ? color : "text-zinc-500"}`}>
+              <div className={`p-2 rounded-lg shrink-0 ${connected ? "bg-current/10" : "bg-zinc-500/10"} ${connected ? color : "text-zinc-500"}`}>
                 <Icon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-medium text-white">{label}</span>
                   {connected
-                    ? <CheckCircle2 className="w-3 h-3 text-green-400" />
-                    : <AlertCircle className="w-3 h-3 text-yellow-400" />
+                    ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+                    : <AlertCircle className="w-3 h-3 text-yellow-400 shrink-0" />
                   }
                 </div>
-                <p className="text-xs text-gray-500 truncate">{desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5 break-words">{desc}</p>
               </div>
             </CardContent>
           </Card>
@@ -450,8 +450,8 @@ export default function ContentCreatorPage() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
-          <TabsList className="bg-[#161b22] border border-[#21262d] w-max">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1" style={{ WebkitOverflowScrolling: "touch", overflowX: "auto" }}>
+          <TabsList className="bg-[#161b22] border border-[#21262d] flex w-max">
             <TabsTrigger value="studio" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><PenTool className="w-3.5 h-3.5" /> Studio</TabsTrigger>
             <TabsTrigger value="queue" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Layers className="w-3.5 h-3.5" /> Content Queue</TabsTrigger>
             <TabsTrigger value="campaigns" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Megaphone className="w-3.5 h-3.5" /> Campaigns</TabsTrigger>
