@@ -70,7 +70,7 @@ function PlanCard({
         </div>
       )}
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">{plan.label}</CardTitle>
           <div className="text-right">
             <div className="text-2xl font-bold">${plan.price_monthly}</div>
@@ -309,7 +309,7 @@ export default function TitanStoragePage() {
 
   if (!subQuery.data && !subQuery.isLoading) {
     return (
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="w-full max-w-6xl space-y-6">
         <div className="text-center space-y-3 py-4">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-2">
             <HardDrive className="h-7 w-7 text-primary" />
@@ -345,7 +345,7 @@ export default function TitanStoragePage() {
   // ── Render: Active Subscription ───────────────────────────────
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

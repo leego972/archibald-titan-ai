@@ -141,7 +141,7 @@ function ProxyPoolSection() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Proxy Pool</CardTitle>

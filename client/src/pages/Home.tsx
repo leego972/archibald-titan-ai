@@ -160,7 +160,7 @@ function UsageStatsWidget({ sub, setLocation }: { sub: any; setLocation: (path: 
         <Card key={stat.label} className="relative overflow-hidden">
           <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-50`} />
           <CardHeader className="pb-2 relative">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardDescription className="text-[10px] font-semibold uppercase tracking-widest">
                 {stat.label}
               </CardDescription>

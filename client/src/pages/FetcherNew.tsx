@@ -150,7 +150,7 @@ export default function FetcherNew() {
   const unlockedCount = allProviders.filter((p) => !p.locked).length;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">New Fetch Job</h1>
         <p className="text-muted-foreground mt-1">
@@ -244,7 +244,7 @@ export default function FetcherNew() {
         {/* Provider Selection */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-lg">Select Providers</CardTitle>
                 <CardDescription>

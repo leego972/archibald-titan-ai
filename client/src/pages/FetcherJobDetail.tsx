@@ -59,7 +59,7 @@ export default function FetcherJobDetail() {
   const { job, tasks } = data;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => setLocation("/fetcher/jobs")}>
           <ArrowLeft className="h-4 w-4 mr-1" />

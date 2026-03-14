@@ -121,9 +121,9 @@ export default function HealthTrendsPage() {
   const isLoading = overviewQuery.isLoading || dailyQuery.isLoading;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
             <BarChart3 className="h-7 w-7 text-primary" />

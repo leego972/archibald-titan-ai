@@ -1100,7 +1100,7 @@ function PayoutMethodsManager() {
   return (
     <Card className="border-border/30 bg-card/50">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Wallet className="w-5 h-5 text-amber-400" /> Payout Methods
           </CardTitle>

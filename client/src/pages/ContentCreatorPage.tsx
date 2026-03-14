@@ -122,7 +122,7 @@ function StatCard({ label, value, icon: Icon, color }: {
   return (
     <Card className="bg-[#0d1117] border-[#21262d]">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>

@@ -277,7 +277,7 @@ export default function CredentialHistoryPage() {
 
                       {/* Content */}
                       <div className="flex-1 pb-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-medium text-sm">
                               {cred

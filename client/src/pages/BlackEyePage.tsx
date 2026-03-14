@@ -369,7 +369,7 @@ export default function BlackEyePage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <div className="bg-orange-500/10 rounded-xl p-3">
             <Eye className="w-8 h-8 text-orange-400" />

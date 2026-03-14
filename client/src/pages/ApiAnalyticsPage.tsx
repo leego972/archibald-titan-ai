@@ -86,7 +86,7 @@ export default function ApiAnalyticsPage() {
   const recent = recentQuery.data || [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-5xl space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
@@ -107,7 +107,7 @@ export default function ApiAnalyticsPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground font-medium">
                       Total Requests

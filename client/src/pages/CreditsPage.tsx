@@ -109,7 +109,7 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl space-y-6">
       <AffiliateRecommendations context="subscription" variant="banner" />
 
       {/* Balance Overview */}

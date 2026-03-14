@@ -52,7 +52,7 @@ function StatCard({ title, value, icon: Icon, subtitle, color = "purple" }: {
   return (
     <Card className="bg-gradient-to-br border-white/5 backdrop-blur-sm">
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-2xl font-bold mt-1">{value}</p>

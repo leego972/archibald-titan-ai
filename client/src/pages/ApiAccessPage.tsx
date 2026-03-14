@@ -139,9 +139,9 @@ export default function ApiAccessPage() {
     keysQuery.data?.filter((k) => k.revokedAt) || [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl space-y-6">
       <AffiliateRecommendations context="developer" variant="banner" />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">API Access</h1>
           <p className="text-muted-foreground mt-1">

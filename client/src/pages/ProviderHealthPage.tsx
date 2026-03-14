@@ -198,7 +198,7 @@ function ProviderCard({
             </div>
 
             {/* Circuit Breaker */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">Circuit Breaker</span>
@@ -296,7 +296,7 @@ export default function ProviderHealthPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

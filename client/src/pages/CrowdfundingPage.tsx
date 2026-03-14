@@ -328,7 +328,7 @@ function CommentsSection({ campaignId }: { campaignId: number }) {
           <div className="space-y-3">
             {comments.map((comment: any) => (
               <div key={comment.id} className="p-3 rounded-lg border border-white/5 bg-white/[0.02]">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs font-medium text-blue-400">User #{comment.userId}</span>
                   <span className="text-[10px] text-muted-foreground">{new Date(comment.createdAt).toLocaleDateString()}</span>
                 </div>

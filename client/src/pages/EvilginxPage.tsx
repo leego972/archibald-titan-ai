@@ -355,7 +355,7 @@ function ConfigTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
       {/* Current Config Display */}
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-white text-lg flex items-center gap-2">
               <Settings className="w-5 h-5 text-red-400" />
               Current Configuration

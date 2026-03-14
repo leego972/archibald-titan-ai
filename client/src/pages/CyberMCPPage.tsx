@@ -411,7 +411,7 @@ function InfrastructureTab() {
 // ─── Main Page ────────────────────────────────────────────────────
 export default function CyberMCPPage() {
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

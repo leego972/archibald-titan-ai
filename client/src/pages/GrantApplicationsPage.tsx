@@ -320,7 +320,7 @@ export default function GrantApplicationsPage() {
     : null;
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-5xl space-y-6">
       <Button variant="ghost" onClick={() => navigate("/companies")} className="gap-2 text-zinc-400 hover:text-white -ml-2">
         <ArrowLeft className="w-4 h-4" /> Back to Companies
       </Button>

@@ -471,7 +471,7 @@ export default function DeveloperDocsPage() {
               }
             >
               <CardContent className="py-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <MethodBadge method={endpoint.method} />
                     <code className="text-sm font-mono">
