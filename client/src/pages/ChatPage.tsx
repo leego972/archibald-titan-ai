@@ -95,6 +95,9 @@ import {
   Bug,
   Crosshair,
   ScanSearch,
+  Clock,
+  ListX,
+  Hourglass,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -1519,7 +1522,6 @@ export default function ChatPage() {
       setMessageQueue((prev) => [...prev, messageText]);
       setInput('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
-      toast.info('Message queued — will be sent when the current build finishes.');
       return;
     }
 
@@ -2738,52 +2740,88 @@ export default function ChatPage() {
                 />
               </div>
 
-              {/* Send / Stop button */}
-              {isLoading ? (
-                <Button
-                  onClick={async () => {
-                    try {
-                      if (activeConversationId) {
-                        const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
-                        await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
-                      }
-                      if (eventSourceRef.current) {
-                        eventSourceRef.current.close();
-                        eventSourceRef.current = null;
-                      }
-                      setIsLoading(false);
-                      setStreamEvents([]);
-                      toast.info('Titan stopped');
-                    } catch {
-                      toast.error('Failed to stop');
-                    }
-                  }}
-                  size="icon"
-                  className={`rounded-xl shrink-0 touch-target bg-red-600 hover:bg-red-700 text-white animate-pulse ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
-                  title="Stop Titan"
-                >
-                  <Square className="h-4 w-4 fill-current" />
-                </Button>
-              ) : (
+              {/* Send + Stop buttons — both visible while Titan is running */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Queue-send button: always visible so you can send while Titan is busy */}
                 <Button
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isRecording || isTranscribing}
                   size="icon"
-                  className={`rounded-xl shrink-0 touch-target ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
+                  className={`rounded-xl touch-target transition-all ${
+                    isLoading
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-400'
+                      : ''
+                  } ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
+                  title={isLoading ? 'Queue this message — sends after current build' : 'Send message'}
                 >
-                  <Send className="h-4 w-4" />
+                  {isLoading ? <Clock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                 </Button>
-              )}
+                {/* Stop button: only visible while Titan is running */}
+                {isLoading && (
+                  <Button
+                    onClick={async () => {
+                      try {
+                        if (activeConversationId) {
+                          const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+                          await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
+                        }
+                        if (eventSourceRef.current) {
+                          eventSourceRef.current.close();
+                          eventSourceRef.current = null;
+                        }
+                        setIsLoading(false);
+                        setStreamEvents([]);
+                        toast.info('Titan stopped');
+                      } catch {
+                        toast.error('Failed to stop');
+                      }
+                    }}
+                    size="icon"
+                    className={`rounded-xl touch-target bg-red-600 hover:bg-red-700 text-white animate-pulse ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
+                    title="Stop Titan"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Queued messages indicator */}
+          {/* Queued messages indicator — shows each pending message as a dismissible chip */}
           {messageQueue.length > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
-              <span className="text-[11px] text-amber-500 font-medium">
-                {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued — will send after current build
-              </span>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center gap-1.5 px-1">
+                <Hourglass className="h-3 w-3 text-amber-400 shrink-0" />
+                <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide">
+                  {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued
+                </span>
+                <span className="text-[10px] text-muted-foreground">— will send automatically when Titan finishes</span>
+                <button
+                  onClick={() => setMessageQueue([])}
+                  className="ml-auto text-[10px] text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-0.5"
+                  title="Clear all queued messages"
+                >
+                  <ListX className="h-3 w-3" /> Clear all
+                </button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {messageQueue.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-amber-500/8 border border-amber-500/20 rounded-lg group"
+                  >
+                    <Clock className="h-3 w-3 text-amber-400/60 shrink-0" />
+                    <span className="text-[11px] text-muted-foreground truncate flex-1">{msg}</span>
+                    <button
+                      onClick={() => setMessageQueue((prev) => prev.filter((_, i) => i !== idx))}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 shrink-0"
+                      title="Remove this queued message"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
