@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { trackDownload } from "@/lib/adTracking";
-import { AT_ICON_64 } from "@/lib/logos";
+import { AT_ICON_64, FULL_LOGO_256, TIER_LOGOS } from "@/lib/logos";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
@@ -198,6 +198,14 @@ export default function LandingPage() {
         </div>
         <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center mb-8">
+            <img
+              loading="eager"
+              src={FULL_LOGO_256}
+              alt="Archibald Titan"
+              className="h-28 w-28 sm:h-36 sm:w-36 object-contain drop-shadow-[0_0_40px_rgba(59,130,246,0.35)] hover:drop-shadow-[0_0_55px_rgba(59,130,246,0.5)] transition-all duration-500"
+            />
+          </div>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 mb-8">
             <Sparkles className="h-3.5 w-3.5 text-blue-400" />
             <span className="text-xs font-medium text-blue-300">Titan Builder — v{latestRelease?.version ?? "9.0.0"} Now Available</span>
@@ -530,7 +538,10 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <div className="relative p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300">
-              <div className="text-sm font-semibold text-white/60 mb-1">Starter</div>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={TIER_LOGOS.free} alt="Starter" className="h-10 w-10 object-contain" />
+                <div className="text-sm font-semibold text-white/60">Starter</div>
+              </div>
               <div className="text-3xl font-bold text-white mb-1">$0<span className="text-base font-normal text-white/40">/mo</span></div>
               <p className="text-sm text-white/40 mb-6">Good for early testing</p>
               <div className="space-y-3">
@@ -544,7 +555,10 @@ export default function LandingPage() {
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/30">MOST POPULAR</span>
               </div>
-              <div className="text-sm font-semibold text-blue-400 mb-1">Pro</div>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={TIER_LOGOS.pro} alt="Pro" className="h-10 w-10 object-contain" />
+                <div className="text-sm font-semibold text-blue-400">Pro</div>
+              </div>
               <div className="text-3xl font-bold text-white mb-1">$29<span className="text-base font-normal text-white/40">/mo</span></div>
               <p className="text-sm text-white/40 mb-6">Good for weekly production work</p>
               <div className="space-y-3">
@@ -556,7 +570,10 @@ export default function LandingPage() {
               <p className="text-xs text-center text-white/30 mt-2">30-day money-back guarantee</p>
             </div>
             <div className="relative p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300">
-              <div className="text-sm font-semibold text-white/60 mb-1">Enterprise</div>
+              <div className="flex items-center gap-3 mb-3">
+                <img src={TIER_LOGOS.enterprise} alt="Enterprise" className="h-10 w-10 object-contain" />
+                <div className="text-sm font-semibold text-white/60">Enterprise</div>
+              </div>
               <div className="text-3xl font-bold text-white mb-1">$99<span className="text-base font-normal text-white/40">/mo</span></div>
               <p className="text-sm text-white/40 mb-6">Good for teams with governance needs</p>
               <div className="space-y-3">

@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import { AT_ICON_64 } from "@/lib/logos";
+import { AT_ICON_64, FULL_LOGO_256, TIER_LOGOS } from "@/lib/logos";
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import {
@@ -30,9 +31,13 @@ export default function BuilderPage() {
   const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const { isFree, loading: subLoading } = useSubscription();
+
+  // Builder is paid-only. Free users are redirected to pricing with upgrade intent.
   const handleCTA = () => {
-    if (user) setLocation("/dashboard");
-    else window.location.href = getLoginUrl();
+    if (!user) { window.location.href = getLoginUrl(); return; }
+    if (isFree) { setLocation("/pricing?upgrade=builder"); return; }
+    setLocation("/dashboard");
   };
 
   return (
@@ -96,6 +101,14 @@ export default function BuilderPage() {
         </div>
         <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center mb-8">
+            <img
+              loading="eager"
+              src={FULL_LOGO_256}
+              alt="Archibald Titan"
+              className="h-28 w-28 sm:h-36 sm:w-36 object-contain drop-shadow-[0_0_40px_rgba(59,130,246,0.35)] hover:drop-shadow-[0_0_55px_rgba(59,130,246,0.5)] transition-all duration-500"
+            />
+          </div>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 mb-8">
             <Sparkles className="h-3.5 w-3.5 text-blue-400" />
             <span className="text-xs font-medium text-blue-300">Titan Builder — AI-powered output for real work</span>
@@ -109,8 +122,9 @@ export default function BuilderPage() {
             Titan Builder is the AI-powered build environment inside Archibald Titan. Describe what you need — a landing page, internal tool, business plan, or prototype — and Titan Builder produces a structured, editable, exportable result.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" onClick={handleCTA} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
-              <Rocket className="h-5 w-5" />{user ? "Open Titan Builder" : "Start Building Free"}
+            <Button size="lg" onClick={handleCTA} disabled={subLoading} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
+              <Rocket className="h-5 w-5" />
+              {!user ? "Start Building" : isFree ? "Upgrade to Use Builder" : "Open Titan Builder"}
             </Button>
             <a href="#how-it-works">
               <Button size="lg" variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white h-12 px-8 text-base">
@@ -352,9 +366,9 @@ export default function BuilderPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
             {[
-              { tier: "Starter", price: "$0", desc: "Good for early testing", features: ["300 AI credits/month", "AI Chat & Builder", "AES-256 vault", "3 integrations"], cta: "Start Free", primary: false },
-              { tier: "Pro", price: "$29", desc: "Good for weekly production work", features: ["10,000 AI credits/month", "Unlimited credential fetches", "All 15+ integrations", "Priority support", "API access"], cta: "Start 7-Day Trial", primary: true },
-              { tier: "Enterprise", price: "$99", desc: "Good for teams", features: ["25,000 AI credits/month", "Team vault with RBAC", "Full audit trail", "All 15+ integrations"], cta: "Contact Sales", primary: false },
+              { tier: "Starter", tierKey: "free", price: "$0", desc: "Good for early testing", features: ["300 AI credits/month", "AI Chat only", "AES-256 vault", "3 integrations"], cta: "Start Free", primary: false, builderAccess: false },
+              { tier: "Pro", tierKey: "pro", price: "$29", desc: "Good for weekly production work", features: ["10,000 AI credits/month", "Full Titan Builder access", "All 15+ integrations", "Priority support", "API access"], cta: "Start 7-Day Trial", primary: true, builderAccess: true },
+              { tier: "Enterprise", tierKey: "enterprise", price: "$99", desc: "Good for teams", features: ["25,000 AI credits/month", "Full Titan Builder access", "Team vault with RBAC", "Full audit trail", "All 15+ integrations"], cta: "Contact Sales", primary: false, builderAccess: true },
             ].map((plan) => (
               <div key={plan.tier} className={`p-6 rounded-2xl border transition-all duration-300 ${plan.primary ? "border-2 border-blue-500/40 bg-blue-500/[0.04] ring-1 ring-blue-500/20 shadow-xl shadow-blue-500/10" : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"}`}>
                 {plan.primary && (
@@ -362,7 +376,19 @@ export default function BuilderPage() {
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/30">MOST POPULAR</span>
                   </div>
                 )}
-                <div className={`text-sm font-semibold mb-1 ${plan.primary ? "text-blue-400" : "text-white/60"}`}>{plan.tier}</div>
+                <div className="flex items-center gap-3 mb-2">
+                  <img src={TIER_LOGOS[plan.tierKey]} alt={plan.tier} className="h-10 w-10 object-contain" />
+                  <div className={`text-sm font-semibold ${plan.primary ? "text-blue-400" : "text-white/60"}`}>{plan.tier}</div>
+                </div>
+                {plan.builderAccess ? (
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-400 mb-3">
+                    <CheckCircle2 className="h-3 w-3" /> Builder Included
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-white/40 mb-3">
+                    <Lock className="h-3 w-3" /> Chat Only
+                  </div>
+                )}
                 <div className="text-3xl font-bold text-white mb-1">{plan.price}<span className="text-base font-normal text-white/40">/mo</span></div>
                 <p className="text-sm text-white/40 mb-5">{plan.desc}</p>
                 <div className="space-y-2.5 mb-6">
@@ -401,7 +427,7 @@ export default function BuilderPage() {
             <FAQItem question="Does it run locally or in the cloud?" answer="Titan Builder runs locally on your machine. Your prompts, credentials, and outputs are processed in a local-first environment. Nothing leaves your machine unless you explicitly export or deploy the output." />
             <FAQItem question="Can I edit the output?" answer="Yes. Every output is fully editable inside the builder. You can refine copy, adjust structure, modify code, and iterate with follow-up prompts. When you're satisfied, export in your preferred format." />
             <FAQItem question="What formats can I export to?" answer="HTML, CSS, Markdown, JSON, Python, TypeScript, .env files, and zip archives. The export format depends on the output type — code outputs export as source files, documents export as Markdown or PDF, and full projects export as zip archives." />
-            <FAQItem question="Is Titan Builder available on the free plan?" answer="Yes. The free Starter plan includes 300 AI credits per month, which is enough to test the workflow and produce small outputs. Pro ($29/mo) gives you 10,000 credits for regular production work. All paid plans include a 7-day free trial." />
+            <FAQItem question="Is Titan Builder available on the free plan?" answer="No. Titan Builder is a paid feature. The free Starter plan includes AI Chat only. To access Titan Builder, upgrade to the Pro plan ($29/mo) or higher. All paid plans include a 7-day free trial and a 30-day money-back guarantee." />
             <FAQItem question="Can teams use Titan Builder?" answer="Yes. The Enterprise plan ($99/mo) adds team management with role-based access control, shared credential vaults, and a full audit trail — designed for teams that need governed AI workflows." />
           </div>
         </div>
@@ -416,8 +442,9 @@ export default function BuilderPage() {
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Start building with Titan Builder</h2>
           <p className="mt-4 text-white/50 text-lg max-w-2xl mx-auto">Turn your next idea into a working output. No setup. No cloud dependency. Just describe what you need and build it.</p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" onClick={handleCTA} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
-              <Rocket className="h-5 w-5" />{user ? "Open Titan Builder" : "Start Building Free"}
+            <Button size="lg" onClick={handleCTA} disabled={subLoading} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
+              <Rocket className="h-5 w-5" />
+              {!user ? "Start Building" : isFree ? "Upgrade to Use Builder" : "Open Titan Builder"}
             </Button>
             <Link href="/contact">
               <Button size="lg" variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white h-12 px-8 text-base">
