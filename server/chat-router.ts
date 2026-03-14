@@ -96,7 +96,7 @@ export function logChatError(error: string, userId?: number): void {
   if (recentChatErrors.length > 10) recentChatErrors.pop();
 }
 
-// MAX_CONTEXT_MESSAGES is now 40 — imported from titan-memory.ts
+// MAX_CONTEXT_MESSAGES is now 100 — imported from titan-memory.ts
 // The memory module handles context window, summarization, and long-term facts.
 const MAX_TOOL_ROUNDS = 40; // complex builder tasks need many rounds: plan + create files + install + test + fix + retest
 
