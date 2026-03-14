@@ -11,6 +11,7 @@ import { ArchibaldProvider } from "./contexts/ArchibaldContext";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
+import BuilderPage from "./pages/BuilderPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import ContactPage from "./pages/ContactPage";
@@ -239,6 +240,7 @@ function Router() {
       <Route path="/desktop-login" component={DesktopLoginPage} />
 
       {/* Public pages */}
+      <Route path="/builder" component={BuilderPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
