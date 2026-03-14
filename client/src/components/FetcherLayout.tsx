@@ -649,7 +649,7 @@ function FetcherLayoutContent({
           </div>
         )}
         <TrialBanner />
-        <main className="flex-1 p-3 sm:p-4 md:p-6 max-md:[&:has(.chat-page-root)]:p-0 [&:has(.chat-page-root)]:overflow-hidden">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden max-md:[&:has(.chat-page-root)]:p-0 [&:has(.chat-page-root)]:overflow-hidden">{children}</main>
       </SidebarInset>
     </>
   );

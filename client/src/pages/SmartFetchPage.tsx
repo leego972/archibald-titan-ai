@@ -13,12 +13,9 @@ import {
   TrendingUp,
   Shield,
   Zap,
-  CheckCircle2,
-  XCircle,
   Loader2,
   Brain,
   ArrowRight,
-  Eye,
   EyeOff,
 } from "lucide-react";
 import { PROVIDERS } from "@shared/fetcher";
@@ -76,22 +73,22 @@ export default function SmartFetchPage() {
   const mediumCount = recommendations.filter((r: Rec) => r.priority === "medium").length;
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-            <Sparkles className="h-7 w-7 text-primary" />
-            Smart Fetch Recommendations
+    <div className="w-full max-w-5xl space-y-4 sm:space-y-6 overflow-x-hidden">
+      {/* Header — stacks on mobile, side-by-side on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
+            <Sparkles className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0" />
+            <span>Smart Fetch Recommendations</span>
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm leading-snug">
             AI-powered analysis of your credential usage patterns with actionable recommendations.
           </p>
         </div>
         <Button
           onClick={handleGenerate}
           disabled={generateMutation.isPending}
-          className="gap-2"
+          className="gap-2 w-full sm:w-auto shrink-0"
         >
           {generateMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,56 +99,56 @@ export default function SmartFetchPage() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Summary Cards — 2 columns on mobile, 4 on md+ */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Sparkles className="h-5 w-5 text-primary" />
+          <CardContent className="pt-4 pb-4 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-primary/10 shrink-0">
+                <Sparkles className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{recommendations.length}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+              <div className="min-w-0">
+                <p className="text-xl font-bold leading-none">{recommendations.length}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Total</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-red-500/10">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+          <CardContent className="pt-4 pb-4 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-red-500/10 shrink-0">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{criticalCount}</p>
-                <p className="text-sm text-muted-foreground">Critical</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10">
-                <Shield className="h-5 w-5 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{highCount}</p>
-                <p className="text-sm text-muted-foreground">High Priority</p>
+              <div className="min-w-0">
+                <p className="text-xl font-bold leading-none">{criticalCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Critical</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
+          <CardContent className="pt-4 pb-4 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-amber-500/10 shrink-0">
+                <Shield className="h-4 w-4 text-amber-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{mediumCount}</p>
-                <p className="text-sm text-muted-foreground">Medium</p>
+              <div className="min-w-0">
+                <p className="text-xl font-bold leading-none">{highCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">High</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-blue-500/10 shrink-0">
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xl font-bold leading-none">{mediumCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Medium</p>
               </div>
             </div>
           </CardContent>
@@ -161,15 +158,15 @@ export default function SmartFetchPage() {
       {/* Generating state */}
       {generateMutation.isPending && (
         <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="flex items-center gap-4 py-6">
-            <div className="relative">
-              <Brain className="h-8 w-8 text-primary animate-pulse" />
-              <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
+          <CardContent className="flex items-center gap-3 py-4 px-4">
+            <div className="relative shrink-0">
+              <Brain className="h-7 w-7 text-primary animate-pulse" />
+              <Sparkles className="h-3.5 w-3.5 text-primary absolute -top-1 -right-1 animate-bounce" />
             </div>
-            <div>
-              <p className="font-semibold">Analyzing credential patterns...</p>
-              <p className="text-sm text-muted-foreground">
-                Titan AI is reviewing your fetch history, provider health, and credential age to generate smart recommendations.
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Analyzing credential patterns...</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                Titan AI is reviewing your fetch history, provider health, and credential age.
               </p>
             </div>
           </CardContent>
@@ -183,13 +180,13 @@ export default function SmartFetchPage() {
         </div>
       ) : recommendations.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Sparkles className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-semibold mb-1">No recommendations yet</h3>
-            <p className="text-muted-foreground text-sm mb-4 text-center max-w-md">
-              Click "Generate Insights" to let Titan AI analyze your credential usage patterns and provide smart recommendations.
+          <CardContent className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
+            <h3 className="text-base font-semibold mb-1">No recommendations yet</h3>
+            <p className="text-muted-foreground text-sm mb-4 max-w-xs">
+              Click "Generate Insights" to let Titan AI analyze your credential usage patterns.
             </p>
-            <Button onClick={handleGenerate} disabled={generateMutation.isPending}>
+            <Button onClick={handleGenerate} disabled={generateMutation.isPending} size="sm">
               <Brain className="h-4 w-4 mr-2" />
               Generate Insights
             </Button>
@@ -203,20 +200,31 @@ export default function SmartFetchPage() {
 
             return (
               <Card key={rec.id} className={`border-l-4 ${priority.border}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${priority.bg}`}>
-                        <TypeIcon className={`h-5 w-5 ${priority.color}`} />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base flex items-center gap-2">
+                <CardHeader className="pb-2 px-4 pt-4">
+                  {/* Title row — icon + title + dismiss button */}
+                  <div className="flex items-start gap-3">
+                    <div className={`p-1.5 rounded-lg ${priority.bg} shrink-0 mt-0.5`}>
+                      <TypeIcon className={`h-4 w-4 ${priority.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-sm font-semibold leading-snug flex-1 min-w-0">
                           {rec.title}
-                          <Badge variant="outline" className={`text-xs ${priority.color}`}>
-                            {priority.label}
-                          </Badge>
                         </CardTitle>
-                        <CardDescription className="mt-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDismiss(rec.id)}
+                          className="text-muted-foreground hover:text-foreground h-7 w-7 p-0 shrink-0"
+                        >
+                          <EyeOff className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${priority.color}`}>
+                          {priority.label}
+                        </Badge>
+                        <CardDescription className="text-xs">
                           {rec.providerId && (
                             <span className="font-medium">
                               {PROVIDERS[rec.providerId]?.name || rec.providerId}
@@ -227,25 +235,17 @@ export default function SmartFetchPage() {
                         </CardDescription>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDismiss(rec.id)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <EyeOff className="h-4 w-4" />
-                    </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">{rec.description}</p>
+                <CardContent className="px-4 pb-4">
+                  <p className="text-sm text-muted-foreground mb-2 leading-snug">{rec.description}</p>
                   {rec.actionUrl && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-sm mb-2">
+                      <ArrowRight className="h-3.5 w-3.5 text-primary shrink-0" />
                       <span className="text-primary font-medium">Take Action</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
                     <span>Type: {rec.recommendationType.replace(/_/g, " ")}</span>
                     <span>Generated: {new Date(rec.createdAt).toLocaleDateString()}</span>
                   </div>
