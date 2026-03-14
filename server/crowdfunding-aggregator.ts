@@ -528,6 +528,44 @@ export function seedToInsert(seed: SeedCampaign): Omit<InsertCrowdfundingCampaig
 }
 
 /**
+ * Update imageUrls for all existing seeded campaigns.
+ * Fixes campaigns that were seeded with broken/empty image URLs.
+ * Safe to run on every startup — only updates rows where imageUrl is broken or empty.
+ */
+export async function updateCampaignImages(
+  updateCampaign: (id: number, data: any) => Promise<void>,
+  listCampaigns: (filters?: any) => Promise<any[]>,
+): Promise<{ updated: number; skipped: number }> {
+  const allSeeds = getAllSeedCampaigns();
+  const existingCampaigns = await listCampaigns();
+  const existingByExternalId = new Map(
+    existingCampaigns.filter((c: any) => c.externalId).map((c: any) => [c.externalId, c])
+  );
+
+  let updated = 0;
+  let skipped = 0;
+
+  for (const seed of allSeeds) {
+    if (!seed.imageUrl) { skipped++; continue; }
+    const campaign = existingByExternalId.get(seed.externalId);
+    if (!campaign) { skipped++; continue; }
+    // Update if the stored imageUrl is empty, null, or a broken Kickstarter CDN URL
+    const needsUpdate = !campaign.imageUrl ||
+      campaign.imageUrl === '' ||
+      campaign.imageUrl.includes('kickstarter.com/assets');
+    if (!needsUpdate) { skipped++; continue; }
+    try {
+      await updateCampaign(campaign.id, { imageUrl: seed.imageUrl });
+      updated++;
+    } catch (err) {
+      skipped++;
+    }
+  }
+
+  return { updated, skipped };
+}
+
+/**
  * Seed all external campaigns into the database.
  * Skips campaigns that already exist (by externalId).
  */

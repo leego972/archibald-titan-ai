@@ -24,6 +24,8 @@ import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
 import { runOptimizationCycleV2 } from "../affiliate-engine-v2";
 import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
+import { updateCampaignImages } from "../crowdfunding-aggregator";
+import { updateCampaign, listCampaigns } from "../db";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { startBusinessModuleGeneratorScheduler } from "../business-module-generator";
@@ -798,6 +800,21 @@ async function startServer() {
         log.error('Marketplace seed failed', { error: String(err) });
       }
     }, 12000);
+
+    // ─── Crowdfunding Image Migration ──────────────────────────────
+    // Fixes any campaigns that were seeded with broken/empty image URLs.
+    // Safe to run every startup — only updates rows with broken images.
+    setTimeout(async () => {
+      try {
+        const result = await updateCampaignImages(updateCampaign, listCampaigns);
+        if (result.updated > 0) {
+          log.info('[CrowdfundingImages] Fixed broken images', { updated: result.updated, skipped: result.skipped });
+        }
+      } catch (err) {
+        log.error('[CrowdfundingImages] Image update failed', { error: String(err) });
+      }
+    }, 14000);
+
     // ─── Autonomous Affiliate Signup Engine ───────────────────────
     // Runs weekly: auto-signs up for discovered affiliate programs,
     // generates unique referral links, and tracks conversions.
