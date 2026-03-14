@@ -725,6 +725,13 @@ export async function executeToolCall(
         return await execMarketplaceBrowse(userId, args);
       case "cybermcp_test_basic_auth":
         return await execCybermcpTestBasicAuth(userId, args);
+      // Memory management
+      case "memory_list_facts":
+        return await execMemoryListFacts(userId);
+      case "memory_save_fact":
+        return await execMemorySaveFact(userId, args);
+      case "memory_delete_fact":
+        return await execMemoryDeleteFact(userId, args);
 
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
@@ -6492,5 +6499,67 @@ async function execCybermcpTestBasicAuth(userId: number, args: Record<string, un
     };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to test basic auth" };
+  }
+}
+
+// ── Memory Management Executors ────────────────────────────────────────────
+
+async function execMemoryListFacts(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const { listMemoryFacts } = await import("./titan-memory");
+    const facts = await listMemoryFacts(userId);
+    if (facts.length === 0) {
+      return {
+        success: true,
+        data: { count: 0, facts: [], message: "No long-term memory facts stored yet." },
+      };
+    }
+    // Group by category for readability
+    const grouped: Record<string, Array<{ id: number; fact: string; confidence: number }>> = {};
+    for (const f of facts) {
+      if (!grouped[f.category]) grouped[f.category] = [];
+      grouped[f.category].push({ id: f.id, fact: f.fact, confidence: f.confidence });
+    }
+    return {
+      success: true,
+      data: { count: facts.length, byCategory: grouped },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to list memory facts" };
+  }
+}
+
+async function execMemorySaveFact(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  try {
+    const fact = String(args.fact || "").trim();
+    const category = String(args.category || "general");
+    if (!fact) return { success: false, error: "fact is required" };
+    const { saveMemoryFact } = await import("./titan-memory");
+    const result = await saveMemoryFact(userId, fact, category);
+    return result.success
+      ? { success: true, data: { id: result.id, fact, category, message: "Memory fact saved." } }
+      : { success: false, error: "Failed to save memory fact" };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to save memory fact" };
+  }
+}
+
+async function execMemoryDeleteFact(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  try {
+    const factId = Number(args.factId);
+    if (!factId) return { success: false, error: "factId is required" };
+    const { deleteMemoryFact } = await import("./titan-memory");
+    const ok = await deleteMemoryFact(userId, factId);
+    return ok
+      ? { success: true, data: { message: `Memory fact #${factId} deleted.` } }
+      : { success: false, error: "Fact not found or already deleted" };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to delete memory fact" };
   }
 }

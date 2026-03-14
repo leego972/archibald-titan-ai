@@ -2616,6 +2616,55 @@ export const marketplaceBrowseTool: Tool = {
   },
 };
 
+// ── Titan Memory Management Tools ────────────────────────────────────────
+export const memoryListFactsTool: Tool = {
+  type: "function",
+  function: {
+    name: "memory_list_facts",
+    description: "List all long-term memory facts Titan has stored about this user across all conversations.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+export const memorySaveFactTool: Tool = {
+  type: "function",
+  function: {
+    name: "memory_save_fact",
+    description: "Save a new long-term memory fact about the user for future conversations. Use this when the user shares important preferences, project details, skills, goals, or context that should be remembered.",
+    parameters: {
+      type: "object",
+      properties: {
+        fact: { type: "string", description: "The fact to remember (concise, max 200 chars)" },
+        category: {
+          type: "string",
+          enum: ["preferences", "projects", "skills", "context", "goals", "constraints", "general"],
+          description: "Category for the fact",
+        },
+      },
+      required: ["fact", "category"],
+    },
+  },
+};
+
+export const memoryDeleteFactTool: Tool = {
+  type: "function",
+  function: {
+    name: "memory_delete_fact",
+    description: "Delete a specific long-term memory fact by its ID.",
+    parameters: {
+      type: "object",
+      properties: {
+        factId: { type: "number", description: "The ID of the fact to delete" },
+      },
+      required: ["factId"],
+    },
+  },
+};
+
 export const cybermcpTestBasicAuthTool: Tool = {
   type: "function",
   function: {
@@ -2766,6 +2815,10 @@ export const TITAN_TOOLS: Tool[] = [
   storageGetStatsTool,
   marketplaceBrowseTool,
   cybermcpTestBasicAuthTool,
+  // Memory management tools
+  memoryListFactsTool,
+  memorySaveFactTool,
+  memoryDeleteFactTool,
 ];
 
 // Focused tool subset for build/research requests — fewer tools = less model confusion

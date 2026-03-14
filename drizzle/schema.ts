@@ -695,6 +695,8 @@ export const chatConversations = mysqlTable("chat_conversations", {
   lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  contextSummary: text("contextSummary"),
+  summarizedUpToId: int("summarizedUpToId"),
 });
 export type ChatConversation = typeof chatConversations.$inferSelect;
 export type InsertChatConversation = typeof chatConversations.$inferInsert;
@@ -2285,3 +2287,17 @@ export type {
   StorageApiKey,
   InsertStorageApiKey,
 } from "./storage-schema";
+
+// ─── Titan Long-Term Memory ──────────────────────────────────────────────
+export const userMemory = mysqlTable("user_memory", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  fact: text("fact").notNull(),
+  category: varchar("category", { length: 100 }).notNull().default("general"),
+  confidence: int("confidence").notNull().default(100),
+  source: varchar("source", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UserMemory = typeof userMemory.$inferSelect;
+export type InsertUserMemory = typeof userMemory.$inferInsert;

@@ -76,6 +76,16 @@ import {
   sanitizeLLMOutput,
   trackIncident,
 } from "./security-fortress";
+import {
+  MAX_CONTEXT_MESSAGES,
+  loadConversationContextWithMemory,
+  loadUserMemory,
+  extractAndSaveMemory,
+  saveMemoryFact,
+  deleteMemoryFact,
+  listMemoryFacts,
+  maybeCreateConversationSummary,
+} from "./titan-memory";
 const log = createLogger("ChatRouter");
 
 // ── In-memory error log for diagnostics ──────────────────────────────────────
@@ -86,9 +96,8 @@ export function logChatError(error: string, userId?: number): void {
   if (recentChatErrors.length > 10) recentChatErrors.pop();
 }
 
-const MAX_CONTEXT_MESSAGES = 12; // max messages loaded into LLM context
-// Reduced from 20 to 12 — Tier 1 OpenAI has 200K TPM limit.
-// 12 messages keeps context under ~30K tokens, leaving room for system prompt + tools + response.
+// MAX_CONTEXT_MESSAGES is now 40 — imported from titan-memory.ts
+// The memory module handles context window, summarization, and long-term facts.
 const MAX_TOOL_ROUNDS = 40; // complex builder tasks need many rounds: plan + create files + install + test + fix + retest
 
 /**
@@ -703,74 +712,12 @@ async function generateTitle(userMessage: string): Promise<string> {
 }
 
 // ─── Load conversation messages into LLM format ──────────────────────
+// loadConversationContext is now a thin wrapper around the enhanced memory module
 async function loadConversationContext(
   conversationId: number,
   userId: number
 ): Promise<Message[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  const rows = await db
-    .select()
-    .from(chatMessages)
-    .where(
-      and(
-        eq(chatMessages.conversationId, conversationId),
-        eq(chatMessages.userId, userId)
-      )
-    )
-    .orderBy(desc(chatMessages.id))
-    .limit(MAX_CONTEXT_MESSAGES);
-
-  // Reverse to chronological order
-  rows.reverse();
-
-  const messages: Message[] = [];
-  for (const row of rows) {
-    if (row.role === "tool") continue; // tool messages are ephemeral — but assistant messages with toolCalls/actionsTaken summaries are preserved below
-    // If this is an assistant message that has tool call summaries, inject a condensed file manifest
-    if (row.role === "assistant" && row.toolCalls && Array.isArray(row.toolCalls) && (row.toolCalls as any[]).length > 0) {
-      const toolCalls = row.toolCalls as Array<{ name: string; args: Record<string, unknown>; result: unknown }>;
-      const fileCreations = toolCalls.filter(tc => tc.name === 'create_file' || tc.name === 'sandbox_write_file');
-      if (fileCreations.length > 0) {
-        const fileList = fileCreations.map(tc => {
-          const path = (tc.args as any)?.path || (tc.args as any)?.filePath || 'unknown';
-          const success = (tc.result as any)?.success !== false;
-          return `  - ${path} ${success ? '✓' : '✗'}`;
-        }).join('\n');
-        // Append file manifest to the assistant message so the LLM knows what was created
-        const manifestNote = `\n\n[Files created in this turn:\n${fileList}\n]`;
-        messages.push({
-          role: "assistant",
-          content: (row.content || '') + manifestNote,
-        });
-        continue;
-      }
-    }
-    // Convert image URLs in user messages to vision content parts
-    if (row.role === "user" && row.content.includes("[Attached image:")) {
-      const imageRegex = /\[Attached image:[^\]]*\]\((https?:\/\/[^)]+)\)/g;
-      const imageUrls: string[] = [];
-      let m;
-      while ((m = imageRegex.exec(row.content)) !== null) imageUrls.push(m[1]);
-      if (imageUrls.length > 0) {
-        const cleanText = row.content
-          .replace(/\[Attached image:[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '')
-          .replace(/\n*I have attached image\(s\) above\. Please analyze them using the read_uploaded_file tool\.\n?/g, '')
-          .trim();
-        const parts: any[] = [];
-        if (cleanText) parts.push({ type: "text", text: cleanText });
-        for (const url of imageUrls) parts.push({ type: "image_url", image_url: { url, detail: "auto" } });
-        messages.push({ role: "user", content: parts });
-        continue;
-      }
-    }
-    messages.push({
-      role: row.role as "user" | "assistant" | "system",
-      content: row.content,
-    });
-  }
-
+  const { messages } = await loadConversationContextWithMemory(conversationId, userId);
   return messages;
 }
 
@@ -1254,13 +1201,13 @@ export const chatRouter = router({
       // ── Parallelise pre-LLM async work ────────────────────────
       // Run all independent async operations concurrently to minimise
       // time-to-first-token. These do not depend on each other.
-      const [userApiKey, previousMessages, userContext] = await Promise.all([
+      const [userApiKey, previousMessages, userContext, longTermMemory] = await Promise.all([
         // 1. Personal API key lookup
         getUserOpenAIKey(userId).catch((err: unknown) => {
           log.error("[Chat] Failed to load user API key:", { error: getErrorMessage(err) });
           return undefined as string | undefined;
         }),
-        // 2. Conversation history
+        // 2. Conversation history (now uses enhanced memory module with 40-message context + summaries)
         loadConversationContext(conversationId, userId).catch((err: unknown) => {
           log.error("[Chat] Failed to load conversation context:", { error: getErrorMessage(err) });
           return [] as Message[];
@@ -1268,6 +1215,11 @@ export const chatRouter = router({
         // 3. User context (credentials, jobs, proxies, etc.)
         buildUserContext(userId).catch((err: unknown) => {
           log.error("[Chat] Failed to build user context:", { error: getErrorMessage(err) });
+          return "";
+        }),
+        // 4. Long-term memory (cross-conversation facts about this user)
+        loadUserMemory(userId).catch((err: unknown) => {
+          log.error("[Chat] Failed to load long-term memory:", { error: getErrorMessage(err) });
           return "";
         }),
       ]);
@@ -1417,10 +1369,15 @@ Do NOT attempt any tool calls or builds.`;
         : "English";
       const languageDirective = `\n\n--- LANGUAGE RULE (HIGHEST PRIORITY — overrides all other language instructions) ---\nALWAYS respond in the SAME LANGUAGE the user wrote or spoke their message in. Detect the language of the user's actual input and reply in that language — do NOT translate or switch languages unless the user explicitly asks you to.\nIf the user's input language cannot be determined, default to: ${preferredLangName}.\nThis rule applies to EVERY response including code comments, error messages, and explanations.\n--- END LANGUAGE RULE ---`;
 
+      // Inject long-term memory if available
+      const longTermMemoryBlock = longTermMemory
+        ? `\n\n${longTermMemory}`
+        : "";
+
       const llmMessages: Message[] = [
         {
           role: "system",
-          content: `${effectivePrompt}${expertKnowledge}${affiliateContext}${creditUrgencyContext}\n\n--- Current User Context ---\n${userContext}${customInstructionsBlock}${languageDirective}`,
+          content: `${effectivePrompt}${expertKnowledge}${affiliateContext}${creditUrgencyContext}\n\n--- Current User Context ---\n${userContext}${longTermMemoryBlock}${customInstructionsBlock}${languageDirective}`,
         },
         ...previousMessages,
       ];
@@ -2767,6 +2724,20 @@ Do NOT attempt any tool calls or builds.`;
         emitChatEvent(conversationId!, {
           type: "done",
           data: { response: (finalText || '').slice(0, 200), actionCount: executedActions.length },
+        });
+
+        // ── Background Memory Operations ──────────────────────────────
+        // Run asynchronously — do NOT await, so they don't delay the response.
+        // 1. Extract and save long-term memory facts from this conversation
+        // 2. Summarize old messages if the conversation is getting long
+        setImmediate(async () => {
+          const apiKey = userApiKey ?? undefined;
+          try {
+            await extractAndSaveMemory(userId, previousMessages, apiKey);
+          } catch (_) { /* non-fatal */ }
+          try {
+            await maybeCreateConversationSummary(conversationId!, userId, apiKey);
+          } catch (_) { /* non-fatal */ }
         });
 
         // ── Mark Background Build Complete ─────────────────────────
