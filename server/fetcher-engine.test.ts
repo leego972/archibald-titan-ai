@@ -158,11 +158,14 @@ describe("fetcher-db encryption", () => {
     expect(enc1).not.toBe(enc2);
   });
 
-  it("decrypt fails on tampered ciphertext", async () => {
+  it("decrypt fails on tampered auth tag", async () => {
     const { encrypt, decrypt } = await import("./fetcher-db");
     const encrypted = encrypt("test");
     const parts = encrypted.split(":");
-    parts[2] = parts[2].replace(/[0-9a-f]/, "0"); // tamper
+    // Tamper the GCM auth tag (parts[1]) — tag verification always causes decipher.final() to throw
+    const tagChars = parts[1].split("");
+    tagChars[0] = tagChars[0] === "0" ? "1" : "0";
+    parts[1] = tagChars.join("");
     expect(() => decrypt(parts.join(":"))).toThrow();
   });
 });
