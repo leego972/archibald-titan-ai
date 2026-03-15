@@ -612,7 +612,7 @@ export default function DemoPage() {
 
       {/* Hero */}
       <section className="py-20 px-4 sm:px-6 text-center">
-        <div className="w-full max-w-4xl">
+        <div className="max-w-4xl mx-auto">
           <Badge className="mb-6 bg-indigo-500/20 text-indigo-300 border-indigo-500/30 px-4 py-1.5 text-sm">
             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
             Interactive Demo
@@ -647,7 +647,7 @@ export default function DemoPage() {
 
       {/* Scenario selector + demo */}
       <section className="pb-20 px-4 sm:px-6">
-        <div className="w-full max-w-5xl">
+        <div className="max-w-5xl mx-auto">
           {/* Scenario tabs */}
           <div className="flex flex-wrap gap-3 mb-8 justify-center">
             {DEMO_SCENARIOS.map((s, i) => (
@@ -673,7 +673,7 @@ export default function DemoPage() {
 
       {/* What Titan can build */}
       <section className="py-20 px-4 sm:px-6 border-t border-white/10">
-        <div className="w-full max-w-6xl">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">What can you build?</h2>
             <p className="text-slate-400 text-lg">Anything you can describe, Titan can build.</p>

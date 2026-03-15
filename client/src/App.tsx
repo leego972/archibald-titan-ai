@@ -306,6 +306,8 @@ function Router() {
       <Route path="/argus" component={DashboardRouter} />
       <Route path="/storage" component={DashboardRouter} />
       <Route path="/admin/titan-server" component={DashboardRouter} />
+      <Route path="/admin/activity-log" component={DashboardRouter} />
+      <Route path="/fetcher/self-improvement" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

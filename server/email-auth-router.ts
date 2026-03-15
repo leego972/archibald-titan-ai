@@ -1060,4 +1060,86 @@ export function registerEmailAuthRoutes(app: Express) {
       return res.status(500).json({ error: "Two-factor verification failed. Please try again." });
     }
   });
+
+  // ─── POST /api/desktop/login ─────────────────────────────────────
+  // Used by the Electron desktop app login screen. Identical to /api/auth/login.
+  app.post("/api/desktop/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body || {};
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ error: "Password is required" });
+      }
+      const normalizedEmail = email.trim().toLowerCase();
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+      const rateCheck = checkRateLimit(clientIp, normalizedEmail);
+      if (!rateCheck.allowed) {
+        const retryMinutes = Math.ceil((rateCheck.retryAfterMs || LOCKOUT_DURATION_MS) / 60000);
+        return res.status(429).json({
+          error: `Too many login attempts. Please try again in ${retryMinutes} minute${retryMinutes > 1 ? "s" : ""}.`,
+          retryAfterMs: rateCheck.retryAfterMs,
+        });
+      }
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const result = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, normalizedEmail), isNotNull(users.passwordHash)))
+        .limit(1);
+      if (result.length === 0) {
+        recordFailedAttempt(clientIp, normalizedEmail);
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      const user = result[0];
+      const isValid = await bcrypt.compare(password, user.passwordHash!);
+      if (!isValid) {
+        recordFailedAttempt(clientIp, normalizedEmail);
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      clearFailedAttempts(clientIp, normalizedEmail);
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        const twoFactorToken = crypto.randomBytes(32).toString("hex");
+        pendingTwoFactorLogins.set(twoFactorToken, {
+          userId: user.id,
+          openId: user.openId,
+          name: user.name || normalizedEmail.split("@")[0],
+          email: normalizedEmail,
+          expiresAt: Date.now() + 5 * 60 * 1000,
+        });
+        return res.json({ success: false, requiresTwoFactor: true, twoFactorToken });
+      }
+      const loginUpdate: Record<string, unknown> = { lastSignedIn: new Date() };
+      if (!isAdminRole(user.role) && (
+        (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail)) ||
+        (user.openId === ENV.ownerOpenId) || user.id === 1
+      )) {
+        loginUpdate.role = (normalizedEmail === ENV.headAdminEmail) ? "head_admin" : "admin";
+      }
+      await db.update(users).set(loginUpdate).where(eq(users.id, user.id));
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: user.name || normalizedEmail.split("@")[0],
+        expiresInMs: ONE_YEAR_MS,
+      });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      await db.update(identityProviders)
+        .set({ lastUsedAt: new Date() })
+        .where(and(
+          eq(identityProviders.userId, user.id),
+          eq(identityProviders.provider, "email"),
+          eq(identityProviders.providerAccountId, normalizedEmail)
+        ))
+        .catch(() => {});
+      return res.json({
+        success: true,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      });
+    } catch (error: unknown) {
+      log.error("[Desktop Login] Login failed:", { error: String(error) });
+      return res.status(500).json({ error: "Login failed. Please try again." });
+    }
+  });
 }
