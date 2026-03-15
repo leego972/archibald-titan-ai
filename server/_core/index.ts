@@ -560,6 +560,16 @@ async function startServer() {
       try {
         await pool.promise().query('CREATE INDEX `idx_user_memory_userId` ON `user_memory` (`userId`)');
       } catch (_) { /* index already exists */ }
+      // Add performance indexes on chat tables (high-traffic per-user queries)
+      const chatIndexes = [
+        'CREATE INDEX `idx_chat_conversations_userId` ON `chat_conversations` (`userId`)',
+        'CREATE INDEX `idx_chat_conversations_lastMessageAt` ON `chat_conversations` (`lastMessageAt`)',
+        'CREATE INDEX `idx_chat_messages_conversationId` ON `chat_messages` (`conversationId`)',
+        'CREATE INDEX `idx_chat_messages_userId` ON `chat_messages` (`userId`)',
+      ];
+      for (const idx of chatIndexes) {
+        try { await pool.promise().query(idx); } catch (_) { /* index already exists */ }
+      }
       log.info('All tables ensured');
     } catch (err: unknown) {
       log.error('Raw SQL migration failed', { error: getErrorMessage(err) });
