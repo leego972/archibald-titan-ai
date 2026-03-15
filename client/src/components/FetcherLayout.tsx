@@ -189,6 +189,7 @@ const menuGroups: MenuGroup[] = [
     title: "Account & Settings",
     items: [
       { icon: featureIcon("icon_11_r2c3"), label: "Subscription", path: "/dashboard/subscription" },
+      { icon: featureIcon("icon_35_r5c3"), label: "Credits", path: "/dashboard/credits", isNew: true },
       { icon: featureIcon("icon_26_r4c2"), label: "Credentials", path: "/fetcher/credentials" },
       { icon: featureIcon("icon_19_r3c3"), label: "API Access", path: "/fetcher/api-access" },
       { icon: featureIcon("icon_36_r5c4"), label: "Team Management", path: "/fetcher/team" },
