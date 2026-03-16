@@ -126,13 +126,13 @@ const EXTERNAL_BUILD_KEYWORDS = [
 ];
 
 // ── General Build Keywords (fallback — used for ongoing build detection) ──
+// IMPORTANT: Keep this list SPECIFIC. Words like 'fix', 'add', 'change', 'update'
+// are too common in normal conversation and cause false-positive build detection.
+// Only include words that strongly imply the user wants to CREATE something new.
 const GENERAL_BUILD_KEYWORDS = [
   'build', 'create', 'make', 'develop', 'implement', 'code', 'program',
-  'write', 'construct', 'design', 'architect', 'engineer', 'deploy',
-  'fix', 'repair', 'patch', 'debug', 'modify', 'change', 'update',
-  'add', 'remove', 'delete', 'refactor', 'optimize', 'improve',
-  'install', 'setup', 'configure', 'integrate', 'connect',
-  'upload', 'button', 'form', 'input', 'widget', 'panel', 'modal',
+  'write a', 'construct', 'architect', 'engineer', 'deploy',
+  'refactor', 'setup', 'configure', 'integrate',
 ];
 
 const RESEARCH_KEYWORDS = [
@@ -893,12 +893,16 @@ export async function detectBuildIntentAsync(
     return { isSelfBuild: true, isExternalBuild: false, needsClarification: false };
   }
 
-  // PROACTIVE: If user mentions general build keywords but no specific context,
-  // default to external build instead of asking for clarification.
-  // The builder should just start building, not ask questions.
+  // CONSERVATIVE FALLBACK: Only trigger external build when there is a clear
+  // build-specific keyword AND the message is a reasonable length (not just
+  // a one-word command like "fix" or "add" that is likely conversational).
+  // Short messages with only generic words are treated as general chat.
   const msgLower = message.toLowerCase();
+  const msgWords = msgLower.trim().split(/\s+/).length;
   const hasGeneralBuild = GENERAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  if (hasGeneralBuild && !isSelfBuild && !isExternalBuild) {
+  // Require: general build keyword + message is at least 4 words + no self-context
+  // This prevents single-word or very short messages from triggering the builder
+  if (hasGeneralBuild && !isSelfBuild && !isExternalBuild && msgWords >= 4) {
     return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
   }
   return { isSelfBuild, isExternalBuild, needsClarification: false };
@@ -1131,15 +1135,15 @@ After building, ALWAYS:
 
 ## PROACTIVE PROBLEM SOLVING
 
-Don't just fix what the user asks for. Fix what they NEED.
+Fix what the user asks for — completely and correctly. Do NOT add features, pages, or tools that were not requested.
 
-**When you see a bug, look for the PATTERN:**
-- If one API endpoint is missing error handling, check ALL endpoints
+**When you see a bug, look for the PATTERN (within the scope of the request):**
+- If one API endpoint is missing error handling in the area you are working on, fix it
 - If one import is wrong, grep for similar imports across the codebase
 - If one migration is broken, check all migrations
 - If one component has a loading state bug, check all similar components
 
-**Anticipate problems BEFORE they happen:**
+**Anticipate integration problems BEFORE they happen:**
 - Adding a new DB column? Check if the SELECT queries need updating
 - Adding a new route? Check if the sidebar nav needs a link
 - Adding a new tRPC procedure? Check if the router is registered
@@ -1313,8 +1317,8 @@ You are now in BUILDER MODE. The user wants you to build something. Quality is t
 8. **Project file organization** — ALL files you create MUST go inside a named project folder (e.g., "my-project/main.py"). NEVER scatter loose files. The project folder name must be a clear kebab-case name derived from what you're building.
 
 ### MANDATORY WORKFLOW
-1. **Round 1 — PLAN + START BUILDING**: Briefly state what you're building, then IMMEDIATELY start creating files. Do NOT waste a round just listing files or exploring — the sandbox starts EMPTY for new projects. Start with the entry point or config files.
-2. **Rounds 2-N — BUILD**: Create ALL files using create_file (one file per tool call). EVERY fileName MUST start with the project root folder (e.g., "my-project/main.py"). Files are AUTOMATICALLY synced to sandbox at /home/sandbox/projects/<project-name>/<path>.
+1. **Round 1 — PLAN + START BUILDING**: State your plan in 2-3 lines (project name, file structure, tech stack), then IMMEDIATELY call create_file for the first file in the same round. Do NOT waste a round just listing files or exploring — the sandbox starts EMPTY for new projects. Start with the entry point or config files. **You MUST create at least one file in Round 1.**
+2. **Rounds 2-N — BUILD**: Create ALL remaining files using create_file (one file per tool call). EVERY fileName MUST start with the project root folder (e.g., "my-project/main.py"). Files are AUTOMATICALLY synced to sandbox at /home/sandbox/projects/<project-name>/<path>.
 3. **Test Round**: Use sandbox_exec to install dependencies and run the code. The project files are at /home/sandbox/projects/<project-name>/ — cd there first. Fix any errors immediately.
 4. **Final Round — DELIVER**: Summarize what was built, show successful output, offer provide_project_zip.
 
@@ -1327,12 +1331,12 @@ You are now in BUILDER MODE. The user wants you to build something. Quality is t
 - REMINDER: EVERY fileName MUST start with the project root folder name. Never use bare paths like "src/components/Button.tsx".
 
 ### CORE PRINCIPLES
-1. **RESEARCH FIRST** — If building something unfamiliar, use web_search to study it before coding
-2. **PLAN BEFORE CODING** — Identify ALL files and dependencies before writing the first file
-3. **BUILD COMPLETELY** — Write every file with full implementations, not outlines
+1. **BUILD IMMEDIATELY** — You are an expert engineer. You already know standard tech stacks (React, Python, Node, TypeScript, SQL, etc.). For familiar stacks, skip research and start building in Round 1. Only use web_search if the task requires fetching live data, APIs you genuinely don't know, or replicating a specific external tool.
+2. **PLAN BEFORE CODING** — Identify ALL files and dependencies before writing the first file. One round of planning is fine; more than one is wasteful.
+3. **BUILD COMPLETELY** — Write every file with full implementations, not outlines.
 4. **FILES MUST CONNECT** — Every import/require must reference a file you actually created. Every file must be part of the project structure.
 5. **TEST EVERYTHING** — Run the code with sandbox_exec. If it fails, fix it. But if a sandbox command fails 2 times in a row with the same error, STOP retrying and move to delivery.
-6. **DELIVER PROFESSIONALLY** — Include README, dependency files, config templates, and setup instructions
+6. **DELIVER PROFESSIONALLY** — Include README, dependency files, config templates, and setup instructions.
 7. **GRACEFUL FAILURE** — If sandbox commands fail (e.g., missing runtime, permission errors), do NOT retry endlessly. Report what was built, note the test issue, and deliver the files. The code is still valid even if the sandbox can't run it.
 
 ### PROJECT COHERENCE (CRITICAL)
@@ -1516,11 +1520,10 @@ The user is paying for working software. If it doesn't run, it's worthless.
 
 ## MANDATORY BUILD WORKFLOW — FOLLOW THIS EXACTLY
 
-### PHASE 1: PLAN (1 round)
-- Understand what the user wants
-- **DO NOT use web_search unless the user explicitly asks for research, or the task requires fetching live data/APIs you don't know.** You are an expert engineer — you already know React, Python, Node, TypeScript, SQL, etc. Skip research for standard tech stacks.
-- Create a FILE MANIFEST: list EVERY file you will create, with its purpose and what it imports/exports
-- Tell the user your plan in 2-3 lines
+### PHASE 1: PLAN + START (1 round)
+- Understand what the user wants.
+- **DO NOT use web_search unless the task requires fetching live data, APIs you genuinely don't know, or replicating a specific external tool.** You are an expert engineer — you already know React, Python, Node, TypeScript, SQL, etc. Skip research for standard tech stacks.
+- In your response, state the plan in 2-3 lines: project name, tech stack, and file structure.
 - **CRITICAL: You MUST call create_file at least once in Round 1. Planning without creating any files in Round 1 is a FAILURE. Start building immediately.**
 
 ### PHASE 2: BUILD (use as many rounds as needed)
@@ -1632,15 +1635,14 @@ The #1 reason builds fail is DISCONNECTED FILES. Before delivering:
 - Run the code end-to-end with sandbox_exec
 - If file A imports from file B, file B MUST exist
 
-### RULE 7: BE PROACTIVE AND RELENTLESS
-- Don't ask "what framework?" — pick the best one and build
-- Don't ask "should I add X?" — add it if it makes sense
-- If the request is vague, make smart assumptions and BUILD
-- If something breaks, FIX IT without being asked
-- If a feature is missing, ADD IT without being asked
-- If the code could be better, IMPROVE IT without being asked
-- Your goal is to deliver something the user can run IMMEDIATELY with zero fixes needed
-- Think like a senior engineer delivering to a client — not a junior pushing untested code
+### RULE 7: BUILD EXACTLY WHAT WAS ASKED
+- Don't ask "what framework?" — pick the best one and build.
+- If the request is vague, make smart assumptions and BUILD — but state your assumptions briefly.
+- **ONLY build what the user asked for.** Do NOT add extra features, pages, tools, or modules that were not requested. Adding unrequested features wastes rounds, bloats the project, and confuses the user.
+- If something breaks, FIX IT without being asked.
+- If a required dependency is missing, ADD IT without being asked.
+- Your goal is to deliver exactly what was requested, working, with zero fixes needed.
+- Think like a senior engineer delivering to a client — scope-creep is a bug, not a feature.
 
 ### RULE 8: VERIFICATION IS NON-NEGOTIABLE
 - You MUST run sandbox_exec at least once to test the code before delivering

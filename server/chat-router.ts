@@ -1544,15 +1544,17 @@ Do NOT attempt any tool calls or builds.`;
             await new Promise(r => setTimeout(r, 800));
           }
 
-          // EXTERNAL BUILD OVERRIDE: If we're at round 3+ and no files have been created yet,
-          // inject a hard override to stop researching and start building immediately.
-          if (isExternalBuild && rounds >= 3) {
+          // EXTERNAL BUILD OVERRIDE: If we're at round 4+ and no files have been created yet,
+          // inject a gentle nudge to start building. Round 3 is a reasonable amount of time
+          // to spend on research/planning before we need to push for file creation.
+          // Only fires once (rounds === 4) to avoid spamming the context.
+          if (isExternalBuild && rounds === 4) {
             const filesCreatedSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success).length;
             if (filesCreatedSoFar === 0) {
-              log.warn(`[Chat] External build round ${rounds} — NO files created yet. Injecting FORCE BUILD override.`);
+              log.warn(`[Chat] External build round ${rounds} — NO files created yet. Nudging to start building.`);
               llmMessages.push({
                 role: 'user',
-                content: `SYSTEM OVERRIDE — CRITICAL: You have spent ${rounds - 1} rounds without creating a single file. This is a BUILD task. You MUST call create_file RIGHT NOW. Stop researching. Stop planning. Stop listing files. Call create_file with the FIRST file of the project immediately. The user is waiting. Every round without a create_file call is a failure.`,
+                content: `You have done ${rounds - 1} rounds of research/planning. It is time to start creating files. Please call create_file with the first file of the project now.`,
               });
               forceFirstTool = 'create_file';
             }
@@ -2070,83 +2072,78 @@ Do NOT attempt any tool calls or builds.`;
             if (isBuildRequest && rounds <= MAX_TOOL_ROUNDS - 2) {
               const createdSoFar = executedActions.filter(a => a.tool === 'create_file' && a.success);
               const successfulTests = executedActions.filter(a => a.tool === 'sandbox_exec' && a.success);
-              const failedTests = executedActions.filter(a => a.tool === 'sandbox_exec' && !a.success);
               const textLower = (textContent || '').toLowerCase();
 
-              // Heuristics for "build is incomplete":
+              // Heuristics for build state:
               const mentionsContinuation = /\b(next|continue|now (i'll|let me|i will)|remaining|still need|more files|let's (create|build|add))\b/i.test(textContent || '');
               const mentionsUnbuiltFiles = /\b(will create|need to create|haven't (created|built)|todo|to do|upcoming)\b/i.test(textContent || '');
               const looksLikeDelivery = /\b(done|complete|finished|all files|here('s| is) (the|your)|ready to|download|zip)\b/i.test(textContent || '');
               const isProgressUpdate = (mentionsContinuation || mentionsUnbuiltFiles) && !looksLikeDelivery;
-              const looksLikeWrapper = /\b(wrapper|launcher|gui.*(start|stop)|subprocess\.run|os\.system|exec\(|spawn|child_process|shells? out)\b/i.test(textContent || '');
+              // Wrapper detection: only flag when the response EXPLICITLY describes wrapping an external binary
+              const looksLikeWrapper = /\b(wrapper|launcher)\b/i.test(textContent || '') &&
+                /\b(subprocess\.run|os\.system|exec\(|spawn|child_process|shells? out)\b/i.test(textContent || '');
               const isComplexRequest = /\b(framework|replicate|clone|reproduce|recreate|platform|system|engine|full|complete|comprehensive)\b/i.test(input.message || '');
-              const minFiles = isComplexRequest ? 8 : 5;
-              const tooFewFiles = createdSoFar.length > 0 && createdSoFar.length < minFiles && isExternalBuild;
-              const prematureCompletion = looksLikeDelivery && (tooFewFiles || looksLikeWrapper);
 
-              // ── GATE 1: Wrapper/too-few-files detection ──
-              if ((isProgressUpdate || tooFewFiles || prematureCompletion || looksLikeWrapper) && rounds < MAX_TOOL_ROUNDS - 5) {
-                const nudgeMessage = prematureCompletion || looksLikeWrapper
-                  ? 'STOP. You have NOT completed this build. You created a thin wrapper/launcher or too few files. The user asked you to BUILD the actual implementation — not wrap an existing binary. Go back and implement the REAL core logic from scratch. Create all the necessary files with full implementations. Do NOT declare done until you have a complete, working, multi-file project with real functionality.'
-                  : 'Continue building. Create the remaining files now using create_file. Do not stop until ALL files are created and tested.';
-                log.info(`[Chat] BUILD GATE 1 (incomplete): round ${rounds}, ${createdSoFar.length} files (min=${minFiles}, wrapper=${looksLikeWrapper}, premature=${prematureCompletion}). Forcing continuation...`);
+              // ── GATE 1: Continuation detection — LLM itself says it has more to do ──
+              // Only fire when the LLM's OWN text says it is not done yet (not based on file counts).
+              // This prevents the gate from looping endlessly on legitimately small builds.
+              if (isProgressUpdate && rounds < MAX_TOOL_ROUNDS - 5) {
+                log.info(`[Chat] BUILD GATE 1 (continuation): round ${rounds}, LLM says more to do. Nudging to continue...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
-                llmMessages.push({ role: 'user', content: nudgeMessage });
+                llmMessages.push({ role: 'user', content: 'Continue building. Create the remaining files now using create_file.' });
+                continue;
+              }
+
+              // ── GATE 1b: Wrapper detection — only when code explicitly shells out to an external binary ──
+              if (looksLikeWrapper && rounds < MAX_TOOL_ROUNDS - 5) {
+                log.info(`[Chat] BUILD GATE 1b (wrapper): round ${rounds}. Nudging to implement real logic...`);
+                llmMessages.push({ role: 'assistant', content: textContent || '' });
+                llmMessages.push({ role: 'user', content: 'The user asked you to BUILD the actual implementation — not wrap an existing binary. Implement the core logic yourself using create_file. Do not shell out to external tools.' });
                 continue;
               }
 
               // ── GATE 2: Mandatory verification — did Titan actually TEST the code? ──
-              // If Titan says "done" but never ran sandbox_exec successfully, force testing
-              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && successfulTests.length === 0 && rounds < MAX_TOOL_ROUNDS - 3) {
+              // Only fire when: (a) Titan says done, (b) files were created, (c) no successful test run yet.
+              // Capped at round MAX_TOOL_ROUNDS - 5 to avoid forcing tests on the last few rounds.
+              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && successfulTests.length === 0 && rounds < MAX_TOOL_ROUNDS - 5) {
                 log.info(`[Chat] BUILD GATE 2 (untested): Titan says done with ${createdSoFar.length} files but 0 successful sandbox_exec runs. Forcing verification...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
-                llmMessages.push({ role: 'user', content: 'STOP. You said "done" but you have NOT tested the code. You MUST run sandbox_exec to verify the code actually works before delivering. Install dependencies first (pip install -r requirements.txt or npm install), then run the entry point. If it fails, FIX the code and retest. Do NOT deliver untested code.' });
+                llmMessages.push({ role: 'user', content: 'Before delivering, please run sandbox_exec to verify the code works. Install dependencies (pip install -r requirements.txt or npm install), then run the entry point. If it fails, fix the code and retest.' });
                 continue;
               }
 
               // ── GATE 3: Last test failed — force fix before delivery ──
-              // If the most recent sandbox_exec FAILED and Titan is trying to deliver anyway, force a fix
+              // If the most recent sandbox_exec FAILED and Titan is trying to deliver anyway, force a fix.
+              // Only fire when there is a clear delivery signal AND the last test genuinely failed.
               const lastSandboxAction = [...executedActions].reverse().find(a => a.tool === 'sandbox_exec');
               if (looksLikeDelivery && lastSandboxAction && !lastSandboxAction.success && rounds < MAX_TOOL_ROUNDS - 3) {
                 log.info(`[Chat] BUILD GATE 3 (last test failed): Titan trying to deliver but last sandbox_exec failed. Forcing fix...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
-                llmMessages.push({ role: 'user', content: 'STOP. Your last test FAILED. You cannot deliver code that you know is broken. Read the error output from your last sandbox_exec, identify the bug, fix the code with create_file, and retest with sandbox_exec. Keep fixing until it runs cleanly. Do NOT deliver until tests pass.' });
+                llmMessages.push({ role: 'user', content: 'Your last test run had an error. Please read the error output, fix the code with create_file, and retest with sandbox_exec before delivering.' });
                 continue;
               }
 
-              // ── GATE 4b: Total code size check ──
-              // If total code output is too small for the request complexity, force continuation
-              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && rounds < MAX_TOOL_ROUNDS - 5) {
-                const totalBytes = createdSoFar.reduce((sum, f) => sum + (f.size || 0), 0);
-                const minBytes = isComplexRequest ? 50000 : 15000; // 50KB for complex, 15KB for simple
-                if (totalBytes < minBytes) {
-                  log.info(`[Chat] BUILD GATE 4b (undersized): ${totalBytes} bytes total across ${createdSoFar.length} files (min=${minBytes}). Forcing expansion...`);
-                  llmMessages.push({ role: 'assistant', content: textContent || '' });
-                  llmMessages.push({ role: 'user', content: `STOP. Your build is UNDERSIZED. You created ${createdSoFar.length} files totaling only ${Math.round(totalBytes/1024)}KB — the minimum for this request is ${Math.round(minBytes/1024)}KB. Go back and ADD MORE SUBSTANCE to each file: comprehensive error handling, input validation, logging, docstrings, type hints, edge cases, configuration options, and output formatting. Also add any missing features. Do NOT deliver thin skeleton code.` });
-                  continue;
-                }
-              }
-
-              // ── GATE 5: Feature completeness check ──
-              // If the user's request mentions specific features, check if Titan addressed them
+              // ── GATE 4: Feature completeness check ──
+              // Only fires when the user EXPLICITLY listed 3+ numbered/keyword features AND
+              // the response clearly doesn't mention at least half of them.
+              // This avoids false positives on vague requests.
               if (looksLikeDelivery && isExternalBuild && rounds < MAX_TOOL_ROUNDS - 3) {
                 const userMsg = (input.message || '').toLowerCase();
-                // Extract numbered features or feature keywords from the user's request
                 const featurePatterns = userMsg.match(/\d+\)\s*[^,\n]+|\d+\.\s*[^,\n]+/g) || [];
                 const keyFeatures = userMsg.match(/(?:must include|must have|should have|i want|i need|with|including)[:\s]+([^.]+)/gi) || [];
                 const allRequestedFeatures = [...featurePatterns, ...keyFeatures];
                 
                 if (allRequestedFeatures.length >= 3) {
-                  // User explicitly listed 3+ features — check if Titan's response mentions them
                   const responseText = (textContent || '').toLowerCase();
                   const missingFeatures = allRequestedFeatures.filter(f => {
                     const keywords = f.toLowerCase().replace(/^\d+[.)\s]+/, '').trim().split(/\s+/).filter(w => w.length > 3);
                     return !keywords.some(kw => responseText.includes(kw));
                   });
-                  if (missingFeatures.length >= 2 && missingFeatures.length > allRequestedFeatures.length * 0.3) {
-                    log.info(`[Chat] BUILD GATE 4 (missing features): ${missingFeatures.length}/${allRequestedFeatures.length} features possibly missing. Forcing review...`);
+                  // Only nudge if MORE THAN HALF the explicitly listed features appear to be missing
+                  if (missingFeatures.length >= 2 && missingFeatures.length > allRequestedFeatures.length * 0.5) {
+                    log.info(`[Chat] BUILD GATE 4 (missing features): ${missingFeatures.length}/${allRequestedFeatures.length} features possibly missing. Nudging review...`);
                     llmMessages.push({ role: 'assistant', content: textContent || '' });
-                    llmMessages.push({ role: 'user', content: `WAIT. The user requested these specific features that may be missing from your build: ${missingFeatures.slice(0, 5).join('; ')}. Review your implementation and either confirm these are covered or add the missing features now. Do NOT deliver an incomplete build.` });
+                    llmMessages.push({ role: 'user', content: `Please confirm these requested features are covered or add them: ${missingFeatures.slice(0, 5).join('; ')}.` });
                     continue;
                   }
                 }
@@ -2435,7 +2432,7 @@ Do NOT attempt any tool calls or builds.`;
               log.warn(`[Chat] ACTION PADDING DETECTED: ${recentPaddingCount} list/read calls in last 6 actions with 0 file creations. Injecting anti-padding nudge.`);
               llmMessages.push({
                 role: 'system',
-                content: 'WARNING: You are wasting rounds by repeatedly listing/reading files without creating anything. STOP browsing and START BUILDING. Use create_file to write actual implementation files NOW. Every round you waste on list_files is a round you could use to create real code.',
+                content: 'You have been reading and listing files for several rounds without creating any new files. Please start writing implementation files now using create_file.',
               });
             }
           }
