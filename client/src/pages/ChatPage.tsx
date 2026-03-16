@@ -810,7 +810,7 @@ function MobileConversationDrawer({
 }
 
 // ─── Scroll to Bottom Button ────────────────────────────────────────
-function ScrollToBottomButton({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) {
+function ScrollToBottomButton({ scrollRef, isUserScrolledUpRef }: { scrollRef: React.RefObject<HTMLDivElement>; isUserScrolledUpRef: React.MutableRefObject<boolean> }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -820,7 +820,7 @@ function ScrollToBottomButton({ scrollRef }: { scrollRef: React.RefObject<HTMLDi
       const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
       setShow(distFromBottom > 100);
     };
-    el.addEventListener('scroll', handleScroll);
+    el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, [scrollRef]);
 
@@ -829,6 +829,8 @@ function ScrollToBottomButton({ scrollRef }: { scrollRef: React.RefObject<HTMLDi
   return (
     <button
       onClick={() => {
+        // Re-pin to bottom and scroll down
+        isUserScrolledUpRef.current = false;
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
       }}
       className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 h-8 w-8 rounded-full bg-background border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
@@ -928,6 +930,8 @@ export default function ChatPage() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // true when the user has manually scrolled up — suppress auto-scroll while set
+  const isUserScrolledUpRef = useRef(false);
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -1467,18 +1471,58 @@ export default function ChatPage() {
     return () => { cancelled = true; };
   }, [activeConversationId]);
 
-  // Auto-scroll to bottom — use double-rAF to ensure layout is settled
+  // ── Sticky-bottom scroll ─────────────────────────────────────────────
+  // Rules:
+  //   1. While the user is pinned to the bottom, scroll down on every content
+  //      height change (new messages, streaming tokens, images loading).
+  //   2. When the user manually scrolls UP, stop auto-scrolling.
+  //   3. When the user scrolls back to the bottom, re-enable auto-scrolling.
+  //   4. Sending a new message always re-pins to the bottom.
+  // This replaces the old naive `scrollTop = scrollHeight` on every render
+  // which caused the chat to jump while typing (textarea resize) and failed
+  // to follow streaming tokens.
   useEffect(() => {
-    if (scrollRef.current) {
-      const el = scrollRef.current;
-      // Double requestAnimationFrame ensures the DOM has painted before scrolling
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          el.scrollTop = el.scrollHeight;
-        });
-      });
-    }
-  }, [localMessages, isLoading]);
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // Helper: scroll to bottom instantly (no animation — avoids jitter)
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+
+    // Detect manual scroll: if user scrolls up more than 80px from bottom,
+    // mark as scrolled-up. If they return within 40px of the bottom, re-pin.
+    const handleScroll = () => {
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distFromBottom > 80) {
+        isUserScrolledUpRef.current = true;
+      } else if (distFromBottom <= 40) {
+        isUserScrolledUpRef.current = false;
+      }
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Watch the inner content div for height changes (new messages, tokens)
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (!inner) return () => el.removeEventListener('scroll', handleScroll);
+
+    const ro = new ResizeObserver(() => {
+      if (!isUserScrolledUpRef.current) {
+        scrollToBottom();
+      }
+    });
+    ro.observe(inner);
+
+    // Initial scroll to bottom when the component mounts or conversation changes
+    scrollToBottom();
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      ro.disconnect();
+    };
+  // Re-run when the conversation changes so we scroll to the bottom of the new chat
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId]);
 
   // Cycle loading phase text
   useEffect(() => {
@@ -1515,10 +1559,9 @@ export default function ChatPage() {
         const viewport = window.visualViewport;
         const offset = window.innerHeight - viewport.height;
         document.documentElement.style.setProperty('--keyboard-offset', `${offset}px`);
-        // After keyboard resize, scroll to bottom so user sees latest messages
-        // and the input bar stays visible above the keyboard
+        // After keyboard resize, scroll to bottom only if user is pinned to bottom
         requestAnimationFrame(() => {
-          if (scrollRef.current) {
+          if (scrollRef.current && !isUserScrolledUpRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
           }
           // Scroll the textarea into view so it sits just above the keyboard
@@ -1551,6 +1594,8 @@ export default function ChatPage() {
     if (isLoading) {
       const midRunMsg: ChatMsg = { id: -Date.now(), role: 'user', content: messageText, createdAt: Date.now() };
       optimisticIdsRef.current.add(midRunMsg.id);
+      // Re-pin to bottom so the user sees the injected message
+      isUserScrolledUpRef.current = false;
       setLocalMessages((prev) => [...prev, { ...midRunMsg, content: `⚡ [Mid-run note] ${messageText}` }]);
       setInput('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -1669,6 +1714,8 @@ export default function ChatPage() {
     };
     // Register as optimistic so the DB sync effect won't wipe it
     optimisticIdsRef.current.add(tempId);
+    // Re-pin to bottom whenever the user sends a new message
+    isUserScrolledUpRef.current = false;
     setLocalMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setLoadingPhase("Thinking...");
@@ -2597,7 +2644,7 @@ export default function ChatPage() {
             </div>
           </div>
           {/* Scroll to bottom button */}
-          <ScrollToBottomButton scrollRef={scrollRef as React.RefObject<HTMLDivElement>} />
+          <ScrollToBottomButton scrollRef={scrollRef as React.RefObject<HTMLDivElement>} isUserScrolledUpRef={isUserScrolledUpRef} />
         </div>
 
         {/* Input area */}
