@@ -128,12 +128,19 @@ const EXTERNAL_BUILD_KEYWORDS = [
 // ── General Build Keywords (fallback — used for ongoing build detection) ──
 // IMPORTANT: Keep this list SPECIFIC. Words like 'fix', 'add', 'change', 'update'
 // are too common in normal conversation and cause false-positive build detection.
-// Only include words that strongly imply the user wants to CREATE something new.
-const GENERAL_BUILD_KEYWORDS = [
+// Words that strongly imply the user wants to CREATE something new (fire on any length message).
+const STRONG_BUILD_KEYWORDS = [
   'build', 'create', 'make', 'develop', 'implement', 'code', 'program',
   'write a', 'construct', 'architect', 'engineer', 'deploy',
   'refactor', 'setup', 'configure', 'integrate',
 ];
+// Words that imply a build action but are too common in casual conversation.
+// These only trigger the builder when the message has >= 4 words (enough context).
+const CONTEXT_BUILD_KEYWORDS = [
+  'fix', 'update', 'add', 'remove', 'delete', 'change', 'modify',
+  'install', 'upgrade', 'patch', 'debug', 'rewrite',
+];
+const GENERAL_BUILD_KEYWORDS = [...STRONG_BUILD_KEYWORDS, ...CONTEXT_BUILD_KEYWORDS];
 
 const RESEARCH_KEYWORDS = [
   'research', 'search', 'find', 'look up', 'google', 'investigate', 'discover',
@@ -807,7 +814,12 @@ export function detectSelfBuildIntent(
   if (hasSelfKeyword) return true;
 
   // Check for general build keyword + self-context phrase
-  const hasGeneralBuild = GENERAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  // CONTEXT_BUILD_KEYWORDS (fix, update, add, etc.) require >= 4 words to avoid
+  // false positives from short conversational messages like "fix that" or "add it".
+  const msgWords = msgLower.trim().split(/\s+/).length;
+  const hasStrongBuild = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasContextBuild = msgWords >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasGeneralBuild = hasStrongBuild || hasContextBuild;
   const hasSelfContext = SELF_CONTEXT_PHRASES.some(p => msgLower.includes(p));
   if (hasGeneralBuild && hasSelfContext) return true;
 
@@ -849,7 +861,11 @@ export function detectExternalBuildIntent(
      m.content.includes('create_file') ||
      m.content.includes('app_clone'))
   );
-  const hasGeneralBuild = GENERAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  // CONTEXT_BUILD_KEYWORDS require >= 4 words to avoid false positives
+  const msgWords2 = msgLower.trim().split(/\s+/).length;
+  const hasStrongBuild2 = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasContextBuild2 = msgWords2 >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasGeneralBuild = hasStrongBuild2 || hasContextBuild2;
   if (hasOngoingSandboxBuild && hasGeneralBuild) return true;
   // Short affirmative follow-ups during an ongoing build (e.g. 'yes do it', 'go ahead', 'proceed')
   const isAffirmative = [
@@ -869,8 +885,15 @@ export function detectBuildIntent(
   message: string,
   previousMessages: Message[]
 ): boolean {
-  return detectSelfBuildIntent(message, previousMessages) ||
-         detectExternalBuildIntent(message, previousMessages);
+  if (detectSelfBuildIntent(message, previousMessages)) return true;
+  if (detectExternalBuildIntent(message, previousMessages)) return true;
+  // Fallback: strong build keyword alone is enough (no previous context needed)
+  // Context build keywords (fix, update, add, etc.) require >= 4 words
+  const msgLower = message.toLowerCase();
+  const msgWords = msgLower.trim().split(/\s+/).length;
+  const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasContext = msgWords >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  return hasStrong || hasContext;
 }
 
 /**
@@ -894,15 +917,15 @@ export async function detectBuildIntentAsync(
   }
 
   // CONSERVATIVE FALLBACK: Only trigger external build when there is a clear
-  // build-specific keyword AND the message is a reasonable length (not just
-  // a one-word command like "fix" or "add" that is likely conversational).
-  // Short messages with only generic words are treated as general chat.
+  // build-specific keyword AND the message is a reasonable length.
+  // STRONG keywords (build, create, make, ...) fire on any length.
+  // CONTEXT keywords (fix, update, add, ...) require >= 4 words to avoid
+  // false positives from short conversational messages.
   const msgLower = message.toLowerCase();
   const msgWords = msgLower.trim().split(/\s+/).length;
-  const hasGeneralBuild = GENERAL_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  // Require: general build keyword + message is at least 4 words + no self-context
-  // This prevents single-word or very short messages from triggering the builder
-  if (hasGeneralBuild && !isSelfBuild && !isExternalBuild && msgWords >= 4) {
+  const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  const hasContext = msgWords >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
+  if ((hasStrong || hasContext) && !isSelfBuild && !isExternalBuild) {
     return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
   }
   return { isSelfBuild, isExternalBuild, needsClarification: false };
