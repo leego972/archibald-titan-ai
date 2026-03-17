@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { PasswordEntry } from "../types";
 import { encrypt, decrypt } from "../utils/crypto";
-import { v4 as uuidv4 } from "uuid";
-
 const STORAGE_KEY_PREFIX = "pm_passwords_";
 
 export function usePasswords(masterPassword: string, username: string) {
@@ -42,7 +40,7 @@ export function usePasswords(masterPassword: string, username: string) {
   async function add(entry: Omit<PasswordEntry, "id" | "createdAt" | "updatedAt">) {
     const newEntry: PasswordEntry = {
       ...entry,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

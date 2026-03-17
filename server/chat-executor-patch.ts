@@ -39,5 +39,5 @@ export async function executeToolCall(
   if (toolName === "designer_build") {
     return await handleDesignerBuildLogic(args);
   }
-  return originalExecuteToolCall(toolName, args, userId, userName, userEmail, userApiKey, conversationId);
+  return originalExecuteToolCall(toolName, args, userId, userName, userEmail ?? undefined, userApiKey, conversationId);
 }
