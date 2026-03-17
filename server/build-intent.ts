@@ -99,6 +99,29 @@ const SELF_CONTEXT_PHRASES = [
   'the website', 'the web app', 'the frontend', 'the client',
 ];
 
+// ── GitHub Repo Modification Keywords ────────────────────────────────────
+// These indicate the user wants to MODIFY AN EXISTING GitHub repo (not build new)
+const GITHUB_REPO_MODIFY_KEYWORDS = [
+  'go into my repo', 'go into the repo', 'go into my github', 'go into the github',
+  'go into my repository', 'go into the repository',
+  'modify my repo', 'modify the repo', 'modify my repository', 'modify the repository',
+  'update my repo', 'update the repo', 'update my repository', 'update the repository',
+  'change my repo', 'change the repo', 'change my repository', 'change the repository',
+  'fix my repo', 'fix the repo', 'fix my repository', 'fix the repository',
+  'push changes to', 'push to my repo', 'push to the repo', 'push to my github',
+  'push to the github', 'push to my repository', 'push to the repository',
+  'clone my repo', 'clone the repo', 'clone my repository', 'clone the repository',
+  'make changes to my repo', 'make changes to the repo', 'make changes to my repository',
+  'make changes to the repository', 'make changes to my github', 'make changes to the github',
+  'edit my repo', 'edit the repo', 'edit my repository', 'edit the repository',
+  'add to my repo', 'add to the repo', 'add to my repository', 'add to the repository',
+  'commit to my repo', 'commit to the repo', 'commit to my repository',
+  'my github repo', 'my github repository', 'my existing repo', 'my existing repository',
+  'existing codebase', 'existing project', 'existing repo', 'existing repository',
+  'already have a repo', 'already have a repository', 'already have a github',
+  'have a repo', 'have a repository', 'have a github repo',
+];
+
 // ── External Build Keywords ────────────────────────────────────────────
 // These indicate the user wants to build something NEW in the sandbox
 const EXTERNAL_BUILD_KEYWORDS = [
@@ -874,6 +897,40 @@ export function detectExternalBuildIntent(
     'continue', 'keep going', 'carry on', 'run it', 'execute it', 'compile it',
   ].some(p => msgLower.trim() === p || msgLower.trim().startsWith(p + ' ') || msgLower.trim().endsWith(' ' + p));
   if (hasOngoingSandboxBuild && isAffirmative) return true;
+  return false;
+}
+
+/**
+ * Detect if the user wants to MODIFY AN EXISTING GitHub repository.
+ * This is distinct from building a new project — the workflow is:
+ * git clone → make changes → git push (not create new files from scratch).
+ */
+export function detectGitHubRepoModifyIntent(
+  message: string,
+  previousMessages: Message[]
+): boolean {
+  const msgLower = message.toLowerCase();
+
+  // Check for explicit GitHub repo modification keywords
+  if (GITHUB_REPO_MODIFY_KEYWORDS.some(kw => msgLower.includes(kw))) {
+    return true;
+  }
+
+  // Check if a GitHub URL is present AND the message implies modification
+  const hasGitHubUrl = /github\.com\/[\w-]+\/[\w-]+/.test(msgLower);
+  const hasModifyVerb = /\b(fix|update|add|remove|delete|change|modify|edit|refactor|patch|push|commit|improve|upgrade)\b/.test(msgLower);
+  if (hasGitHubUrl && hasModifyVerb) {
+    return true;
+  }
+
+  // Check conversation history — if user previously shared a GitHub URL and is now asking to modify
+  const prevHasGitHubUrl = previousMessages.some(m =>
+    typeof m.content === 'string' && /github\.com\/[\w-]+\/[\w-]+/.test(m.content)
+  );
+  if (prevHasGitHubUrl && hasModifyVerb && msgLower.split(/\s+/).length >= 3) {
+    return true;
+  }
+
   return false;
 }
 
@@ -1814,6 +1871,70 @@ For Complex/Enterprise: tell the user upfront what you're building and the plan.
 Keep messages SHORT. Professional but warm British wit.
 Good: "Done — 12 files created, all tested and working. Here's what you've got: [brief list]. Download from the Files panel or I can push to GitHub."
 Bad: "Certainly! I'd be happy to help you with that. Let me walk you through the architecture..."
+`;
+
+// ── GitHub Repo Modify Prompt — injected when user wants to modify an existing GitHub repo ──
+export const GITHUB_REPO_MODIFY_PROMPT = `
+
+## GITHUB REPOSITORY MODIFICATION MODE
+
+The user wants to MODIFY AN EXISTING GitHub repository — NOT build a new project from scratch.
+
+### WORKFLOW (MANDATORY — follow this exactly)
+
+1. **IDENTIFY THE REPO** — Extract the GitHub URL from the user's message or conversation history. If no URL was given, ask for it immediately.
+
+2. **CHECK FOR CREDENTIALS** — You need a GitHub token to push changes. Check if the user has a GitHub PAT saved:
+   - Call list_credentials to see if a GitHub token exists
+   - If no GitHub token: tell the user "I need your GitHub Personal Access Token to push changes. You can paste it here and I'll save it securely."
+   - If token exists: proceed
+
+3. **CLONE THE REPO** — Use sandbox_exec to clone it:
+   \`\`\`bash
+   git clone https://<TOKEN>@github.com/<owner>/<repo>.git /home/sandbox/projects/<repo-name>
+   cd /home/sandbox/projects/<repo-name>
+   git config user.email "titan@archibald.ai"
+   git config user.name "Titan AI"
+   \`\`\`
+
+4. **EXPLORE THE CODEBASE** — Use sandbox_exec to understand the structure:
+   \`\`\`bash
+   find /home/sandbox/projects/<repo-name> -type f | head -50
+   \`\`\`
+   Read key files with sandbox_read_file to understand the codebase before making changes.
+
+5. **MAKE THE CHANGES** — Use sandbox_write_file to modify existing files or create new ones. Make ALL the changes the user requested.
+
+6. **VERIFY THE CHANGES** — Use sandbox_exec to run any tests, linting, or build steps that the project has.
+
+7. **COMMIT AND PUSH** — Use sandbox_exec:
+   \`\`\`bash
+   cd /home/sandbox/projects/<repo-name>
+   git add -A
+   git commit -m "<meaningful commit message describing the changes>"
+   git push origin main
+   \`\`\`
+   If the default branch is not main, check with: \`git branch -r\`
+
+8. **REPORT** — Tell the user:
+   - What files were changed and why
+   - The commit message used
+   - Confirmation that the push succeeded
+   - Link to the repo on GitHub
+
+### CRITICAL RULES
+- NEVER create a new GitHub repository — you are modifying an EXISTING one
+- ALWAYS clone first, then modify — do NOT try to use create_file for repo modifications
+- ALWAYS use sandbox_write_file to modify files inside the cloned repo
+- ALWAYS commit with a meaningful message that describes what was changed
+- If the push fails due to authentication, ask the user to provide their GitHub PAT
+- If the push fails due to conflicts, pull first: \`git pull origin main --rebase\` then push again
+- If the user's GitHub token is saved as a credential, retrieve it with get_credential and use it in the clone URL
+
+### TOKEN HANDLING
+- GitHub PATs starting with \`ghp_\` or \`github_pat_\` are Personal Access Tokens
+- Use them in the clone URL: \`https://ghp_TOKEN@github.com/owner/repo.git\`
+- NEVER log or display the token in your response — mask it as \`ghp_***\`
 `;
 
 // ── Security Build Addendum — ONLY injected when the build request is security-related ──

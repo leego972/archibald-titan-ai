@@ -49,6 +49,7 @@ import {
   detectSelfBuildIntent,
   detectExternalBuildIntent,
   detectBuildIntentAsync,
+  detectGitHubRepoModifyIntent,
   getForceFirstTool,
   isRefusalResponse,
   SELF_BUILDER_LOCKOUT_CORRECTION,
@@ -56,6 +57,7 @@ import {
   EXTERNAL_BUILD_REMINDER,
   BUILDER_SYSTEM_PROMPT,
   SECURITY_BUILD_ADDENDUM,
+  GITHUB_REPO_MODIFY_PROMPT,
   REFUSAL_CORRECTION,
 } from "./build-intent";
 import { getAffiliateRecommendationContext } from "./affiliate-recommendation-engine";
@@ -1421,11 +1423,21 @@ Do NOT attempt any tool calls or builds.`;
       let isSelfBuild = false;
       let isExternalBuild = false;
       let needsClarification = false;
+      let isGitHubRepoModify = false;
       try {
-        const buildIntent = await detectBuildIntentAsync(input.message, previousMessages);
-        isSelfBuild = buildIntent.isSelfBuild;
-        isExternalBuild = buildIntent.isExternalBuild;
-        needsClarification = buildIntent.needsClarification;
+        // Check for GitHub repo modification intent FIRST (before general build detection)
+        // This prevents "go into my repo and fix X" from being treated as a new project build
+        isGitHubRepoModify = detectGitHubRepoModifyIntent(input.message, previousMessages);
+        if (!isGitHubRepoModify) {
+          const buildIntent = await detectBuildIntentAsync(input.message, previousMessages);
+          isSelfBuild = buildIntent.isSelfBuild;
+          isExternalBuild = buildIntent.isExternalBuild;
+          needsClarification = buildIntent.needsClarification;
+        } else {
+          // GitHub repo modify is treated as an external build (uses sandbox tools)
+          isExternalBuild = true;
+          log.info('[Chat] GitHub repo modification intent detected — injecting repo modify workflow');
+        }
       } catch (intentErr: unknown) {
         log.error("[Chat] Build intent detection failed, defaulting to general chat:", { error: getErrorMessage(intentErr) });
         // Default to general chat on failure — don't crash the mutation
@@ -1481,22 +1493,35 @@ Do NOT attempt any tool calls or builds.`;
         }
       } else if (isExternalBuild) {
         forceFirstTool = getForceFirstTool(input.message, false);
-        // Detect if this is a security-specific build to conditionally inject security templates
-        const isSecurityRequest = /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|hardening|zero.?trust|nist|mitre|owasp|rat|c2|keylog|payload|shellcode|reverse.?shell|privilege.?escalat|lateral.?move|exfiltrat|persistence|evasion|obfuscat|rootkit|backdoor|trojan|botnet|phishing|spoof|sniff|crack|deauth|arp.?poison|dns.?poison|mitm|man.?in.?the.?middle|packet.?craft|port.?scan|network.?scan|web.?fuzz|directory.?brute|subdomain|enumerat|footprint|fingerprint|social.?engineer)\b/i.test(input.message);
-        // Build the system prompt: core builder + external reminder + security addendum (only if security build)
-        const builderPromptParts = [BUILDER_SYSTEM_PROMPT, EXTERNAL_BUILD_REMINDER];
-        if (isSecurityRequest) {
-          builderPromptParts.push(SECURITY_BUILD_ADDENDUM);
-          log.info(`[Chat] Security build detected — injecting security addendum`);
+
+        if (isGitHubRepoModify) {
+          // GitHub repo modification workflow — clone, edit, push
+          const builderPromptParts = [BUILDER_SYSTEM_PROMPT, EXTERNAL_BUILD_REMINDER, GITHUB_REPO_MODIFY_PROMPT];
+          builderPromptParts.push(ANTI_REPLICATION_PROMPT);
+          const userMsgIdx = llmMessages.length - 1;
+          llmMessages.splice(userMsgIdx, 0, {
+            role: 'system',
+            content: builderPromptParts.join('\n\n'),
+          });
+          log.info(`[Chat] GitHub repo modify mode — injecting GITHUB_REPO_MODIFY_PROMPT`);
         } else {
-          log.info(`[Chat] General build detected — using core builder prompt only (no security templates)`);
+          // Detect if this is a security-specific build to conditionally inject security templates
+          const isSecurityRequest = /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|hardening|zero.?trust|nist|mitre|owasp|rat|c2|keylog|payload|shellcode|reverse.?shell|privilege.?escalat|lateral.?move|exfiltrat|persistence|evasion|obfuscat|rootkit|backdoor|trojan|botnet|phishing|spoof|sniff|crack|deauth|arp.?poison|dns.?poison|mitm|man.?in.?the.?middle|packet.?craft|port.?scan|network.?scan|web.?fuzz|directory.?brute|subdomain|enumerat|footprint|fingerprint|social.?engineer)\b/i.test(input.message);
+          // Build the system prompt: core builder + external reminder + security addendum (only if security build)
+          const builderPromptParts = [BUILDER_SYSTEM_PROMPT, EXTERNAL_BUILD_REMINDER];
+          if (isSecurityRequest) {
+            builderPromptParts.push(SECURITY_BUILD_ADDENDUM);
+            log.info(`[Chat] Security build detected — injecting security addendum`);
+          } else {
+            log.info(`[Chat] General build detected — using core builder prompt only (no security templates)`);
+          }
+          builderPromptParts.push(ANTI_REPLICATION_PROMPT);
+          const userMsgIdx = llmMessages.length - 1;
+          llmMessages.splice(userMsgIdx, 0, {
+            role: 'system',
+            content: builderPromptParts.join('\n\n'),
+          });
         }
-        builderPromptParts.push(ANTI_REPLICATION_PROMPT);
-        const userMsgIdx = llmMessages.length - 1;
-        llmMessages.splice(userMsgIdx, 0, {
-          role: 'system',
-          content: builderPromptParts.join('\n\n'),
-        });
       }
 
       // Choose tool set:
@@ -1504,7 +1529,7 @@ Do NOT attempt any tool calls or builds.`;
       // - External build: EXTERNAL_BUILD_TOOLS (focused builder tools — create_file, sandbox, web research, GitHub)
       // - General chat: TITAN_TOOLS (full platform access, gated by membership/credits)
       const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? EXTERNAL_BUILD_TOOLS : TITAN_TOOLS);
-      log.info(`[Chat] Self-build: ${isSelfBuild}, External-build: ${isExternalBuild}, force tool: ${forceFirstTool || 'none'}, tools: ${activeTools.length}`);
+      log.info(`[Chat] Self-build: ${isSelfBuild}, External-build: ${isExternalBuild}, GitHub-repo-modify: ${isGitHubRepoModify}, force tool: ${forceFirstTool || 'none'}, tools: ${activeTools.length}`);
 
       // Enable deferred mode ONLY for self-build — file writes will be staged
       // in memory and only flushed to disk after the conversation loop completes.
