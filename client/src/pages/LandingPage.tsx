@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import AffiliateRecommendations from "@/components/AffiliateRecommendations";
 import ArchibaldWizard from "@/components/ArchibaldWizard";
 import { Button } from "@/components/ui/button";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getRegisterUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { trackDownload } from "@/lib/adTracking";
 import { AT_ICON_64, FULL_LOGO_256, TIER_LOGOS } from "@/lib/logos";
@@ -164,7 +164,8 @@ export default function LandingPage() {
               ) : (
                 <>
                   <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" variant="ghost" className="text-white/70 hover:text-white hidden sm:flex">Sign In</Button>
-                  <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-lg shadow-blue-600/25">Start Building</Button>
+                  <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 hidden sm:flex">Sign Up</Button>
+                  <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-lg shadow-blue-600/25">Start Building</Button>
                 </>
               )}
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors" aria-label="Toggle menu">
@@ -185,8 +186,9 @@ export default function LandingPage() {
               <Link href="/demo" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Demo</Link>
               <Link href="/customers" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Customers</Link>
               <Link href="/contact" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors">Contact</Link>
-              <div className="pt-2 border-t border-white/5 mt-1">
-                <Button onClick={() => { setMobileMenuOpen(false); window.location.href = getLoginUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0" size="sm">Start Building Free</Button>
+              <div className="pt-2 border-t border-white/5 mt-1 flex flex-col gap-2">
+                <Button onClick={() => { setMobileMenuOpen(false); window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0" size="sm">Sign Up Free</Button>
+                <Button onClick={() => { setMobileMenuOpen(false); window.location.href = getLoginUrl(); }} variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" size="sm">Sign In</Button>
               </div>
             </div>
           </div>
@@ -229,14 +231,12 @@ export default function LandingPage() {
               </Button>
             ) : (
               <>
-                <Button size="lg" onClick={() => { window.location.href = getLoginUrl(); }} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
-                  <Rocket className="h-5 w-5" />Start Building Free
+                <Button size="lg" onClick={() => { window.location.href = getRegisterUrl(); }} className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/25 h-14 px-10 text-base font-semibold gap-3">
+                  <Rocket className="h-5 w-5" />Sign Up Free
                 </Button>
-                <Link href="/builder">
-                  <Button size="lg" variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white h-12 px-8 text-base">
-                    See How It Works <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button size="lg" onClick={() => { window.location.href = getLoginUrl(); }} variant="outline" className="border-white/20 bg-white/5 hover:bg-white/10 text-white h-14 px-8 text-base">
+                  Sign In
+                </Button>
               </>
             )}
           </div>

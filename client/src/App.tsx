@@ -33,6 +33,7 @@ import DemoPage from "./pages/DemoPage";
 // Auth pages
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import SignUpPage from "./pages/SignUpPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -245,7 +246,7 @@ function Router() {
 
       {/* Auth pages */}
       <Route path="/login" component={() => <LoginPage />} />
-      <Route path="/register" component={() => <RegisterPage />} />
+      <Route path="/register" component={() => <SignUpPage />} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />

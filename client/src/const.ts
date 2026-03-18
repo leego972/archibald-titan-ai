@@ -9,3 +9,11 @@ export const getLoginUrl = (returnPath?: string) => {
   }
   return base;
 };
+
+export const getRegisterUrl = (returnPath?: string) => {
+  const base = "/register";
+  if (returnPath) {
+    return `${base}?returnTo=${encodeURIComponent(returnPath)}`;
+  }
+  return base;
+};
