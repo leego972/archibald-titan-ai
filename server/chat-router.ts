@@ -1553,6 +1553,13 @@ Do NOT attempt any tool calls or builds.`;
         size?: number;
       }> = [];
 
+      // ── Register active build so mid-run injection works ──────────
+      // This MUST be called before the tool loop so the /api/chat/inject endpoint
+      // can find the active build in activeBuilds and queue mid-run messages.
+      // Without this call, inject always returns 409 "No active build" even when
+      // Titan is actively processing — causing the "Could not inject message" error.
+      registerBuild(conversationId!, userId);
+
       try {
 
         // ── Tool-calling loop ──────────────────────────────────────

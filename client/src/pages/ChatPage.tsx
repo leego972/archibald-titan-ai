@@ -1058,17 +1058,27 @@ export default function ChatPage() {
     }, 300);
   };
 
-  // Exit voice mode
+  // Exit voice mode — cleans up all recording/TTS state and returns to chat
   const exitVoiceMode = () => {
-    setVoiceModeActive(false);
-    setVoiceStatus('idle');
-    // Stop any recording
+    // Cancel VAD so it doesn't fire after exit
+    vadAnalyserRef.current = null;
+    if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
+    if (vadSilenceTimerRef.current) { clearTimeout(vadSilenceTimerRef.current); vadSilenceTimerRef.current = null; }
+    // Stop recording timer
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    // Stop any active recording
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     // Stop any TTS playback
     stopTtsPlayback();
+    // Reset all voice state
     setIsSpeaking(false);
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setVoiceStatus('idle');
+    // Deactivate voice mode overlay — chat page is revealed underneath
+    setVoiceModeActive(false);
   };
 
   // Cleanup TTS on unmount
@@ -1309,6 +1319,9 @@ export default function ChatPage() {
     vadAnalyserRef.current = null;
     if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
     if (vadSilenceTimerRef.current) { clearTimeout(vadSilenceTimerRef.current); vadSilenceTimerRef.current = null; }
+    // Immediately update voiceStatus so the Stop button disappears and UI shows 'thinking'
+    // The onstop handler will also set it to 'thinking', but this gives instant feedback
+    if (voiceModeRef.current) setVoiceStatus('thinking');
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -1607,10 +1620,20 @@ export default function ChatPage() {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', ...(csrfTkn ? { 'x-csrf-token': csrfTkn } : {}) },
           body: JSON.stringify({ message: messageText }),
-        }).then(r => {
-          if (r.ok) toast.success('Titan will read this mid-task', { duration: 2000 });
-          else toast.error('Could not inject message — queued instead');
-        }).catch(() => toast.error('Could not inject message'));
+        }).then(async r => {
+          if (r.ok) {
+            toast.success('Titan will read this mid-task', { duration: 2000 });
+          } else {
+            // 409 means no active build registered yet (e.g. still in first round)
+            // The message is already shown in chat — Titan will see it when he finishes
+            const data = await r.json().catch(() => ({}));
+            if (r.status === 409) {
+              toast.info('Message noted — Titan will see it when he finishes', { duration: 2500 });
+            } else {
+              toast.error(data?.error || 'Could not send mid-task message');
+            }
+          }
+        }).catch(() => toast.error('Could not send mid-task message'));
       }
       return;
     }
@@ -3371,19 +3394,19 @@ export default function ChatPage() {
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-background via-background/98 to-background"
           style={{ backdropFilter: 'blur(20px)' }}
         >
-          {/* Close button */}
-          <button
-            onClick={exitVoiceMode}
-            className="absolute top-6 right-6 p-3 rounded-full bg-muted/50 hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all"
-          >
-            <PhoneOff className="h-6 w-6" />
-          </button>
-
-          {/* Status text top */}
-          <div className="absolute top-8 left-0 right-0 text-center">
+          {/* Top bar: Voice Mode label + Hang Up button */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-4" style={{ zIndex: 110 }}>
             <span className="text-sm font-medium text-muted-foreground tracking-wider uppercase">
               Voice Mode
             </span>
+            <button
+              onClick={exitVoiceMode}
+              className="p-3 rounded-full bg-muted/50 hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all active:scale-95"
+              style={{ touchAction: 'manipulation', minWidth: 48, minHeight: 48 }}
+              aria-label="Hang up and return to chat"
+            >
+              <PhoneOff className="h-6 w-6" />
+            </button>
           </div>
 
           {/* Large Titan Logo with pulse animation */}
@@ -3478,11 +3501,19 @@ export default function ChatPage() {
             {voiceStatus === 'listening' && (
               <button
                 onClick={stopRecording}
-                className="px-8 py-4 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 transition-all text-lg font-medium flex items-center gap-3 animate-pulse"
+                className="px-8 py-4 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 active:bg-red-500/50 transition-all text-lg font-medium flex items-center gap-3"
+                style={{ touchAction: 'manipulation', minHeight: 56 }}
+                aria-label="Stop recording"
               >
                 <Square className="h-5 w-5 fill-current" />
                 Stop
               </button>
+            )}
+            {voiceStatus === 'thinking' && (
+              <div className="px-8 py-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-lg font-medium flex items-center gap-3">
+                <span className="animate-spin inline-block h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full" />
+                Processing...
+              </div>
             )}
             {voiceStatus === 'speaking' && (
               <button
