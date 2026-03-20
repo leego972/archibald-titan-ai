@@ -326,16 +326,19 @@ body {
 .chat-page-root {
   overflow: hidden;
   display: flex;
-  flex-direction: column;
+  flex-direction: row; /* sidebar + chat sit side by side */
 }
 
 /* Ensure the parent chain constrains height properly */
 [data-slot="sidebar-inset"]:has(.chat-page-root) {
-  overflow: hidden;
+  /* Do NOT set overflow:hidden here — it would clip the fixed sidebar */
+  overflow: visible;
 }
 [data-slot="sidebar-inset"]:has(.chat-page-root) > main {
-  overflow: hidden;
+  /* Do NOT set overflow:hidden here — it clips the fixed nav sidebar on desktop */
+  overflow: visible;
   position: relative;
+  /* The chat-page-root itself handles its own overflow:hidden */
 }
 
 @media screen and (max-width: 768px) {

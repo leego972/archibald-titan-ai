@@ -89,7 +89,7 @@ import DesktopStatusBar from "./DesktopStatusBar";
 import { isDesktop } from "@/lib/desktop";
 import { useArchibald } from "@/contexts/ArchibaldContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LanguageSelector } from "@/i18n";
+import { LanguageSelector, useLanguage } from "@/i18n";
 import { AddAdminModal } from "./AddAdminModal";
 import { isAdminRole } from "@shared/const";
 
@@ -109,135 +109,153 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
-const menuGroups: MenuGroup[] = [
+function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
+  return [
   // ═══════════════════════════════════════════════════════════════
   // SECTION 1: DEVELOPER TOOLS
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Developer Tools",
+    title: t("group.developerTools"),
     items: [
-      { icon: () => <TitanLogo size="sm" />, label: "Titan Builder", path: "/dashboard" },
-      { icon: featureIcon("icon_41_r6c1"), label: "Sandbox", path: "/sandbox", isNew: true },
-      { icon: featureIcon("icon_04_r1c4"), label: "My Projects", path: "/project-files", isNew: true },
-      { icon: featureIcon("icon_05_r1c5"), label: "Smart Fetch AI", path: "/fetcher/smart-fetch" },
-      { icon: featureIcon("icon_06_r1c6"), label: "New Fetch", path: "/fetcher/new" },
-      { icon: featureIcon("icon_08_r1c8"), label: "Fetch Jobs", path: "/fetcher/jobs" },
-      { icon: featureIcon("icon_09_r2c1"), label: "Grand Bazaar", path: "/marketplace", isNew: true },
-      { icon: featureIcon("icon_10_r2c2"), label: "My Inventory", path: "/marketplace/inventory", isNew: true },
-      { icon: featureIcon("icon_07_r1c7"), label: "Sell / Listings", path: "/marketplace/sell", isNew: true },
-      { icon: featureIcon("icon_45_r6c5"), label: "Seller Dashboard", path: "/marketplace/seller", isNew: true },
+      { icon: () => <TitanLogo size="sm" />, label: t("nav.titanBuilder"), path: "/dashboard" },
+      { icon: featureIcon("icon_41_r6c1"), label: t("nav.sandbox"), path: "/sandbox", isNew: true },
+      { icon: featureIcon("icon_04_r1c4"), label: t("nav.myProjects"), path: "/project-files", isNew: true },
+      { icon: featureIcon("icon_05_r1c5"), label: t("nav.smartFetch"), path: "/fetcher/smart-fetch" },
+      { icon: featureIcon("icon_06_r1c6"), label: t("nav.newFetch"), path: "/fetcher/new" },
+      { icon: featureIcon("icon_08_r1c8"), label: t("nav.fetchJobs"), path: "/fetcher/jobs" },
+      { icon: featureIcon("icon_09_r2c1"), label: t("nav.grandBazaar"), path: "/marketplace", isNew: true },
+      { icon: featureIcon("icon_10_r2c2"), label: t("nav.myInventory"), path: "/marketplace/inventory", isNew: true },
+      { icon: featureIcon("icon_07_r1c7"), label: t("nav.sellListings"), path: "/marketplace/sell", isNew: true },
+      { icon: featureIcon("icon_45_r6c5"), label: t("nav.sellerDashboard"), path: "/marketplace/seller", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 1b: SECURITY TOOLS
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Security",
+    title: t("group.security"),
     items: [
-      { icon: featureIcon("icon_14_r2c6"), label: "TOTP Vault", path: "/fetcher/totp-vault", isCyber: true },
-      { icon: featureIcon("icon_15_r2c7"), label: "Expiry Watchdog", path: "/fetcher/watchdog" },
-      { icon: featureIcon("icon_16_r2c8"), label: "Provider Health", path: "/fetcher/provider-health" },
-      { icon: featureIcon("icon_37_r5c5"), label: "Health Trends", path: "/fetcher/health-trends", isCyber: true },
-      { icon: featureIcon("icon_38_r5c6"), label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
-      { icon: featureIcon("icon_18_r3c2"), label: "Credential Health", path: "/fetcher/credential-health", isCyber: true },
-      { icon: featureIcon("icon_19_r3c3"), label: "Site Monitor", path: "/site-monitor", premiumOnly: true, isNew: true },
-      { icon: featureIcon("icon_16_r2c8"), label: "LinkenSphere", path: "/linken-sphere", isNew: true },
-      { icon: featureIcon("icon_38_r5c6"), label: "CyberMCP", path: "/cybermcp", isCyber: true, isNew: true },
-      { icon: featureIcon("icon_18_r3c2"), label: "Astra API Scanner", path: "/astra", isCyber: true, isNew: true },
-      { icon: featureIcon("icon_15_r2c7"), label: "Argus OSINT", path: "/argus", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_14_r2c6"), label: t("nav.totpVault"), path: "/fetcher/totp-vault", isCyber: true },
+      { icon: featureIcon("icon_15_r2c7"), label: t("nav.expiryWatchdog"), path: "/fetcher/watchdog" },
+      { icon: featureIcon("icon_16_r2c8"), label: t("nav.providerHealth"), path: "/fetcher/provider-health" },
+      { icon: featureIcon("icon_37_r5c5"), label: t("nav.healthTrends"), path: "/fetcher/health-trends", isCyber: true },
+      { icon: featureIcon("icon_38_r5c6"), label: t("nav.leakScanner"), path: "/fetcher/leak-scanner", isCyber: true },
+      { icon: featureIcon("icon_18_r3c2"), label: t("nav.credentialHealth"), path: "/fetcher/credential-health", isCyber: true },
+      { icon: featureIcon("icon_19_r3c3"), label: t("nav.siteMonitor"), path: "/site-monitor", premiumOnly: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: t("nav.linkenSphere"), path: "/linken-sphere", isNew: true },
+      { icon: featureIcon("icon_38_r5c6"), label: t("nav.cyberMcp"), path: "/cybermcp", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_18_r3c2"), label: t("nav.astraScanner"), path: "/astra", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_15_r2c7"), label: t("nav.argusOsint"), path: "/argus", isCyber: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 1c: SPECIALISED (Titan + Admin only — hidden from all other tiers)
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Specialised",
+    title: t("group.specialised"),
     items: [
-      { icon: featureIcon("icon_02_r1c2"), label: "Clone Website", path: "/replicate", isNew: true, premiumOnly: true },
+      { icon: featureIcon("icon_02_r1c2"), label: t("nav.cloneWebsite"), path: "/replicate", isNew: true, premiumOnly: true },
       { icon: featureIcon("icon_15_r2c7"), label: "Evilginx 3", path: "/evilginx", titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "BlackEye", path: "/blackeye", titanOnly: true },
       { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
       // ── Titan Storage Add-on ──────────────────────────────────────────────
-      { icon: featureIcon("icon_31_r4c7"), label: "Titan Storage", path: "/storage", isNew: true },
+      { icon: featureIcon("icon_31_r4c7"), label: t("nav.titanStorage"), path: "/storage", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 2: BUSINESS & FUNDING
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Business & Funding",
+    title: t("group.businessFunding"),
     items: [
-      { icon: featureIcon("icon_29_r4c5"), label: "Browse Grants", path: "/grants", isNew: true },
-      { icon: featureIcon("icon_21_r3c5"), label: "Grant Applications", path: "/grant-applications", isNew: true },
-      { icon: featureIcon("icon_23_r3c7"), label: "Companies", path: "/companies", isNew: true },
-      { icon: featureIcon("icon_01_r1c1"), label: "Business Plans", path: "/business-plans", isNew: true },
-      { icon: featureIcon("icon_39_r5c7"), label: "Crowdfunding", path: "/crowdfunding", isNew: true },
-      { icon: featureIcon("icon_20_r3c4"), label: "My Campaigns", path: "/crowdfunding/my-campaigns", isNew: true },
-      { icon: featureIcon("icon_12_r2c4"), label: "Advertising", path: "/advertising", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_43_r6c3"), label: "Affiliate Dashboard", path: "/affiliate", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_35_r5c3"), label: "My Referrals", path: "/referrals", isNew: true },
-      { icon: featureIcon("icon_13_r2c5"), label: "SEO Command Center", path: "/seo", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_33_r5c1"), label: "Blog Engine", path: "/blog-admin", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_31_r4c7"), label: "Marketing Engine", path: "/marketing", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_12_r2c4"), label: "Content Creator", path: "/content-creator", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_29_r4c5"), label: t("nav.browseGrants"), path: "/grants", isNew: true },
+      { icon: featureIcon("icon_21_r3c5"), label: t("nav.grantApplications"), path: "/grant-applications", isNew: true },
+      { icon: featureIcon("icon_23_r3c7"), label: t("nav.companies"), path: "/companies", isNew: true },
+      { icon: featureIcon("icon_01_r1c1"), label: t("nav.businessPlans"), path: "/business-plans", isNew: true },
+      { icon: featureIcon("icon_39_r5c7"), label: t("nav.crowdfunding"), path: "/crowdfunding", isNew: true },
+      { icon: featureIcon("icon_20_r3c4"), label: t("nav.myCampaigns"), path: "/crowdfunding/my-campaigns", isNew: true },
+      { icon: featureIcon("icon_12_r2c4"), label: t("nav.advertising"), path: "/advertising", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_43_r6c3"), label: t("nav.affiliateDashboard"), path: "/affiliate", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_35_r5c3"), label: t("nav.myReferrals"), path: "/referrals", isNew: true },
+      { icon: featureIcon("icon_13_r2c5"), label: t("nav.seoCommandCenter"), path: "/seo", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_33_r5c1"), label: t("nav.blogEngine"), path: "/blog-admin", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_31_r4c7"), label: t("nav.marketingEngine"), path: "/marketing", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_12_r2c4"), label: t("nav.contentCreator"), path: "/content-creator", adminOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 3: ACCOUNT & SETTINGS
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Account & Settings",
+    title: t("group.accountSettings"),
     items: [
-      { icon: featureIcon("icon_11_r2c3"), label: "Subscription", path: "/dashboard/subscription" },
-      { icon: featureIcon("icon_35_r5c3"), label: "Credits", path: "/dashboard/credits", isNew: true },
-      { icon: featureIcon("icon_26_r4c2"), label: "Credentials", path: "/fetcher/credentials" },
-      { icon: featureIcon("icon_19_r3c3"), label: "API Access", path: "/fetcher/api-access" },
-      { icon: featureIcon("icon_36_r5c4"), label: "Team Management", path: "/fetcher/team" },
-      { icon: featureIcon("icon_22_r3c6"), label: "Team Vault", path: "/fetcher/team-vault", isNew: true },
-      { icon: featureIcon("icon_44_r6c4"), label: "Settings", path: "/fetcher/settings" },
+      { icon: featureIcon("icon_11_r2c3"), label: t("nav.subscription"), path: "/dashboard/subscription" },
+      { icon: featureIcon("icon_35_r5c3"), label: t("nav.credits"), path: "/dashboard/credits", isNew: true },
+      { icon: featureIcon("icon_26_r4c2"), label: t("nav.credentials"), path: "/fetcher/credentials" },
+      { icon: featureIcon("icon_19_r3c3"), label: t("nav.apiAccess"), path: "/fetcher/api-access" },
+      { icon: featureIcon("icon_36_r5c4"), label: t("nav.teamManagement"), path: "/fetcher/team" },
+      { icon: featureIcon("icon_22_r3c6"), label: t("nav.teamVault"), path: "/fetcher/team-vault", isNew: true },
+      { icon: featureIcon("icon_44_r6c4"), label: t("nav.settings"), path: "/fetcher/settings" },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 3b: DATA & AUTOMATION
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Automation",
+    title: t("group.automation"),
     items: [
-      { icon: featureIcon("icon_40_r5c8"), label: "CSV Export", path: "/fetcher/export" },
-      { icon: featureIcon("icon_42_r6c2"), label: "Import", path: "/fetcher/import", isNew: true },
-      { icon: featureIcon("icon_32_r4c8"), label: "Bulk Sync", path: "/fetcher/bulk-sync" },
-      { icon: featureIcon("icon_34_r5c2"), label: "Auto-Sync", path: "/fetcher/auto-sync" },
-      { icon: featureIcon("icon_03_r1c3"), label: "Provider Onboarding", path: "/fetcher/onboarding", isNew: true },
-      { icon: featureIcon("icon_08_r1c8"), label: "Credential History", path: "/fetcher/history" },
-      { icon: featureIcon("icon_08_r1c8"), label: "Audit Logs", path: "/fetcher/audit-logs" },
+      { icon: featureIcon("icon_40_r5c8"), label: t("nav.csvExport"), path: "/fetcher/export" },
+      { icon: featureIcon("icon_42_r6c2"), label: t("nav.import"), path: "/fetcher/import", isNew: true },
+      { icon: featureIcon("icon_32_r4c8"), label: t("nav.bulkSync"), path: "/fetcher/bulk-sync" },
+      { icon: featureIcon("icon_34_r5c2"), label: t("nav.autoSync"), path: "/fetcher/auto-sync" },
+      { icon: featureIcon("icon_03_r1c3"), label: t("nav.providerOnboarding"), path: "/fetcher/onboarding", isNew: true },
+      { icon: featureIcon("icon_08_r1c8"), label: t("nav.credentialHistory"), path: "/fetcher/history" },
+      { icon: featureIcon("icon_08_r1c8"), label: t("nav.auditLogs"), path: "/fetcher/audit-logs" },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
   // SECTION 4: DEVELOPER API & ADMIN
   // ═══════════════════════════════════════════════════════════════
   {
-    title: "Developer API",
+    title: t("group.developerApi"),
     items: [
-      { icon: featureIcon("icon_33_r5c1"), label: "API Docs", path: "/fetcher/developer-docs", isNew: true },
-      { icon: featureIcon("icon_27_r4c3"), label: "Webhooks", path: "/fetcher/webhooks", isNew: true },
-      { icon: featureIcon("icon_28_r4c4"), label: "Notifications", path: "/fetcher/notifications", isNew: true },
-      { icon: featureIcon("icon_30_r4c6"), label: "API Analytics", path: "/fetcher/api-analytics", isNew: true },
-      { icon: featureIcon("icon_41_r6c1"), label: "CLI Tool", path: "/fetcher/cli", isNew: true },
+      { icon: featureIcon("icon_33_r5c1"), label: t("nav.apiDocs"), path: "/fetcher/developer-docs", isNew: true },
+      { icon: featureIcon("icon_27_r4c3"), label: t("nav.webhooks"), path: "/fetcher/webhooks", isNew: true },
+      { icon: featureIcon("icon_28_r4c4"), label: t("nav.notifications"), path: "/fetcher/notifications", isNew: true },
+      { icon: featureIcon("icon_30_r4c6"), label: t("nav.apiAnalytics"), path: "/fetcher/api-analytics", isNew: true },
+      { icon: featureIcon("icon_41_r6c1"), label: t("nav.cliTool"), path: "/fetcher/cli", isNew: true },
     ],
   },
   {
-    title: "Admin",
+    title: t("group.admin"),
     items: [
-      { icon: featureIcon("icon_10_r2c2"), label: "Releases", path: "/fetcher/releases", adminOnly: true },
-      { icon: featureIcon("icon_44_r6c4"), label: "User Management", path: "/fetcher/admin", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_16_r2c8"), label: "Activity Log", path: "/admin/activity-log", adminOnly: true },
-      { icon: featureIcon("icon_41_r6c1"), label: "Titan Server", path: "/admin/titan-server", adminOnly: true, isNew: true },
-      { icon: featureIcon("icon_06_r1c6"), label: "Self-Improvement", path: "/fetcher/self-improvement", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_10_r2c2"), label: t("nav.releases"), path: "/fetcher/releases", adminOnly: true },
+      { icon: featureIcon("icon_44_r6c4"), label: t("nav.userManagement"), path: "/fetcher/admin", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: t("nav.activityLog"), path: "/admin/activity-log", adminOnly: true },
+      { icon: featureIcon("icon_41_r6c1"), label: t("nav.titanServer"), path: "/admin/titan-server", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_06_r1c6"), label: t("nav.selfImprovement"), path: "/fetcher/self-improvement", adminOnly: true, isNew: true },
     ],
   },
+  ];
+}
+// Flat list for active item detection (English fallback for path matching)
+const allMenuItemPaths = [
+  "/dashboard", "/sandbox", "/project-files", "/fetcher/smart-fetch", "/fetcher/new", "/fetcher/jobs",
+  "/marketplace", "/marketplace/inventory", "/marketplace/sell", "/marketplace/seller",
+  "/fetcher/totp-vault", "/fetcher/watchdog", "/fetcher/provider-health", "/fetcher/health-trends",
+  "/fetcher/leak-scanner", "/fetcher/credential-health", "/site-monitor", "/linken-sphere",
+  "/cybermcp", "/astra", "/argus", "/replicate", "/evilginx", "/blackeye", "/metasploit", "/storage",
+  "/grants", "/grant-applications", "/companies", "/business-plans", "/crowdfunding",
+  "/crowdfunding/my-campaigns", "/advertising", "/affiliate", "/referrals", "/seo",
+  "/blog-admin", "/marketing", "/content-creator",
+  "/dashboard/subscription", "/dashboard/credits", "/fetcher/credentials", "/fetcher/api-access",
+  "/fetcher/team", "/fetcher/team-vault", "/fetcher/settings",
+  "/fetcher/export", "/fetcher/import", "/fetcher/bulk-sync", "/fetcher/auto-sync",
+  "/fetcher/onboarding", "/fetcher/history", "/fetcher/audit-logs",
+  "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
+  "/fetcher/api-analytics", "/fetcher/cli",
+  "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
 ];
-// Flat list for active item detection
-const allMenuItems = menuGroups.flatMap((g) => g.items);
 
 const SIDEBAR_WIDTH_KEY = "fetcher-sidebar-width";
 const DEFAULT_WIDTH = 260;
@@ -338,11 +356,14 @@ function FetcherLayoutContent({
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const sub = useSubscription();
   const isCollapsed = state === "collapsed";
+  const menuGroups = buildMenuGroups(t);
   const [isResizing, setIsResizing] = useState(false);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const allMenuItems = menuGroups.flatMap((g) => g.items);
   const activeMenuItem = allMenuItems.find(
     (item) => item.path === location || (item.path !== "/dashboard" && location.startsWith(item.path))
   );
@@ -541,7 +562,7 @@ function FetcherLayoutContent({
               className="flex items-center gap-2 w-full rounded-xl px-3 py-2 mb-1 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              <span className="group-data-[collapsible=icon]:hidden">Sign out</span>
+              <span className="group-data-[collapsible=icon]:hidden">{t("common.signOut")}</span>
             </button>
 
             <DropdownMenu>
@@ -571,13 +592,13 @@ function FetcherLayoutContent({
                   className="cursor-pointer h-10 sm:h-auto"
                 >
                   <Settings className="mr-2 h-4 w-4" />
-                  <span>Account Settings</span>
+                  <span>{t("common.accountSettings")}</span>
                 </DropdownMenuItem>
                 <ArchibaldToggleItem />
                 {toggleTheme && (
                   <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
                     {theme === 'dark' ? <Sun className="mr-2 h-4 w-4 text-amber-400" /> : <Moon className="mr-2 h-4 w-4 text-blue-400" />}
-                    <span>{theme === 'dark' ? 'Day Mode' : 'Night Mode'}</span>
+                    <span>{theme === 'dark' ? t("common.dayMode") || 'Day Mode' : t("common.nightMode") || 'Night Mode'}</span>
                   </DropdownMenuItem>
                 )}
                 {sub.isFree && (
@@ -586,7 +607,7 @@ function FetcherLayoutContent({
                     className="cursor-pointer text-amber-500 focus:text-amber-500"
                   >
                     <Crown className="mr-2 h-4 w-4" />
-                    <span>Upgrade Plan</span>
+                    <span>{t("common.upgradePlan")}</span>
                   </DropdownMenuItem>
                 )}
                 {isAdminRole(user?.role) && (
@@ -603,7 +624,7 @@ function FetcherLayoutContent({
                   className="cursor-pointer text-destructive focus:text-destructive h-10 sm:h-auto"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>{t("common.signOut")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
