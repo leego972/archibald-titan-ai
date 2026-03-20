@@ -928,6 +928,8 @@ export default function ChatPage() {
   const [slashFilter, setSlashFilter] = useState('');
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // iOS keyboard height — used to shrink chat-page-root via inline style so React re-renders reliably
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // true when the user has manually scrolled up — suppress auto-scroll while set
@@ -1564,35 +1566,38 @@ export default function ChatPage() {
     }
   }, [isLoading, messageQueue]);
 
-  // iOS keyboard handling — adjust viewport when keyboard opens
+  // iOS keyboard handling — use React state so the component re-renders with the correct height.
+  // CSS variable approach is unreliable on iOS Safari when body is not position:fixed.
   useEffect(() => {
     if (!isMobile) return;
-    const handleResize = () => {
-      if (window.visualViewport) {
-        const viewport = window.visualViewport;
-        const offset = window.innerHeight - viewport.height;
-        document.documentElement.style.setProperty('--keyboard-offset', `${offset}px`);
-        // After keyboard resize, scroll to bottom only if user is pinned to bottom
-        requestAnimationFrame(() => {
-          if (scrollRef.current && !isUserScrolledUpRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-          }
-          // Scroll the textarea into view so it sits just above the keyboard
-          textareaRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
-        });
-      }
+    const updateLayout = () => {
+      if (!window.visualViewport) return;
+      const vv = window.visualViewport;
+      // keyboard height = difference between window height and visual viewport height
+      const kbHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardHeight(kbHeight);
+      // Also keep the CSS variable in sync for any CSS that still uses it
+      document.documentElement.style.setProperty('--keyboard-offset', `${kbHeight}px`);
+      // Scroll messages to bottom when keyboard opens (if user is pinned)
+      requestAnimationFrame(() => {
+        if (scrollRef.current && !isUserScrolledUpRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
     };
     const handleScroll = () => {
-      // On iOS, visualViewport scroll events fire when the viewport shifts
-      // due to keyboard. We need to keep the chat pinned.
+      // Prevent iOS from scrolling the page body when keyboard shifts the viewport
       if (window.visualViewport && window.visualViewport.offsetTop > 0) {
         window.scrollTo(0, 0);
       }
+      updateLayout();
     };
-    window.visualViewport?.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('resize', updateLayout);
     window.visualViewport?.addEventListener('scroll', handleScroll);
+    // Run once on mount to capture initial state
+    updateLayout();
     return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', updateLayout);
       window.visualViewport?.removeEventListener('scroll', handleScroll);
     };
   }, [isMobile]);
@@ -2149,7 +2154,16 @@ export default function ChatPage() {
 
 
   return (
-    <div className={`chat-page-root flex ${isMobile ? 'h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)]' : 'h-[calc(100vh-3rem)]'}`}>
+    <div
+      className={`chat-page-root flex ${isMobile ? 'h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)]' : 'h-[calc(100vh-3rem)]'}`}
+      style={isMobile && keyboardHeight > 0 ? {
+        // Shrink the chat area by the keyboard height so the input stays visible.
+        // Using inline style (not CSS var) forces a React re-render which is
+        // reliable on iOS Safari — CSS variable updates alone are not.
+        height: `calc(100dvh - 3.5rem - ${keyboardHeight}px)`,
+        maxHeight: `calc(100dvh - 3.5rem - ${keyboardHeight}px)`,
+      } : undefined}
+    >
       {/* Mobile Conversation Drawer */}
       {isMobile && (
         <MobileConversationDrawer
@@ -2830,14 +2844,24 @@ export default function ChatPage() {
                   onChange={handleTextareaInput}
                   onKeyDown={handleKeyDown}
                   onFocus={() => {
-                    // On iOS, scroll the input into view when keyboard opens
                     if (isMobile) {
-                      setTimeout(() => {
-                        textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                        if (scrollRef.current) {
+                      // iOS keyboard takes ~300ms to fully open. Poll the visualViewport
+                      // height at 100ms intervals for 600ms to catch the final keyboard height
+                      // and trigger a React re-render that shrinks the chat area.
+                      let polls = 0;
+                      const poll = () => {
+                        if (!window.visualViewport) return;
+                        const vv = window.visualViewport;
+                        const kbHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                        setKeyboardHeight(kbHeight);
+                        document.documentElement.style.setProperty('--keyboard-offset', `${kbHeight}px`);
+                        if (scrollRef.current && !isUserScrolledUpRef.current) {
                           scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
                         }
-                      }, 350);
+                        polls++;
+                        if (polls < 6) setTimeout(poll, 100);
+                      };
+                      setTimeout(poll, 100);
                     }
                   }}
                   placeholder={
@@ -2852,6 +2876,19 @@ export default function ChatPage() {
                   }`}
                   rows={1}
                   disabled={isRecording || isTranscribing}
+                  onBlur={() => {
+                    // When keyboard is dismissed on iOS, reset the keyboard height
+                    // after a short delay to allow the viewport to settle
+                    if (isMobile) {
+                      setTimeout(() => {
+                        if (!window.visualViewport) return;
+                        const vv = window.visualViewport;
+                        const kbHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                        setKeyboardHeight(kbHeight);
+                        document.documentElement.style.setProperty('--keyboard-offset', `${kbHeight}px`);
+                      }, 150);
+                    }
+                  }}
                 />
               </div>
 

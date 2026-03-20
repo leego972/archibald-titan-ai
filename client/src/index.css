@@ -342,11 +342,10 @@ body {
 }
 
 @media screen and (max-width: 768px) {
-  /* Use keyboard offset to shrink the chat page when iOS keyboard opens */
+  /* chat-page-root height is controlled via React inline style (keyboardHeight state)
+     so the component re-renders reliably on iOS Safari when the keyboard opens.
+     The CSS variable --keyboard-offset is kept in sync as a fallback. */
   .chat-page-root {
-    height: calc(100dvh - 3.5rem - var(--keyboard-offset, 0px)) !important;
-    max-height: calc(100dvh - 3.5rem - var(--keyboard-offset, 0px)) !important;
-    /* No transition — instant resize prevents message overlap during keyboard open/close */
     will-change: height;
   }
   /* Ensure chat messages don't overflow horizontally */
@@ -360,14 +359,18 @@ body {
     max-width: calc(100vw - 5rem);
     overflow-x: auto;
   }
-  /* Keep input area always visible and above keyboard */
+  /* Keep input area always visible at the bottom of the chat column */
   .chat-input-area {
     position: sticky;
     bottom: 0;
     z-index: 10;
     background: var(--background);
+    /* Ensure it's always fully visible above the keyboard */
+    flex-shrink: 0;
   }
-  /* Prevent body scroll bounce on iOS which can cause chat to jump */
+  /* Prevent body scroll bounce on iOS which can cause chat to jump.
+     NOTE: Do NOT use position:fixed on body — it prevents the layout from
+     repainting when keyboard height changes, causing the input to go off-screen. */
   .chat-page-root {
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
@@ -378,10 +381,10 @@ body {
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
   }
-  /* Prevent the outer page from scrolling when chat is active */
+  /* Prevent the outer page from scrolling when chat is active.
+     overflow:hidden is safe here — only position:fixed was the problem. */
   body:has(.chat-page-root) {
     overflow: hidden;
-    position: fixed;
     width: 100%;
     height: 100%;
   }
