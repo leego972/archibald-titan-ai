@@ -2734,7 +2734,13 @@ export default function ChatPage() {
         </div>
 
         {/* Input area */}
-        <div className={`chat-input-area border-t border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-3 pt-2' : 'px-4 pt-3 pb-2'}`} style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
+        <div
+          className={`chat-input-area border-t border-border/50 bg-background/80 backdrop-blur-sm shrink-0 ${isMobile ? 'px-3 pt-2' : 'px-4 pt-3 pb-2'}`}
+          style={voiceModeActive
+            ? { paddingBottom: 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 68px)' }
+            : isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined
+          }
+        >
           {/* Recording indicator */}
           {isRecording && (
             <div className="flex items-center gap-3 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-xl">
@@ -2875,11 +2881,21 @@ export default function ChatPage() {
                 />
 
                 <button
-                  onClick={enterVoiceMode}
-                  className={`flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all touch-target ${
+                  onClick={voiceModeActive ? exitVoiceMode : enterVoiceMode}
+                  className={`flex items-center justify-center rounded-xl border transition-all touch-target ${
                     isMobile ? 'h-[40px] w-[40px]' : 'h-10 w-10'
+                  } ${
+                    voiceModeActive
+                      ? voiceStatus === 'listening'
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 ring-1 ring-cyan-500/40 animate-pulse'
+                        : voiceStatus === 'speaking'
+                        ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 ring-1 ring-purple-500/40 animate-pulse'
+                        : voiceStatus === 'thinking'
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 ring-1 ring-amber-500/40'
+                        : 'bg-purple-500/15 border-purple-500/40 text-purple-400'
+                      : 'border-border/50 text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50'
                   }`}
-                  title="Voice Mode — talk to Titan"
+                  title={voiceModeActive ? 'End Voice Mode' : 'Voice Mode — talk to Titan'}
                 >
                   <AudioLines className="h-4 w-4" />
                 </button>
@@ -3005,8 +3021,8 @@ export default function ChatPage() {
                 <Mic className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice
               </button>
               {' · '}
-              <button onClick={enterVoiceMode} className="text-purple-400 hover:underline cursor-pointer">
-                <AudioLines className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />Voice Mode
+              <button onClick={voiceModeActive ? exitVoiceMode : enterVoiceMode} className={`hover:underline cursor-pointer ${voiceModeActive ? 'text-cyan-400 font-medium' : 'text-purple-400'}`}>
+                <AudioLines className="h-3 w-3 inline-block mr-0.5 -mt-0.5" />{voiceModeActive ? 'Voice On ●' : 'Voice Mode'}
               </button>
               {' · '}
               <button onClick={() => handleSend('/help')} className="text-primary hover:underline cursor-pointer">/help</button>
@@ -3554,131 +3570,111 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Voice Mode Overlay */}
+      {/* Voice Mode Bar — compact floating bar above input, chat stays fully visible */}
       {voiceModeActive && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-background via-background/98 to-background"
-          style={{ backdropFilter: 'blur(20px)' }}
+        <div
+          className={`fixed bottom-0 left-0 right-0 z-[90] flex items-center gap-3 px-4 py-3 border-t transition-all duration-300 ${
+            voiceStatus === 'listening'
+              ? 'bg-cyan-950/95 border-cyan-500/40'
+              : voiceStatus === 'speaking'
+              ? 'bg-purple-950/95 border-purple-500/40'
+              : voiceStatus === 'thinking'
+              ? 'bg-amber-950/95 border-amber-500/40'
+              : 'bg-background/95 border-border/50'
+          }`}
+          style={{ backdropFilter: 'blur(16px)', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          {/* Top bar: Voice Mode label + Hang Up button */}
-          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-4" style={{ zIndex: 110 }}>
-            <span className="text-sm font-medium text-muted-foreground tracking-wider uppercase">
-              Voice Mode
-            </span>
-            <button
-              onClick={exitVoiceMode}
-              className="p-3 rounded-full bg-muted/50 hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all active:scale-95"
-              style={{ touchAction: 'manipulation', minWidth: 48, minHeight: 48 }}
-              aria-label="Hang up and return to chat"
-            >
-              <PhoneOff className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Large Titan Logo with pulse animation */}
-          <div className={`relative mb-8 ${
-            voiceStatus === 'listening' ? 'animate-pulse' : ''
+          {/* Titan logo with status glow */}
+          <div className={`relative h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${
+            voiceStatus === 'listening'
+              ? 'ring-2 ring-cyan-500/70 shadow-[0_0_14px_rgba(0,200,255,0.4)]'
+              : voiceStatus === 'speaking'
+              ? 'ring-2 ring-purple-500/70 shadow-[0_0_14px_rgba(168,85,247,0.4)] animate-pulse'
+              : voiceStatus === 'thinking'
+              ? 'ring-2 ring-amber-500/70 shadow-[0_0_14px_rgba(245,158,11,0.3)]'
+              : 'ring-1 ring-border/50'
           }`}>
-            {/* Outer glow rings */}
-            <div className={`absolute inset-0 rounded-full transition-all duration-700 ${
-              voiceStatus === 'listening'
-                ? 'bg-cyan-500/20 scale-150 animate-ping'
-                : voiceStatus === 'speaking'
-                ? 'bg-purple-500/20 scale-150 animate-pulse'
-                : voiceStatus === 'thinking'
-                ? 'bg-amber-500/20 scale-125 animate-pulse'
-                : 'bg-transparent scale-100'
-            }`} />
-            <div className={`absolute inset-0 rounded-full transition-all duration-500 ${
-              voiceStatus === 'listening'
-                ? 'bg-cyan-500/10 scale-125'
-                : voiceStatus === 'speaking'
-                ? 'bg-purple-500/10 scale-125'
-                : voiceStatus === 'thinking'
-                ? 'bg-amber-500/10 scale-110'
-                : 'bg-transparent scale-100'
-            }`} />
-
-            {/* Logo container */}
-            <div className={`relative h-48 w-48 sm:h-56 sm:w-56 rounded-full flex items-center justify-center transition-all duration-500 ${
-              voiceStatus === 'listening'
-                ? 'ring-4 ring-cyan-500/60 shadow-[0_0_60px_rgba(0,200,255,0.3)]'
-                : voiceStatus === 'speaking'
-                ? 'ring-4 ring-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.3)]'
-                : voiceStatus === 'thinking'
-                ? 'ring-4 ring-amber-500/60 shadow-[0_0_60px_rgba(245,158,11,0.3)]'
-                : 'ring-2 ring-border/50'
-            }`}>
-              <img
-                src={AT_ICON_FULL}
-                alt="Titan"
-                className="h-40 w-40 sm:h-48 sm:w-48 object-contain drop-shadow-2xl"
-                draggable={false}
-              />
-            </div>
+            <img src={AT_ICON_FULL} alt="Titan" className="h-8 w-8 object-contain rounded-full" draggable={false} />
           </div>
 
-          {/* Status indicator */}
-          <div className="flex items-center gap-3 mb-6">
+          {/* Status + waveform */}
+          <div className="flex-1 min-w-0 flex items-center gap-2">
             {voiceStatus === 'listening' && (
               <>
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
+                {/* Animated waveform bars */}
+                <div className="flex items-center gap-[3px] shrink-0">
+                  {[0.6, 1.0, 0.75, 1.0, 0.5, 0.85, 0.65].map((h, i) => (
                     <div
                       key={i}
-                      className="w-1 bg-cyan-500 rounded-full animate-pulse"
+                      className="w-[3px] bg-cyan-400 rounded-full animate-pulse"
                       style={{
-                        height: `${12 + Math.random() * 20}px`,
-                        animationDelay: `${i * 0.15}s`,
-                        animationDuration: '0.6s',
+                        height: `${10 + h * 14}px`,
+                        animationDelay: `${i * 0.12}s`,
+                        animationDuration: '0.55s',
                       }}
                     />
                   ))}
                 </div>
-                <span className="text-lg font-medium text-cyan-400">Listening...</span>
+                <span className="text-sm font-medium text-cyan-300 shrink-0">Listening</span>
+                {recordingDuration > 0 && (
+                  <span className="text-xs text-cyan-400/70 shrink-0">{formatDuration(recordingDuration)}</span>
+                )}
               </>
             )}
             {voiceStatus === 'thinking' && (
               <>
-                <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
-                <span className="text-lg font-medium text-amber-400">Thinking...</span>
+                <Loader2 className="h-4 w-4 animate-spin text-amber-400 shrink-0" />
+                <span className="text-sm font-medium text-amber-300">Titan is thinking...</span>
               </>
             )}
             {voiceStatus === 'speaking' && (
               <>
-                <Volume2 className="h-5 w-5 text-purple-400 animate-pulse" />
-                <span className="text-lg font-medium text-purple-400">Speaking...</span>
+                <div className="flex items-center gap-[3px] shrink-0">
+                  {[0.5, 0.9, 0.7, 1.0, 0.6, 0.8, 0.55].map((h, i) => (
+                    <div
+                      key={i}
+                      className="w-[3px] bg-purple-400 rounded-full animate-pulse"
+                      style={{
+                        height: `${8 + h * 14}px`,
+                        animationDelay: `${i * 0.1}s`,
+                        animationDuration: '0.45s',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm font-medium text-purple-300">Titan is speaking...</span>
               </>
             )}
-            {voiceStatus === 'idle' && null}
+            {voiceStatus === 'idle' && (
+              <>
+                <Mic className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-muted-foreground">Voice mode active — tap mic to speak</span>
+              </>
+            )}
           </div>
 
-          {/* Tap-to-talk / Stop buttons */}
-          <div className="flex gap-4">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
             {voiceStatus === 'idle' && (
               <button
                 onClick={() => { startRecording(); setVoiceStatus('listening'); }}
-                className="px-8 py-4 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 transition-all text-lg font-medium flex items-center gap-3"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/30 transition-all text-sm font-medium"
+                style={{ touchAction: 'manipulation', minHeight: 40 }}
               >
-                <Mic className="h-6 w-6" />
-                Start Talking
+                <Mic className="h-4 w-4" />
+                {!isMobile && 'Speak'}
               </button>
             )}
             {voiceStatus === 'listening' && (
               <button
                 onClick={stopRecording}
-                className="px-8 py-4 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 active:bg-red-500/50 transition-all text-lg font-medium flex items-center gap-3"
-                style={{ touchAction: 'manipulation', minHeight: 56 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 active:bg-red-500/50 transition-all text-sm font-medium"
+                style={{ touchAction: 'manipulation', minHeight: 40 }}
                 aria-label="Stop recording"
               >
-                <Square className="h-5 w-5 fill-current" />
-                Stop
+                <Square className="h-3.5 w-3.5 fill-current" />
+                {!isMobile && 'Stop'}
               </button>
-            )}
-            {voiceStatus === 'thinking' && (
-              <div className="px-8 py-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-lg font-medium flex items-center gap-3">
-                <span className="animate-spin inline-block h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full" />
-                Processing...
-              </div>
             )}
             {voiceStatus === 'speaking' && (
               <button
@@ -3687,26 +3683,23 @@ export default function ChatPage() {
                   setIsSpeaking(false);
                   setVoiceStatus('idle');
                 }}
-                className="px-8 py-4 rounded-2xl bg-muted/50 border border-border/50 text-muted-foreground hover:bg-muted transition-all text-lg font-medium flex items-center gap-3"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border/50 text-muted-foreground hover:bg-muted transition-all text-sm font-medium"
+                style={{ minHeight: 40 }}
               >
-                <VolumeX className="h-6 w-6" />
-                Stop Speaking
+                <VolumeX className="h-4 w-4" />
+                {!isMobile && 'Skip'}
               </button>
             )}
-          </div>
-
-          {/* Recording duration */}
-          {voiceStatus === 'listening' && recordingDuration > 0 && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              {formatDuration(recordingDuration)}
-            </div>
-          )}
-
-          {/* Bottom hint */}
-          <div className="absolute bottom-8 left-0 right-0 text-center">
-            <p className="text-xs text-muted-foreground">
-              Voice conversations are saved to your chat history
-            </p>
+            {/* Hang up */}
+            <button
+              onClick={exitVoiceMode}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 transition-all text-sm font-medium"
+              style={{ touchAction: 'manipulation', minHeight: 40 }}
+              aria-label="End voice mode"
+            >
+              <PhoneOff className="h-4 w-4" />
+              {!isMobile && 'End'}
+            </button>
           </div>
         </div>
       )}
