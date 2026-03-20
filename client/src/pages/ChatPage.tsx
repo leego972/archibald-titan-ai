@@ -1127,6 +1127,12 @@ export default function ChatPage() {
   const [expandedFileIdx, setExpandedFileIdx] = useState<number | null>(null);
   const [filePreviewContent, setFilePreviewContent] = useState<Record<number, string>>({});
   const [loadingPreview, setLoadingPreview] = useState<number | null>(null);
+  // Save As modal state — shown before any ZIP download so user can name the file
+  const [saveAsModalOpen, setSaveAsModalOpen] = useState(false);
+  const [saveAsFilename, setSaveAsFilename] = useState('');
+  const [saveAsPendingAction, setSaveAsPendingAction] = useState<'all' | 'single' | null>(null);
+  const [saveAsSingleFileUrl, setSaveAsSingleFileUrl] = useState<string | null>(null);
+  const [saveAsSingleFileName, setSaveAsSingleFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUploadClick = () => { fileInputRef.current?.click(); };
@@ -3318,32 +3324,18 @@ export default function ChatPage() {
                     </button>
                     {file.url && (
                       <button
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
-                          try {
-                            const s3Res = await fetch(file.url, { mode: 'cors' }).catch(() => null);
-                            if (s3Res && s3Res.ok) {
-                              const fileBlob = await s3Res.blob();
-                              saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), file.name);
-                            } else {
-                              const dlUrl = activeConversationId
-                                ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
-                                : '/api/project-files/download-zip?all=true';
-                              const zipRes = await fetch(dlUrl, { credentials: 'include' });
-                              if (zipRes.ok) {
-                                const zipBlob = await zipRes.blob();
-                                saveAs(zipBlob, 'project-files.zip');
-                                toast.info('Downloaded all files as zip');
-                              } else {
-                                toast.error('Download failed');
-                              }
-                            }
-                          } catch {
-                            toast.error('Download failed');
-                          }
+                          // Open Save As modal — pre-fill with the file's base name (no extension)
+                          const baseName = file.name.replace(/\.[^.]+$/, '') || 'project-files';
+                          setSaveAsFilename(baseName);
+                          setSaveAsPendingAction('single');
+                          setSaveAsSingleFileUrl(file.url);
+                          setSaveAsSingleFileName(file.name);
+                          setSaveAsModalOpen(true);
                         }}
                         className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
-                        title="Download"
+                        title="Save As"
                       >
                         <Download className="h-3.5 w-3.5" />
                       </button>
@@ -3385,26 +3377,20 @@ export default function ChatPage() {
           </div>
           <div className="border-t border-border p-3 space-y-2">
             <Button
-              onClick={async () => {
-                try {
-                  toast.info('Preparing zip file...');
-                  const downloadUrl = activeConversationId
-                    ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
-                    : '/api/project-files/download-zip?all=true';
-                  const res = await fetch(downloadUrl, {
-                    credentials: 'include',
-                  });
-                  if (res.ok) {
-                    const blob = await res.blob();
-                    saveAs(blob, 'project-files.zip');
-                    toast.success(`Downloaded ${createdFiles.length} files as project-files.zip`);
-                  } else {
-                    const err = await res.json().catch(() => ({ error: 'Download failed' }));
-                    toast.error(err.error || 'Download failed');
-                  }
-                } catch (err) {
-                  toast.error('Download failed — please try again');
-                }
+              onClick={() => {
+                // Open Save As modal — pre-fill with a smart default based on first file name or conversation id
+                const firstFile = createdFiles[0]?.name ?? '';
+                const topFolder = firstFile.includes('/') ? firstFile.split('/')[0] : '';
+                const defaultName = topFolder
+                  ? topFolder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+                  : activeConversationId
+                    ? `project-${activeConversationId}`
+                    : 'project-files';
+                setSaveAsFilename(defaultName);
+                setSaveAsPendingAction('all');
+                setSaveAsSingleFileUrl(null);
+                setSaveAsSingleFileName('');
+                setSaveAsModalOpen(true);
               }}
               variant="outline"
               size="sm"
@@ -3422,6 +3408,105 @@ export default function ChatPage() {
               <ExternalLink className="h-3.5 w-3.5" />
               Push to GitHub
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Save As Modal — shown before ZIP download so user can name the file */}
+      {saveAsModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          style={{ backdropFilter: 'blur(8px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSaveAsModalOpen(false); }}
+        >
+          <div className="bg-background border border-border rounded-2xl shadow-2xl p-6 w-[90vw] max-w-sm mx-4 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold">Save As</h3>
+              <button
+                onClick={() => setSaveAsModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted-foreground font-medium">File name</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={saveAsFilename}
+                  onChange={(e) => setSaveAsFilename(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      document.getElementById('save-as-confirm-btn')?.click();
+                    }
+                    if (e.key === 'Escape') setSaveAsModalOpen(false);
+                  }}
+                  className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  autoFocus
+                  spellCheck={false}
+                />
+                <span className="text-xs text-muted-foreground shrink-0">.zip</span>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setSaveAsModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                id="save-as-confirm-btn"
+                onClick={async () => {
+                  const finalName = (saveAsFilename.trim() || 'project-files') + '.zip';
+                  setSaveAsModalOpen(false);
+                  if (saveAsPendingAction === 'single' && saveAsSingleFileUrl) {
+                    // Single file fallback zip
+                    try {
+                      const s3Res = await fetch(saveAsSingleFileUrl, { mode: 'cors' }).catch(() => null);
+                      if (s3Res && s3Res.ok) {
+                        const fileBlob = await s3Res.blob();
+                        saveAs(new Blob([fileBlob], { type: 'application/octet-stream' }), saveAsSingleFileName || finalName);
+                      } else {
+                        const dlUrl = activeConversationId
+                          ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
+                          : '/api/project-files/download-zip?all=true';
+                        const zipRes = await fetch(dlUrl, { credentials: 'include' });
+                        if (zipRes.ok) {
+                          const zipBlob = await zipRes.blob();
+                          saveAs(zipBlob, finalName);
+                          toast.info('Downloaded as ' + finalName);
+                        } else {
+                          toast.error('Download failed');
+                        }
+                      }
+                    } catch { toast.error('Download failed'); }
+                  } else {
+                    // Download All zip
+                    try {
+                      toast.info('Preparing ' + finalName + '...');
+                      const downloadUrl = activeConversationId
+                        ? `/api/project-files/download-zip?conversationId=${activeConversationId}`
+                        : '/api/project-files/download-zip?all=true';
+                      const res = await fetch(downloadUrl, { credentials: 'include' });
+                      if (res.ok) {
+                        const blob = await res.blob();
+                        saveAs(blob, finalName);
+                        toast.success(`Downloaded ${createdFiles.length} files as ${finalName}`);
+                      } else {
+                        const err = await res.json().catch(() => ({ error: 'Download failed' }));
+                        toast.error(err.error || 'Download failed');
+                      }
+                    } catch { toast.error('Download failed — please try again'); }
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Download
+              </button>
+            </div>
           </div>
         </div>
       )}
