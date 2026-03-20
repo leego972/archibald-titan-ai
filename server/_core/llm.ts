@@ -107,6 +107,11 @@ export type InvokeParams = {
    * This flag is ignored — kept for backward compatibility to avoid breaking callers.
    */
   useGemini?: boolean;
+  /**
+   * Force Gemini 2.5 Flash for this call — used for security builds where GPT-4 refuses.
+   * Gemini has significantly fewer content restrictions for professional security research.
+   */
+  forceGemini?: boolean;
 };
 
 export type ToolCall = {
@@ -404,9 +409,11 @@ async function _invokeLLMWithRetry(
   const hasToolsDefined = params.tools && params.tools.length > 0;
   const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
   const useOpenAI = hasKeys();
-  // useGemini flag is IGNORED — all traffic goes through OpenAI now
-  const forceGemini = false;
-  const model = useOpenAI
+  // forceGemini: routes this specific call to Gemini 2.5 Flash (used for security builds)
+  const forceGemini = params.forceGemini === true;
+  const model = forceGemini
+    ? "gemini-2.5-flash"
+    : useOpenAI
     ? (modelPreference === "fast" ? "gpt-4.1-nano" : "gpt-4.1-mini")
     : "gemini-2.5-flash";
 

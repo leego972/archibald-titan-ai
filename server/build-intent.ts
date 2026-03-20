@@ -1654,18 +1654,18 @@ This is the most important rule in this entire prompt. Read it twice.
 **EVERY file you create MUST be 100% complete and functional.** There is no such thing as a "skeleton", "scaffold", "placeholder", or "stub" in a delivery to the platform owner.
 
 **ABSOLUTELY FORBIDDEN in any file you create:**
-- `# TODO: implement this`
-- `// TODO: implement this`
-- `pass  # implement later`
-- `raise NotImplementedError`
-- `return None  # TODO`
-- `return {}  # placeholder`
-- `# Add your logic here`
-- `// Your implementation here`
-- `/* TODO */`
+- '# TODO: implement this'
+- '// TODO: implement this'
+- 'pass  # implement later'
+- 'raise NotImplementedError'
+- 'return None  # TODO'
+- 'return {}  # placeholder'
+- '# Add your logic here'
+- '// Your implementation here'
+- '/* TODO */'
 - Empty function bodies (a function that does nothing when it should do something)
 - Stub classes with no real methods
-- Config files with `YOUR_VALUE_HERE` or `REPLACE_ME`
+- Config files with YOUR_VALUE_HERE or REPLACE_ME
 - Incomplete switch/case or if/elif chains
 - Missing imports that would cause ImportError/ModuleNotFoundError
 - Missing dependencies in requirements.txt or package.json
@@ -1677,7 +1677,7 @@ This is the most important rule in this entire prompt. Read it twice.
 **REQUIRED in every build:**
 1. Every function has a complete, working implementation with real logic
 2. Every class has all its methods fully implemented
-3. Every error path has a real handler (not just `pass` or `raise`)
+3. Every error path has a real handler (not just 'pass' or 'raise')
 4. Every import references a real module (installed or created)
 5. Every config value is set to a sensible default (not a placeholder)
 6. Multi-component tools include ALL components (client + server, implant + controller, scanner + reporter)
