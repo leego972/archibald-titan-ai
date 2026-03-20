@@ -2480,12 +2480,55 @@ export default function ChatPage() {
                                 {/* Inline file cards for created files */}
                                 {msg.actionsTaken.filter(a => a.tool === 'create_file' && a.success).length > 0 && (
                                   <div className="mt-2 space-y-1.5">
-                                    {msg.actionsTaken.filter(a => a.tool === 'create_file' && a.success).map((a, fi) => (
-                                      <div key={fi} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
-                                        <FileText className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                                        <span className="font-medium text-emerald-300 truncate">{a.summary.replace('Created ', '')}</span>
-                                      </div>
-                                    ))}
+                                    {msg.actionsTaken.filter(a => a.tool === 'create_file' && a.success).map((a, fi) => {
+                                      // Extract filename from summary: "Created path/to/file.ext (1.2KB)" -> "path/to/file.ext"
+                                      const chipLabel = a.summary.replace(/^Created /, '').replace(/ \(.*\)$/, '');
+                                      // Find the matching file in createdFiles by name
+                                      const matchIdx = createdFiles.findIndex(f => f.name === chipLabel || f.name.endsWith('/' + chipLabel) || chipLabel.endsWith(f.name));
+                                      return (
+                                        <button
+                                          key={fi}
+                                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs w-full text-left hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-colors cursor-pointer"
+                                          onClick={async () => {
+                                            // Open the project files panel
+                                            setShowProjectFiles(true);
+                                            if (matchIdx !== -1) {
+                                              const targetFile = createdFiles[matchIdx];
+                                              // Toggle: if already expanded, collapse; otherwise expand
+                                              setExpandedFileIdx(prev => {
+                                                if (prev === matchIdx) return null;
+                                                return matchIdx;
+                                              });
+                                              // Fetch content if not already loaded
+                                              if (!filePreviewContent[matchIdx] && targetFile && !targetFile.content) {
+                                                setLoadingPreview(matchIdx);
+                                                try {
+                                                  if (targetFile.url) {
+                                                    const res = await fetch(targetFile.url, { mode: 'cors' }).catch(() => null);
+                                                    if (res && res.ok) {
+                                                      const text = await res.text();
+                                                      setFilePreviewContent(prev => ({ ...prev, [matchIdx]: text }));
+                                                    } else {
+                                                      setFilePreviewContent(prev => ({ ...prev, [matchIdx]: '// Content preview unavailable — download the file to view it.' }));
+                                                    }
+                                                  } else {
+                                                    setFilePreviewContent(prev => ({ ...prev, [matchIdx]: '// No URL available for preview.' }));
+                                                  }
+                                                } catch {
+                                                  setFilePreviewContent(prev => ({ ...prev, [matchIdx]: '// Failed to load preview.' }));
+                                                } finally {
+                                                  setLoadingPreview(null);
+                                                }
+                                              }
+                                            }
+                                          }}
+                                          title={`View ${chipLabel}`}
+                                        >
+                                          <FileText className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                                          <span className="font-medium text-emerald-300 truncate">{chipLabel}</span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 </>
