@@ -2742,6 +2742,23 @@ export const storageDeleteFileTool: Tool = {
   },
 };
 
+export const storageUploadFileTool: Tool = {
+  type: "function",
+  function: {
+    name: "storage_upload_file",
+    description: "Save text content (e.g. scan output, logs, reports, code) as a file in Titan Storage. Use this to persist important results from Metasploit, Evilginx, BlackEye, or any other tool so the user can download them later.",
+    parameters: {
+      type: "object",
+      properties: {
+        filename: { type: "string", description: "Filename to save as (e.g. 'metasploit-scan-2024.txt', 'evilginx-sessions.json')" },
+        content: { type: "string", description: "The text content to save" },
+        feature: { type: "string", description: "Feature category tag: 'metasploit', 'evilginx', 'blackeye', 'general', 'builder', 'scan'" },
+      },
+      required: ["filename", "content"],
+    },
+  },
+};
+
 export const marketplaceBrowseTool: Tool = {
   type: "function",
   function: {
@@ -2825,6 +2842,254 @@ export const cybermcpTestBasicAuthTool: Tool = {
     },
   },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOR BROWSER TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const torGetStatusTool: Tool = {
+  type: "function",
+  function: {
+    name: "tor_get_status",
+    description: "Get the current status of the Tor service running on the user's server — whether it's running, the exit IP, Tor version, and firewall state.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const torNewCircuitTool: Tool = {
+  type: "function",
+  function: {
+    name: "tor_new_circuit",
+    description: "Request a new Tor circuit to get a fresh exit IP address. Use this when the user wants to change their Tor exit IP.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const torInstallTool: Tool = {
+  type: "function",
+  function: {
+    name: "tor_install",
+    description: "Install or reinstall Tor on the user's server with ultra-fast configuration (circuit racing, bandwidth relay filtering, guard pinning) and reverse-connection firewall.",
+    parameters: {
+      type: "object",
+      properties: {
+        enableFirewall: { type: "boolean", description: "Whether to enable the reverse-connection firewall (default: true)" },
+      },
+      required: [],
+    },
+  },
+};
+
+export const torSetActiveTool: Tool = {
+  type: "function",
+  function: {
+    name: "tor_set_active",
+    description: "Enable or disable Tor routing for the user.",
+    parameters: {
+      type: "object",
+      properties: {
+        active: { type: "boolean", description: "true to enable Tor, false to disable" },
+      },
+      required: ["active"],
+    },
+  },
+};
+
+export const torSetFirewallTool: Tool = {
+  type: "function",
+  function: {
+    name: "tor_set_firewall",
+    description: "Enable or disable the reverse-connection firewall on the Tor server. When enabled, remote servers cannot connect back to the user's device.",
+    parameters: {
+      type: "object",
+      properties: {
+        enabled: { type: "boolean", description: "true to enable firewall, false to disable" },
+      },
+      required: ["enabled"],
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VPN CHAIN TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const vpnChainGetChainTool: Tool = {
+  type: "function",
+  function: {
+    name: "vpn_chain_get_chain",
+    description: "Get the user's current VPN chain configuration — all hops, their order, and whether the chain is active.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const vpnChainAddHopTool: Tool = {
+  type: "function",
+  function: {
+    name: "vpn_chain_add_hop",
+    description: "Add a new VPN hop (server) to the user's VPN chain. Traffic will route through all hops in sequence.",
+    parameters: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Friendly name for this hop, e.g. 'Germany VPS'" },
+        host: { type: "string", description: "IP address or hostname of the server" },
+        port: { type: "number", description: "SSH port (default 22)" },
+        username: { type: "string", description: "SSH username" },
+        password: { type: "string", description: "SSH password" },
+        country: { type: "string", description: "Country name for display purposes" },
+      },
+      required: ["host", "username"],
+    },
+  },
+};
+
+export const vpnChainTestChainTool: Tool = {
+  type: "function",
+  function: {
+    name: "vpn_chain_test_chain",
+    description: "Test the full VPN chain by connecting through all hops and verifying the final exit IP.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const vpnChainSetActiveTool: Tool = {
+  type: "function",
+  function: {
+    name: "vpn_chain_set_active",
+    description: "Enable or disable the VPN chain routing.",
+    parameters: {
+      type: "object",
+      properties: {
+        active: { type: "boolean", description: "true to enable VPN chain, false to disable" },
+      },
+      required: ["active"],
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROXY MAKER TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const proxyMakerGetPoolTool: Tool = {
+  type: "function",
+  function: {
+    name: "proxy_maker_get_pool",
+    description: "Get the user's current proxy pool — all proxies, their status (alive/dead), latency, and rotation settings.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const proxyMakerScrapeProxiesTool: Tool = {
+  type: "function",
+  function: {
+    name: "proxy_maker_scrape_proxies",
+    description: "Automatically scrape free public proxies from multiple sources, test them, and add working ones to the pool.",
+    parameters: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["socks5", "http", "all"], description: "Type of proxies to scrape" },
+        maxToAdd: { type: "number", description: "Maximum number of working proxies to add (default 20)" },
+      },
+      required: [],
+    },
+  },
+};
+
+export const proxyMakerHealthCheckTool: Tool = {
+  type: "function",
+  function: {
+    name: "proxy_maker_health_check",
+    description: "Run a health check on all proxies in the pool — test each one and mark alive/dead.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+export const proxyMakerSetRotationTool: Tool = {
+  type: "function",
+  function: {
+    name: "proxy_maker_set_rotation",
+    description: "Enable or disable automatic proxy rotation in the pool.",
+    parameters: {
+      type: "object",
+      properties: {
+        enabled: { type: "boolean", description: "true to enable rotation, false to disable" },
+      },
+      required: ["enabled"],
+    },
+  },
+};
+
+export const proxyMakerDeployProxyTool: Tool = {
+  type: "function",
+  function: {
+    name: "proxy_maker_deploy_proxy",
+    description: "Deploy a SOCKS5 and HTTP proxy server on a VPS via SSH. Installs 3proxy and adds the new proxy to the pool.",
+    parameters: {
+      type: "object",
+      properties: {
+        useTitanServer: { type: "boolean", description: "Deploy on the user's Titan Server" },
+        host: { type: "string", description: "VPS IP or hostname (if not using Titan Server)" },
+        port: { type: "number", description: "SSH port" },
+        username: { type: "string", description: "SSH username" },
+        password: { type: "string", description: "SSH password" },
+        label: { type: "string", description: "Friendly name for this proxy" },
+      },
+      required: [],
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIN CHECKER TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const binLookupTool: Tool = {
+  type: "function",
+  function: {
+    name: "bin_lookup",
+    description: "Look up a BIN (Bank Identification Number — first 6-8 digits of a card) to identify the issuing bank, card network (Visa/Mastercard/etc), card type, country, and more. Zero-charge passive lookup only.",
+    parameters: {
+      type: "object",
+      properties: {
+        bin: { type: "string", description: "The BIN to look up (first 6-8 digits of a card number)" },
+      },
+      required: ["bin"],
+    },
+  },
+};
+
+export const cardValidateTool: Tool = {
+  type: "function",
+  function: {
+    name: "card_validate",
+    description: "Validate a card number using the Luhn algorithm and card network rules. Completely offline — no network request, no charge, no transaction. Returns whether the card number is structurally valid.",
+    parameters: {
+      type: "object",
+      properties: {
+        cardNumber: { type: "string", description: "The card number to validate (spaces allowed)" },
+      },
+      required: ["cardNumber"],
+    },
+  },
+};
+
+export const binReverseLookupTool: Tool = {
+  type: "function",
+  function: {
+    name: "bin_reverse_lookup",
+    description: "Search for BIN numbers by bank name or card product name. For example, search 'ANZ Business Platinum' to find the BIN numbers for that card. Can be filtered by country.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Bank name or card product name to search for" },
+        country: { type: "string", description: "ISO 3166-1 alpha-2 country code to filter results (e.g. AU, US, GB)" },
+      },
+      required: ["query"],
+    },
+  },
+};
+
 
 export const TITAN_TOOLS: Tool[] = [
   // Navigation
@@ -2967,12 +3232,34 @@ export const TITAN_TOOLS: Tool[] = [
   storageListFilesTool,
   storageGetDownloadUrlTool,
   storageDeleteFileTool,
+  storageUploadFileTool,
   marketplaceBrowseTool,
   cybermcpTestBasicAuthTool,
   // Memory management tools
   memoryListFactsTool,
   memorySaveFactTool,
   memoryDeleteFactTool,
+  // Tor Browser
+  torGetStatusTool,
+  torNewCircuitTool,
+  torInstallTool,
+  torSetActiveTool,
+  torSetFirewallTool,
+  // VPN Chain
+  vpnChainGetChainTool,
+  vpnChainAddHopTool,
+  vpnChainTestChainTool,
+  vpnChainSetActiveTool,
+  // Proxy Maker
+  proxyMakerGetPoolTool,
+  proxyMakerScrapeProxiesTool,
+  proxyMakerHealthCheckTool,
+  proxyMakerSetRotationTool,
+  proxyMakerDeployProxyTool,
+  // BIN Checker
+  binLookupTool,
+  cardValidateTool,
+  binReverseLookupTool,
 ];
 
 // Focused tool subset for build/research requests — fewer tools = less model confusion
@@ -3111,6 +3398,28 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   storageListFilesTool,
   storageGetDownloadUrlTool,
   storageDeleteFileTool,
+  storageUploadFileTool,
   marketplaceBrowseTool,
   cybermcpTestBasicAuthTool,
+  // Tor Browser
+  torGetStatusTool,
+  torNewCircuitTool,
+  torInstallTool,
+  torSetActiveTool,
+  torSetFirewallTool,
+  // VPN Chain
+  vpnChainGetChainTool,
+  vpnChainAddHopTool,
+  vpnChainTestChainTool,
+  vpnChainSetActiveTool,
+  // Proxy Maker
+  proxyMakerGetPoolTool,
+  proxyMakerScrapeProxiesTool,
+  proxyMakerHealthCheckTool,
+  proxyMakerSetRotationTool,
+  proxyMakerDeployProxyTool,
+  // BIN Checker
+  binLookupTool,
+  cardValidateTool,
+  binReverseLookupTool,
 ];

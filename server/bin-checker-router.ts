@@ -1,0 +1,408 @@
+/**
+ * Titan BIN Checker & Card Validator
+ *
+ * ZERO-CHARGE PASSIVE METHODS ONLY:
+ *   • BIN database lookup (no transaction, no authorisation request)
+ *   • Luhn algorithm (mathematical check — completely offline)
+ *   • Card network identification (Visa/MC/Amex/etc. by prefix)
+ *   • Issuer bank lookup via public BIN databases
+ *   • Reverse BIN search (search by bank name + country → get BIN numbers)
+ *
+ * Nothing here touches a live payment network. No charges, no auth requests,
+ * no CVV checks, no balance checks. Pure data lookup only.
+ */
+
+import { z } from "zod";
+import { router, protectedProcedure } from "./_core/trpc";
+import { createLogger } from "./_core/logger.js";
+
+const log = createLogger("BinChecker");
+
+// ─── Card network detection ───────────────────────────────────────────────────
+
+interface CardNetwork {
+  name: string;
+  code: string;
+  pattern: RegExp;
+  lengths: number[];
+  cvvLength: number;
+  luhnCheck: boolean;
+}
+
+const CARD_NETWORKS: CardNetwork[] = [
+  { name: "Visa", code: "visa", pattern: /^4/, lengths: [13, 16, 19], cvvLength: 3, luhnCheck: true },
+  { name: "Mastercard", code: "mastercard", pattern: /^(5[1-5]|2[2-7])/, lengths: [16], cvvLength: 3, luhnCheck: true },
+  { name: "American Express", code: "amex", pattern: /^3[47]/, lengths: [15], cvvLength: 4, luhnCheck: true },
+  { name: "Discover", code: "discover", pattern: /^(6011|622|64[4-9]|65)/, lengths: [16, 19], cvvLength: 3, luhnCheck: true },
+  { name: "Diners Club", code: "diners", pattern: /^(300|301|302|303|304|305|36|38)/, lengths: [14], cvvLength: 3, luhnCheck: true },
+  { name: "JCB", code: "jcb", pattern: /^35(2[89]|[3-8])/, lengths: [16, 17, 18, 19], cvvLength: 3, luhnCheck: true },
+  { name: "UnionPay", code: "unionpay", pattern: /^62/, lengths: [16, 17, 18, 19], cvvLength: 3, luhnCheck: false },
+  { name: "Maestro", code: "maestro", pattern: /^(5018|5020|5038|6304|6759|676[1-3])/, lengths: [12, 13, 14, 15, 16, 17, 18, 19], cvvLength: 3, luhnCheck: true },
+  { name: "Elo", code: "elo", pattern: /^(4011|4312|4389|4514|4576|5041|5066|5090|6277|6362|6516|6550)/, lengths: [16], cvvLength: 3, luhnCheck: true },
+  { name: "Hipercard", code: "hipercard", pattern: /^(384100|384140|384160|606282|637095|637568|60643)/, lengths: [13, 16, 19], cvvLength: 3, luhnCheck: true },
+  { name: "Mir", code: "mir", pattern: /^220[0-4]/, lengths: [16], cvvLength: 3, luhnCheck: true },
+  { name: "RuPay", code: "rupay", pattern: /^(508[5-9]|6069|607|608|6521|6522)/, lengths: [16], cvvLength: 3, luhnCheck: true },
+];
+
+function detectNetwork(cardNumber: string): CardNetwork | null {
+  const clean = cardNumber.replace(/\D/g, "");
+  return CARD_NETWORKS.find(n => n.pattern.test(clean)) ?? null;
+}
+
+// ─── Luhn algorithm ───────────────────────────────────────────────────────────
+
+function luhnCheck(cardNumber: string): boolean {
+  const digits = cardNumber.replace(/\D/g, "").split("").reverse().map(Number);
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    let d = digits[i];
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+// ─── BIN API lookup ───────────────────────────────────────────────────────────
+
+interface BinApiResult {
+  scheme?: string;
+  type?: string;
+  brand?: string;
+  prepaid?: boolean;
+  country?: { name?: string; alpha2?: string; emoji?: string; currency?: string; latitude?: number; longitude?: number };
+  bank?: { name?: string; url?: string; phone?: string; city?: string };
+  number?: { length?: number; luhn?: boolean };
+}
+
+async function lookupBinApi(bin: string): Promise<BinApiResult | null> {
+  try {
+    const res = await fetch(`https://lookup.binlist.net/${bin}`, {
+      headers: { "Accept-Version": "3", "User-Agent": "TitanBinChecker/1.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    return await res.json() as BinApiResult;
+  } catch {
+    return null;
+  }
+}
+
+// Fallback: bincheck.io
+async function lookupBinFallback(bin: string): Promise<BinApiResult | null> {
+  try {
+    const res = await fetch(`https://api.bincodes.com/bin/?format=json&api_key=free&bin=${bin}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    if (data.error) return null;
+    return {
+      scheme: data.card?.toLowerCase(),
+      type: data.type?.toLowerCase(),
+      brand: data.brand,
+      country: { name: data.country, alpha2: data.countrycode },
+      bank: { name: data.bank },
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Country list ─────────────────────────────────────────────────────────────
+
+export const COUNTRIES = [
+  { code: "AU", name: "Australia", emoji: "🇦🇺" },
+  { code: "US", name: "United States", emoji: "🇺🇸" },
+  { code: "GB", name: "United Kingdom", emoji: "🇬🇧" },
+  { code: "CA", name: "Canada", emoji: "🇨🇦" },
+  { code: "NZ", name: "New Zealand", emoji: "🇳🇿" },
+  { code: "DE", name: "Germany", emoji: "🇩🇪" },
+  { code: "FR", name: "France", emoji: "🇫🇷" },
+  { code: "IT", name: "Italy", emoji: "🇮🇹" },
+  { code: "ES", name: "Spain", emoji: "🇪🇸" },
+  { code: "NL", name: "Netherlands", emoji: "🇳🇱" },
+  { code: "BE", name: "Belgium", emoji: "🇧🇪" },
+  { code: "CH", name: "Switzerland", emoji: "🇨🇭" },
+  { code: "AT", name: "Austria", emoji: "🇦🇹" },
+  { code: "SE", name: "Sweden", emoji: "🇸🇪" },
+  { code: "NO", name: "Norway", emoji: "🇳🇴" },
+  { code: "DK", name: "Denmark", emoji: "🇩🇰" },
+  { code: "FI", name: "Finland", emoji: "🇫🇮" },
+  { code: "PL", name: "Poland", emoji: "🇵🇱" },
+  { code: "PT", name: "Portugal", emoji: "🇵🇹" },
+  { code: "IE", name: "Ireland", emoji: "🇮🇪" },
+  { code: "SG", name: "Singapore", emoji: "🇸🇬" },
+  { code: "HK", name: "Hong Kong", emoji: "🇭🇰" },
+  { code: "JP", name: "Japan", emoji: "🇯🇵" },
+  { code: "KR", name: "South Korea", emoji: "🇰🇷" },
+  { code: "CN", name: "China", emoji: "🇨🇳" },
+  { code: "IN", name: "India", emoji: "🇮🇳" },
+  { code: "BR", name: "Brazil", emoji: "🇧🇷" },
+  { code: "MX", name: "Mexico", emoji: "🇲🇽" },
+  { code: "AR", name: "Argentina", emoji: "🇦🇷" },
+  { code: "ZA", name: "South Africa", emoji: "🇿🇦" },
+  { code: "AE", name: "United Arab Emirates", emoji: "🇦🇪" },
+  { code: "SA", name: "Saudi Arabia", emoji: "🇸🇦" },
+  { code: "TR", name: "Turkey", emoji: "🇹🇷" },
+  { code: "RU", name: "Russia", emoji: "🇷🇺" },
+  { code: "UA", name: "Ukraine", emoji: "🇺🇦" },
+  { code: "TH", name: "Thailand", emoji: "🇹🇭" },
+  { code: "MY", name: "Malaysia", emoji: "🇲🇾" },
+  { code: "ID", name: "Indonesia", emoji: "🇮🇩" },
+  { code: "PH", name: "Philippines", emoji: "🇵🇭" },
+  { code: "VN", name: "Vietnam", emoji: "🇻🇳" },
+  { code: "NG", name: "Nigeria", emoji: "🇳🇬" },
+  { code: "KE", name: "Kenya", emoji: "🇰🇪" },
+  { code: "GH", name: "Ghana", emoji: "🇬🇭" },
+  { code: "EG", name: "Egypt", emoji: "🇪🇬" },
+  { code: "IL", name: "Israel", emoji: "🇮🇱" },
+  { code: "CZ", name: "Czech Republic", emoji: "🇨🇿" },
+  { code: "HU", name: "Hungary", emoji: "🇭🇺" },
+  { code: "RO", name: "Romania", emoji: "🇷🇴" },
+  { code: "GR", name: "Greece", emoji: "🇬🇷" },
+  { code: "HR", name: "Croatia", emoji: "🇭🇷" },
+];
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+export const binCheckerRouter = router({
+
+  /** Get the country list for the country picker */
+  getCountries: protectedProcedure.query(async () => {
+    return { countries: COUNTRIES };
+  }),
+
+  /**
+   * Look up a BIN (first 6-8 digits of a card number).
+   * Returns bank name, card type, country, network — NO charge, NO auth.
+   */
+  lookupBin: protectedProcedure
+    .input(z.object({ bin: z.string().min(6).max(8) }))
+    .mutation(async ({ input }) => {
+      const bin = input.bin.replace(/\D/g, "").slice(0, 8);
+      if (bin.length < 6) return { success: false, error: "BIN must be at least 6 digits." };
+
+      // Detect card network from prefix
+      const network = detectNetwork(bin);
+
+      // Try primary API, then fallback
+      let apiData = await lookupBinApi(bin.slice(0, 6));
+      if (!apiData) apiData = await lookupBinFallback(bin.slice(0, 6));
+
+      return {
+        success: true,
+        bin: bin.slice(0, 6),
+        network: network ? { name: network.name, code: network.code } : (apiData?.scheme ? { name: apiData.scheme, code: apiData.scheme } : null),
+        type: apiData?.type ?? null,
+        brand: apiData?.brand ?? null,
+        prepaid: apiData?.prepaid ?? null,
+        country: apiData?.country ?? null,
+        bank: apiData?.bank ?? null,
+        luhnEnabled: apiData?.number?.luhn ?? (network?.luhnCheck ?? true),
+      };
+    }),
+
+  /**
+   * Validate a full card number using Luhn algorithm + network detection.
+   * Completely offline — no network request, no charge.
+   */
+  validateCard: protectedProcedure
+    .input(z.object({ cardNumber: z.string().min(13).max(19) }))
+    .mutation(async ({ input }) => {
+      const clean = input.cardNumber.replace(/\D/g, "");
+      if (clean.length < 13 || clean.length > 19) {
+        return { valid: false, luhnValid: false, network: null, error: "Card number must be 13-19 digits." };
+      }
+
+      const network = detectNetwork(clean);
+      const luhnValid = luhnCheck(clean);
+      const lengthValid = network ? network.lengths.includes(clean.length) : true;
+
+      // Look up BIN info
+      const bin = clean.slice(0, 6);
+      let binData = await lookupBinApi(bin);
+      if (!binData) binData = await lookupBinFallback(bin);
+
+      return {
+        valid: luhnValid && lengthValid,
+        luhnValid,
+        lengthValid,
+        cardLength: clean.length,
+        network: network ? { name: network.name, code: network.code, cvvLength: network.cvvLength } : null,
+        bin,
+        bank: binData?.bank ?? null,
+        country: binData?.country ?? null,
+        type: binData?.type ?? null,
+        prepaid: binData?.prepaid ?? null,
+        maskedNumber: `${clean.slice(0, 4)} **** **** ${clean.slice(-4)}`,
+        message: luhnValid && lengthValid ? "✓ Card number is mathematically valid" : luhnValid ? "Card passes Luhn but length is unusual for this network" : "✗ Card number fails Luhn check — likely invalid",
+      };
+    }),
+
+  /**
+   * Bulk validate multiple card numbers at once.
+   */
+  bulkValidate: protectedProcedure
+    .input(z.object({ cards: z.array(z.string()).min(1).max(100) }))
+    .mutation(async ({ input }) => {
+      const results = input.cards.map(card => {
+        const clean = card.replace(/\D/g, "");
+        if (clean.length < 13 || clean.length > 19) return { card: card.trim(), valid: false, luhnValid: false, network: null, error: "Invalid length" };
+        const network = detectNetwork(clean);
+        const luhnValid = luhnCheck(clean);
+        const lengthValid = network ? network.lengths.includes(clean.length) : true;
+        return {
+          card: `${clean.slice(0, 4)} **** **** ${clean.slice(-4)}`,
+          bin: clean.slice(0, 6),
+          valid: luhnValid && lengthValid,
+          luhnValid,
+          lengthValid,
+          network: network ? network.name : "Unknown",
+        };
+      });
+      const valid = results.filter(r => r.valid).length;
+      return { results, validCount: valid, invalidCount: results.length - valid, total: results.length };
+    }),
+
+  /**
+   * Reverse BIN search — search by bank name + country to get BIN numbers.
+   * Uses the binlist.net database via their search endpoint.
+   */
+  reverseBinSearch: protectedProcedure
+    .input(z.object({
+      query: z.string().min(2).max(100),
+      country: z.string().optional(),   // ISO alpha-2 code e.g. "AU"
+      network: z.string().optional(),   // "visa", "mastercard", etc.
+      cardType: z.string().optional(),  // "credit", "debit"
+    }))
+    .mutation(async ({ input }) => {
+      const query = input.query.trim().toLowerCase();
+
+      // Build search URL with filters
+      const params = new URLSearchParams();
+      params.set("q", query);
+      if (input.country) params.set("country", input.country);
+      if (input.network) params.set("scheme", input.network);
+      if (input.cardType) params.set("type", input.cardType);
+
+      const results: Array<{
+        bin: string;
+        bank: string;
+        brand: string;
+        type: string;
+        network: string;
+        country: string;
+        countryCode: string;
+        prepaid: boolean;
+      }> = [];
+
+      try {
+        // Primary: binlist.net search
+        const res = await fetch(`https://lookup.binlist.net/search?${params.toString()}`, {
+          headers: { "Accept-Version": "3", "User-Agent": "TitanBinChecker/1.0" },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (res.ok) {
+          const data = await res.json() as any;
+          const items = Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+          for (const item of items.slice(0, 50)) {
+            results.push({
+              bin: item.bin ?? item.number ?? "",
+              bank: item.bank?.name ?? item.issuer ?? "Unknown",
+              brand: item.brand ?? item.scheme ?? "Unknown",
+              type: item.type ?? "Unknown",
+              network: item.scheme ?? item.network ?? "Unknown",
+              country: item.country?.name ?? item.country ?? "Unknown",
+              countryCode: item.country?.alpha2 ?? item.countryCode ?? "",
+              prepaid: item.prepaid ?? false,
+            });
+          }
+        }
+      } catch { /* fallback below */ }
+
+      // Fallback: bincheck.io search
+      if (results.length === 0) {
+        try {
+          const res = await fetch(`https://api.bincodes.com/binsearch/?format=json&api_key=free&bank=${encodeURIComponent(input.query)}${input.country ? `&country=${input.country}` : ""}`, {
+            signal: AbortSignal.timeout(10000),
+          });
+          if (res.ok) {
+            const data = await res.json() as any;
+            const items = Array.isArray(data) ? data : (data.results ?? []);
+            for (const item of items.slice(0, 50)) {
+              results.push({
+                bin: item.bin ?? "",
+                bank: item.bank ?? "Unknown",
+                brand: item.brand ?? "Unknown",
+                type: item.type ?? "Unknown",
+                network: item.card ?? "Unknown",
+                country: item.country ?? "Unknown",
+                countryCode: item.countrycode ?? "",
+                prepaid: false,
+              });
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Filter by country if specified and API didn't filter
+      const filtered = input.country
+        ? results.filter(r => r.countryCode.toUpperCase() === input.country!.toUpperCase() || r.country.toLowerCase().includes(input.query.toLowerCase()) || r.bank.toLowerCase().includes(query))
+        : results;
+
+      return {
+        success: true,
+        results: filtered,
+        count: filtered.length,
+        query: input.query,
+        country: input.country,
+        message: filtered.length > 0 ? `Found ${filtered.length} BIN(s) matching "${input.query}"` : `No BINs found for "${input.query}"${input.country ? ` in ${input.country}` : ""}. Try a shorter search term.`,
+      };
+    }),
+
+  /**
+   * Bulk BIN lookup — look up multiple BINs at once.
+   */
+  bulkBinLookup: protectedProcedure
+    .input(z.object({ bins: z.array(z.string().min(6).max(8)).min(1).max(50) }))
+    .mutation(async ({ input }) => {
+      const results = [];
+      for (const rawBin of input.bins) {
+        const bin = rawBin.replace(/\D/g, "").slice(0, 6);
+        const network = detectNetwork(bin);
+        let apiData = await lookupBinApi(bin);
+        if (!apiData) apiData = await lookupBinFallback(bin);
+        results.push({
+          bin,
+          network: network?.name ?? apiData?.scheme ?? "Unknown",
+          type: apiData?.type ?? "Unknown",
+          bank: apiData?.bank?.name ?? "Unknown",
+          country: apiData?.country?.name ?? "Unknown",
+          countryCode: apiData?.country?.alpha2 ?? "",
+          prepaid: apiData?.prepaid ?? false,
+        });
+        // Rate limit: 1 request per 500ms for binlist.net
+        await new Promise(r => setTimeout(r, 500));
+      }
+      return { results, count: results.length };
+    }),
+
+  /** Get card network info by prefix (instant, offline) */
+  detectNetwork: protectedProcedure
+    .input(z.object({ prefix: z.string().min(1).max(8) }))
+    .query(async ({ input }) => {
+      const network = detectNetwork(input.prefix);
+      if (!network) return { found: false, network: null };
+      return {
+        found: true,
+        network: {
+          name: network.name,
+          code: network.code,
+          lengths: network.lengths,
+          cvvLength: network.cvvLength,
+          luhnCheck: network.luhnCheck,
+        },
+      };
+    }),
+});

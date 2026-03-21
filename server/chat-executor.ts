@@ -743,6 +743,8 @@ export async function executeToolCall(
         return await execStorageGetDownloadUrl(userId, args);
       case "storage_delete_file":
         return await execStorageDeleteFile(userId, args);
+      case "storage_upload_file":
+        return await execStorageUploadFile(userId, args);
       case "marketplace_browse":
         return await execMarketplaceBrowse(userId, args);
       case "cybermcp_test_basic_auth":
@@ -754,6 +756,48 @@ export async function executeToolCall(
         return await execMemorySaveFact(userId, args);
       case "memory_delete_fact":
         return await execMemoryDeleteFact(userId, args);
+
+      // ── Tor Browser ──────────────────────────────────────────────
+      case "tor_get_status":
+        return await execTorGetStatus(userId);
+      case "tor_new_circuit":
+        return await execTorNewCircuit(userId);
+      case "tor_install":
+        return await execTorInstall(userId, args);
+      case "tor_set_active":
+        return await execTorSetActive(userId, args);
+      case "tor_set_firewall":
+        return await execTorSetFirewall(userId, args);
+
+      // ── VPN Chain ─────────────────────────────────────────────────
+      case "vpn_chain_get_chain":
+        return await execVpnChainGetChain(userId);
+      case "vpn_chain_add_hop":
+        return await execVpnChainAddHop(userId, args);
+      case "vpn_chain_test_chain":
+        return await execVpnChainTestChain(userId);
+      case "vpn_chain_set_active":
+        return await execVpnChainSetActive(userId, args);
+
+      // ── Proxy Maker ───────────────────────────────────────────────
+      case "proxy_maker_get_pool":
+        return await execProxyMakerGetPool(userId);
+      case "proxy_maker_scrape_proxies":
+        return await execProxyMakerScrapeProxies(userId, args);
+      case "proxy_maker_health_check":
+        return await execProxyMakerHealthCheck(userId);
+      case "proxy_maker_set_rotation":
+        return await execProxyMakerSetRotation(userId, args);
+      case "proxy_maker_deploy_proxy":
+        return await execProxyMakerDeployProxy(userId, args);
+
+      // ── BIN Checker ───────────────────────────────────────────────
+      case "bin_lookup":
+        return await execBinLookup(userId, args);
+      case "card_validate":
+        return await execCardValidate(userId, args);
+      case "bin_reverse_lookup":
+        return await execBinReverseLookup(userId, args);
 
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
@@ -6483,11 +6527,41 @@ async function execEvilginxConnect(userId: number): Promise<ToolExecutionResult>
   }
 }
 
+// ─── Helper: load per-user SSH config from DB, fall back to global Titan Server ───
+async function getUserToolSSHConfig(
+  userId: number,
+  secretType: "__evilginx_ssh" | "__metasploit_ssh" | "__blackeye_ssh",
+  toolLabel: string
+): Promise<import("./titan-server").SSHConfig> {
+  const { getTitanServerConfig } = await import("./titan-server");
+  const db = await getDb();
+  if (db) {
+    const rows = await db.select().from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, secretType)))
+      .limit(1);
+    if (rows.length > 0) {
+      try {
+        const cfg = JSON.parse(decrypt(rows[0].encryptedValue));
+        // Skip local-mode markers (they have no SSH host)
+        if (cfg.mode !== "local" && cfg.host) {
+          return cfg as import("./titan-server").SSHConfig;
+        }
+      } catch (_) { /* ignore decrypt error, fall through */ }
+    }
+  }
+  // Fall back to global Titan Server env config
+  const global = getTitanServerConfig();
+  if (global) return global;
+  throw new Error(
+    `${toolLabel} server not connected. Go to the ${toolLabel} page, enter your server SSH credentials, and click Connect — then come back here.`
+  );
+}
+
 async function execEvilginxRunCommand(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
   try {
     const command = args.command as string;
     if (!command) return { success: false, error: "command is required" };
-    // Try local Evilginx first
+    // 1. Try local Evilginx binary first (same-server install)
     try {
       const { execEvilginxCommandPublic } = await import("./evilginx-router") as any;
       if (execEvilginxCommandPublic) {
@@ -6495,14 +6569,13 @@ async function execEvilginxRunCommand(userId: number, args: Record<string, unkno
         return { success: true, data: { command, output } };
       }
     } catch (_) { /* fall through to SSH */ }
-    // Fall back to Titan Server SSH
-    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
-    const titanConfig = getTitanServerConfig();
-    if (!titanConfig) return { success: false, error: "Evilginx is not running locally and no Titan Server SSH is configured. Go to the Evilginx page to set up your connection." };
-    // Run evilginx command via SSH using expect-style piping
-    const sshCmd = `echo '${command.replace(/'/g, "'\\''")}' | timeout 10 evilginx 2>/dev/null || evilginx -p /opt/evilginx/phishlets -c /opt/evilginx/config -developer 2>&1 | head -50`;
-    const output = await execTitanSSH(titanConfig, sshCmd, 15000, userId);
-    return { success: true, data: { command, output: output.trim() } };
+    // 2. Use user's saved SSH config (or global Titan Server fallback)
+    const { execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const sshConfig = await getUserToolSSHConfig(userId, "__evilginx_ssh", "Evilginx");
+    const safeCmd = command.replace(/'/g, "'\\'\''");
+    const sshCmd = `evilginx -p /opt/evilginx/phishlets -c /opt/evilginx/config -developer -x '${safeCmd}' 2>&1 | head -80`;
+    const output = await execTitanSSH(sshConfig, sshCmd, 15000, userId);
+    return { success: true, data: { command, output: output.trim() || "(no output)" } };
   } catch (err: any) {
     return { success: false, error: `Evilginx command failed: ${err.message}` };
   }
@@ -6513,13 +6586,12 @@ async function execMetasploitRunCommand(userId: number, args: Record<string, unk
     const command = args.command as string;
     const timeout = (args.timeout as number) || 30000;
     if (!command) return { success: false, error: "command is required" };
-    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
-    const sshConfig = getTitanServerConfig();
-    if (!sshConfig) return { success: false, error: "No Titan Server configured. Go to the Metasploit page to set up your SSH connection." };
-    // Run msfconsole with the command in quiet mode
-    const sshCmd = `msfconsole -q -x '${command.replace(/'/g, "'\\''")}; exit' 2>/dev/null`;
+    const { execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const sshConfig = await getUserToolSSHConfig(userId, "__metasploit_ssh", "Metasploit");
+    const safeCmd = command.replace(/'/g, "'\\'\''");
+    const sshCmd = `msfconsole -q -x '${safeCmd}; exit' 2>/dev/null`;
     const output = await execTitanSSH(sshConfig, sshCmd, timeout, userId);
-    return { success: true, data: { command, output: output.trim() } };
+    return { success: true, data: { command, output: output.trim() || "(no output)" } };
   } catch (err: any) {
     return { success: false, error: `Metasploit command failed: ${err.message}` };
   }
@@ -6530,11 +6602,10 @@ async function execBlackeyeRunCommand(userId: number, args: Record<string, unkno
     const command = args.command as string;
     const timeout = (args.timeout as number) || 15000;
     if (!command) return { success: false, error: "command is required" };
-    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
-    const sshConfig = getTitanServerConfig();
-    if (!sshConfig) return { success: false, error: "No Titan Server configured. Go to the BlackEye page to set up your SSH connection." };
+    const { execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const sshConfig = await getUserToolSSHConfig(userId, "__blackeye_ssh", "BlackEye");
     const output = await execTitanSSH(sshConfig, command, timeout, userId);
-    return { success: true, data: { command, output: output.trim() } };
+    return { success: true, data: { command, output: output.trim() || "(no output)" } };
   } catch (err: any) {
     return { success: false, error: `BlackEye command failed: ${err.message}` };
   }
@@ -6736,6 +6807,23 @@ async function execStorageDeleteFile(userId: number, args: Record<string, unknow
   }
 }
 
+async function execStorageUploadFile(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { uploadFile } = await import("./storage-service");
+    const filename = args.filename as string;
+    const content = args.content as string;
+    const feature = (args.feature as string) || "general";
+    if (!filename) return { success: false, error: "filename is required" };
+    if (!content) return { success: false, error: "content is required" };
+    const buf = Buffer.from(content, "utf8");
+    const mimeType = filename.endsWith(".json") ? "application/json" : "text/plain";
+    const file = await uploadFile(userId, buf, filename, mimeType, { feature: feature as any, originalName: filename }, "admin");
+    return { success: true, data: { message: `Saved to Titan Storage: ${filename}`, fileId: file.id, name: file.originalName, size: file.sizeBytes } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to upload file to Titan Storage" };
+  }
+}
+
 async function execMarketplaceBrowse(_userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
   try {
     const { listMarketplaceListings } = await import("./db");
@@ -6825,5 +6913,451 @@ async function execMemoryDeleteFact(
       : { success: false, error: "Fact not found or already deleted" };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to delete memory fact" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOR BROWSER EXECUTORS
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function execTorGetStatus(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const { torRouter } = await import("./tor-router");
+    // Call the getStatus mutation logic directly by invoking the underlying function
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const secretRow = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_ssh"))).limit(1);
+    let sshConfig: { host: string; port: number; username: string; password?: string } | null = null;
+    if (secretRow.length > 0) {
+      const raw = JSON.parse(decrypt(secretRow[0].encryptedValue));
+      sshConfig = raw;
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No Tor server configured. Go to /tor to set up your server." };
+    const result = await execTitanSSH(sshConfig, "systemctl is-active tor 2>/dev/null && curl -s --socks5 127.0.0.1:9050 https://check.torproject.org/api/ip 2>/dev/null || echo '{}'");
+    return { success: true, data: { raw: result, message: "Tor status retrieved" } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to get Tor status" };
+  }
+}
+
+async function execTorNewCircuit(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const secretRow = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_ssh"))).limit(1);
+    let sshConfig: { host: string; port: number; username: string; password?: string } | null = null;
+    if (secretRow.length > 0) {
+      sshConfig = JSON.parse(decrypt(secretRow[0].encryptedValue));
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No Tor server configured." };
+    await execTitanSSH(sshConfig, "echo SIGNAL NEWNYM | nc -w 1 127.0.0.1 9051 2>/dev/null || kill -HUP $(pidof tor) 2>/dev/null");
+    const newIp = await execTitanSSH(sshConfig, "sleep 3 && curl -s --socks5 127.0.0.1:9050 https://api.ipify.org 2>/dev/null || echo 'unknown'");
+    return { success: true, data: { message: "New Tor circuit requested", newExitIp: newIp.trim() } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to request new circuit" };
+  }
+}
+
+async function execTorInstall(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const secretRow = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_ssh"))).limit(1);
+    let sshConfig: { host: string; port: number; username: string; password?: string } | null = null;
+    if (secretRow.length > 0) {
+      sshConfig = JSON.parse(decrypt(secretRow[0].encryptedValue));
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No server configured. Go to /tor to connect your server first." };
+    const enableFirewall = args.enableFirewall !== false;
+    const installCmd = `apt-get update -qq && apt-get install -y tor obfs4proxy 2>&1 | tail -5 && echo "Tor installed"`;
+    const result = await execTitanSSH(sshConfig, installCmd);
+    return { success: true, data: { message: "Tor installation complete", output: result, firewallEnabled: enableFirewall } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to install Tor" };
+  }
+}
+
+async function execTorSetActive(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const active = Boolean(args.active);
+    // Store the active state in userSecrets
+    const existing = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_active"))).limit(1);
+    const val = encrypt(JSON.stringify({ active }));
+    if (existing.length > 0) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_active")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__tor_active", encryptedValue: val });
+    }
+    return { success: true, data: { active, message: active ? "Tor routing enabled" : "Tor routing disabled" } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to set Tor active state" };
+  }
+}
+
+async function execTorSetFirewall(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const secretRow = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__tor_ssh"))).limit(1);
+    let sshConfig: { host: string; port: number; username: string; password?: string } | null = null;
+    if (secretRow.length > 0) {
+      sshConfig = JSON.parse(decrypt(secretRow[0].encryptedValue));
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No Tor server configured." };
+    const enabled = Boolean(args.enabled);
+    const cmd = enabled
+      ? `iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT && iptables -I INPUT -m state --state NEW -j DROP && echo "Firewall enabled"`
+      : `iptables -D INPUT -m state --state NEW -j DROP 2>/dev/null; echo "Firewall disabled"`;
+    const result = await execTitanSSH(sshConfig, cmd);
+    return { success: true, data: { enabled, message: result.trim() } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to set firewall" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VPN CHAIN EXECUTORS
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function execVpnChainGetChain(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain"))).limit(1);
+    if (!row.length) return { success: true, data: { hops: [], active: false, message: "No VPN chain configured yet. Use vpn_chain_add_hop to add servers." } };
+    const config = JSON.parse(decrypt(row[0].encryptedValue));
+    // Sanitize — don't return passwords
+    const sanitized = { ...config, hops: (config.hops || []).map((h: any) => ({ ...h, password: h.password ? "***" : undefined })) };
+    return { success: true, data: sanitized };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to get VPN chain" };
+  }
+}
+
+async function execVpnChainAddHop(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain"))).limit(1);
+    const config = row.length ? JSON.parse(decrypt(row[0].encryptedValue)) : { hops: [], active: false };
+    const newHop = {
+      id: crypto.randomUUID(),
+      label: (args.label as string) || `Hop ${config.hops.length + 1}`,
+      host: args.host as string,
+      port: (args.port as number) || 22,
+      username: args.username as string,
+      password: args.password as string | undefined,
+      country: (args.country as string) || "Unknown",
+      order: config.hops.length,
+    };
+    config.hops.push(newHop);
+    const val = encrypt(JSON.stringify(config));
+    if (row.length) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__vpn_chain", encryptedValue: val });
+    }
+    return { success: true, data: { message: `Hop "${newHop.label}" added to VPN chain`, hopId: newHop.id, totalHops: config.hops.length } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to add VPN hop" };
+  }
+}
+
+async function execVpnChainTestChain(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain"))).limit(1);
+    if (!row.length) return { success: false, error: "No VPN chain configured." };
+    const config = JSON.parse(decrypt(row[0].encryptedValue));
+    if (!config.hops || config.hops.length === 0) return { success: false, error: "VPN chain has no hops. Add servers first." };
+    const { execSSHCommand: execTitanSSH } = await import("./titan-server");
+    // Test the first hop
+    const firstHop = config.hops[0];
+    const result = await execTitanSSH(firstHop, "curl -s https://api.ipify.org 2>/dev/null || echo 'unreachable'");
+    return { success: true, data: { message: `Chain test complete — first hop IP: ${result.trim()}`, hops: config.hops.length, firstHopIp: result.trim() } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to test VPN chain" };
+  }
+}
+
+async function execVpnChainSetActive(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const active = Boolean(args.active);
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain"))).limit(1);
+    const config = row.length ? JSON.parse(decrypt(row[0].encryptedValue)) : { hops: [], active: false };
+    config.active = active;
+    const val = encrypt(JSON.stringify(config));
+    if (row.length) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__vpn_chain")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__vpn_chain", encryptedValue: val });
+    }
+    return { success: true, data: { active, message: active ? "VPN chain activated" : "VPN chain deactivated" } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to set VPN chain active state" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROXY MAKER EXECUTORS
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function execProxyMakerGetPool(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool"))).limit(1);
+    if (!row.length) return { success: true, data: { proxies: [], rotationEnabled: false, message: "No proxies in pool yet. Use proxy_maker_scrape_proxies or proxy_maker_deploy_proxy to add proxies." } };
+    const pool = JSON.parse(decrypt(row[0].encryptedValue));
+    return { success: true, data: pool };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to get proxy pool" };
+  }
+}
+
+async function execProxyMakerScrapeProxies(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const proxyType = (args.type as string) || "all";
+    const maxToAdd = (args.maxToAdd as number) || 20;
+    // Scrape from free proxy lists
+    const sources = [
+      "https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=socks5&timeout=5000&country=all&simplified=true",
+      "https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=http&timeout=5000&country=all&simplified=true",
+    ];
+    const proxies: string[] = [];
+    for (const src of sources) {
+      try {
+        const resp = await fetch(src, { signal: AbortSignal.timeout(10000) });
+        const text = await resp.text();
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l && l.includes(":"));
+        proxies.push(...lines.slice(0, 50));
+      } catch { /* skip failed source */ }
+    }
+    const unique = [...new Set(proxies)].slice(0, maxToAdd * 3);
+    // Test a sample (quick timeout)
+    const working: Array<{ host: string; port: number; type: string; latency: number }> = [];
+    for (const proxy of unique.slice(0, 30)) {
+      const [host, portStr] = proxy.split(":");
+      const port = parseInt(portStr);
+      if (!host || isNaN(port)) continue;
+      const start = Date.now();
+      try {
+        const resp = await fetch(`https://api.ipify.org`, {
+          signal: AbortSignal.timeout(4000),
+        });
+        if (resp.ok) {
+          working.push({ host, port, type: proxyType === "all" ? "http" : proxyType, latency: Date.now() - start });
+          if (working.length >= maxToAdd) break;
+        }
+      } catch { /* dead proxy */ }
+    }
+    // Save to pool
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool"))).limit(1);
+    const pool = row.length ? JSON.parse(decrypt(row[0].encryptedValue)) : { proxies: [], rotationEnabled: true };
+    const existingHosts = new Set(pool.proxies.map((p: any) => `${p.host}:${p.port}`));
+    for (const w of working) {
+      if (!existingHosts.has(`${w.host}:${w.port}`)) {
+        pool.proxies.push({ ...w, id: crypto.randomUUID(), alive: true, addedAt: new Date().toISOString(), source: "scraped" });
+      }
+    }
+    const val = encrypt(JSON.stringify(pool));
+    if (row.length) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__proxy_pool", encryptedValue: val });
+    }
+    return { success: true, data: { added: working.length, message: `Added ${working.length} working proxies to pool`, totalInPool: pool.proxies.length } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to scrape proxies" };
+  }
+}
+
+async function execProxyMakerHealthCheck(userId: number): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool"))).limit(1);
+    if (!row.length) return { success: false, error: "No proxy pool found." };
+    const pool = JSON.parse(decrypt(row[0].encryptedValue));
+    let alive = 0, dead = 0;
+    for (const proxy of pool.proxies) {
+      try {
+        const resp = await fetch("https://api.ipify.org", { signal: AbortSignal.timeout(4000) });
+        proxy.alive = resp.ok;
+        proxy.lastChecked = new Date().toISOString();
+        if (resp.ok) alive++; else dead++;
+      } catch {
+        proxy.alive = false;
+        proxy.lastChecked = new Date().toISOString();
+        dead++;
+      }
+    }
+    const val = encrypt(JSON.stringify(pool));
+    await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool")));
+    return { success: true, data: { alive, dead, total: pool.proxies.length, message: `Health check complete: ${alive} alive, ${dead} dead` } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to run health check" };
+  }
+}
+
+async function execProxyMakerSetRotation(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const enabled = Boolean(args.enabled);
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool"))).limit(1);
+    const pool = row.length ? JSON.parse(decrypt(row[0].encryptedValue)) : { proxies: [], rotationEnabled: false };
+    pool.rotationEnabled = enabled;
+    const val = encrypt(JSON.stringify(pool));
+    if (row.length) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__proxy_pool", encryptedValue: val });
+    }
+    return { success: true, data: { rotationEnabled: enabled, message: enabled ? "Proxy rotation enabled" : "Proxy rotation disabled" } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to set rotation" };
+  }
+}
+
+async function execProxyMakerDeployProxy(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    let sshConfig: { host: string; port: number; username: string; password?: string } | null = null;
+    if (args.useTitanServer) {
+      sshConfig = getTitanServerConfig();
+    } else if (args.host) {
+      sshConfig = { host: args.host as string, port: (args.port as number) || 22, username: args.username as string, password: args.password as string };
+    }
+    if (!sshConfig) return { success: false, error: "No server specified. Set useTitanServer: true or provide host/username." };
+    const deployCmd = `apt-get install -y 3proxy 2>&1 | tail -3 && echo "proxy ---socks -p1080" > /etc/3proxy/3proxy.cfg && echo "proxy -p8080" >> /etc/3proxy/3proxy.cfg && systemctl restart 3proxy 2>/dev/null || 3proxy /etc/3proxy/3proxy.cfg & echo "Proxy deployed on port 1080 (SOCKS5) and 8080 (HTTP)"`;
+    const result = await execTitanSSH(sshConfig, deployCmd);
+    // Add to pool
+    const db = await getDb();
+    if (!db) return { success: false, error: "Database unavailable" };
+    const row = await db.select().from(userSecrets).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool"))).limit(1);
+    const pool = row.length ? JSON.parse(decrypt(row[0].encryptedValue)) : { proxies: [], rotationEnabled: true };
+    pool.proxies.push({
+      id: crypto.randomUUID(),
+      host: sshConfig.host,
+      port: 1080,
+      type: "socks5",
+      alive: true,
+      label: (args.label as string) || `Deployed on ${sshConfig.host}`,
+      addedAt: new Date().toISOString(),
+      source: "deployed",
+    });
+    const val = encrypt(JSON.stringify(pool));
+    if (row.length) {
+      await db.update(userSecrets).set({ encryptedValue: val }).where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__proxy_pool")));
+    } else {
+      await db.insert(userSecrets).values({ userId, secretType: "__proxy_pool", encryptedValue: val });
+    }
+    return { success: true, data: { message: `Proxy deployed on ${sshConfig.host}`, output: result, socks5Port: 1080, httpPort: 8080 } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to deploy proxy" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BIN CHECKER EXECUTORS
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function execBinLookup(_userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const bin = (args.bin as string || "").replace(/\D/g, "").slice(0, 8);
+    if (bin.length < 6) return { success: false, error: "BIN must be at least 6 digits" };
+    const result = await checkBin(bin);
+    if (!result) return { success: false, error: `No BIN data found for ${bin}` };
+    return { success: true, data: result };
+  } catch (err: any) {
+    return { success: false, error: err.message || "BIN lookup failed" };
+  }
+}
+
+async function execCardValidate(_userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const cardNumber = (args.cardNumber as string || "").replace(/\s/g, "");
+    if (!cardNumber) return { success: false, error: "Card number is required" };
+    // Luhn algorithm
+    let sum = 0;
+    let alternate = false;
+    for (let i = cardNumber.length - 1; i >= 0; i--) {
+      let n = parseInt(cardNumber[i], 10);
+      if (isNaN(n)) return { success: false, error: "Card number contains non-numeric characters" };
+      if (alternate) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+      alternate = !alternate;
+    }
+    const valid = sum % 10 === 0;
+    // Detect network
+    let network = "Unknown";
+    if (/^4/.test(cardNumber)) network = "Visa";
+    else if (/^5[1-5]/.test(cardNumber)) network = "Mastercard";
+    else if (/^3[47]/.test(cardNumber)) network = "American Express";
+    else if (/^6(?:011|5)/.test(cardNumber)) network = "Discover";
+    else if (/^35/.test(cardNumber)) network = "JCB";
+    else if (/^3(?:0[0-5]|[68])/.test(cardNumber)) network = "Diners Club";
+    return {
+      success: true,
+      data: {
+        valid,
+        network,
+        length: cardNumber.length,
+        message: valid ? `Valid ${network} card number (Luhn check passed)` : `Invalid card number (Luhn check failed)`,
+        note: "This is a structural validation only. No transaction, no charge, no network request.",
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Card validation failed" };
+  }
+}
+
+async function execBinReverseLookup(_userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const query = (args.query as string || "").trim();
+    const country = (args.country as string || "").toUpperCase();
+    if (!query) return { success: false, error: "Search query is required" };
+    // Try BINcodes API for reverse search
+    const url = `https://api.bincodes.com/binsearch/?format=json&api_key=free&bank=${encodeURIComponent(query)}${country ? `&country=${country}` : ""}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return { success: true, data: { results: data, count: data.length, query, country: country || "All" } };
+      }
+    }
+    // Fallback: BIN-list API
+    const fallbackUrl = `https://binlist.net/search?q=${encodeURIComponent(query)}`;
+    const fallbackResp = await fetch(fallbackUrl, { headers: { "Accept-Version": "3" }, signal: AbortSignal.timeout(8000) });
+    if (fallbackResp.ok) {
+      const fallbackData = await fallbackResp.json();
+      return { success: true, data: { results: Array.isArray(fallbackData) ? fallbackData : [fallbackData], query, country: country || "All" } };
+    }
+    return { success: false, error: `No BINs found for "${query}"${country ? ` in ${country}` : ""}. Try a shorter or different search term.` };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Reverse BIN lookup failed" };
   }
 }

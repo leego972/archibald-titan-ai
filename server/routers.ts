@@ -55,6 +55,10 @@ import { argusRouter } from "./argus-router";
 import { titanServerRouter } from "./titan-server-router";
 import { storageRouter } from "./storage-router";
 import { storageBillingRouter } from "./storage-billing-router";
+import { torRouter } from "./tor-router";
+import { vpnChainRouter } from "./vpn-chain-router";
+import { proxyMakerRouter } from "./proxy-maker-router";
+import { binCheckerRouter } from "./bin-checker-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -136,6 +140,11 @@ export const appRouter = router({
   // ── Titan Storage Add-on ──────────────────────────────────────────────
   titanStorage: storageRouter,
   titanStorageBilling: storageBillingRouter,
+  // ── Privacy & Security Tools ─────────────────────────────────────────
+  tor: torRouter,
+  vpnChain: vpnChainRouter,
+  proxyMaker: proxyMakerRouter,
+  binChecker: binCheckerRouter,
 });
 
 export type AppRouter = typeof appRouter;

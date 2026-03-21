@@ -132,6 +132,12 @@ import ArgusPage from "./pages/ArgusPage";
 // Titan Storage Add-on
 import TitanStoragePage from "./pages/TitanStoragePage";
 
+// Privacy & Anonymity Tools
+import TorPage from "./pages/TorPage";
+import VpnChainPage from "./pages/VpnChainPage";
+import ProxyMakerPage from "./pages/ProxyMakerPage";
+import BinCheckerPage from "./pages/BinCheckerPage";
+
 
 function DashboardRouter() {
   return (
@@ -225,6 +231,12 @@ function DashboardRouter() {
         {/* Titan Storage Add-on */}
         <Route path="/storage" component={TitanStoragePage} />
 
+        {/* Privacy & Anonymity Tools */}
+        <Route path="/tor" component={TorPage} />
+        <Route path="/vpn-chain" component={VpnChainPage} />
+        <Route path="/proxy-maker" component={ProxyMakerPage} />
+        <Route path="/bin-checker" component={BinCheckerPage} />
+
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
         <Route path="/fetcher/admin" component={AdminPanel} />
@@ -306,6 +318,10 @@ function Router() {
       <Route path="/astra" component={DashboardRouter} />
       <Route path="/argus" component={DashboardRouter} />
       <Route path="/storage" component={DashboardRouter} />
+      <Route path="/tor" component={DashboardRouter} />
+      <Route path="/vpn-chain" component={DashboardRouter} />
+      <Route path="/proxy-maker" component={DashboardRouter} />
+      <Route path="/bin-checker" component={DashboardRouter} />
       <Route path="/admin/titan-server" component={DashboardRouter} />
       <Route path="/admin/activity-log" component={DashboardRouter} />
       <Route path="/fetcher/self-improvement" component={DashboardRouter} />

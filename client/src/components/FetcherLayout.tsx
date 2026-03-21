@@ -92,6 +92,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { LanguageSelector, useLanguage } from "@/i18n";
 import { AddAdminModal } from "./AddAdminModal";
 import { isAdminRole } from "@shared/const";
+import { trpc } from "@/lib/trpc";
+import { Shield } from "lucide-react";
 
 type MenuItem = {
   icon: any;
@@ -160,6 +162,12 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
       // ── Titan Storage Add-on ──────────────────────────────────────────────
       { icon: featureIcon("icon_31_r4c7"), label: t("nav.titanStorage"), path: "/storage", isNew: true },
+      // ── Privacy & Anonymity ───────────────────────────────────────────────
+      { icon: featureIcon("icon_38_r5c6"), label: "Tor Browser", path: "/tor", isNew: true, titanOnly: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "VPN Chain", path: "/vpn-chain", isNew: true, titanOnly: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Proxy Maker", path: "/proxy-maker", isNew: true, titanOnly: true },
+      // ── Card Tools ───────────────────────────────────────────────────────
+      { icon: featureIcon("icon_12_r2c4"), label: "BIN Checker", path: "/bin-checker", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -255,6 +263,7 @@ const allMenuItemPaths = [
   "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
   "/fetcher/api-analytics", "/fetcher/cli",
   "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
+  "/tor", "/vpn-chain", "/proxy-maker", "/bin-checker",
 ];
 
 const SIDEBAR_WIDTH_KEY = "fetcher-sidebar-width";
@@ -368,7 +377,13 @@ function FetcherLayoutContent({
     (item) => item.path === location || (item.path !== "/dashboard" && location.startsWith(item.path))
   );
   const isMobile = useIsMobile();
-
+  // VPN / Tor status for sidebar toggle
+  const vpnActiveQuery = trpc.vpnChain.getActiveState.useQuery();
+  const torActiveQuery = trpc.tor.getActiveState.useQuery();
+  const setVpnActive = trpc.vpnChain.setActive.useMutation({ onSuccess: () => vpnActiveQuery.refetch() });
+  const setTorActive = trpc.tor.setActive.useMutation({ onSuccess: () => torActiveQuery.refetch() });
+  const vpnActive = vpnActiveQuery.data?.active ?? false;
+  const torActive = torActiveQuery.data?.active ?? false;
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -555,6 +570,33 @@ function FetcherLayoutContent({
                 )}
               </div>
             )}
+            {/* VPN Chain + Tor quick toggles */}
+            <div className="flex items-center gap-2 px-1 pb-1">
+              <button
+                onClick={() => setVpnActive.mutate({ active: !vpnActive })}
+                title={vpnActive ? "VPN Chain: ON — click to disable" : "VPN Chain: OFF — click to enable"}
+                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                  vpnActive
+                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
+                    : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
+                } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">VPN {vpnActive ? "ON" : "OFF"}</span>
+              </button>
+              <button
+                onClick={() => setTorActive.mutate({ active: !torActive })}
+                title={torActive ? "Tor: ON — click to disable" : "Tor: OFF — click to enable"}
+                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                  torActive
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30"
+                    : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
+                } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
+              >
+                <Globe className="h-3.5 w-3.5 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">Tor {torActive ? "ON" : "OFF"}</span>
+              </button>
+            </div>
             {/* Standalone Logout Button — always visible in sidebar footer */}
             <button
               onClick={logout}
