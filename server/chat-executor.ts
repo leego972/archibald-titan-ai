@@ -4000,10 +4000,81 @@ async function execReadUploadedFile(
     if (!response.ok) {
       return { success: false, error: `Failed to fetch file: ${response.statusText}` };
     }
+
+    // Detect file type from URL or Content-Type header
+    const contentType = response.headers.get('content-type') || '';
+    const urlLower = url.toLowerCase().split('?')[0];
+    const isZip = urlLower.endsWith('.zip') || contentType.includes('zip') || contentType.includes('octet-stream');
+    const isPdf = urlLower.endsWith('.pdf') || contentType.includes('pdf');
+
+    if (isZip) {
+      // Handle ZIP files: extract and return a manifest + contents of text files
+      try {
+        const JSZip = (await import('jszip')).default;
+        const arrayBuffer = await response.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const fileEntries: string[] = [];
+        let extractedContent = '';
+        let totalChars = 0;
+        const MAX_CHARS = 80000;
+        const TEXT_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.txt', '.css', '.html', '.env', '.yaml', '.yml', '.toml', '.sh', '.py', '.sql', '.prisma', '.graphql', '.xml', '.csv', '.ini', '.conf', '.config'];
+
+        // First pass: collect file names
+        const fileNames: string[] = [];
+        zip.forEach((relativePath, _file) => { fileNames.push(relativePath); });
+        fileEntries.push(...fileNames);
+
+        // Second pass: extract text file contents
+        for (const fileName of fileNames) {
+          const file = zip.file(fileName);
+          if (!file || file.dir) continue;
+          const ext = '.' + fileName.split('.').pop()?.toLowerCase();
+          if (!TEXT_EXTENSIONS.includes(ext)) continue;
+          if (totalChars >= MAX_CHARS) break;
+          try {
+            const text = await file.async('text');
+            const snippet = text.slice(0, Math.min(5000, MAX_CHARS - totalChars));
+            extractedContent += `\n\n=== ${fileName} ===\n${snippet}`;
+            if (text.length > 5000) extractedContent += `\n... [truncated — ${text.length} chars total]`;
+            totalChars += snippet.length;
+          } catch { /* skip binary files that fail text decode */ }
+        }
+
+        return {
+          success: true,
+          data: {
+            type: 'zip',
+            fileCount: fileNames.length,
+            files: fileEntries.slice(0, 200),
+            content: extractedContent.slice(0, MAX_CHARS),
+            truncated: totalChars >= MAX_CHARS,
+            summary: `ZIP archive with ${fileNames.length} file(s). Text file contents extracted below.`,
+          },
+        };
+      } catch (zipErr: unknown) {
+        return { success: false, error: `Failed to extract ZIP: ${getErrorMessage(zipErr)}. Please ensure the file is a valid ZIP archive.` };
+      }
+    }
+
+    if (isPdf) {
+      // For PDFs, return a helpful message since we can't parse binary PDFs server-side easily
+      const arrayBuffer = await response.arrayBuffer();
+      return {
+        success: true,
+        data: {
+          type: 'pdf',
+          size: arrayBuffer.byteLength,
+          content: '[PDF file detected. PDF text extraction is not supported in this context. Please convert to text or copy-paste the relevant content directly.]',
+        },
+      };
+    }
+
+    // Default: treat as text
     const content = await response.text();
     return {
       success: true,
       data: {
+        type: 'text',
         content: content.slice(0, 100000), // Limit to 100KB
         size: content.length,
         truncated: content.length > 100000,

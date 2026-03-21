@@ -2159,7 +2159,7 @@ const readUploadedFile: Tool = {
   function: {
     name: "read_uploaded_file",
     description:
-      "Read the content of a file that the user uploaded to the chat. Use this when the user uploads a file and you need to read its contents to understand what they want.",
+      "Read the content of a file that the user uploaded to the chat. Supports text files, source code, and ZIP archives. For ZIP files, it extracts and returns the file manifest plus the contents of all text/code files inside. Use this when the user uploads a file and you need to read its contents to understand what they want. Always call this tool when the user's message contains [Attached file: ...] before doing anything else.",
     parameters: {
       type: "object",
       properties: {

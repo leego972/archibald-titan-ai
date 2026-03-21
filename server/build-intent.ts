@@ -1092,6 +1092,10 @@ export async function detectBuildIntentAsync(
  */
 export function getForceFirstTool(message: string, isSelfBuild: boolean = true): string | null {
   const msgLower = message.toLowerCase();
+  // HIGHEST PRIORITY: If the user uploaded a file, always read it first
+  if (msgLower.includes('[attached file:') || msgLower.includes('[attached image:')) {
+    return 'read_uploaded_file';
+  }
   if (RESEARCH_KEYWORDS.some(kw => msgLower.includes(kw))) {
     return 'web_search';
   }
@@ -1924,7 +1928,7 @@ The #1 reason builds fail is DISCONNECTED FILES. Before delivering:
 **File Creation (user-downloadable + auto-synced to sandbox):**
 - **create_file** — Create a file (cloud + sandbox automatically)
 - **provide_project_zip** — Package all files into downloadable ZIP
-- **read_uploaded_file** — Read user-uploaded files
+- **read_uploaded_file** — Read user-uploaded files (text, source code, and ZIP archives). **MANDATORY: Call this FIRST if the user's message contains [Attached file: ...]**. For ZIP files it returns the full file manifest plus extracted source code contents. Never skip this step.
 
 **Sandbox (testing environment):**
 - **sandbox_exec** — Execute shell commands (install, compile, test)

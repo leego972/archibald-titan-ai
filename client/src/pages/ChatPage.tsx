@@ -865,6 +865,8 @@ export default function ChatPage() {
     results?: string[];
     block?: string;
     error?: string;
+    reasoning?: boolean;  // true when this is Titan's actual LLM reasoning content
+    phase?: string;       // 'build' | 'github' | 'chat'
     timestamp: number;
   }
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([]);
@@ -1402,11 +1404,18 @@ export default function ChatPage() {
         }
         return !found;
       });
-      // Final list: DB messages + any still-pending optimistic messages appended
-      if (stillPending.length === 0) {
-        return dbMessages;
-      }
-      return [...dbMessages, ...stillPending];
+      // Final list: DB messages + any still-pending optimistic messages appended.
+      // Always sort so messages appear in correct conversation order:
+      //   - Positive IDs (DB messages) sort ascending by ID (insertion order)
+      //   - Negative IDs (optimistic) always come after all DB messages,
+      //     sorted by absolute value descending so the most-recently-sent is last.
+      const merged = stillPending.length === 0 ? dbMessages : [...dbMessages, ...stillPending];
+      return merged.sort((a, b) => {
+        if (a.id > 0 && b.id > 0) return a.id - b.id;      // both DB: ascending
+        if (a.id > 0) return -1;                             // DB before optimistic
+        if (b.id > 0) return 1;                              // DB before optimistic
+        return Math.abs(b.id) - Math.abs(a.id);              // both optimistic: newest last
+      });
     });
   }, [convDetail, activeConversationId]);
 
@@ -1470,7 +1479,7 @@ export default function ChatPage() {
           // Reconnect SSE stream
           const es = new EventSource(`/api/chat/stream/${activeConversationId}`, { withCredentials: true });
           eventSourceRef.current = es;
-          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Thinking...'); } catch {} });
+          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message, reasoning: d.reasoning, phase: d.phase, round: d.round, timestamp: Date.now() }]); if (!d.reasoning) setLoadingPhase(d.message || 'Thinking...'); } catch {} });
           es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description, timestamp: Date.now() }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
           es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary, timestamp: Date.now() }]); } catch {} });
           es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
@@ -1792,10 +1801,11 @@ export default function ChatPage() {
         });
         es.addEventListener('thinking', (e) => {
           const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'thinking', message: data.message, round: data.round, timestamp: Date.now() };
+          const evt: StreamEvent = { type: 'thinking', message: data.message, round: data.round, reasoning: data.reasoning, phase: data.phase, timestamp: Date.now() };
           setStreamEvents(prev => [...prev, evt]);
           setBuildLog(prev => [...prev, evt]);
-          setLoadingPhase(data.message || 'Thinking...');
+          // Only update the loading phase label with non-reasoning events (reasoning content is shown in the panel)
+          if (!data.reasoning) setLoadingPhase(data.message || 'Thinking...');
         });
         es.addEventListener('status', (e) => {
           const data = JSON.parse(e.data);
@@ -2310,7 +2320,7 @@ export default function ChatPage() {
             data-chat-scroll
             className={`absolute inset-0 overflow-y-auto ${isMobile ? 'px-3 py-3' : 'px-4 py-4 scroll-smooth'}`}
           >
-            <div className="w-full max-w-5xl space-y-4">
+            <div className="w-full max-w-5xl mx-auto space-y-4">
               {showEmptyState ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center px-2">
                   <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -2591,9 +2601,12 @@ export default function ChatPage() {
                         </summary>
                         <div className="mt-1 ml-5 space-y-0.5 border-l-2 border-border/30 pl-3 py-1">
                           {buildLog.map((evt, i) => (
-                            <div key={i} className="flex items-start gap-2 text-xs py-0.5">
-                              {evt.type === 'thinking' && (
+                            <div key={i} className={`flex items-start gap-2 text-xs py-0.5 ${evt.reasoning ? 'bg-purple-500/5 rounded px-1 border-l-2 border-purple-500/30' : ''}`}>
+                              {evt.type === 'thinking' && !evt.reasoning && (
                                 <><Cpu className="h-3 w-3 text-blue-400/60 shrink-0 mt-0.5" /><span className="text-muted-foreground">{evt.message}</span></>
+                              )}
+                              {evt.type === 'thinking' && evt.reasoning && (
+                                <><Cpu className="h-3 w-3 text-purple-400/80 shrink-0 mt-0.5" /><span className="text-purple-300/80 italic">{evt.message}</span></>
                               )}
                               {evt.type === 'tool_start' && (
                                 <><Activity className="h-3 w-3 text-amber-400/60 shrink-0 mt-0.5" /><span className="text-muted-foreground">{evt.description || (evt.tool || '').replace(/_/g, ' ')}</span></>
@@ -2654,10 +2667,16 @@ export default function ChatPage() {
                         {/* Real-time activity feed — thought process & build log */}
                         {showStreamPanel && streamEvents.length > 0 && (
                           <div className="space-y-1 border-t border-border/30 pt-2 max-h-[300px] overflow-y-auto scrollbar-thin">
-                            {streamEvents.slice(-12).map((evt, i) => (
-                              <div key={i} className="flex items-start gap-2 text-xs py-0.5">
-                                {evt.type === 'thinking' && (
+                            {streamEvents.slice(-15).map((evt, i) => (
+                              <div key={i} className={`flex items-start gap-2 text-xs py-0.5 ${evt.reasoning ? 'bg-purple-500/5 rounded px-1.5 py-1 border border-purple-500/10' : ''}`}>
+                                {evt.type === 'thinking' && !evt.reasoning && (
                                   <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message || 'Thinking...'}</span></>
+                                )}
+                                {evt.type === 'thinking' && evt.reasoning && (
+                                  <div className="flex items-start gap-1.5 w-full">
+                                    <span className="text-purple-400 shrink-0 mt-0.5 text-[10px] font-bold uppercase tracking-wide">Titan thinks:</span>
+                                    <span className="text-purple-300 italic leading-relaxed">{evt.message}</span>
+                                  </div>
                                 )}
                                 {evt.type === 'tool_start' && (
                                   <><Activity className="h-3 w-3 text-amber-400 shrink-0 mt-0.5 animate-pulse" /><span className="text-amber-400">{evt.description || (evt.tool || '').replace(/_/g, ' ')}</span></>
@@ -3272,6 +3291,7 @@ export default function ChatPage() {
                 evt.type === 'tool_start' ? 'border-blue-500/20 bg-blue-500/5' :
                 evt.type === 'tool_result' ? (evt.success ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5') :
                 evt.type === 'verification' ? 'border-amber-500/20 bg-amber-500/5' :
+                (evt.type === 'thinking' && evt.reasoning) ? 'border-purple-500/30 bg-purple-500/5' :
                 'border-border/30 bg-card'
               }`}>
                 <div className="flex items-center gap-2 mb-1">
@@ -3279,17 +3299,18 @@ export default function ChatPage() {
                   {evt.type === 'tool_result' && (evt.success
                     ? <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
                     : <XCircle className="h-3 w-3 text-red-400 shrink-0" />)}
-                  {evt.type === 'thinking' && <Activity className="h-3 w-3 text-muted-foreground shrink-0" />}
+                  {evt.type === 'thinking' && !evt.reasoning && <Activity className="h-3 w-3 text-muted-foreground shrink-0" />}
+                  {evt.type === 'thinking' && evt.reasoning && <Cpu className="h-3 w-3 text-purple-400 shrink-0" />}
                   {evt.type === 'verification' && <ScanLine className="h-3 w-3 text-amber-400 shrink-0" />}
-                  <span className="font-mono font-medium truncate">
-                    {evt.tool ? evt.tool.replace(/_/g, ' ') : evt.type}
+                  <span className={`font-mono font-medium truncate ${evt.type === 'thinking' && evt.reasoning ? 'text-purple-400' : ''}`}>
+                    {evt.reasoning ? 'Titan\'s reasoning' : (evt.tool ? evt.tool.replace(/_/g, ' ') : evt.type)}
                   </span>
                   <span className="ml-auto text-muted-foreground shrink-0">
                     {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </div>
                 {(evt.description || evt.summary || evt.message) && (
-                  <p className="text-muted-foreground leading-relaxed">
+                  <p className={`leading-relaxed ${evt.reasoning ? 'text-purple-300 italic' : 'text-muted-foreground'}`}>
                     {evt.description || evt.summary || evt.message}
                   </p>
                 )}
