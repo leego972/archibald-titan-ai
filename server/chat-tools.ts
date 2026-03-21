@@ -2458,6 +2458,102 @@ export const blackeyeTestConnectionTool: Tool = {
   },
 };
 
+// ─── Evilginx Action Tools ──────────────────────────────────────────
+export const evilginxRunCommandTool: Tool = {
+  type: "function",
+  function: {
+    name: "evilginx_run_command",
+    description: "Run an Evilginx3 command on the Titan Server (e.g. 'phishlets', 'sessions', 'lures', 'phishlets enable <name>', 'lures create <phishlet>'). Returns the command output. Use evilginx_connect first to verify the server is running.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "The Evilginx3 command to run (e.g. 'phishlets', 'sessions', 'lures', 'phishlets enable microsoft', 'lures create microsoft')" },
+      },
+      required: ["command"],
+    },
+  },
+};
+export const evilginxListPhishletsTool: Tool = {
+  type: "function",
+  function: {
+    name: "evilginx_list_phishlets",
+    description: "List all available Evilginx3 phishlets and their enabled/disabled status on the Titan Server.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+export const evilginxListSessionsTool: Tool = {
+  type: "function",
+  function: {
+    name: "evilginx_list_sessions",
+    description: "List all captured Evilginx3 sessions (phishing captures) on the Titan Server. Returns session IDs, targets, tokens, and timestamps.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+export const evilginxListLuresTool: Tool = {
+  type: "function",
+  function: {
+    name: "evilginx_list_lures",
+    description: "List all Evilginx3 lures (phishing URLs) configured on the Titan Server.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+// ─── Metasploit Action Tools ─────────────────────────────────────────
+export const metasploitRunCommandTool: Tool = {
+  type: "function",
+  function: {
+    name: "metasploit_run_command",
+    description: "Run a Metasploit console command on the Titan Server via SSH (e.g. 'search type:exploit platform:windows', 'use exploit/multi/handler', 'show sessions'). Returns the console output. Use metasploit_test_connection first.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "The msfconsole command to run (e.g. 'search cve:2021-44228', 'use exploit/multi/handler', 'show sessions', 'db_nmap -sV 192.168.1.0/24')" },
+        timeout: { type: "number", description: "Timeout in milliseconds (default 30000)" },
+      },
+      required: ["command"],
+    },
+  },
+};
+export const metasploitListSessionsTool: Tool = {
+  type: "function",
+  function: {
+    name: "metasploit_list_sessions",
+    description: "List all active Metasploit sessions on the Titan Server. Returns session IDs, types, targets, and connection info.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+export const metasploitSearchModulesTool: Tool = {
+  type: "function",
+  function: {
+    name: "metasploit_search_modules",
+    description: "Search Metasploit for exploit/auxiliary/post modules matching a query. Returns module names, descriptions, and CVEs.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query (e.g. 'eternalblue', 'cve:2021-44228', 'type:exploit platform:linux')" },
+      },
+      required: ["query"],
+    },
+  },
+};
+
+// ─── BlackEye Action Tools ───────────────────────────────────────────
+export const blackeyeRunCommandTool: Tool = {
+  type: "function",
+  function: {
+    name: "blackeye_run_command",
+    description: "Run a BlackEye command on the Titan Server via SSH. BlackEye is a phishing page generator. Use this to list available templates, start a phishing page, or check status.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command to run in the BlackEye directory (e.g. 'ls /opt/blackeye', 'cat /opt/blackeye/README.md', 'bash /opt/blackeye/blackeye.sh')" },
+        timeout: { type: "number", description: "Timeout in milliseconds (default 15000)" },
+      },
+      required: ["command"],
+    },
+  },
+};
+
 export const contentCreatorGetCampaignsTool: Tool = {
   type: "function",
   function: {
@@ -2590,11 +2686,58 @@ export const storageGetStatsTool: Tool = {
   type: "function",
   function: {
     name: "storage_get_stats",
-    description: "Get storage usage statistics.",
+    description: "Get Titan Storage usage statistics and list the 20 most recent files. Returns quota info (used/total bytes) and file list.",
     parameters: {
       type: "object",
       properties: {},
       required: [],
+    },
+  },
+};
+
+export const storageListFilesTool: Tool = {
+  type: "function",
+  function: {
+    name: "storage_list_files",
+    description: "List files stored in Titan Storage. Returns file IDs, names, sizes, MIME types, and upload dates. Use this to browse the user's Titan Storage.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max number of files to return (default 50)" },
+        offset: { type: "number", description: "Offset for pagination" },
+        feature: { type: "string", description: "Filter by feature category (e.g. 'metasploit', 'evilginx', 'general')" },
+      },
+      required: [],
+    },
+  },
+};
+
+export const storageGetDownloadUrlTool: Tool = {
+  type: "function",
+  function: {
+    name: "storage_get_download_url",
+    description: "Get a temporary signed download URL for a file in Titan Storage. Use storage_list_files first to get the file ID.",
+    parameters: {
+      type: "object",
+      properties: {
+        fileId: { type: "number", description: "The numeric ID of the file in Titan Storage" },
+      },
+      required: ["fileId"],
+    },
+  },
+};
+
+export const storageDeleteFileTool: Tool = {
+  type: "function",
+  function: {
+    name: "storage_delete_file",
+    description: "Permanently delete a file from Titan Storage. Use storage_list_files first to get the file ID.",
+    parameters: {
+      type: "object",
+      properties: {
+        fileId: { type: "number", description: "The numeric ID of the file to delete from Titan Storage" },
+      },
+      required: ["fileId"],
     },
   },
 };
@@ -2799,10 +2942,18 @@ export const TITAN_TOOLS: Tool[] = [
   checkBinTool,
   // New Titan Platform Tools
   evilginxConnectTool,
+  evilginxRunCommandTool,
+  evilginxListPhishletsTool,
+  evilginxListSessionsTool,
+  evilginxListLuresTool,
   metasploitTestConnectionTool,
+  metasploitRunCommandTool,
+  metasploitListSessionsTool,
+  metasploitSearchModulesTool,
   argusTestConnectionTool,
   astraTestConnectionTool,
   blackeyeTestConnectionTool,
+  blackeyeRunCommandTool,
   contentCreatorGetCampaignsTool,
   siteMonitorListSitesTool,
   totpVaultListTool,
@@ -2813,6 +2964,9 @@ export const TITAN_TOOLS: Tool[] = [
   affiliateGetStatsTool,
   grantListTool,
   storageGetStatsTool,
+  storageListFilesTool,
+  storageGetDownloadUrlTool,
+  storageDeleteFileTool,
   marketplaceBrowseTool,
   cybermcpTestBasicAuthTool,
   // Memory management tools
@@ -2932,10 +3086,18 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   sandboxDownloadUrlTool,
   // New Titan Platform Tools
   evilginxConnectTool,
+  evilginxRunCommandTool,
+  evilginxListPhishletsTool,
+  evilginxListSessionsTool,
+  evilginxListLuresTool,
   metasploitTestConnectionTool,
+  metasploitRunCommandTool,
+  metasploitListSessionsTool,
+  metasploitSearchModulesTool,
   argusTestConnectionTool,
   astraTestConnectionTool,
   blackeyeTestConnectionTool,
+  blackeyeRunCommandTool,
   contentCreatorGetCampaignsTool,
   siteMonitorListSitesTool,
   totpVaultListTool,
@@ -2946,6 +3108,9 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   affiliateGetStatsTool,
   grantListTool,
   storageGetStatsTool,
+  storageListFilesTool,
+  storageGetDownloadUrlTool,
+  storageDeleteFileTool,
   marketplaceBrowseTool,
   cybermcpTestBasicAuthTool,
 ];

@@ -28,6 +28,12 @@ import fs from "fs";
 
 const execAsync = promisify(execCb);
 
+// ─── Public export for Titan AI tool access ───────────────────────
+/** Execute an Evilginx command and return its output. Used by the Titan AI chat executor. */
+export async function execEvilginxCommandPublic(command: string, timeoutMs = 10000): Promise<string> {
+  return execEvilginxCommand(command, timeoutMs);
+}
+
 // ─── Local Exec Helper ────────────────────────────────────────────
 
 function getEvilginxBin(): string {

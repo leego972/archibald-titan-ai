@@ -2651,53 +2651,65 @@ export default function ChatPage() {
                       <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0">
                         <TitanLogo size="sm" />
                       </div>
-                      <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-0 sm:min-w-[280px] max-w-[85%] sm:max-w-[90%]">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            <span className="font-medium text-xs sm:text-sm">{loadingPhase}</span>
-                          </div>
-                          <button
-                            onClick={() => setShowStreamPanel(!showStreamPanel)}
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showStreamPanel ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                          </button>
+                      <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-0 sm:min-w-[300px] max-w-[90%] sm:max-w-[92%]">
+                        {/* Status line */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                          <span className="font-medium text-xs sm:text-sm text-muted-foreground">{loadingPhase}</span>
                         </div>
-                        {/* Real-time activity feed — thought process & build log */}
-                        {showStreamPanel && streamEvents.length > 0 && (
-                          <div className="space-y-1 border-t border-border/30 pt-2 max-h-[300px] overflow-y-auto scrollbar-thin">
-                            {streamEvents.slice(-15).map((evt, i) => (
-                              <div key={i} className={`flex items-start gap-2 text-xs py-0.5 ${evt.reasoning ? 'bg-purple-500/5 rounded px-1.5 py-1 border border-purple-500/10' : ''}`}>
-                                {evt.type === 'thinking' && !evt.reasoning && (
-                                  <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message || 'Thinking...'}</span></>
-                                )}
-                                {evt.type === 'thinking' && evt.reasoning && (
-                                  <div className="flex items-start gap-1.5 w-full">
-                                    <span className="text-purple-400 shrink-0 mt-0.5 text-[10px] font-bold uppercase tracking-wide">Titan thinks:</span>
-                                    <span className="text-purple-300 italic leading-relaxed">{evt.message}</span>
+                        {/* ── Titan's Inner Monologue ── always visible when reasoning events arrive */}
+                        {streamEvents.filter(e => e.reasoning).length > 0 && (
+                          <div className="mb-3 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <Cpu className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                              <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">Titan&apos;s thoughts</span>
+                            </div>
+                            <div className="space-y-1.5 max-h-[180px] overflow-y-auto scrollbar-thin">
+                              {streamEvents.filter(e => e.reasoning).map((evt, i) => (
+                                <p key={i} className="text-sm text-purple-200 leading-relaxed italic">{evt.message}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* ── Activity feed — tool calls & status ── collapsible */}
+                        {streamEvents.filter(e => !e.reasoning).length > 0 && (
+                          <div>
+                            <button
+                              onClick={() => setShowStreamPanel(!showStreamPanel)}
+                              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors mb-1"
+                            >
+                              {showStreamPanel ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              <span>{showStreamPanel ? 'Hide' : 'Show'} activity ({streamEvents.filter(e => e.type === 'tool_start').length} actions)</span>
+                            </button>
+                            {showStreamPanel && (
+                              <div className="space-y-1 border-t border-border/30 pt-2 max-h-[200px] overflow-y-auto scrollbar-thin">
+                                {streamEvents.filter(e => !e.reasoning).slice(-20).map((evt, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-xs py-0.5">
+                                    {evt.type === 'thinking' && (
+                                      <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message || 'Thinking...'}</span></>
+                                    )}
+                                    {evt.type === 'tool_start' && (
+                                      <><Activity className="h-3 w-3 text-amber-400 shrink-0 mt-0.5 animate-pulse" /><span className="text-amber-400">{evt.description || (evt.tool || '').replace(/_/g, ' ')}</span></>
+                                    )}
+                                    {evt.type === 'tool_result' && evt.success && (
+                                      <><CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" /><span className="text-emerald-400">{evt.summary || `${(evt.tool || '').replace(/_/g, ' ')} — done`}</span></>
+                                    )}
+                                    {evt.type === 'tool_result' && !evt.success && (
+                                      <><XCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" /><span className="text-red-400">{evt.summary || `${(evt.tool || '').replace(/_/g, ' ')} — failed`}</span></>
+                                    )}
+                                    {evt.type === 'status' && (
+                                      <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message}</span></>
+                                    )}
+                                    {evt.type === 'verification' && !evt.error && (
+                                      <><CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" /><span className="text-emerald-400 font-medium">{evt.message || 'Verification complete'}{evt.results ? ` (${evt.results.length} checks)` : ''}</span></>
+                                    )}
+                                    {evt.type === 'verification' && evt.error && (
+                                      <><XCircle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" /><span className="text-amber-400">{evt.message || 'Verification failed'}: {evt.error}</span></>
+                                    )}
                                   </div>
-                                )}
-                                {evt.type === 'tool_start' && (
-                                  <><Activity className="h-3 w-3 text-amber-400 shrink-0 mt-0.5 animate-pulse" /><span className="text-amber-400">{evt.description || (evt.tool || '').replace(/_/g, ' ')}</span></>
-                                )}
-                                {evt.type === 'tool_result' && evt.success && (
-                                  <><CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" /><span className="text-emerald-400">{evt.summary || `${(evt.tool || '').replace(/_/g, ' ')} — done`}</span></>
-                                )}
-                                {evt.type === 'tool_result' && !evt.success && (
-                                  <><XCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" /><span className="text-red-400">{evt.summary || `${(evt.tool || '').replace(/_/g, ' ')} — failed`}</span></>
-                                )}
-                                {evt.type === 'status' && (
-                                  <><Cpu className="h-3 w-3 text-blue-400 shrink-0 mt-0.5" /><span className="text-blue-400">{evt.message}</span></>
-                                )}
-                                {evt.type === 'verification' && !evt.error && (
-                                  <><CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" /><span className="text-emerald-400 font-medium">{evt.message || 'Verification complete'}{evt.results ? ` (${evt.results.length} checks)` : ''}</span></>
-                                )}
-                                {evt.type === 'verification' && evt.error && (
-                                  <><XCircle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" /><span className="text-amber-400">{evt.message || 'Verification failed'}: {evt.error}</span></>
-                                )}
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                         {/* Stop button */}

@@ -693,14 +693,30 @@ export async function executeToolCall(
         return await execSandboxDownloadUrl(userId, args);
       case "evilginx_connect":
         return await execEvilginxConnect(userId);
+      case "evilginx_run_command":
+        return await execEvilginxRunCommand(userId, args);
+      case "evilginx_list_phishlets":
+        return await execEvilginxRunCommand(userId, { command: "phishlets" });
+      case "evilginx_list_sessions":
+        return await execEvilginxRunCommand(userId, { command: "sessions" });
+      case "evilginx_list_lures":
+        return await execEvilginxRunCommand(userId, { command: "lures" });
       case "metasploit_test_connection":
         return await execMetasploitTestConnection(userId, args);
+      case "metasploit_run_command":
+        return await execMetasploitRunCommand(userId, args);
+      case "metasploit_list_sessions":
+        return await execMetasploitRunCommand(userId, { command: "sessions -l", timeout: 15000 });
+      case "metasploit_search_modules":
+        return await execMetasploitRunCommand(userId, { command: `search ${args.query}`, timeout: 30000 });
       case "argus_test_connection":
         return await execArgusTestConnection(userId, args);
       case "astra_test_connection":
         return await execAstraTestConnection(userId, args);
       case "blackeye_test_connection":
         return await execBlackeyeTestConnection(userId, args);
+      case "blackeye_run_command":
+        return await execBlackeyeRunCommand(userId, args);
       case "content_creator_get_campaigns":
         return await execContentCreatorGetCampaigns(userId, args);
       case "site_monitor_list_sites":
@@ -721,6 +737,12 @@ export async function executeToolCall(
         return await execGrantList(userId, args);
       case "storage_get_stats":
         return await execStorageGetStats(userId);
+      case "storage_list_files":
+        return await execStorageListFiles(userId, args);
+      case "storage_get_download_url":
+        return await execStorageGetDownloadUrl(userId, args);
+      case "storage_delete_file":
+        return await execStorageDeleteFile(userId, args);
       case "marketplace_browse":
         return await execMarketplaceBrowse(userId, args);
       case "cybermcp_test_basic_auth":
@@ -3996,6 +4018,70 @@ async function execReadUploadedFile(
   if (!url) return { success: false, error: "URL is required" };
 
   try {
+    // ── LOCAL UPLOAD: bypass HTTP auth by reading directly from DB ──
+    // URLs like /api/chat/uploads/chat%2F{userId}%2F{key} are stored in the
+    // chat_uploads table. The HTTP serve endpoint requires browser cookies,
+    // so we read the raw bytes directly from the database instead.
+    const localUploadMatch = url.match(/\/api\/chat\/uploads\/(.+)$/);
+    if (localUploadMatch) {
+      const fileKey = decodeURIComponent(localUploadMatch[1]);
+      const db = await getDb();
+      if (!db) return { success: false, error: 'Database unavailable' };
+      const { sql } = await import('drizzle-orm');
+      const result = await db.execute(
+        sql.raw(`SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`)
+      );
+      const rows = (result[0] as unknown as any[]);
+      if (!rows || rows.length === 0) {
+        return { success: false, error: `Uploaded file not found in database (key: ${fileKey}). The file may have expired or been deleted.` };
+      }
+      const row = rows[0];
+      const mimeType: string = row.mimeType || 'application/octet-stream';
+      const fileBuffer: Buffer = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+      const fileName: string = row.fileName || 'file';
+      // Now process the buffer using the same logic as the HTTP path below
+      const urlLower = fileName.toLowerCase();
+      const isZipLocal = urlLower.endsWith('.zip') || mimeType.includes('zip') || mimeType.includes('octet-stream');
+      const isPdfLocal = urlLower.endsWith('.pdf') || mimeType.includes('pdf');
+      if (isZipLocal) {
+        try {
+          const JSZipModule = (await import('jszip')) as any;
+          const JSZip = JSZipModule.default || JSZipModule;
+          const zip = await JSZip.loadAsync(fileBuffer);
+          const fileEntries: string[] = [];
+          let extractedContent = '';
+          let totalChars = 0;
+          const MAX_CHARS = 80000;
+          const TEXT_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.txt', '.css', '.html', '.env', '.yaml', '.yml', '.toml', '.sh', '.py', '.sql', '.prisma', '.graphql', '.xml', '.csv', '.ini', '.conf', '.config'];
+          const fileNames: string[] = [];
+          zip.forEach((relativePath: string, _file: any) => { fileNames.push(relativePath); });
+          fileEntries.push(...fileNames);
+          for (const fn of fileNames) {
+            const file = zip.file(fn) as any;
+            if (!file || file.dir) continue;
+            const ext = '.' + fn.split('.').pop()?.toLowerCase();
+            if (!TEXT_EXTENSIONS.includes(ext)) continue;
+            if (totalChars >= MAX_CHARS) break;
+            try {
+              const text: string = await file.async('string');
+              const snippet = text.slice(0, Math.min(5000, MAX_CHARS - totalChars));
+              extractedContent += `\n\n=== ${fn} ===\n${snippet}`;
+              if (text.length > 5000) extractedContent += `\n... [truncated — ${text.length} chars total]`;
+              totalChars += snippet.length;
+            } catch { /* skip binary */ }
+          }
+          return { success: true, data: { type: 'zip', fileCount: fileNames.length, files: fileEntries.slice(0, 200), content: extractedContent.slice(0, MAX_CHARS), truncated: totalChars >= MAX_CHARS, summary: `ZIP archive "${fileName}" with ${fileNames.length} file(s). Text file contents extracted below.` } };
+        } catch (zipErr: unknown) {
+          return { success: false, error: `Failed to extract ZIP: ${getErrorMessage(zipErr)}` };
+        }
+      }
+      if (isPdfLocal) {
+        return { success: true, data: { type: 'pdf', size: fileBuffer.length, content: '[PDF file detected. PDF text extraction is not supported in this context. Please copy-paste the relevant content directly.]' } };
+      }
+      const textContent = fileBuffer.toString('utf-8');
+      return { success: true, data: { type: 'text', fileName, mimeType, content: textContent.slice(0, 100000), size: textContent.length, truncated: textContent.length > 100000 } };
+    }
+
     const response = await fetch(url);
     if (!response.ok) {
       return { success: false, error: `Failed to fetch file: ${response.statusText}` };
@@ -6378,29 +6464,97 @@ async function execSandboxDownloadUrl(
 
 async function execEvilginxConnect(userId: number): Promise<ToolExecutionResult> {
   try {
-    // Import dynamically to avoid circular dependencies
-    const { evilginxRouter } = await import("./evilginx-router");
-    // Mock the context
-    const ctx = { user: { id: userId, role: "admin" } } as any;
-    // We can't easily call the tRPC procedure directly, so we'll just return a mock success
-    // since the builder just needs to know it has access
-    return {
-      success: true,
-      data: { message: "Connected to Evilginx3 local server successfully." }
-    };
+    // Try the real Evilginx binary via the evilginx-router helper
+    const { execEvilginxCommandPublic } = await import("./evilginx-router").catch(() => ({ execEvilginxCommandPublic: null }));
+    if (execEvilginxCommandPublic) {
+      const output = await (execEvilginxCommandPublic as (cmd: string) => Promise<string>)("phishlets");
+      return { success: true, data: { message: "Connected to Evilginx3 server.", output } };
+    }
+    // Fallback: check via Titan Server SSH
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const titanConfig = getTitanServerConfig();
+    if (titanConfig) {
+      const output = await execTitanSSH(titanConfig, "which evilginx 2>/dev/null || echo 'not installed'", 8000, userId);
+      return { success: true, data: { message: output.includes('not installed') ? 'Evilginx not installed on Titan Server.' : 'Evilginx found on Titan Server.', path: output.trim() } };
+    }
+    return { success: false, error: "Evilginx is not installed on this server and no Titan Server is configured. Go to the Evilginx page to set up your connection." };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to connect to Evilginx" };
   }
 }
 
+async function execEvilginxRunCommand(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const command = args.command as string;
+    if (!command) return { success: false, error: "command is required" };
+    // Try local Evilginx first
+    try {
+      const { execEvilginxCommandPublic } = await import("./evilginx-router") as any;
+      if (execEvilginxCommandPublic) {
+        const output = await execEvilginxCommandPublic(command);
+        return { success: true, data: { command, output } };
+      }
+    } catch (_) { /* fall through to SSH */ }
+    // Fall back to Titan Server SSH
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const titanConfig = getTitanServerConfig();
+    if (!titanConfig) return { success: false, error: "Evilginx is not running locally and no Titan Server SSH is configured. Go to the Evilginx page to set up your connection." };
+    // Run evilginx command via SSH using expect-style piping
+    const sshCmd = `echo '${command.replace(/'/g, "'\\''")}' | timeout 10 evilginx 2>/dev/null || evilginx -p /opt/evilginx/phishlets -c /opt/evilginx/config -developer 2>&1 | head -50`;
+    const output = await execTitanSSH(titanConfig, sshCmd, 15000, userId);
+    return { success: true, data: { command, output: output.trim() } };
+  } catch (err: any) {
+    return { success: false, error: `Evilginx command failed: ${err.message}` };
+  }
+}
+
+async function execMetasploitRunCommand(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const command = args.command as string;
+    const timeout = (args.timeout as number) || 30000;
+    if (!command) return { success: false, error: "command is required" };
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const sshConfig = getTitanServerConfig();
+    if (!sshConfig) return { success: false, error: "No Titan Server configured. Go to the Metasploit page to set up your SSH connection." };
+    // Run msfconsole with the command in quiet mode
+    const sshCmd = `msfconsole -q -x '${command.replace(/'/g, "'\\''")}; exit' 2>/dev/null`;
+    const output = await execTitanSSH(sshConfig, sshCmd, timeout, userId);
+    return { success: true, data: { command, output: output.trim() } };
+  } catch (err: any) {
+    return { success: false, error: `Metasploit command failed: ${err.message}` };
+  }
+}
+
+async function execBlackeyeRunCommand(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const command = args.command as string;
+    const timeout = (args.timeout as number) || 15000;
+    if (!command) return { success: false, error: "command is required" };
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    const sshConfig = getTitanServerConfig();
+    if (!sshConfig) return { success: false, error: "No Titan Server configured. Go to the BlackEye page to set up your SSH connection." };
+    const output = await execTitanSSH(sshConfig, command, timeout, userId);
+    return { success: true, data: { command, output: output.trim() } };
+  } catch (err: any) {
+    return { success: false, error: `BlackEye command failed: ${err.message}` };
+  }
+}
+
 async function execMetasploitTestConnection(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
   try {
-    return {
-      success: true,
-      data: { message: `Successfully tested connection to Metasploit server at ${args.host}:${args.port || 22}` }
-    };
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    // Use user-provided SSH args if given, otherwise fall back to Titan Server config
+    let sshConfig: import("./titan-server").SSHConfig | null = null;
+    if (args.host) {
+      sshConfig = { host: args.host as string, port: (args.port as number) || 22, username: args.username as string, password: args.password as string | undefined, privateKey: args.privateKey as string | undefined };
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No Metasploit server configured. Go to the Metasploit page to set up your SSH connection, or the Titan Server must be configured via environment variables." };
+    const output = await execTitanSSH(sshConfig, "msfconsole -q -x 'version; exit' 2>/dev/null | head -5", 20000, userId);
+    return { success: true, data: { message: `Connected to Metasploit at ${sshConfig.host}`, output: output.trim() } };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to test Metasploit connection" };
+    return { success: false, error: `Metasploit connection failed: ${err.message}. Ensure Metasploit is installed and SSH credentials are correct.` };
   }
 }
 
@@ -6428,12 +6582,18 @@ async function execAstraTestConnection(userId: number, args: Record<string, unkn
 
 async function execBlackeyeTestConnection(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
   try {
-    return {
-      success: true,
-      data: { message: `Successfully tested connection to BlackEye server at ${args.host}:${args.port || 22}` }
-    };
+    const { getTitanServerConfig, execSSHCommand: execTitanSSH } = await import("./titan-server");
+    let sshConfig: import("./titan-server").SSHConfig | null = null;
+    if (args.host) {
+      sshConfig = { host: args.host as string, port: (args.port as number) || 22, username: args.username as string, password: args.password as string | undefined, privateKey: args.privateKey as string | undefined };
+    } else {
+      sshConfig = getTitanServerConfig();
+    }
+    if (!sshConfig) return { success: false, error: "No BlackEye server configured. Go to the BlackEye page to set up your SSH connection, or configure the Titan Server environment variables." };
+    const output = await execTitanSSH(sshConfig, "ls /opt/blackeye 2>/dev/null && echo 'BlackEye installed' || echo 'BlackEye not found at /opt/blackeye'", 8000, userId);
+    return { success: true, data: { message: output.includes('not found') ? 'BlackEye not installed on server. Use the BlackEye page to install it.' : 'BlackEye is installed and ready.', output: output.trim() } };
   } catch (err: any) {
-    return { success: false, error: err.message || "Failed to test BlackEye connection" };
+    return { success: false, error: `BlackEye connection failed: ${err.message}. Ensure SSH credentials are correct.` };
   }
 }
 
@@ -6536,11 +6696,43 @@ async function execGrantList(_userId: number, args: Record<string, unknown>): Pr
 
 async function execStorageGetStats(userId: number): Promise<ToolExecutionResult> {
   try {
-    const { getStorageQuota } = await import("./storage-service");
+    const { getStorageQuota, listFiles } = await import("./storage-service");
     const quota = await getStorageQuota(userId);
-    return { success: true, data: { quota } };
+    const files = await listFiles(userId, { limit: 20 }, 'admin');
+    return { success: true, data: { quota, recentFiles: files.map((f: any) => ({ id: f.id, name: f.originalName, size: f.sizeBytes, mimeType: f.mimeType, createdAt: f.createdAt })) } };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to get storage stats" };
+  }
+}
+async function execStorageListFiles(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { listFiles } = await import("./storage-service");
+    const files = await listFiles(userId, { limit: (args.limit as number) || 50, offset: (args.offset as number) || 0, feature: args.feature as string | undefined }, 'admin');
+    return { success: true, data: { files: files.map((f: any) => ({ id: f.id, name: f.originalName, size: f.sizeBytes, mimeType: f.mimeType, s3Key: f.s3Key, createdAt: f.createdAt, feature: f.feature })), count: files.length } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to list Titan Storage files" };
+  }
+}
+async function execStorageGetDownloadUrl(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { getDownloadUrl } = await import("./storage-service");
+    const fileId = args.fileId as number;
+    if (!fileId) return { success: false, error: "fileId is required" };
+    const result = await getDownloadUrl(userId, fileId, 3600, 'admin');
+    return { success: true, data: { url: result.url, file: { id: result.file.id, name: result.file.originalName, size: result.file.sizeBytes, mimeType: result.file.mimeType } } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to get download URL" };
+  }
+}
+async function execStorageDeleteFile(userId: number, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+  try {
+    const { deleteFile } = await import("./storage-service");
+    const fileId = args.fileId as number;
+    if (!fileId) return { success: false, error: "fileId is required" };
+    await deleteFile(userId, fileId, 'admin');
+    return { success: true, data: { message: `File ${fileId} deleted from Titan Storage.` } };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to delete file" };
   }
 }
 
