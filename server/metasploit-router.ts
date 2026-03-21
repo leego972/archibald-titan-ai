@@ -154,8 +154,20 @@ function sanitize(n: MetasploitNode): Omit<MetasploitNode, "sshPassword" | "sshK
 }
 
 async function execMsfCommand(node: MetasploitNode, command: string, timeoutMs = 30000, userId?: number): Promise<string> {
-  const safeCmd = command.replace(/[`\\|;&><]/g, "");
-  const script = `echo '${safeCmd.replace(/'/g, "'\\''")}' | msfconsole -q -x "${safeCmd.replace(/"/g, '\\"')}; exit" 2>&1 | head -200`;
+  // Write the command to a temp file on the VPS and execute via msfconsole -r (resource file)
+  // This correctly handles semicolons, multi-command chains, and special characters
+  // without any sanitisation that would break valid msfconsole syntax
+  const tmpFile = `/tmp/msf_cmd_${Date.now()}.rc`;
+  // Escape single quotes in the command for the heredoc
+  const escapedCmd = command.replace(/'/g, "'\\''" );
+  const script = [
+    `cat > ${tmpFile} << 'MSFEOF'`,
+    command,
+    `exit`,
+    `MSFEOF`,
+    `msfconsole -q -r ${tmpFile} 2>&1 | head -300`,
+    `rm -f ${tmpFile}`,
+  ].join("\n");
   return execSSHCommand(nodeToSSH(node), script, timeoutMs, userId);
 }
 
@@ -453,8 +465,17 @@ export const metasploitRouter = router({
       const pass = input?.rpcPassword ?? 'msf';
       const port = input?.rpcPort ?? 55553;
       const sslFlag = input?.ssl !== false ? '-S' : '';
-      const out = await execMsfCommand(node, `msfrpcd -P ${pass} ${sslFlag} -f -a 127.0.0.1 -p ${port} 2>&1 & sleep 2; echo RPCD_STARTED`, 30000, ctx.user.id);
-      return { success: out.includes("RPCD_STARTED"), message: "MSFRPCD started on active node." };
+      // msfrpcd is a standalone binary — call it directly via SSH, NOT via msfconsole
+      const script = [
+        `pkill -f msfrpcd 2>/dev/null || true`,
+        `sleep 1`,
+        `nohup msfrpcd -P '${pass}' ${sslFlag} -f -a 127.0.0.1 -p ${port} > /tmp/msfrpcd.log 2>&1 &`,
+        `sleep 3`,
+        `if pgrep -f msfrpcd > /dev/null; then echo RPCD_STARTED; else echo RPCD_FAILED; cat /tmp/msfrpcd.log | tail -5; fi`,
+      ].join("\n");
+      const out = await execSSHCommand(nodeToSSH(node), script, 30000, ctx.user.id);
+      const started = out.includes("RPCD_STARTED");
+      return { success: started, message: started ? `MSFRPCD started on ${node.publicIp ?? node.sshHost}:${port}` : `MSFRPCD failed to start: ${out.slice(-200)}` };
     } catch (e: any) { return { success: false, message: e.message }; }
   }),
 

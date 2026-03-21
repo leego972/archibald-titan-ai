@@ -403,9 +403,34 @@ export const blackeyeRouter = router({
   install: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const node = await getActiveNode(ctx.user.id);
-    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node. Add a dedicated VPS node and deploy it first." });
-    return { success: false, output: "Use the Deploy button on your node to install BlackEye automatically.", message: "Use the Deploy button on your node to install BlackEye automatically." };
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    const idx = nodes.findIndex(n => n.id === activeId);
+    if (idx === -1) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node. Add a dedicated VPS node first." });
+    const node = nodes[idx];
+    node.status = "deploying";
+    await saveNodes(ctx.user.id, nodes);
+    try {
+      const output = await execSSHCommand(nodeToSSH(node), INSTALL_BLACKEYE, 180000, ctx.user.id);
+      const ok = output.includes("BLACKEYE_OK");
+      const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+      if (ipMatch) node.publicIp = ipMatch[1];
+      node.status = ok ? "ready" : "error";
+      node.installed = ok;
+      if (ok) { node.deployedAt = new Date().toISOString(); node.errorMessage = undefined; }
+      else { node.errorMessage = "Installation failed. Check SSH credentials and server access."; }
+      node.lastChecked = new Date().toISOString();
+      await saveNodes(ctx.user.id, nodes);
+      const msg = ok
+        ? `BlackEye installed successfully on "${node.label}" at ${node.publicIp ?? node.sshHost}`
+        : `Installation failed on "${node.label}". Check the output for details.`;
+      return { success: ok, output, message: msg };
+    } catch (err: any) {
+      node.status = "error"; node.errorMessage = err.message;
+      node.lastChecked = new Date().toISOString();
+      await saveNodes(ctx.user.id, nodes);
+      return { success: false, output: err.message, message: `Install failed: ${err.message}` };
+    }
   }),
 
   launch: protectedProcedure

