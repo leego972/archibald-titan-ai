@@ -742,14 +742,27 @@ export const vpnChainRouter = router({
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-    const active = await isChainActive(ctx.user.id);
     const hops = await getHops(ctx.user.id);
-    const hasReadyHops = hops.some(h => h.status === "ready" && h.installed);
-    if (active && !hasReadyHops) {
+    const readyHops = hops.filter(h => h.status === "ready" && h.installed);
+    const hasReadyHops = readyHops.length > 0;
+    if (!hasReadyHops) {
       await setChainActiveFlag(ctx.user.id, false);
       return { active: false, hopCount: hops.length, hasReadyHops: false };
     }
-    return { active, hopCount: hops.length, hasReadyHops };
+    // Live SSH check: verify WireGuard interface is actually up on the first hop
+    const firstHop = readyHops[0];
+    try {
+      const wgOut = await execSSHCommand(hopToSSH(firstHop), "wg show wg0 2>/dev/null && echo WG_UP || echo WG_DOWN", 8000, ctx.user.id);
+      const liveActive = wgOut.includes("WG_UP");
+      // Sync DB flag if it differs from live state
+      const dbActive = await isChainActive(ctx.user.id);
+      if (liveActive !== dbActive) await setChainActiveFlag(ctx.user.id, liveActive);
+      return { active: liveActive, hopCount: hops.length, hasReadyHops };
+    } catch {
+      // SSH unreachable — chain is offline
+      await setChainActiveFlag(ctx.user.id, false);
+      return { active: false, hopCount: hops.length, hasReadyHops };
+    }
   }),
 
   setActive: protectedProcedure

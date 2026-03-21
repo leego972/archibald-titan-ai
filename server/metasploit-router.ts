@@ -354,10 +354,36 @@ export const metasploitRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node." });
     const output = await execMsfCommand(node, "sessions -l", 30000, ctx.user.id);
-    const sessions = output.split('\n').filter(l => l.match(/^\s+\d+\s+/)).map(l => {
-      const parts = l.trim().split(/\s+/);
-      return { id: parts[0] ?? '0', type: parts[1] ?? '', info: parts.slice(2).join(' '), via: parts[2] ?? '', remoteAddr: parts[3] ?? '', connection: parts[3] ?? '' };
-    });
+    // Robust parser: handles both the tabular and JSON-like output formats from msfconsole
+    // Format: "  1  meterpreter x86/windows  SYSTEM @ WIN7  tcp  192.168.1.5:4444 -> 192.168.1.10:49152"
+    const sessions: Array<{ id: string; type: string; info: string; via: string; remoteAddr: string; connection: string }> = [];
+    for (const line of output.split('\n')) {
+      // Match lines starting with optional whitespace then a session ID number
+      const m = line.match(/^\s*(\d+)\s+(\S+\s+\S+)\s+(.*?)\s+(tcp|udp)\s+(\S+)/);
+      if (m) {
+        sessions.push({
+          id: m[1],
+          type: m[2].trim(),
+          info: m[3].trim(),
+          via: m[4],
+          remoteAddr: m[5].split('->')[1]?.trim() ?? m[5],
+          connection: m[5],
+        });
+      } else {
+        // Fallback: any line with leading whitespace + number
+        const fb = line.match(/^\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)/);
+        if (fb) {
+          sessions.push({
+            id: fb[1],
+            type: fb[2],
+            info: fb[4].trim(),
+            via: fb[3],
+            remoteAddr: fb[4].split(' ').pop() ?? '',
+            connection: fb[4].trim(),
+          });
+        }
+      }
+    }
     return { output, raw: output, sessions, nodeLabel: node.label };
   }),
 
@@ -425,22 +451,51 @@ export const metasploitRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) return { running: false, version: null, raw: "No active node.", message: "No active node." };
     try {
-      const out = await execMsfCommand(node, "msfconsole -v 2>/dev/null | head -1 || echo not_installed", 15000, ctx.user.id);
+      // Use execSSHCommand directly — msfconsole -v is a shell command, not an msfconsole command
+      const out = await execSSHCommand(nodeToSSH(node), "msfconsole -v 2>/dev/null | head -1 || echo not_installed", 15000, ctx.user.id);
       const installed = !out.includes("not_installed") && !out.includes("command not found");
-      return { running: installed, version: out.trim(), raw: out, message: installed ? `Metasploit running on ${node.publicIp ?? node.sshHost}` : "Metasploit not installed on active node." };
+      const rpcdRunning = await execSSHCommand(nodeToSSH(node), "pgrep -f msfrpcd > /dev/null && echo RPCD_UP || echo RPCD_DOWN", 5000, ctx.user.id).catch(() => "RPCD_DOWN");
+      return { running: installed, version: out.trim(), raw: out, rpcdRunning: rpcdRunning.includes("RPCD_UP"), message: installed ? `Metasploit ready on ${node.publicIp ?? node.sshHost}` : "Metasploit not installed on active node." };
     } catch (e: any) { return { running: false, version: null, raw: e.message, message: e.message }; }
   }),
 
   install: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
-    const node = await getActiveNode(ctx.user.id);
-    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node. Add a dedicated VPS node and deploy it first." });
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    const idx = nodes.findIndex(n => n.id === activeId);
+    if (idx === -1) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node. Add a dedicated VPS node first." });
+    const node = nodes[idx];
+    // Check if already installed first
+    const checkOut = await execSSHCommand(nodeToSSH(node), "command -v msfconsole > /dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED", 10000, ctx.user.id).catch(() => "NOT_INSTALLED");
+    if (checkOut.includes("INSTALLED")) {
+      return { success: true, output: "Metasploit Framework is already installed on this node.", message: "Metasploit Framework is already installed on this node." };
+    }
+    // Run the full install script
+    node.status = "deploying";
+    await saveNodes(ctx.user.id, nodes);
     try {
-      const out = await execMsfCommand(node, "msfconsole -v 2>/dev/null | head -1 || echo not_installed", 15000, ctx.user.id);
-      if (!out.includes("not_installed")) return { success: true, output: "Metasploit already installed on active node.", message: "Metasploit already installed on active node." };
-      return { success: false, output: "Deploy the node first using the Deploy button — it installs Metasploit automatically.", message: "Deploy the node first using the Deploy button — it installs Metasploit automatically." };
-    } catch (e: any) { return { success: false, output: e.message, message: e.message }; }
+      const output = await execSSHCommand(nodeToSSH(node), INSTALL_METASPLOIT, 600000, ctx.user.id);
+      const ok = output.includes("MSF_OK");
+      const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+      if (ipMatch) node.publicIp = ipMatch[1];
+      node.status = ok ? "ready" : "error";
+      node.installed = ok;
+      if (ok) { node.deployedAt = new Date().toISOString(); node.errorMessage = undefined; }
+      else { node.errorMessage = "Installation failed. Check SSH credentials and server access."; }
+      node.lastChecked = new Date().toISOString();
+      await saveNodes(ctx.user.id, nodes);
+      const msg = ok
+        ? `Metasploit Framework installed on "${node.label}" at ${node.publicIp ?? node.sshHost}`
+        : `Installation failed on "${node.label}". Check the output for details.`;
+      return { success: ok, output, message: msg };
+    } catch (err: any) {
+      node.status = "error"; node.errorMessage = err.message;
+      node.lastChecked = new Date().toISOString();
+      await saveNodes(ctx.user.id, nodes);
+      return { success: false, output: err.message, message: `Install failed: ${err.message}` };
+    }
   }),
 
   update: protectedProcedure.mutation(async ({ ctx }) => {
@@ -449,7 +504,8 @@ export const metasploitRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
     try {
-      const out = await execMsfCommand(node, "apt-get update -qq && apt-get upgrade -y metasploit-framework 2>&1 | tail -3", 120000, ctx.user.id);
+      // Use execSSHCommand directly — apt-get is a shell command, not an msfconsole command
+      const out = await execSSHCommand(nodeToSSH(node), "apt-get update -qq 2>&1 | tail -1 && apt-get upgrade -y metasploit-framework 2>&1 | tail -5", 120000, ctx.user.id);
       return { success: true, output: out || "Update complete.", message: out || "Update complete." };
     } catch (e: any) { return { success: false, output: e.message, message: e.message }; }
   }),
@@ -485,7 +541,8 @@ export const metasploitRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
     try {
-      const out = await execMsfCommand(node, "pkill -f msfrpcd 2>/dev/null; echo RPCD_STOPPED", 10000, ctx.user.id);
+      // Use execSSHCommand directly — pkill is a shell command, not an msfconsole command
+      await execSSHCommand(nodeToSSH(node), "pkill -f msfrpcd 2>/dev/null; sleep 1; echo RPCD_STOPPED", 10000, ctx.user.id);
       return { success: true, message: "MSFRPCD stopped." };
     } catch (e: any) { return { success: false, message: e.message }; }
   }),
@@ -497,7 +554,8 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      const out = await execMsfCommand(node, `msfconsole -q -x 'info ${input.module}; exit' 2>&1`, 30000, ctx.user.id);
+      // execMsfCommand already wraps in msfconsole -r, so pass the msfconsole command directly
+      const out = await execMsfCommand(node, `info ${input.module}`, 30000, ctx.user.id);
       return { info: out, output: out };
     }),
 
@@ -508,7 +566,8 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      const out = await execMsfCommand(node, `msfconsole -q -x 'sessions -k ${input.sessionId}; exit' 2>&1`, 20000, ctx.user.id);
+      // Pass msfconsole command directly to execMsfCommand (it wraps in msfconsole -r)
+      const out = await execMsfCommand(node, `sessions -k ${input.sessionId}`, 20000, ctx.user.id);
       return { success: true, output: out };
     }),
 
@@ -519,8 +578,10 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('; ');
-      const cmd = `msfconsole -q -x 'use ${input.module}; ${setOpts}; run; exit' 2>&1`;
+      // Build a multi-line msfconsole resource script — execMsfCommand handles the wrapping
+      const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('\n');
+      const payloadLine = input.payload ? `set PAYLOAD ${input.payload}\n` : '';
+      const cmd = `use ${input.module}\n${setOpts}\n${payloadLine}run`;
       const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
       return { success: true, output: out };
     }),
@@ -534,8 +595,9 @@ export const metasploitRouter = router({
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       const encoderFlag = input.encoder ? `-e ${input.encoder}` : '';
       const outputFile = `/tmp/payload_${Date.now()}.${input.format}`;
-      const cmd = `msfvenom -p ${input.payload} LHOST=${input.lhost} LPORT=${input.lport} -f ${input.format} ${encoderFlag} -o ${outputFile} 2>&1; echo OUTPUT_FILE:${outputFile}`;
-      const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
+      // msfvenom is a standalone shell binary — use execSSHCommand directly, NOT execMsfCommand
+      const cmd = `msfvenom -p '${input.payload}' LHOST='${input.lhost}' LPORT=${input.lport} -f '${input.format}' ${encoderFlag} -o '${outputFile}' 2>&1; echo OUTPUT_FILE:${outputFile}`;
+      const out = await execSSHCommand(nodeToSSH(node), cmd, 60000, ctx.user.id);
       return { success: true, output: out, outputFile };
     }),
 
@@ -544,8 +606,12 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    const out = await execMsfCommand(node, "msfconsole -q -x 'workspace; exit' 2>&1", 20000, ctx.user.id);
-    const workspaces = out.split('\n').filter(l => l.trim().startsWith('*') || l.trim().match(/^\w/)).map(l => l.trim().replace(/^\*\s*/, ''));
+    // Pass msfconsole command directly to execMsfCommand (it wraps in msfconsole -r)
+    const out = await execMsfCommand(node, "workspace", 20000, ctx.user.id);
+    const workspaces = out.split('\n')
+      .filter(l => l.trim().startsWith('*') || l.trim().match(/^[a-zA-Z0-9_-]+$/))
+      .map(l => l.trim().replace(/^\*\s*/, ''))
+      .filter(Boolean);
     return { raw: out, workspaces };
   }),
 

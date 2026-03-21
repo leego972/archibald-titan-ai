@@ -452,12 +452,27 @@ export const torRouter = router({
       return { success: true, firewallEnabled: input.enabled, message: input.enabled ? "Firewall enabled — inbound connections blocked" : "Firewall disabled" };
     }),
 
-  /** Get whether Tor is currently active (has a running node) */
+  /** Get whether Tor is currently active — does a live SSH check, not just DB status */
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
-    return { active: !!node && node.status === 'running' };
+    if (!node || !node.installed) return { active: false, nodeLabel: node?.label, installed: node?.installed ?? false };
+    try {
+      // Live SSH check: is the Tor service actually running?
+      const out = await execSSHCommand(nodeToSSH(node), "systemctl is-active tor 2>/dev/null || pgrep -x tor > /dev/null && echo active || echo inactive", 8000, ctx.user.id);
+      const active = out.trim().startsWith("active");
+      // Sync DB status if it differs
+      if (active !== (node.status === 'running')) {
+        const nodes = await getNodes(ctx.user.id);
+        const idx = nodes.findIndex(n => n.id === node.id);
+        if (idx !== -1) { nodes[idx].status = active ? 'running' : 'stopped'; await saveNodes(ctx.user.id, nodes); }
+      }
+      return { active, nodeLabel: node.label, installed: node.installed };
+    } catch {
+      // SSH failed — node is offline
+      return { active: false, nodeLabel: node.label, installed: node.installed };
+    }
   }),
 
   /** Toggle Tor active state (start/stop Tor on the active node) */
