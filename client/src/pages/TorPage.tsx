@@ -1,433 +1,244 @@
 /**
- * Titan Tor Browser Page
- * Ultra-fast server-side Tor with reverse-connection firewall.
- * Advanced under the hood — dead simple to operate.
+ * Tor Browser Page — Ultra-fast Tor with dedicated VPS nodes
+ * Reverse-connection firewall, circuit racing, guard pinning
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  Shield, ShieldCheck, ShieldOff, Globe, RefreshCw, Loader2,
-  Terminal, Copy, CheckCircle2, AlertTriangle, Wifi, WifiOff,
-  Lock, Unlock, Eye, Server, Zap, Info
+  Globe, Plus, Trash2, Play, Square, RefreshCw, CheckCircle, XCircle,
+  Clock, Loader2, Star, Shield, Zap, Lock, RotateCcw,
 } from "lucide-react";
 
+function statusBadge(status: string) {
+  switch (status) {
+    case "ready": return <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><CheckCircle className="w-3 h-3 mr-1" />Ready</Badge>;
+    case "deploying": return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Deploying</Badge>;
+    case "running": return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30"><CheckCircle className="w-3 h-3 mr-1" />Running</Badge>;
+    case "offline": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="w-3 h-3 mr-1" />Offline</Badge>;
+    case "error": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="w-3 h-3 mr-1" />Error</Badge>;
+    default: return <Badge className="bg-zinc-500/20 text-zinc-400 border-zinc-500/30"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+  }
+}
+
 export default function TorPage() {
-  const [tab, setTab] = useState("status");
-  const [customHost, setCustomHost] = useState("");
-  const [customPort, setCustomPort] = useState("22");
-  const [customUser, setCustomUser] = useState("root");
-  const [customPass, setCustomPass] = useState("");
-  const [tunnelPort, setTunnelPort] = useState("9150");
-  const [copied, setCopied] = useState(false);
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.tor.listNodes.useQuery();
+  const statusQuery = trpc.tor.getStatus.useQuery();
 
-  const configQuery = trpc.tor.getConfig.useQuery();
-  const activeStateQuery = trpc.tor.getActiveState.useQuery();
-  const tunnelQuery = trpc.tor.getTunnelCommand.useQuery();
+  const addNode = trpc.tor.addNode.useMutation({ onSuccess: () => { utils.tor.listNodes.invalidate(); toast.success("Node added"); setAddOpen(false); resetForm(); } });
+  const deployNode = trpc.tor.deployNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const checkNode = trpc.tor.checkNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); toast.info(r.message); } });
+  const setActive = trpc.tor.setActiveNode.useMutation({ onSuccess: () => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); toast.success("Active node updated"); } });
+  const removeNode = trpc.tor.removeNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); toast.success(r.message); } });
+  const startTor = trpc.tor.startTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const stopTor = trpc.tor.stopTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const newCircuit = trpc.tor.newCircuit.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const toggleFirewall = trpc.tor.toggleFirewall.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); toast.success(r.message); } });
 
-  const configureTitan = trpc.tor.configureTitanServer.useMutation({
-    onSuccess: () => { toast.success("Configured to use Titan Server"); configQuery.refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-  const configureCustom = trpc.tor.configureCustomServer.useMutation({
-    onSuccess: () => { toast.success("Custom server configured"); configQuery.refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-  const installTor = trpc.tor.installTor.useMutation({
-    onSuccess: (d) => {
-      if (d.success) toast.success(d.message);
-      else toast.error(d.message);
-      configQuery.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const setFirewall = trpc.tor.setFirewall.useMutation({
-    onSuccess: (d) => {
-      toast[d.success ? "success" : "error"](d.message);
-      configQuery.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const getStatus = trpc.tor.getStatus.useMutation({
-    onSuccess: (d) => {
-      if (d.running) toast.success(d.message);
-      else toast.warning(d.message);
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const newCircuit = trpc.tor.newCircuit.useMutation({
-    onSuccess: (d) => toast[d.success ? "success" : "error"](d.message),
-    onError: (e) => toast.error(e.message),
-  });
-  const setActive = trpc.tor.setActive.useMutation({
-    onSuccess: () => activeStateQuery.refetch(),
-    onError: (e) => toast.error(e.message),
-  });
+  const [addOpen, setAddOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [sshHost, setSshHost] = useState("");
+  const [sshPort, setSshPort] = useState("22");
+  const [sshUser, setSshUser] = useState("root");
+  const [sshPassword, setSshPassword] = useState("");
+  const [sshKey, setSshKey] = useState("");
+  const [country, setCountry] = useState("");
 
-  const config = configQuery.data;
-  const status = getStatus.data;
-  const tunnel = tunnelQuery.data;
-  const isActive = activeStateQuery.data?.active ?? false;
+  const resetForm = () => { setLabel(""); setSshHost(""); setSshPort("22"); setSshUser("root"); setSshPassword(""); setSshKey(""); setCountry(""); };
 
-  const copyTunnel = () => {
-    if (tunnel?.command) {
-      navigator.clipboard.writeText(tunnel.command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const nodes = data?.nodes ?? [];
+  const activeId = data?.activeNodeId;
+  const status = statusQuery.data;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
-            <Globe className="w-6 h-6 text-purple-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Tor Browser</h1>
-            <p className="text-sm text-zinc-400">Ultra-fast anonymous browsing with reverse-connection firewall</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {config?.configured && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-zinc-400">Active</span>
-              <Switch
-                checked={isActive}
-                onCheckedChange={(v) => setActive.mutate({ active: v })}
-              />
+    <div className="min-h-screen bg-zinc-950 text-white p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+              <Globe className="w-6 h-6 text-purple-400" />
             </div>
-          )}
-          <Badge variant={isActive ? "default" : "secondary"} className={isActive ? "bg-purple-500/20 text-purple-300 border-purple-500/30" : ""}>
-            {isActive ? "ON" : "OFF"}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Speed + Security badges */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { icon: Zap, label: "Circuit Racing", desc: "3 circuits built simultaneously", color: "yellow" },
-          { icon: Shield, label: "Firewall", desc: config?.firewallEnabled ? "Active" : "Inactive", color: config?.firewallEnabled ? "green" : "zinc" },
-          { icon: Lock, label: "DNS Protected", desc: "No DNS leaks", color: "blue" },
-          { icon: Globe, label: "Exit IP", desc: status?.exitIp ?? "Unknown", color: "purple" },
-        ].map(({ icon: Icon, label, desc, color }) => (
-          <div key={label} className={`p-3 rounded-lg bg-${color}-500/10 border border-${color}-500/20`}>
-            <Icon className={`w-4 h-4 text-${color}-400 mb-1`} />
-            <div className={`text-xs font-medium text-${color}-300`}>{label}</div>
-            <div className="text-xs text-zinc-400 truncate">{desc}</div>
-          </div>
-        ))}
-      </div>
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-zinc-900 border border-zinc-800">
-          <TabsTrigger value="status">Status</TabsTrigger>
-          <TabsTrigger value="setup">Setup</TabsTrigger>
-          <TabsTrigger value="connect">Connect Browser</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-
-        {/* ── Status Tab ── */}
-        <TabsContent value="status" className="space-y-4 mt-4">
-          {!config?.configured ? (
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardContent className="pt-6 text-center space-y-3">
-                <Globe className="w-12 h-12 text-zinc-600 mx-auto" />
-                <p className="text-zinc-400">Tor is not configured yet.</p>
-                <Button onClick={() => setTab("setup")} variant="outline">Go to Setup</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {/* Status card */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    {status?.running
-                      ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      : <AlertTriangle className="w-4 h-4 text-yellow-400" />}
-                    Tor Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Status</span>
-                      <div className={`font-medium ${status?.running ? "text-green-400" : "text-zinc-400"}`}>
-                        {status?.running ? "Running" : "Not checked"}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Tor Verified</span>
-                      <div className={`font-medium ${status?.isTor ? "text-green-400" : "text-zinc-400"}`}>
-                        {status?.isTor ? "✓ Yes" : "—"}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Exit IP</span>
-                      <div className="font-medium text-purple-300">{status?.exitIp ?? "—"}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Version</span>
-                      <div className="font-medium text-zinc-300">{status?.version ?? "—"}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Firewall</span>
-                      <div className={`font-medium ${status?.firewallActive ? "text-green-400" : "text-zinc-400"}`}>
-                        {status?.firewallActive ? "✓ Active" : "Inactive"}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-zinc-500">Server</span>
-                      <div className="font-medium text-zinc-300">{config.useTitanServer ? "Titan Server" : config.sshHost}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={() => getStatus.mutate()}
-                      disabled={getStatus.isPending}
-                      className="flex-1"
-                      variant="outline"
-                    >
-                      {getStatus.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                      Check Status
-                    </Button>
-                    <Button
-                      onClick={() => newCircuit.mutate()}
-                      disabled={newCircuit.isPending}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
-                    >
-                      {newCircuit.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                      New Circuit
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Install / Reinstall */}
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Install / Update Tor</CardTitle>
-                  <CardDescription>Installs Tor with ultra-fast config on your server. Safe to run again to update.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={() => installTor.mutate({ enableFirewall: true })}
-                    disabled={installTor.isPending}
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                  >
-                    {installTor.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-                    {installTor.isPending ? "Installing..." : "Install Tor (Ultra-Fast + Firewall)"}
-                  </Button>
-                  {installTor.data && (
-                    <div className={`mt-3 p-3 rounded text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto ${installTor.data.success ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
-                      {installTor.data.output || installTor.data.message}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            <div>
+              <h1 className="text-2xl font-bold">Tor Browser</h1>
+              <p className="text-zinc-400 text-sm">Ultra-fast anonymous browsing — dedicated VPS nodes</p>
             </div>
-          )}
-        </TabsContent>
-
-        {/* ── Setup Tab ── */}
-        <TabsContent value="setup" className="space-y-4 mt-4">
-          {/* Option 1: Titan Server */}
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Server className="w-4 h-4 text-purple-400" />
-                Use Titan Server (Recommended)
-              </CardTitle>
-              <CardDescription>Runs Tor on your already-configured Titan Server. One click.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => configureTitan.mutate({ localTunnelPort: parseInt(tunnelPort) })}
-                disabled={configureTitan.isPending}
-                className="w-full bg-purple-600 hover:bg-purple-700"
-              >
-                {configureTitan.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                Use Titan Server
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Option 2: Custom server */}
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-zinc-400" />
-                Use Custom SSH Server
-              </CardTitle>
-              <CardDescription>Connect to any VPS via SSH to run Tor there.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Host / IP</Label>
-                  <Input value={customHost} onChange={e => setCustomHost(e.target.value)} placeholder="192.168.1.1" className="bg-zinc-800 border-zinc-700" />
+          </div>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-purple-600 hover:bg-purple-700 gap-2"><Plus className="w-4 h-4" />Add Node</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+              <DialogHeader><DialogTitle>Add Tor Node</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-sm">
+                  <Lock className="w-4 h-4 inline mr-2" />Use a <strong>dedicated VPS</strong> — never your main server.
                 </div>
-                <div className="space-y-1">
-                  <Label>SSH Port</Label>
-                  <Input value={customPort} onChange={e => setCustomPort(e.target.value)} placeholder="22" className="bg-zinc-800 border-zinc-700" />
+                <div className="space-y-2"><Label>Node Label</Label><Input placeholder="e.g. Tor-Node-DE" value={label} onChange={e => setLabel(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 space-y-2"><Label>Server IP / Hostname</Label><Input placeholder="123.45.67.89" value={sshHost} onChange={e => setSshHost(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
+                  <div className="space-y-2"><Label>SSH Port</Label><Input placeholder="22" value={sshPort} onChange={e => setSshPort(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Username</Label>
-                  <Input value={customUser} onChange={e => setCustomUser(e.target.value)} placeholder="root" className="bg-zinc-800 border-zinc-700" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2"><Label>SSH User</Label><Input placeholder="root" value={sshUser} onChange={e => setSshUser(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
+                  <div className="space-y-2"><Label>Country</Label><Input placeholder="DE" value={country} onChange={e => setCountry(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
                 </div>
-                <div className="space-y-1">
-                  <Label>Password</Label>
-                  <Input type="password" value={customPass} onChange={e => setCustomPass(e.target.value)} placeholder="••••••••" className="bg-zinc-800 border-zinc-700" />
-                </div>
-              </div>
-              <Button
-                onClick={() => configureCustom.mutate({ host: customHost, port: parseInt(customPort), username: customUser, password: customPass, localTunnelPort: parseInt(tunnelPort) })}
-                disabled={configureCustom.isPending || !customHost}
-                className="w-full"
-                variant="outline"
-              >
-                {configureCustom.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Save Custom Server
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Connect Browser Tab ── */}
-        <TabsContent value="connect" className="space-y-4 mt-4">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Connect Your Browser</CardTitle>
-              <CardDescription>Route your browser traffic through Tor in 2 steps.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {tunnel?.command ? (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-300">Step 1 — Run this in your terminal</Label>
-                    <div className="flex gap-2">
-                      <code className="flex-1 p-3 bg-zinc-800 rounded text-xs text-green-300 font-mono break-all">{tunnel.command}</code>
-                      <Button size="icon" variant="outline" onClick={copyTunnel}>
-                        {copied ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-zinc-300">Step 2 — Set browser SOCKS5 proxy</Label>
-                    <div className="p-3 bg-zinc-800 rounded text-sm space-y-1">
-                      <div className="flex justify-between"><span className="text-zinc-400">Proxy type</span><span className="text-white font-mono">SOCKS5</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Host</span><span className="text-white font-mono">127.0.0.1</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Port</span><span className="text-white font-mono">{tunnel.localPort}</span></div>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-300 flex gap-2">
-                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>After connecting, visit <strong>check.torproject.org</strong> to verify. The reverse-connection firewall prevents any website from connecting back to your device.</span>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-6 text-zinc-500">
-                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p>Configure a server first to get connection instructions.</p>
-                  <Button onClick={() => setTab("setup")} variant="outline" className="mt-3">Go to Setup</Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* New circuit */}
-          {config?.configured && (
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Change Exit IP</CardTitle>
-                <CardDescription>Request a new Tor circuit to get a different exit IP address instantly.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={() => newCircuit.mutate()}
-                  disabled={newCircuit.isPending}
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                >
-                  {newCircuit.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  Get New Exit IP
+                <div className="space-y-2"><Label>SSH Password</Label><Input type="password" placeholder="Leave blank if using SSH key" value={sshPassword} onChange={e => setSshPassword(e.target.value)} className="bg-zinc-800 border-zinc-700" /></div>
+                <div className="space-y-2"><Label>SSH Private Key (optional)</Label><Textarea placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" value={sshKey} onChange={e => setSshKey(e.target.value)} className="bg-zinc-800 border-zinc-700 h-20 font-mono text-xs" /></div>
+                <Button onClick={() => addNode.mutate({ label, sshHost, sshPort: parseInt(sshPort), sshUser, sshPassword: sshPassword || undefined, sshKey: sshKey || undefined, country: country || undefined })} disabled={addNode.isPending || !label || !sshHost} className="w-full bg-purple-600 hover:bg-purple-700">
+                  {addNode.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding...</> : "Add Node"}
                 </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* ── Security Tab ── */}
-        <TabsContent value="security" className="space-y-4 mt-4">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-green-400" />
-                Reverse-Connection Firewall
-              </CardTitle>
-              <CardDescription>
-                Prevents remote servers from ever connecting back to your device. All unsolicited inbound connections are blocked at the server level.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                {[
-                  { label: "Inbound block", desc: "All unsolicited TCP/UDP connections dropped" },
-                  { label: "Kill-switch", desc: "If Tor drops, ALL traffic drops — no IP leak" },
-                  { label: "DNS protection", desc: "All DNS queries through Tor — port 53 blocked" },
-                  { label: "TCP hardening", desc: "SYN cookies, no redirects, no source routing" },
-                  { label: "Connection isolation", desc: "Each destination gets its own Tor circuit" },
-                ].map(({ label, desc }) => (
-                  <div key={label} className="flex items-start gap-2 p-2 rounded bg-zinc-800/50">
-                    <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-medium text-zinc-200">{label}</div>
-                      <div className="text-zinc-500 text-xs">{desc}</div>
-                    </div>
-                  </div>
-                ))}
               </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-800 border border-zinc-700">
-                <div>
-                  <div className="text-sm font-medium text-zinc-200">Firewall Status</div>
-                  <div className={`text-xs ${config?.firewallEnabled ? "text-green-400" : "text-zinc-500"}`}>
-                    {config?.firewallEnabled ? "Active — you are protected" : "Inactive"}
+        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-sm text-zinc-400 flex gap-3">
+          <Shield className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+          <div><span className="text-purple-400 font-medium">Maximum anonymity</span> — Tor runs on your dedicated VPS, not on the Titan platform. Guard node pinning, circuit racing (3 parallel), bandwidth relay filtering, reverse-connection firewall (iptables kill-switch).</div>
+        </div>
+
+        {status?.status === "running" && (
+          <Card className="bg-zinc-900 border-purple-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <div>
+                    <p className="font-medium text-green-400">Tor is running</p>
+                    <p className="text-sm text-zinc-400">
+                      {status.nodeLabel && `Node: ${status.nodeLabel}`}
+                      {status.torIp && <span className="ml-3">Exit IP: <span className="font-mono text-white">{status.torIp}</span></span>}
+                      {status.firewallEnabled && <span className="ml-3 text-green-400">Firewall active</span>}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {config?.firewallEnabled
-                    ? <ShieldCheck className="w-5 h-5 text-green-400" />
-                    : <ShieldOff className="w-5 h-5 text-zinc-500" />}
-                  <Switch
-                    checked={config?.firewallEnabled ?? false}
-                    onCheckedChange={(v) => setFirewall.mutate({ enabled: v })}
-                    disabled={setFirewall.isPending || !config?.configured}
-                  />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => newCircuit.mutate()} disabled={newCircuit.isPending} className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1">
+                    {newCircuit.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}New Circuit
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => toggleFirewall.mutate({ enabled: !status.firewallEnabled })} disabled={toggleFirewall.isPending} className={`border-zinc-700 hover:bg-zinc-800 gap-1 ${status.firewallEnabled ? "text-green-400" : "text-red-400"}`}>
+                    <Shield className="w-3 h-3" />{status.firewallEnabled ? "Firewall On" : "Firewall Off"}
+                  </Button>
+                  <Button size="sm" onClick={() => stopTor.mutate()} disabled={stopTor.isPending} className="bg-red-600 hover:bg-red-700 gap-1">
+                    {stopTor.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Square className="w-3 h-3" />}Stop
+                  </Button>
                 </div>
               </div>
-
-              {setFirewall.isPending && (
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Applying firewall rules...
-                </div>
-              )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-zinc-500" /></div>
+        ) : nodes.length === 0 ? (
+          <div className="text-center py-16 space-y-4">
+            <Globe className="w-16 h-16 text-zinc-700 mx-auto" />
+            <p className="text-zinc-400 text-lg">No Tor nodes yet</p>
+            <p className="text-zinc-600 text-sm">Add a dedicated VPS to run Tor. Each node is isolated with its own IP and firewall.</p>
+            <Button onClick={() => setAddOpen(true)} className="bg-purple-600 hover:bg-purple-700 gap-2"><Plus className="w-4 h-4" />Add Your First Node</Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {nodes.map((node: any) => (
+              <Card key={node.id} className={`bg-zinc-900 border-zinc-800 ${activeId === node.id ? "ring-1 ring-purple-500/50" : ""}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {activeId === node.id && <Star className="w-4 h-4 text-yellow-400 flex-shrink-0" />}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{node.label}</span>
+                          {statusBadge(node.status)}
+                          {node.country && <Badge variant="outline" className="text-xs border-zinc-700 text-zinc-400">{node.country}</Badge>}
+                          {node.firewallEnabled && <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-xs"><Shield className="w-3 h-3 mr-1" />Firewall</Badge>}
+                          {node.speedOptimized && <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20 text-xs"><Zap className="w-3 h-3 mr-1" />Fast</Badge>}
+                        </div>
+                        <div className="text-sm text-zinc-500 mt-1">
+                          {node.sshHost}:{node.sshPort}
+                          {node.publicIp && <span className="ml-3 text-zinc-400">IP: <span className="text-white font-mono">{node.publicIp}</span></span>}
+                          {node.lastChecked && <span className="ml-3">Checked: {new Date(node.lastChecked).toLocaleTimeString()}</span>}
+                        </div>
+                        {node.errorMessage && <p className="text-xs text-red-400 mt-1">{node.errorMessage}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {activeId !== node.id && (
+                        <Button size="sm" variant="outline" onClick={() => setActive.mutate({ nodeId: node.id })} className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs">Set Active</Button>
+                      )}
+                      {!node.installed ? (
+                        <Button size="sm" onClick={() => deployNode.mutate({ nodeId: node.id })} disabled={deployNode.isPending} className="bg-purple-600 hover:bg-purple-700 gap-1 text-xs">
+                          {deployNode.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}Deploy
+                        </Button>
+                      ) : activeId === node.id && status?.status !== "running" ? (
+                        <Button size="sm" onClick={() => startTor.mutate()} disabled={startTor.isPending} className="bg-green-600 hover:bg-green-700 gap-1 text-xs">
+                          {startTor.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}Start Tor
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => checkNode.mutate({ nodeId: node.id })} disabled={checkNode.isPending} className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 gap-1 text-xs">
+                          {checkNode.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}Check
+                        </Button>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10"><Trash2 className="w-4 h-4" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Node</AlertDialogTitle>
+                            <AlertDialogDescription className="text-zinc-400">Remove "{node.label}"? The VPS is not affected.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => removeNode.mutate({ nodeId: node.id })} className="bg-red-600 hover:bg-red-700">Remove</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2"><Zap className="w-4 h-4 text-purple-400" />Speed Optimisations (Auto-Applied on Deploy)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 text-sm text-zinc-400">
+              {[
+                ["Guard Node Pinning", "Locks to fast, nearby entry nodes"],
+                ["Circuit Racing", "Builds 3 circuits in parallel, uses fastest"],
+                ["Bandwidth Filtering", "Only uses relays with 1MB/s+ bandwidth"],
+                ["Circuit Pre-building", "5 circuits ready before you need them"],
+                ["DNS Pre-resolution", "Resolves domains before circuit is needed"],
+                ["Reverse-Connection Firewall", "iptables blocks all inbound — kill-switch if Tor drops"],
+              ].map(([title, desc]) => (
+                <div key={title} className="flex gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                  <div><span className="text-white">{title}</span><br /><span className="text-xs">{desc}</span></div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -286,10 +286,10 @@ export default function VpnChainPage() {
               disabled={!newHop.host || addHop.isPending}
               onClick={() => addHop.mutate({
                 label: newHop.label || newHop.host,
-                host: newHop.host,
-                port: parseInt(newHop.port) || 22,
-                username: newHop.username,
-                password: newHop.password || undefined,
+                sshHost: newHop.host,
+                sshPort: parseInt(newHop.port) || 22,
+                sshUser: newHop.username,
+                sshPassword: newHop.password || undefined,
                 country: newHop.country || undefined,
               })}
             >

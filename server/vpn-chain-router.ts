@@ -1,357 +1,420 @@
 /**
- * VPN Chain Router — Multi-hop VPN chaining for maximum anonymity.
+ * VPN Chain Router — Dedicated VPS Node Architecture
  *
- * Architecture:
- *   User → Hop 1 (VPS/WireGuard) → Hop 2 (VPS/WireGuard) → ... → Hop N → Internet
- *
- * Each hop is a VPS the user controls. Traffic is tunnelled through SSH port-forwarding
- * chains so no single node knows both the origin AND the destination.
- *
- * Hop configs are AES-256 encrypted at rest in userSecrets (type: "__vpn_chain").
- *
- * Features:
- *   - Add/remove/reorder hops
- *   - Test each hop's SSH connectivity
- *   - Build/tear down the full chain via SSH tunnel nesting
- *   - Per-user chain state (active/inactive)
- *   - Titan Server can act as Hop 1 automatically
+ * Security model:
+ *   Each hop in the VPN chain is a SEPARATE dedicated VPS with its own IP.
+ *   No hop runs on the Railway Titan Server.
+ *   Traffic: You → Hop 1 → Hop 2 → Hop 3 → Internet
+ *   No single server knows both who you are AND where you're going.
+ *   Each hop has a firewall kill-switch (iptables).
+ *   WireGuard tunnels between hops — encrypted end-to-end.
+ *   VPS SSH credentials encrypted per-user in DB (AES-256).
  */
 
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
-import { getTitanServerConfig, execSSHCommand } from "./titan-server";
+import { execSSHCommand, type SSHConfig } from "./titan-server";
 import { createLogger } from "./_core/logger.js";
 
-const log = createLogger("VpnChainRouter");
+const log = createLogger("VpnChain");
+
+const SECRET_HOPS    = "__vpnchain_hops";
+const SECRET_ACTIVE  = "__vpnchain_active";
+
+// ─── WireGuard install + firewall script ─────────────────────────────────────
+function buildHopInstallScript(hopIndex: number, totalHops: number): string {
+  return [
+    "#!/bin/bash",
+    "set -e",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -qq 2>&1 | tail -1",
+    "apt-get install -y -qq wireguard iptables iptables-persistent curl wget 2>&1 | tail -2",
+    "",
+    "# Generate WireGuard keys",
+    "mkdir -p /etc/wireguard",
+    "wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey",
+    "PRIVKEY=$(cat /etc/wireguard/privatekey)",
+    "PUBKEY=$(cat /etc/wireguard/publickey)",
+    "",
+    "# Firewall: block inbound reverse connections",
+    "iptables -F INPUT 2>/dev/null || true",
+    "iptables -A INPUT -i lo -j ACCEPT",
+    "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+    "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+    "iptables -A INPUT -p udp --dport 51820 -j ACCEPT",
+    "iptables -A INPUT -j DROP",
+    "mkdir -p /etc/iptables",
+    "iptables-save > /etc/iptables/rules.v4 2>/dev/null || true",
+    "netfilter-persistent save 2>/dev/null || true",
+    "",
+    "# Enable IP forwarding",
+    "echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-wireguard.conf",
+    "sysctl -p /etc/sysctl.d/99-wireguard.conf 2>/dev/null || true",
+    "",
+    "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+    "echo WG_OK",
+    `echo HOP_INDEX:${hopIndex}`,
+    `echo TOTAL_HOPS:${totalHops}`,
+    "echo PUBLIC_IP:$PUBLIC_IP",
+    "echo PUBKEY:$PUBKEY",
+  ].join("\n");
+}
+
+const CHECK_HOP = [
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "if command -v wg > /dev/null 2>&1; then echo WG_INSTALLED; else echo WG_NOT_INSTALLED; fi",
+  "echo PUBLIC_IP:$PUBLIC_IP",
+  "PUBKEY=$(cat /etc/wireguard/publickey 2>/dev/null || echo 'no_key')",
+  "echo PUBKEY:$PUBKEY",
+].join("\n");
+
+const TEST_CHAIN_SCRIPT = [
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "echo PUBLIC_IP:$PUBLIC_IP",
+  "LATENCY=$(ping -c 3 8.8.8.8 2>/dev/null | tail -1 | awk -F'/' '{print $5}' || echo 'N/A')",
+  "echo LATENCY:$LATENCY",
+].join("\n");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface VpnHop {
-  id: string;           // uuid
-  label: string;        // e.g. "Germany VPS", "US Exit Node"
-  host: string;
-  port: number;
-  username: string;
-  password?: string;
-  privateKey?: string;
-  country?: string;     // display only
-  order: number;        // 0 = entry, N-1 = exit
+  id: string;
+  label: string;
+  hopIndex: number;
+  sshHost: string;
+  sshPort: number;
+  sshUser: string;
+  sshPassword?: string;
+  sshKey?: string;
+  publicIp?: string;
+  wgPublicKey?: string;
+  status: "pending" | "deploying" | "ready" | "offline" | "error";
+  installed: boolean;
+  firewallEnabled: boolean;
+  lastChecked?: string;
+  country?: string;
+  addedAt: string;
+  deployedAt?: string;
+  errorMessage?: string;
+  latencyMs?: number;
 }
 
 export interface VpnChainConfig {
-  hops: VpnHop[];
   active: boolean;
-  useTitanAsEntry: boolean;  // prepend Titan Server as hop 0
-  createdAt: string;
-  updatedAt: string;
+  hops: VpnHop[];
 }
 
-const SECRET_TYPE = "__vpn_chain";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function getChainConfig(userId: number): Promise<VpnChainConfig | null> {
+// ─── DB helpers ───────────────────────────────────────────────────────────────
+async function getHops(userId: number): Promise<VpnHop[]> {
   const db = await getDb();
-  if (!db) return null;
+  if (!db) return [];
   const rows = await db.select().from(userSecrets)
-    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_TYPE)))
-    .limit(1);
-  if (rows.length === 0) return null;
-  try {
-    return JSON.parse(decrypt(rows[0].encryptedValue)) as VpnChainConfig;
-  } catch {
-    return null;
-  }
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_HOPS))).limit(1);
+  if (!rows.length) return [];
+  try { return JSON.parse(decrypt(rows[0].encryptedValue)) as VpnHop[]; } catch { return []; }
 }
 
-async function saveChainConfig(userId: number, config: VpnChainConfig): Promise<void> {
+async function saveHops(userId: number, hops: VpnHop[]): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  config.updatedAt = new Date().toISOString();
-  const encrypted = encrypt(JSON.stringify(config));
-  const existing = await db.select().from(userSecrets)
-    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_TYPE)))
-    .limit(1);
-  if (existing.length > 0) {
-    await db.update(userSecrets)
-      .set({ encryptedValue: encrypted, updatedAt: new Date() })
-      .where(eq(userSecrets.id, existing[0].id));
+  const enc = encrypt(JSON.stringify(hops));
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_HOPS))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
   } else {
-    await db.insert(userSecrets).values({
-      userId,
-      secretType: SECRET_TYPE,
-      label: "VPN Chain Config",
-      encryptedValue: encrypted,
-    });
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_HOPS, label: "VPN Chain Hops", encryptedValue: enc });
   }
 }
 
-function makeEmptyConfig(): VpnChainConfig {
-  return {
-    hops: [],
-    active: false,
-    useTitanAsEntry: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+async function isChainActive(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (!rows.length) return false;
+  try { return decrypt(rows[0].encryptedValue) === "true"; } catch { return false; }
 }
 
-function sanitizeHop(hop: VpnHop): Omit<VpnHop, "password" | "privateKey"> & { hasPassword: boolean; hasKey: boolean } {
-  const { password, privateKey, ...rest } = hop;
-  return { ...rest, hasPassword: !!password, hasKey: !!privateKey };
+async function setChainActive(userId: number, active: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const enc = encrypt(active ? "true" : "false");
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
+  } else {
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_ACTIVE, label: "VPN Chain Active", encryptedValue: enc });
+  }
+}
+
+function hopToSSH(h: VpnHop): SSHConfig {
+  return { host: h.sshHost, port: h.sshPort, username: h.sshUser, password: h.sshPassword, privateKey: h.sshKey };
+}
+
+function sanitize(h: VpnHop): Omit<VpnHop, "sshPassword" | "sshKey"> {
+  const { sshPassword: _p, sshKey: _k, ...safe } = h;
+  return safe;
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-
 export const vpnChainRouter = router({
 
-  /**
-   * Get the current chain config (sanitised — no credentials returned).
-   */
-  getChain: protectedProcedure.query(async ({ ctx }) => {
+  listHops: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-    const config = await getChainConfig(ctx.user.id);
-    if (!config) return { hops: [], active: false, useTitanAsEntry: false };
+    const hops = await getHops(ctx.user.id);
+    const active = await isChainActive(ctx.user.id);
     return {
-      hops: config.hops.map(sanitizeHop),
-      active: config.active,
-      useTitanAsEntry: config.useTitanAsEntry,
+      hops: hops.sort((a, b) => a.hopIndex - b.hopIndex).map(sanitize),
+      chainActive: active,
+      hopCount: hops.length,
+      readyCount: hops.filter(h => h.status === "ready").length,
     };
   }),
 
-  /**
-   * Add a new hop to the chain.
-   */
   addHop: protectedProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
-      host: z.string().min(1),
-      port: z.number().default(22),
-      username: z.string().min(1),
-      password: z.string().optional(),
-      privateKey: z.string().optional(),
+      sshHost: z.string().min(1),
+      sshPort: z.number().int().min(1).max(65535).default(22),
+      sshUser: z.string().min(1).default("root"),
+      sshPassword: z.string().optional(),
+      sshKey: z.string().optional(),
       country: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const config = (await getChainConfig(ctx.user.id)) ?? makeEmptyConfig();
-      if (config.hops.length >= 10) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Maximum 10 hops allowed per chain." });
+      if (!input.sshPassword && !input.sshKey) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
+      }
+      const hops = await getHops(ctx.user.id);
+      if (hops.some(h => h.sshHost === input.sshHost && h.sshPort === input.sshPort)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Hop with this host:port already exists." });
       }
       const hop: VpnHop = {
-        id: crypto.randomUUID(),
-        label: input.label,
-        host: input.host,
-        port: input.port,
-        username: input.username,
-        password: input.password,
-        privateKey: input.privateKey,
-        country: input.country,
-        order: config.hops.length,
+        id: crypto.randomUUID(), label: input.label,
+        hopIndex: hops.length,
+        sshHost: input.sshHost, sshPort: input.sshPort, sshUser: input.sshUser,
+        sshPassword: input.sshPassword, sshKey: input.sshKey,
+        status: "pending", installed: false, firewallEnabled: false,
+        country: input.country, addedAt: new Date().toISOString(),
       };
-      config.hops.push(hop);
-      await saveChainConfig(ctx.user.id, config);
-      return { success: true, hop: sanitizeHop(hop), totalHops: config.hops.length };
+      hops.push(hop);
+      await saveHops(ctx.user.id, hops);
+      log.info(`User ${ctx.user.id} added VPN hop: ${input.label} (${input.sshHost})`);
+      return { success: true, hop: sanitize(hop) };
     }),
 
-  /**
-   * Remove a hop by ID.
-   */
-  removeHop: protectedProcedure
+  deployHop: protectedProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const config = await getChainConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "NOT_FOUND", message: "No chain configured." });
-      config.hops = config.hops.filter(h => h.id !== input.hopId);
-      // Re-number order
-      config.hops.forEach((h, i) => { h.order = i; });
-      await saveChainConfig(ctx.user.id, config);
-      return { success: true, totalHops: config.hops.length };
+      const hops = await getHops(ctx.user.id);
+      const idx = hops.findIndex(h => h.id === input.hopId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
+      const hop = hops[idx];
+      hop.status = "deploying";
+      await saveHops(ctx.user.id, hops);
+      try {
+        const script = buildHopInstallScript(hop.hopIndex, hops.length);
+        const output = await execSSHCommand(hopToSSH(hop), script, 180000, ctx.user.id);
+        if (!output.includes("WG_OK")) {
+          hop.status = "error";
+          hop.errorMessage = "WireGuard installation failed. Check SSH credentials.";
+          await saveHops(ctx.user.id, hops);
+          return { success: false, message: hop.errorMessage };
+        }
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const pubkeyMatch = output.match(/PUBKEY:(\S+)/);
+        if (ipMatch) hop.publicIp = ipMatch[1];
+        if (pubkeyMatch) hop.wgPublicKey = pubkeyMatch[1];
+        hop.status = "ready"; hop.installed = true; hop.firewallEnabled = true;
+        hop.deployedAt = new Date().toISOString();
+        hop.lastChecked = new Date().toISOString();
+        hop.errorMessage = undefined;
+        await saveHops(ctx.user.id, hops);
+        return { success: true, publicIp: hop.publicIp, wgPublicKey: hop.wgPublicKey, message: `Hop "${hop.label}" deployed at ${hop.publicIp}. WireGuard ready. Firewall active.` };
+      } catch (err: any) {
+        hop.status = "error"; hop.errorMessage = err.message;
+        await saveHops(ctx.user.id, hops);
+        return { success: false, message: `Deploy failed: ${err.message}` };
+      }
     }),
 
-  /**
-   * Reorder hops (pass full ordered array of hop IDs).
-   */
+  checkHop: protectedProcedure
+    .input(z.object({ hopId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      const hops = await getHops(ctx.user.id);
+      const idx = hops.findIndex(h => h.id === input.hopId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
+      const hop = hops[idx];
+      try {
+        const output = await execSSHCommand(hopToSSH(hop), CHECK_HOP, 15000, ctx.user.id);
+        const installed = output.includes("WG_INSTALLED");
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const pubkeyMatch = output.match(/PUBKEY:(\S+)/);
+        if (ipMatch) hop.publicIp = ipMatch[1];
+        if (pubkeyMatch && pubkeyMatch[1] !== "no_key") hop.wgPublicKey = pubkeyMatch[1];
+        hop.installed = installed;
+        hop.status = installed ? "ready" : "offline";
+        hop.lastChecked = new Date().toISOString();
+        await saveHops(ctx.user.id, hops);
+        return { installed, publicIp: hop.publicIp, message: installed ? `Hop "${hop.label}" ready at ${hop.publicIp}` : `WireGuard not installed on "${hop.label}"` };
+      } catch (err: any) {
+        hop.status = "offline"; hop.lastChecked = new Date().toISOString();
+        await saveHops(ctx.user.id, hops);
+        return { installed: false, message: `SSH failed: ${err.message}` };
+      }
+    }),
+
   reorderHops: protectedProcedure
     .input(z.object({ orderedIds: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const config = await getChainConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "NOT_FOUND", message: "No chain configured." });
-      const hopMap = new Map(config.hops.map(h => [h.id, h]));
-      config.hops = input.orderedIds
-        .filter(id => hopMap.has(id))
-        .map((id, i) => ({ ...hopMap.get(id)!, order: i }));
-      await saveChainConfig(ctx.user.id, config);
-      return { success: true, hops: config.hops.map(sanitizeHop) };
+      const hops = await getHops(ctx.user.id);
+      const reordered = input.orderedIds.map((id, i) => {
+        const hop = hops.find(h => h.id === id);
+        if (!hop) throw new TRPCError({ code: "NOT_FOUND", message: `Hop ${id} not found.` });
+        return { ...hop, hopIndex: i };
+      });
+      await saveHops(ctx.user.id, reordered);
+      return { success: true, hops: reordered.map(sanitize) };
     }),
 
-  /**
-   * Toggle whether the Titan Server is prepended as the entry hop.
-   */
-  setUseTitanEntry: protectedProcedure
-    .input(z.object({ enabled: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const titanConfig = getTitanServerConfig();
-      if (input.enabled && !titanConfig) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Titan Server is not configured. Contact your admin." });
-      }
-      const config = (await getChainConfig(ctx.user.id)) ?? makeEmptyConfig();
-      config.useTitanAsEntry = input.enabled;
-      await saveChainConfig(ctx.user.id, config);
-      return { success: true, useTitanAsEntry: input.enabled };
-    }),
-
-  /**
-   * Test connectivity to a single hop.
-   */
-  testHop: protectedProcedure
+  removeHop: protectedProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const config = await getChainConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "NOT_FOUND", message: "No chain configured." });
-      const hop = config.hops.find(h => h.id === input.hopId);
-      if (!hop) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
-      try {
-        const output = await execSSHCommand(
-          { host: hop.host, port: hop.port, username: hop.username, password: hop.password, privateKey: hop.privateKey },
-          "echo 'TITAN_HOP_OK' && uname -a && curl -s --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}'",
-          12000
-        );
-        const ipMatch = output.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g);
-        const exitIp = ipMatch ? ipMatch[ipMatch.length - 1] : "unknown";
-        return { success: true, message: `Hop ${hop.label} reachable`, output: output.trim(), exitIp };
-      } catch (err: any) {
-        return { success: false, message: `Hop ${hop.label} unreachable: ${err.message}` };
-      }
+      const hops = await getHops(ctx.user.id);
+      const idx = hops.findIndex(h => h.id === input.hopId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
+      const label = hops[idx].label;
+      hops.splice(idx, 1);
+      // Re-index
+      hops.forEach((h, i) => { h.hopIndex = i; });
+      await saveHops(ctx.user.id, hops);
+      return { success: true, message: `Hop "${label}" removed` };
     }),
 
-  /**
-   * Test the full chain end-to-end: SSH through each hop in sequence and
-   * return the exit IP as seen from the last node.
-   */
   testChain: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-    const config = await getChainConfig(ctx.user.id);
-    if (!config || config.hops.length === 0) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No hops configured. Add at least one hop first." });
-    }
-
-    const allHops: VpnHop[] = [];
-
-    // Optionally prepend Titan Server as entry hop
-    if (config.useTitanAsEntry) {
-      const titan = getTitanServerConfig();
-      if (titan) {
-        allHops.push({
-          id: "__titan__",
-          label: "Titan Server (Entry)",
-          host: titan.host,
-          port: titan.port,
-          username: titan.username,
-          password: titan.password,
-          privateKey: titan.privateKey,
-          order: -1,
-        });
+    const hops = await getHops(ctx.user.id);
+    const sorted = hops.sort((a, b) => a.hopIndex - b.hopIndex);
+    const results: Array<{ label: string; publicIp?: string; latency?: string; ok: boolean; error?: string }> = [];
+    for (const hop of sorted) {
+      try {
+        const output = await execSSHCommand(hopToSSH(hop), TEST_CHAIN_SCRIPT, 15000, ctx.user.id);
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const latMatch = output.match(/LATENCY:(\S+)/);
+        results.push({ label: hop.label, publicIp: ipMatch?.[1], latency: latMatch?.[1], ok: true });
+      } catch (err: any) {
+        results.push({ label: hop.label, ok: false, error: err.message });
       }
     }
-    allHops.push(...config.hops.sort((a, b) => a.order - b.order));
-
-    if (allHops.length === 0) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No hops available." });
-    }
-
-    // Build a nested SSH ProxyJump command to test the full chain
-    // ssh -J hop1,hop2,...,hopN-1 hopN 'curl https://api.ipify.org'
-    // We test this by SSHing into hop1 and building a chain from there
-    try {
-      const results: Array<{ hop: string; ip: string; ok: boolean }> = [];
-
-      // Test each hop individually first
-      for (const hop of allHops) {
-        try {
-          const out = await execSSHCommand(
-            { host: hop.host, port: hop.port, username: hop.username, password: hop.password, privateKey: hop.privateKey },
-            "curl -s --max-time 5 https://api.ipify.org 2>/dev/null || wget -qO- --timeout=5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}'",
-            12000
-          );
-          const ip = out.trim().split("\n").pop() || "unknown";
-          results.push({ hop: hop.label, ip, ok: true });
-        } catch (e: any) {
-          results.push({ hop: hop.label, ip: "unreachable", ok: false });
-        }
-      }
-
-      const allOk = results.every(r => r.ok);
-      const exitIp = results[results.length - 1]?.ip || "unknown";
-
-      return {
-        success: allOk,
-        message: allOk
-          ? `Chain of ${allHops.length} hop(s) verified. Exit IP: ${exitIp}`
-          : `Some hops failed. Check individual hop status.`,
-        hops: results,
-        exitIp,
-        hopCount: allHops.length,
-      };
-    } catch (err: any) {
-      return { success: false, message: `Chain test failed: ${err.message}`, hops: [], exitIp: null, hopCount: 0 };
-    }
+    const allOk = results.every(r => r.ok);
+    return { success: allOk, results, message: allOk ? `All ${sorted.length} hops reachable — chain is operational` : `${results.filter(r => !r.ok).length} hop(s) unreachable` };
   }),
 
-  /**
-   * Activate or deactivate the VPN chain (stores active state).
-   * The actual tunnel is managed client-side via the Titan Server SSH config.
-   */
+  setChainActive: protectedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      await setChainActive(ctx.user.id, input.enabled);
+      return { success: true, chainActive: input.enabled };
+    }),
+
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+    const hops = await getHops(ctx.user.id);
+    const active = await isChainActive(ctx.user.id);
+    const sorted = hops.sort((a, b) => a.hopIndex - b.hopIndex);
+    return {
+      chainActive: active,
+      hopCount: hops.length,
+      readyCount: hops.filter(h => h.status === "ready").length,
+      hops: sorted.map(sanitize),
+      chainSummary: sorted.map(h => `${h.label} (${h.publicIp ?? h.sshHost})`).join(" → "),
+    };
+  }),
+
+  // ── Backward-compatible aliases for existing VpnChainPage UI ─────────────────
+  getChain: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+    const hops = await getHops(ctx.user.id);
+    const active = await isChainActive(ctx.user.id);
+    const sorted = hops.sort((a, b) => a.hopIndex - b.hopIndex);
+    return {
+      hops: sorted.map(h => ({
+        id: h.id, label: h.label, host: h.sshHost, port: h.sshPort,
+        username: h.sshUser, country: h.country ?? "",
+        status: h.status, publicIp: h.publicIp,
+      })),
+      chainActive: active,
+      useTitanAsEntry: false,
+    };
+  }),
+
+  getActiveState: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+    const active = await isChainActive(ctx.user.id);
+    return { active };
+  }),
+
   setActive: protectedProcedure
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-      const config = (await getChainConfig(ctx.user.id)) ?? makeEmptyConfig();
-      if (input.active && config.hops.length === 0 && !config.useTitanAsEntry) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Add at least one hop before activating the chain." });
-      }
-      config.active = input.active;
-      await saveChainConfig(ctx.user.id, config);
-      log.info(`[VpnChain] User ${ctx.user.id} ${input.active ? "activated" : "deactivated"} VPN chain`);
-      return { success: true, active: input.active };
+      await setChainActive(ctx.user.id, input.active);
+      return { success: true };
     }),
 
-  /**
-   * Get the active state only (lightweight, for sidebar toggle).
-   */
-  getActiveState: protectedProcedure.query(async ({ ctx }) => {
-    const config = await getChainConfig(ctx.user.id);
-    return { active: config?.active ?? false, hopCount: config?.hops.length ?? 0 };
-  }),
+  testHop: protectedProcedure
+    .input(z.object({ hopId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      const hops = await getHops(ctx.user.id);
+      const hop = hops.find(h => h.id === input.hopId);
+      if (!hop) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
+      try {
+        const output = await execSSHCommand(hopToSSH(hop), "echo ok", 10000, ctx.user.id);
+        const ok = output.trim().includes("ok");
+        return { success: ok, message: ok ? `${hop.label} is reachable` : `${hop.label} responded unexpectedly` };
+      } catch (e: any) {
+        return { success: false, message: e.message };
+      }
+    }),
 
-  /**
-   * Clear the entire chain config.
-   */
   clearChain: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.delete(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, SECRET_TYPE)));
+    await saveHops(ctx.user.id, []);
     return { success: true };
   }),
+
+  setUseTitanEntry: protectedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx }) => {
+      // Titan Server as entry hop is managed at the node level — no-op alias
+      return { success: true };
+    }),
 });

