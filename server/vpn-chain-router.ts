@@ -375,7 +375,14 @@ export const vpnChainRouter = router({
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const active = await isChainActive(ctx.user.id);
-    return { active };
+    const hops = await getHops(ctx.user.id);
+    const hasReadyHops = hops.some(h => h.status === 'ready' && h.installed);
+    // Auto-deactivate if no ready hops exist
+    if (active && !hasReadyHops) {
+      await setChainActive(ctx.user.id, false);
+      return { active: false, hopCount: hops.length, hasReadyHops: false };
+    }
+    return { active, hopCount: hops.length, hasReadyHops };
   }),
 
   setActive: protectedProcedure
@@ -383,8 +390,18 @@ export const vpnChainRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      if (input.active) {
+        const hops = await getHops(ctx.user.id);
+        const readyHops = hops.filter(h => h.status === 'ready' && h.installed);
+        if (readyHops.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active VPN hops configured. Add and deploy at least one hop on the VPN Chain page first.",
+          });
+        }
+      }
       await setChainActive(ctx.user.id, input.active);
-      return { success: true };
+      return { success: true, active: input.active };
     }),
 
   testHop: protectedProcedure

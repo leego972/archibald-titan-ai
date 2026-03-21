@@ -467,15 +467,28 @@ export const torRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const node = await getActiveNode(ctx.user.id);
-      if (!node) return { success: false, active: false, message: "No active Tor node. Add and deploy a dedicated VPS node first." };
+      if (!node) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No active Tor node configured. Add and deploy a dedicated VPS node on the Tor page first.",
+        });
+      }
+      if (!node.installed) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Tor is not installed on "${node.label}" yet. Deploy the node first from the Tor page.`,
+        });
+      }
       try {
         const script = input.active ? START_TOR : STOP_TOR;
-        await execSSHCommand(nodeToSSH(node), script, 15000, ctx.user.id);
+        await execSSHCommand(nodeToSSH(node), script, 30000, ctx.user.id);
         const nodes = await getNodes(ctx.user.id);
         const idx = nodes.findIndex(n => n.id === node.id);
         if (idx !== -1) { nodes[idx].status = input.active ? 'running' : 'stopped'; await saveNodes(ctx.user.id, nodes); }
         return { success: true, active: input.active, message: input.active ? `Tor started on "${node.label}"` : `Tor stopped on "${node.label}"` };
-      } catch (e: any) { return { success: false, active: false, message: e.message }; }
+      } catch (e: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `SSH error on "${node.label}": ${e.message}` });
+      }
     }),
 
   /** Run a command through Tor on the active node */

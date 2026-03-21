@@ -93,7 +93,8 @@ import { LanguageSelector, useLanguage } from "@/i18n";
 import { AddAdminModal } from "./AddAdminModal";
 import { isAdminRole } from "@shared/const";
 import { trpc } from "@/lib/trpc";
-import { Shield } from "lucide-react";
+import { Shield, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 type MenuItem = {
   icon: any;
@@ -378,10 +379,44 @@ function FetcherLayoutContent({
   );
   const isMobile = useIsMobile();
   // VPN / Tor status for sidebar toggle
-  const vpnActiveQuery = trpc.vpnChain.getActiveState.useQuery();
-  const torActiveQuery = trpc.tor.getActiveState.useQuery();
-  const setVpnActive = trpc.vpnChain.setActive.useMutation({ onSuccess: () => vpnActiveQuery.refetch() });
-  const setTorActive = trpc.tor.setActive.useMutation({ onSuccess: () => torActiveQuery.refetch() });
+  const vpnActiveQuery = trpc.vpnChain.getActiveState.useQuery(undefined, { retry: false });
+  const torActiveQuery = trpc.tor.getActiveState.useQuery(undefined, { retry: false });
+  const setVpnActive = trpc.vpnChain.setActive.useMutation({
+    onSuccess: (data) => {
+      vpnActiveQuery.refetch();
+      if ('active' in data) {
+        toast.success(data.active ? "VPN Chain activated" : "VPN Chain deactivated");
+      }
+    },
+    onError: (err) => {
+      const msg = err.message ?? "";
+      if (msg.includes("No active") || msg.includes("no hop") || msg.includes("not found")) {
+        toast.error("No VPN hops configured — set up your VPN Chain first", {
+          action: { label: "Go to VPN", onClick: () => setLocation("/vpn-chain") },
+        });
+      } else {
+        toast.error(err.message);
+      }
+    },
+  });
+  const setTorActive = trpc.tor.setActive.useMutation({
+    onSuccess: (data) => {
+      torActiveQuery.refetch();
+      if ('active' in data) {
+        toast.success(data.active ? "Tor started on your VPS node" : "Tor stopped");
+      }
+    },
+    onError: (err) => {
+      const msg = err.message ?? "";
+      if (msg.includes("No active") || msg.includes("no node") || msg.includes("not found")) {
+        toast.error("No Tor node configured — set up your Tor VPS node first", {
+          action: { label: "Go to Tor", onClick: () => setLocation("/tor") },
+        });
+      } else {
+        toast.error(err.message);
+      }
+    },
+  });
   const vpnActive = vpnActiveQuery.data?.active ?? false;
   const torActive = torActiveQuery.data?.active ?? false;
   useEffect(() => {
@@ -573,27 +608,39 @@ function FetcherLayoutContent({
             {/* VPN Chain + Tor quick toggles */}
             <div className="flex items-center gap-2 px-1 pb-1">
               <button
-                onClick={() => setVpnActive.mutate({ active: !vpnActive })}
+                onClick={() => {
+                  if (setVpnActive.isPending) return;
+                  setVpnActive.mutate({ active: !vpnActive });
+                }}
+                disabled={setVpnActive.isPending}
                 title={vpnActive ? "VPN Chain: ON — click to disable" : "VPN Chain: OFF — click to enable"}
-                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   vpnActive
                     ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
                     : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
                 } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
               >
-                <Shield className="h-3.5 w-3.5 shrink-0" />
+                {setVpnActive.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  : <Shield className="h-3.5 w-3.5 shrink-0" />}
                 <span className="group-data-[collapsible=icon]:hidden">VPN {vpnActive ? "ON" : "OFF"}</span>
               </button>
               <button
-                onClick={() => setTorActive.mutate({ active: !torActive })}
+                onClick={() => {
+                  if (setTorActive.isPending) return;
+                  setTorActive.mutate({ active: !torActive });
+                }}
+                disabled={setTorActive.isPending}
                 title={torActive ? "Tor: ON — click to disable" : "Tor: OFF — click to enable"}
-                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   torActive
                     ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30"
                     : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
                 } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
               >
-                <Globe className="h-3.5 w-3.5 shrink-0" />
+                {setTorActive.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  : <Globe className="h-3.5 w-3.5 shrink-0" />}
                 <span className="group-data-[collapsible=icon]:hidden">Tor {torActive ? "ON" : "OFF"}</span>
               </button>
             </div>
