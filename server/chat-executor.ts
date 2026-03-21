@@ -4010,7 +4010,9 @@ async function execReadUploadedFile(
     if (isZip) {
       // Handle ZIP files: extract and return a manifest + contents of text files
       try {
-        const JSZip = (await import('jszip')).default;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const JSZipModule = (await import('jszip')) as any;
+        const JSZip = JSZipModule.default || JSZipModule;
         const arrayBuffer = await response.arrayBuffer();
         const zip = await JSZip.loadAsync(arrayBuffer);
         const fileEntries: string[] = [];
@@ -4018,28 +4020,27 @@ async function execReadUploadedFile(
         let totalChars = 0;
         const MAX_CHARS = 80000;
         const TEXT_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.txt', '.css', '.html', '.env', '.yaml', '.yml', '.toml', '.sh', '.py', '.sql', '.prisma', '.graphql', '.xml', '.csv', '.ini', '.conf', '.config'];
-
         // First pass: collect file names
         const fileNames: string[] = [];
-        zip.forEach((relativePath, _file) => { fileNames.push(relativePath); });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        zip.forEach((relativePath: string, _file: any) => { fileNames.push(relativePath); });
         fileEntries.push(...fileNames);
-
         // Second pass: extract text file contents
         for (const fileName of fileNames) {
-          const file = zip.file(fileName);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const file = zip.file(fileName) as any;
           if (!file || file.dir) continue;
           const ext = '.' + fileName.split('.').pop()?.toLowerCase();
           if (!TEXT_EXTENSIONS.includes(ext)) continue;
           if (totalChars >= MAX_CHARS) break;
           try {
-            const text = await file.async('text');
+            const text: string = await file.async('string');
             const snippet = text.slice(0, Math.min(5000, MAX_CHARS - totalChars));
             extractedContent += `\n\n=== ${fileName} ===\n${snippet}`;
             if (text.length > 5000) extractedContent += `\n... [truncated — ${text.length} chars total]`;
             totalChars += snippet.length;
           } catch { /* skip binary files that fail text decode */ }
         }
-
         return {
           success: true,
           data: {
