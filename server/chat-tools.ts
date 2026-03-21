@@ -2873,6 +2873,8 @@ export const BUILDER_TOOLS: Tool[] = [
   sslCheck,
   // System
   getSystemStatus,
+  // File uploads — allows builder to read user-uploaded files (e.g. ZIP archives of projects to analyse/improve)
+  readUploadedFile,
 ];
 
 // Focused tool subset for EXTERNAL project building — creates real files the user can download

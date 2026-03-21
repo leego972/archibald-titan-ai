@@ -1599,10 +1599,16 @@ Do NOT attempt any tool calls or builds.`;
       const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? EXTERNAL_BUILD_TOOLS : TITAN_TOOLS);
 
       // For general chat: if user attached a file, force read_uploaded_file first
+      // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
       if (!isBuildRequest && !forceFirstTool) {
         const msgLowerChat = input.message.toLowerCase();
         if (msgLowerChat.includes('[attached file:') || msgLowerChat.includes('[attached image:')) {
-          forceFirstTool = 'read_uploaded_file';
+          const toolExists = activeTools.some(t => t.function?.name === 'read_uploaded_file');
+          if (toolExists) {
+            forceFirstTool = 'read_uploaded_file';
+          } else {
+            log.warn('[Chat] read_uploaded_file not in activeTools — skipping force (system prompt instruction will handle it)');
+          }
         }
       }
 
