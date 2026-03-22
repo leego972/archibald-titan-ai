@@ -1793,10 +1793,11 @@ Do NOT attempt any tool calls or builds.`;
             /\b(enterprise|production|professional|advanced|full.?stack|microservice|api.?gateway|distributed|scalable|high.?availability|real.?time|websocket|graphql|grpc|kubernetes|docker|ci.?cd|pipeline)\b/i.test(input.message)
           );
           let modelTier: "fast" | "strong" | "premium" | undefined;
-          // Security builds use OpenRouter uncensored model (Dolphin Mistral 24B Venice)
-          // This completely bypasses OpenAI's safety training for offensive security tasks.
-          // Falls back to OpenAI gpt-4.1 if OpenRouter fails or key not set.
-          const useOpenRouterForSecurity = isSecurityBuild && !!process.env.OPENROUTER_API_KEY;
+          // Security builds use Venice/OpenRouter uncensored model:
+          //   - Venice mistral-31-24b (with tools) or venice-uncensored-role-play (chat only)
+          //   - Falls back to OpenRouter Dolphin free, then OpenAI gpt-4.1
+          // forceOpenRouter flag triggers the Venice → OpenRouter → OpenAI fallback chain.
+          const useOpenRouterForSecurity = isSecurityBuild && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
           if (isSecurityBuild) {
             // Security builds: try OpenRouter uncensored first, fall back to gpt-4.1
             modelTier = "premium";

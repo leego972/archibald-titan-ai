@@ -440,8 +440,13 @@ async function _invokeLLMWithRetry(
   const forceOpenRouter = params.forceOpenRouter === true;
   // Uncensored fallback step: 0=Venice (primary), 1=OpenRouter free (secondary), 2=OpenAI (final)
   const uncensoredStep = params._uncensoredFallbackStep ?? 0;
-  // Venice primary: venice-uncensored-role-play (Dolphin-based, supports tool calling)
-  const VENICE_UNCENSORED_MODEL = "venice-uncensored-role-play";
+  // Venice primary models:
+  //   - venice-uncensored-role-play: fully uncensored, NO tool calling support — chat only
+  //   - mistral-31-24b: Venice-hosted Mistral, supports tool calling, less censored than OpenAI
+  // Use the tool-capable model when tools are present, uncensored chat model otherwise.
+  const VENICE_UNCENSORED_CHAT_MODEL = "venice-uncensored-role-play";
+  const VENICE_UNCENSORED_TOOLS_MODEL = "mistral-31-24b";
+  const VENICE_UNCENSORED_MODEL = hasToolsDefined ? VENICE_UNCENSORED_TOOLS_MODEL : VENICE_UNCENSORED_CHAT_MODEL;
   // OpenRouter secondary: Dolphin Mistral 24B Venice free tier
   const OPENROUTER_UNCENSORED_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
   // Determine which uncensored provider to use based on fallback step and key availability
