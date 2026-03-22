@@ -26,9 +26,15 @@ const log = createLogger("LLM");
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || Buffer.from("QUl6YVN5Q1pkaXpQMnVUMlJZUi14UU1reUpVOWhWdlRDck5LZ1NB", "base64").toString("utf-8");
 
 /**
- * OpenRouter API key — used for uncensored model routing.
- * Primary model: Dolphin Mistral 24B Venice Edition (free, uncensored).
- * Falls back to OpenAI if OpenRouter fails.
+ * Venice API key — PRIMARY uncensored model routing.
+ * Model: venice-uncensored-role-play (Dolphin, supports tool calling, dedicated rate limits).
+ * Fallback chain: Venice → OpenRouter Dolphin free → OpenAI GPT-4.1.
+ */
+const VENICE_API_KEY = process.env.VENICE_API_KEY || "";
+
+/**
+ * OpenRouter API key — SECONDARY uncensored fallback.
+ * Used when Venice is unavailable. Model: Dolphin Mistral 24B Venice Edition (free).
  */
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
@@ -120,11 +126,16 @@ export type InvokeParams = {
    */
   forceGemini?: boolean;
   /**
-   * Force OpenRouter uncensored model for this call — used for security builds.
-   * Routes to Dolphin Mistral 24B Venice Edition (uncensored, no refusals).
-   * Falls back to OpenAI if OpenRouter key is not set or call fails.
+   * Force uncensored model for this call — used for security builds.
+   * Fallback chain: Venice (Dolphin, primary) → OpenRouter Dolphin free → OpenAI GPT-4.1.
    */
   forceOpenRouter?: boolean;
+  /**
+   * Internal: which step in the uncensored fallback chain we are on.
+   * 0 = Venice primary, 1 = OpenRouter free, 2 = OpenAI fallback
+   * @internal
+   */
+  _uncensoredFallbackStep?: number;
 };
 
 export type ToolCall = {
@@ -425,13 +436,21 @@ async function _invokeLLMWithRetry(
   const useOpenAI = hasKeys();
   // forceGemini: routes this specific call to Gemini 2.5 Flash
   const forceGemini = params.forceGemini === true;
-  // forceOpenRouter: routes to uncensored Dolphin/Nous Hermes via OpenRouter
-  const forceOpenRouter = params.forceOpenRouter === true && !!OPENROUTER_API_KEY;
-  // OpenRouter uncensored model cascade for security builds:
-  // Primary: Dolphin Mistral 24B Venice (free, uncensored, 32K context)
-  // The model ID includes :free suffix for the free tier
+  // forceOpenRouter: routes to uncensored model via Venice → OpenRouter → OpenAI fallback chain
+  const forceOpenRouter = params.forceOpenRouter === true;
+  // Uncensored fallback step: 0=Venice (primary), 1=OpenRouter free (secondary), 2=OpenAI (final)
+  const uncensoredStep = params._uncensoredFallbackStep ?? 0;
+  // Venice primary: venice-uncensored-role-play (Dolphin-based, supports tool calling)
+  const VENICE_UNCENSORED_MODEL = "venice-uncensored-role-play";
+  // OpenRouter secondary: Dolphin Mistral 24B Venice free tier
   const OPENROUTER_UNCENSORED_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
-  const model = forceOpenRouter
+  // Determine which uncensored provider to use based on fallback step and key availability
+  const useVenice = forceOpenRouter && uncensoredStep === 0 && !!VENICE_API_KEY;
+  const useOpenRouterUncensored = forceOpenRouter && !useVenice && uncensoredStep <= 1 && !!OPENROUTER_API_KEY;
+  // Step 2 (or no uncensored keys): fall through to OpenAI
+  const model = useVenice
+    ? VENICE_UNCENSORED_MODEL
+    : useOpenRouterUncensored
     ? OPENROUTER_UNCENSORED_MODEL
     : forceGemini
     ? "gemini-2.5-flash"
@@ -449,7 +468,18 @@ async function _invokeLLMWithRetry(
     // Force sequential tool calls — prevents the LLM from returning multiple
     // tool_calls in one response, which causes 400 errors when any single
     // tool execution fails (missing tool_call_id response messages).
-    payload.parallel_tool_calls = false;
+    // Venice supports parallel_tool_calls; OpenRouter Dolphin may not — skip for OpenRouter.
+    if (!useOpenRouterUncensored) {
+      payload.parallel_tool_calls = false;
+    }
+  }
+
+  // Venice-specific parameters: disable default system prompt so our uncensored
+  // instructions are not overridden by Venice's built-in system prompt.
+  if (useVenice) {
+    payload.venice_parameters = {
+      include_venice_system_prompt: false,
+    };
   }
 
   const normalizedToolChoice = normalizeToolChoice(
@@ -486,9 +516,12 @@ async function _invokeLLMWithRetry(
   const usingUserKey = !!params.userApiKey;
   // Determine system tag: explicit tag > priority-based default
   const systemTag = params.systemTag || (priority === "chat" ? "chat" : "misc");
-  // When forceGemini or forceOpenRouter, skip OpenAI key pool entirely
-  const keyHandle = (!usingUserKey && useOpenAI && !forceGemini && !forceOpenRouter) ? acquireKey(systemTag) : null;
-  const apiKey = forceOpenRouter
+  // When using Venice/OpenRouter uncensored or Gemini, skip OpenAI key pool entirely
+  const skipOpenAIPool = forceGemini || useVenice || useOpenRouterUncensored;
+  const keyHandle = (!usingUserKey && useOpenAI && !skipOpenAIPool) ? acquireKey(systemTag) : null;
+  const apiKey = useVenice
+    ? VENICE_API_KEY
+    : useOpenRouterUncensored
     ? OPENROUTER_API_KEY
     : forceGemini
     ? GEMINI_API_KEY
@@ -497,8 +530,12 @@ async function _invokeLLMWithRetry(
   if (usingUserKey) {
     log.info("Using user's personal API key", { system: systemTag, model });
   }
-  if (forceOpenRouter) {
-    log.info(`[LLM] ${systemTag}: Routing to OpenRouter uncensored model: ${model}`);
+  if (useVenice) {
+    log.info(`[LLM] ${systemTag}: Uncensored step 0 — Venice Dolphin: ${model}`);
+  } else if (useOpenRouterUncensored) {
+    log.info(`[LLM] ${systemTag}: Uncensored step 1 — OpenRouter Dolphin free: ${model}`);
+  } else if (forceOpenRouter) {
+    log.info(`[LLM] ${systemTag}: Uncensored step 2 — OpenAI GPT-4.1 fallback: ${model}`);
   }
 
   // Add fetch timeout to prevent hanging requests (5 minutes for chat, 2 minutes for background)
@@ -508,7 +545,9 @@ async function _invokeLLMWithRetry(
 
   let response: Response;
   try {
-    const apiUrl = forceOpenRouter
+    const apiUrl = useVenice
+      ? "https://api.venice.ai/api/v1/chat/completions"
+      : useOpenRouterUncensored
       ? "https://openrouter.ai/api/v1/chat/completions"
       : forceGemini
       ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
@@ -518,7 +557,7 @@ async function _invokeLLMWithRetry(
       authorization: `Bearer ${apiKey}`,
     };
     // OpenRouter requires these headers for proper routing and app identification
-    if (forceOpenRouter) {
+    if (useOpenRouterUncensored) {
       headers["HTTP-Referer"] = "https://archibaldtitan.com";
       headers["X-Title"] = "Archibald Titan";
     }
@@ -534,7 +573,22 @@ async function _invokeLLMWithRetry(
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
 
     if ((err as Error).name === 'AbortError') {
+      // Timeout: advance uncensored fallback chain instead of failing
+      if (useVenice || useOpenRouterUncensored) {
+        const nextStep = uncensoredStep + 1;
+        log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} timed out, advancing to step ${nextStep}`);
+        const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
+        return _invokeLLMWithRetry(fallbackParams, priority, 0);
+      }
       throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`);
+    }
+
+    // For Venice/OpenRouter network errors, advance the fallback chain
+    if (useVenice || useOpenRouterUncensored) {
+      const nextStep = uncensoredStep + 1;
+      log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} network error, advancing to step ${nextStep}: ${(err as Error).message}`);
+      const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
+      return _invokeLLMWithRetry(fallbackParams, priority, 0);
     }
 
     // Retry on network errors (ECONNRESET, ECONNREFUSED, fetch failures)
@@ -552,6 +606,14 @@ async function _invokeLLMWithRetry(
   }
 
   // ── Handle 429 Rate Limit ──
+  // For Venice/OpenRouter uncensored: immediately advance to next fallback step on 429
+  if (response.status === 429 && (useVenice || useOpenRouterUncensored)) {
+    const nextStep = uncensoredStep + 1;
+    log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} rate-limited (429), advancing to step ${nextStep}`);
+    const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
+    return _invokeLLMWithRetry(fallbackParams, priority, 0);
+  }
+
   // With dedicated keys per system, we retry on our own key (+ fallback for chat)
   if (response.status === 429) {
     if (keyHandle) reportRateLimit(keyHandle.index, keyHandle.envVar);
@@ -650,10 +712,11 @@ async function _invokeLLMWithRetry(
   if (!response.ok) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
     const errorText = await response.text();
-    // If OpenRouter fails, fall back to OpenAI
-    if (forceOpenRouter && useOpenAI) {
-      log.warn(`[LLM] ${systemTag}: OpenRouter failed (${response.status}), falling back to OpenAI: ${errorText.slice(0, 200)}`);
-      const fallbackParams = { ...params, forceOpenRouter: false };
+    // Uncensored fallback chain: advance to next step on any failure
+    if (useVenice || useOpenRouterUncensored) {
+      const nextStep = uncensoredStep + 1;
+      log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} failed (${response.status}), advancing to step ${nextStep}: ${errorText.slice(0, 200)}`);
+      const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
       return _invokeLLMWithRetry(fallbackParams, priority, 0);
     }
     throw new Error(
