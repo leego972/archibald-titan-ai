@@ -1791,21 +1791,21 @@ Do NOT attempt any tool calls or builds.`;
           const isComplexBuild = isBuildRequest && (
             /\b(enterprise|production|professional|advanced|full.?stack|microservice|api.?gateway|distributed|scalable|high.?availability|real.?time|websocket|graphql|grpc|kubernetes|docker|ci.?cd|pipeline)\b/i.test(input.message)
           );
-          let modelTier: "fast" | "strong" | undefined;
-          if (isBuildRequest) {
-            // ALL build requests use the stronger model — code quality matters
-            // The cost difference is negligible vs. the cost of bad code output
+          let modelTier: "fast" | "strong" | "premium" | undefined;
+          if (isSecurityBuild) {
+            // Security builds use gpt-4.1 (full model) — max capability, handles complex
+            // offensive security code. The refusal interceptor handles any safety pushback.
+            modelTier = "premium";
+          } else if (isBuildRequest) {
+            // ALL other build requests use the stronger model — code quality matters
             modelTier = "strong";
           } else {
             // Non-build requests: use fast/cheap model to save credits
             // This includes: simple text responses, tool-calling without build intent, research queries
-            // The free model is sufficient for conversational AI and credential management
             modelTier = "fast";
           }
-          // Note: modelTier="fast" uses the cheapest available model (gpt-4.1-nano)
-          // which is cost-optimized for non-build requests and saves user credits
           if (isBuildRequest) {
-            log.info(`[Chat] Round ${rounds}: model=${modelTier || 'default'} (build=${isSelfBuild ? 'self' : 'external'})`);
+            log.info(`[Chat] Round ${rounds}: model=${modelTier || 'default'} (build=${isSelfBuild ? 'self' : 'external'}, security=${isSecurityBuild})`);
           }
 
           // Token estimation for debugging context size issues
@@ -1904,11 +1904,11 @@ Do NOT attempt any tool calls or builds.`;
                 maxTokens: isBuildRequest ? 16384 : 2048,
                 ...(modelTier ? { model: modelTier } : {}),
                 ...(userApiKey ? { userApiKey } : {}),
-                // Security builds route through Gemini 2.5 Flash — it has far fewer
-                // content restrictions than GPT-4 for professional security research.
-                // GPT-4's hardcoded safety training fires on keywords like "keylogger",
-                // "RAT", "C2" etc. regardless of system prompt, causing hardcoded refusals.
-                ...(isSecurityBuild ? { forceGemini: true } : {}),
+                // Security builds use the strong model (gpt-4.1-mini) via OpenAI pool.
+                // The system prompt + refusal interceptor handles any safety training pushback.
+                // forceGemini was removed — Gemini's OpenAI-compatible endpoint has issues
+                // with parallel_tool_calls:false and other OpenAI-specific params, causing
+                // connection errors mid-build. OpenAI is more reliable for tool-calling.
               });
               break; // success
             } catch (llmErr: unknown) {

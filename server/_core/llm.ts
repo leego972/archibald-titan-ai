@@ -96,8 +96,8 @@ export type InvokeParams = {
   priority?: "chat" | "background";
   /** Temperature for response generation (0 = deterministic, 1 = creative) */
   temperature?: number;
-  /** Model override: "fast" uses gpt-4.1-nano (cheapest), "strong" uses gpt-4.1-mini (best value for code) */
-  model?: "fast" | "strong";
+  /** Model override: "fast" = gpt-4.1-nano (cheapest), "strong" = gpt-4.1-mini (best value for code), "premium" = gpt-4.1 (full model, max capability) */
+  model?: "fast" | "strong" | "premium";
   /** User's personal OpenAI API key — bypasses system key pool entirely */
   userApiKey?: string;
   /** Which system is making this call — determines which dedicated API key is used */
@@ -401,20 +401,21 @@ async function _invokeLLMWithRetry(
     response_format,
   } = params;
 
-  // Model selection: "fast" = gpt-4.1-nano, "strong" = gpt-4.1-mini
-  // Default: gpt-4.1-mini for tool-calling, gpt-4.1-nano for simple text
-  // Cost savings: ~84-97% cheaper than previous gpt-4o routing
+  // Model selection:
+  //   "fast"    = gpt-4.1-nano  (cheapest, simple text)
+  //   "strong"  = gpt-4.1-mini  (best value for code)
+  //   "premium" = gpt-4.1       (full model, used for security builds that need max capability)
   // ALL traffic goes through OpenAI key pool (6 keys with rotation).
   // Gemini is ONLY used as emergency fallback when all OpenAI keys are exhausted.
   const hasToolsDefined = params.tools && params.tools.length > 0;
   const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
   const useOpenAI = hasKeys();
-  // forceGemini: routes this specific call to Gemini 2.5 Flash (used for security builds)
+  // forceGemini: routes this specific call to Gemini 2.5 Flash
   const forceGemini = params.forceGemini === true;
   const model = forceGemini
     ? "gemini-2.5-flash"
     : useOpenAI
-    ? (modelPreference === "fast" ? "gpt-4.1-nano" : "gpt-4.1-mini")
+    ? (modelPreference === "fast" ? "gpt-4.1-nano" : modelPreference === "premium" ? "gpt-4.1" : "gpt-4.1-mini")
     : "gemini-2.5-flash";
 
   const payload: Record<string, unknown> = {
@@ -542,7 +543,7 @@ async function _invokeLLMWithRetry(
       // For builds: fall back after 4 retries (code quality matters)
       // For chat/background: fall back after 2 retries (speed > quality for text responses)
       const nanoFallbackThreshold = (params.tools && params.tools.length > 0) ? 4 : 2;
-      if (attempt >= nanoFallbackThreshold && modelPreference === "strong" && useOpenAI) {
+      if (attempt >= nanoFallbackThreshold && (modelPreference === "strong" || modelPreference === "premium") && useOpenAI) {
         log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries`);
         const fallbackParams = { ...params, model: "fast" as const };
         await new Promise((r) => setTimeout(r, waitMs));
