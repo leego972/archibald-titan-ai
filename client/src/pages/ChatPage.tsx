@@ -312,6 +312,7 @@ interface ChatMsg {
   attachments?: ChatAttachment[];
   actionsTaken?: Array<{ tool: string; success: boolean; summary: string }> | null;
   toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: unknown }> | null;
+  thinkingSteps?: string[]; // Titan's reasoning steps — persisted on the message
 }
 
 // ─── Copy Button ────────────────────────────────────────────────────
@@ -961,6 +962,7 @@ export default function ChatPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const voiceModeRef = useRef(false); // non-reactive ref for use in async callbacks
+  const reasoningStepsRef = useRef<string[]>([]); // captures reasoning events in real-time for persistence
 
   // Keep voiceModeRef in sync
   useEffect(() => { voiceModeRef.current = voiceModeActive; }, [voiceModeActive]);
@@ -1786,6 +1788,7 @@ export default function ChatPage() {
     setIsBuildMode(false);
     setStreamEvents([{ type: 'thinking', message: 'Processing your request...', timestamp: Date.now() }]);
     setBuildLog([]);
+    reasoningStepsRef.current = []; // reset reasoning steps for this new message
 
     // Pre-create conversation if this is a new chat, so we can connect SSE before sending
     let convIdForStream = activeConversationId;
@@ -1825,6 +1828,10 @@ export default function ChatPage() {
           const evt: StreamEvent = { type: 'thinking', message: data.message, round: data.round, reasoning: data.reasoning, phase: data.phase, timestamp: Date.now() };
           setStreamEvents(prev => [...prev, evt]);
           setBuildLog(prev => [...prev, evt]);
+          // Capture reasoning steps into ref for persistence on the message
+          if (data.reasoning && data.message && data.message.trim().length > 10) {
+            reasoningStepsRef.current = [...reasoningStepsRef.current, data.message.trim()];
+          }
           // Only update the loading phase label with non-reasoning events (reasoning content is shown in the panel)
           if (!data.reasoning) setLoadingPhase(data.message || 'Thinking...');
         });
@@ -1935,6 +1942,8 @@ export default function ChatPage() {
               return { tool: a.tool, success: a.success, summary };
             })
           : null,
+        // Capture reasoning steps from the ref (not state) to avoid stale closure issues
+        thinkingSteps: reasoningStepsRef.current.length > 0 ? [...reasoningStepsRef.current] : undefined,
       };
 
       // Register assistant message as optimistic so DB sync won't wipe it
@@ -2629,6 +2638,26 @@ export default function ChatPage() {
                                 <Volume2 className="h-3.5 w-3.5" />
                               )}
                             </button>
+                          </div>
+                        )}
+                        {/* Persistent Thinking Steps — shown below each assistant message */}
+                        {msg.role === "assistant" && msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                          <div className="mt-2 rounded-xl border border-purple-500/30 bg-gradient-to-b from-purple-950/40 to-purple-900/10 px-3 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div className="relative shrink-0">
+                                <Cpu className="h-3.5 w-3.5 text-purple-400" />
+                              </div>
+                              <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">Titan&apos;s thoughts</span>
+                              <span className="ml-auto text-[10px] text-purple-500/60">{msg.thinkingSteps.length} step{msg.thinkingSteps.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin">
+                              {msg.thinkingSteps.map((step, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                  <span className="text-purple-500/50 text-[10px] font-mono mt-0.5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                                  <p className="text-xs text-purple-100/80 leading-relaxed">{step}</p>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
