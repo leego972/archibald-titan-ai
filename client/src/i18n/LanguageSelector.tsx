@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "./LanguageContext";
+import { FlagIcon } from "./FlagIcon";
 
 /**
  * Compact language selector dropdown.
- * Shows current language flag + code, expands to show all 12 languages.
- * On mobile, always opens downward to prevent flags going off-screen.
+ * Shows current language flag + code, expands to show all languages.
+ * Uses SVG flag images (not emoji) for cross-platform compatibility including Windows.
  */
 export function LanguageSelector({ compact = false }: { compact?: boolean }) {
-  const { language, languageMeta, setLanguage, supportedLanguages, t } = useLanguage();
+  const { language, setLanguage, supportedLanguages, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [dropDirection, setDropDirection] = useState<"down" | "up">("down");
@@ -30,15 +31,13 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const dropdownHeight = 320; // max-h-80 = 20rem = 320px
+    const dropdownHeight = 320;
 
-    // On small screens (mobile), always open downward
     if (window.innerWidth < 768) {
       setDropDirection("down");
       return;
     }
 
-    // On desktop, choose direction based on available space
     if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
       setDropDirection("down");
     } else {
@@ -53,10 +52,11 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     setOpen(!open);
   };
 
-  // Dropdown position classes
   const dropdownPositionClass = dropDirection === "down"
     ? "top-full mt-1"
     : "bottom-full mb-1";
+
+  const currentLang = supportedLanguages.find((l) => l.code === language);
 
   return (
     <div ref={ref} className="relative inline-block text-left">
@@ -66,7 +66,7 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
         title={t("common.language")}
         aria-label={t("common.language")}
       >
-        <span className="text-base">{languageMeta.flag}</span>
+        <FlagIcon langCode={language} size={16} />
         {!compact && (
           <span className="text-gray-700 dark:text-gray-300 font-medium">
             {language.toUpperCase()}
@@ -104,7 +104,7 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
                   : "text-gray-700 dark:text-gray-300"
               }`}
             >
-              <span className="text-lg">{lang.flag}</span>
+              <FlagIcon langCode={lang.code} size={18} />
               <span className="flex-1 text-left">{lang.nativeName}</span>
               <span className="text-xs text-gray-400 uppercase">{lang.code}</span>
               {lang.code === language && (

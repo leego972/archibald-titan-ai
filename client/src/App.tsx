@@ -98,6 +98,7 @@ import WebhooksPage from "./pages/WebhooksPage";
 import NotificationChannelsPage from "./pages/NotificationChannelsPage";
 import ApiAnalyticsPage from "./pages/ApiAnalyticsPage";
 import CliToolPage from "./pages/CliToolPage";
+import GitBashPage from "./pages/GitBashPage";
 
 // Admin
 import ReleaseManagementPage from "./pages/ReleaseManagementPage";
@@ -206,6 +207,7 @@ function DashboardRouter() {
         <Route path="/fetcher/notifications" component={NotificationChannelsPage} />
         <Route path="/fetcher/api-analytics" component={ApiAnalyticsPage} />
         <Route path="/fetcher/cli" component={CliToolPage} />
+        <Route path="/fetcher/git-bash" component={GitBashPage} />
 
         {/* Site Monitor */}
         <Route path="/site-monitor" component={SiteMonitorPage} />

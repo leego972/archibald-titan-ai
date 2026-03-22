@@ -69,7 +69,7 @@ async function logDownload(params: {
   userName: string | null;
   releaseId: number;
   releaseVersion: string;
-  platform: "windows" | "mac" | "linux";
+  platform: "windows" | "mac" | "linux" | "android";
   tokenId: number | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -103,7 +103,7 @@ export const downloadRouter = router({
     .input(
       z.object({
         releaseId: z.number(),
-        platform: z.enum(["windows", "mac", "linux"]),
+        platform: z.enum(["windows", "mac", "linux", "android"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -157,6 +157,8 @@ export const downloadRouter = router({
           ? release.downloadUrlWindows
           : input.platform === "mac"
           ? release.downloadUrlMac
+          : input.platform === "android"
+          ? (release as any).downloadUrlAndroid
           : release.downloadUrlLinux
         : null;
 
@@ -378,6 +380,8 @@ export function registerDownloadRoute(app: Express) {
         ? release.downloadUrlWindows
         : tokenRecord.platform === "mac"
         ? release.downloadUrlMac
+        : tokenRecord.platform === "android"
+        ? (release as any).downloadUrlAndroid
         : release.downloadUrlLinux;
 
     if (!downloadUrl) {

@@ -895,27 +895,29 @@ export default function ChatPage() {
     return "windows";
   });
 
-  const handleDownloadApp = async (platform: "windows" | "mac" | "linux") => {
+  const handleDownloadApp = async (platform: "windows" | "mac" | "linux" | "android") => {
     if (!latestRelease) {
       toast.error("No release available yet. Check back soon!");
       return;
     }
+    const platformLabel = platform === "mac" ? "macOS" : platform === "windows" ? "Windows" : platform === "android" ? "Android" : "Linux";
     const hasDownload =
       platform === "windows" ? latestRelease.hasWindows :
       platform === "mac" ? latestRelease.hasMac :
+      platform === "android" ? !!(latestRelease as any).hasAndroid :
       latestRelease.hasLinux;
     if (!hasDownload) {
-      toast.info(`${platform === "mac" ? "macOS" : platform === "windows" ? "Windows" : "Linux"} build coming soon!`);
+      toast.info(`${platformLabel} build coming soon!`);
       return;
     }
     try {
       setDownloadPending(platform);
       const { token } = await requestDownloadToken.mutateAsync({
         releaseId: latestRelease.id,
-        platform,
+        platform: platform as "windows" | "mac" | "linux" | "android",
       });
       window.open(`/api/download/${token}`, "_blank");
-      toast.success(`Downloading Titan for ${platform === "mac" ? "macOS" : platform === "windows" ? "Windows" : "Linux"}...`);
+      toast.success(`Downloading Titan for ${platformLabel}...`);
     } catch (err: any) {
       toast.error(err?.message ?? "Download failed. Please try again.");
     } finally {
@@ -2398,6 +2400,19 @@ export default function ChatPage() {
                             {platform === 'mac' ? 'macOS' : platform === 'windows' ? 'Windows' : 'Linux'}
                           </button>
                         ))}
+                        {/* Android APK */}
+                        <button
+                          onClick={() => handleDownloadApp('android')}
+                          disabled={!!downloadPending}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-cyan-400 disabled:opacity-50 transition-colors"
+                        >
+                          {downloadPending === 'android' ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Smartphone className="h-3 w-3" />
+                          )}
+                          Android
+                        </button>
                       </div>
                     </div>
                   </div>

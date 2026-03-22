@@ -169,6 +169,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
+      country-flag-icons:
+        specifier: ^1.6.15
+        version: 1.6.15
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -3085,6 +3088,9 @@ packages:
 
   cose-base@2.2.0:
     resolution: {integrity: sha512-AzlgcsCbUMymkADOJtQm3wO9S3ltPfYOFD5033keQn9NJzIbtnZj+UdBJe7DYml/8TdbtHJW3j58SOnKhWY/5g==}
+
+  country-flag-icons@1.6.15:
+    resolution: {integrity: sha512-92HoA8l6DluEidku8tKBftjuFRj4Rv3zDW1lXxCuNnqAxhUSkvso9gM/Afj4F5BnK+wneHIe3ydI+s+4NA29/Q==}
 
   cpu-features@0.0.10:
     resolution: {integrity: sha512-9IkYqtX3YHPCzoVg1Py+o9057a3i0fp7S530UWokCSaFVTc7CwXPRiOjRjBQQ18ZCNafx78YfnG+HALxtVmOGA==}
@@ -8628,6 +8634,8 @@ snapshots:
   cose-base@2.2.0:
     dependencies:
       layout-base: 2.0.1
+
+  country-flag-icons@1.6.15: {}
 
   cpu-features@0.0.10:
     dependencies:

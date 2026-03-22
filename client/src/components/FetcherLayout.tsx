@@ -233,6 +233,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_28_r4c4"), label: t("nav.notifications"), path: "/fetcher/notifications", isNew: true },
       { icon: featureIcon("icon_30_r4c6"), label: t("nav.apiAnalytics"), path: "/fetcher/api-analytics", isNew: true },
       { icon: featureIcon("icon_41_r6c1"), label: t("nav.cliTool"), path: "/fetcher/cli", isNew: true },
+      { icon: featureIcon("icon_41_r6c1"), label: t("nav.gitBash"), path: "/fetcher/git-bash", isNew: true },
     ],
   },
   {
@@ -262,7 +263,7 @@ const allMenuItemPaths = [
   "/fetcher/export", "/fetcher/import", "/fetcher/bulk-sync", "/fetcher/auto-sync",
   "/fetcher/onboarding", "/fetcher/history", "/fetcher/audit-logs",
   "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
-  "/fetcher/api-analytics", "/fetcher/cli",
+  "/fetcher/api-analytics", "/fetcher/cli", "/fetcher/git-bash",
   "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
   "/tor", "/vpn-chain", "/proxy-maker", "/bin-checker",
 ];

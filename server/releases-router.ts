@@ -43,6 +43,7 @@ const SEED_RELEASE = {
   hasWindows: false,
   hasMac: false,
   hasLinux: false,
+  hasAndroid: false,
   publishedAt: new Date(),
   createdAt: new Date(),
 };
@@ -64,6 +65,7 @@ function sanitizeRelease(release: any) {
     hasWindows: !!release.downloadUrlWindows,
     hasMac: !!release.downloadUrlMac,
     hasLinux: !!release.downloadUrlLinux,
+    hasAndroid: !!release.downloadUrlAndroid,
     publishedAt: release.publishedAt,
     createdAt: release.createdAt,
   };
@@ -605,22 +607,23 @@ export function registerReleaseUploadRoute(app: Express) {
       });
 
       // Validate platform
-      if (!["windows", "mac", "linux"].includes(result.platform)) {
-        return res.status(400).json({ error: "Platform must be windows, mac, or linux" });
+      if (!["windows", "mac", "linux", "android"].includes(result.platform)) {
+        return res.status(400).json({ error: "Platform must be windows, mac, linux, or android" });
       }
 
       // Validate file extension
-      const ext = result.fileName.toLowerCase().match(/\.(exe|msi|dmg|pkg|appimage|deb|rpm|tar\.gz|zip)$/)?.[0];
+      const ext = result.fileName.toLowerCase().match(/\.(exe|msi|dmg|pkg|appimage|deb|rpm|tar\.gz|zip|apk)$/)?.[0];
       if (!ext) {
         return res.status(400).json({
-          error: `Invalid file type. Allowed: ${Object.keys(ALLOWED_EXTENSIONS).join(", ")}`,
+          error: `Invalid file type. Allowed: ${Object.keys(ALLOWED_EXTENSIONS).join(", ")}, .apk`,
         });
       }
 
       // Upload to S3
       const hash = crypto.randomBytes(8).toString("hex");
       const s3Key = `releases/${result.releaseId}/${result.platform}/${hash}-${result.fileName}`;
-      const { url } = await storagePut(s3Key, result.fileBuffer, ALLOWED_EXTENSIONS[ext] || "application/octet-stream");
+      const mimeType = ext === ".apk" ? "application/vnd.android.package-archive" : (ALLOWED_EXTENSIONS[ext] || "application/octet-stream");
+      const { url } = await storagePut(s3Key, result.fileBuffer, mimeType);
 
       // Update the release record with the download URL
       const db = await getDb();
@@ -630,7 +633,8 @@ export function registerReleaseUploadRoute(app: Express) {
 
       const urlField =
         result.platform === "windows" ? "downloadUrlWindows" :
-        result.platform === "mac" ? "downloadUrlMac" : "downloadUrlLinux";
+        result.platform === "mac" ? "downloadUrlMac" :
+        result.platform === "android" ? "downloadUrlAndroid" : "downloadUrlLinux";
 
       await db
         .update(releases)
@@ -711,11 +715,11 @@ export function registerReleaseUploadRoute(app: Express) {
         req.pipe(busboy);
       });
 
-      if (!["windows", "mac", "linux"].includes(result.platform)) {
-        return res.status(400).json({ error: "Platform must be windows, mac, or linux" });
+      if (!["windows", "mac", "linux", "android"].includes(result.platform)) {
+        return res.status(400).json({ error: "Platform must be windows, mac, linux, or android" });
       }
 
-      const ext = result.fileName.toLowerCase().match(/\.(exe|msi|dmg|pkg|appimage|deb|rpm|tar\.gz|zip)$/)?.[0];
+      const ext = result.fileName.toLowerCase().match(/\.(exe|msi|dmg|pkg|appimage|deb|rpm|tar\.gz|zip|apk)$/)?.[0];
       if (!ext) {
         return res.status(400).json({ error: "Invalid file type" });
       }
@@ -742,7 +746,8 @@ export function registerReleaseUploadRoute(app: Express) {
 
       const urlField =
         result.platform === "windows" ? "downloadUrlWindows" :
-        result.platform === "mac" ? "downloadUrlMac" : "downloadUrlLinux";
+        result.platform === "mac" ? "downloadUrlMac" :
+        result.platform === "android" ? "downloadUrlAndroid" : "downloadUrlLinux";
 
       await db
         .update(releases)
