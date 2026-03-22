@@ -122,6 +122,7 @@ import EvilginxPage from "./pages/EvilginxPage";
 // Specialised Tools
 import BlackEyePage from "./pages/BlackEyePage";
 import MetasploitPage from "./pages/MetasploitPage";
+import ExploitPackPage from "./pages/ExploitPackPage";
 
 // Content Creator
 import ContentCreatorPage from "./pages/ContentCreatorPage";
@@ -223,6 +224,7 @@ function DashboardRouter() {
         {/* Specialised Tools */}
         <Route path="/blackeye" component={BlackEyePage} />
         <Route path="/metasploit" component={MetasploitPage} />
+        <Route path="/exploitpack" component={ExploitPackPage} />
 
         {/* Content Creator */}
         <Route path="/content-creator" component={ContentCreatorPage} />

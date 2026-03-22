@@ -47,6 +47,7 @@ import { securityDashboardRouter } from "./security-dashboard-router";
 import { evilginxRouter } from "./evilginx-router";
 import { blackeyeRouter } from "./blackeye-router";
 import { metasploitRouter } from "./metasploit-router";
+import { exploitpackRouter } from "./exploitpack-router";
 import { filesRouter } from "./api/files";
 import { contentCreatorRouter } from "./content-creator-router";
 import { cybermcpRouter } from "./cybermcp-router";
@@ -132,6 +133,7 @@ export const appRouter = router({
   evilginx: evilginxRouter,
   blackeye: blackeyeRouter,
   metasploit: metasploitRouter,
+  exploitpack: exploitpackRouter,
   contentCreator: contentCreatorRouter,
   cyberMcp: cybermcpRouter,
   astra: astraRouter,
