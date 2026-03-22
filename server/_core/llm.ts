@@ -25,6 +25,13 @@ const log = createLogger("LLM");
  */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || Buffer.from("QUl6YVN5Q1pkaXpQMnVUMlJZUi14UU1reUpVOWhWdlRDck5LZ1NB", "base64").toString("utf-8");
 
+/**
+ * OpenRouter API key — used for uncensored model routing.
+ * Primary model: Dolphin Mistral 24B Venice Edition (free, uncensored).
+ * Falls back to OpenAI if OpenRouter fails.
+ */
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {
@@ -112,6 +119,12 @@ export type InvokeParams = {
    * Gemini has significantly fewer content restrictions for professional security research.
    */
   forceGemini?: boolean;
+  /**
+   * Force OpenRouter uncensored model for this call — used for security builds.
+   * Routes to Dolphin Mistral 24B Venice Edition (uncensored, no refusals).
+   * Falls back to OpenAI if OpenRouter key is not set or call fails.
+   */
+  forceOpenRouter?: boolean;
 };
 
 export type ToolCall = {
@@ -405,14 +418,22 @@ async function _invokeLLMWithRetry(
   //   "fast"    = gpt-4.1-nano  (cheapest, simple text)
   //   "strong"  = gpt-4.1-mini  (best value for code)
   //   "premium" = gpt-4.1       (full model, used for security builds that need max capability)
-  // ALL traffic goes through OpenAI key pool (6 keys with rotation).
+  // OpenRouter uncensored models are used for security builds (forceOpenRouter: true).
   // Gemini is ONLY used as emergency fallback when all OpenAI keys are exhausted.
   const hasToolsDefined = params.tools && params.tools.length > 0;
   const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
   const useOpenAI = hasKeys();
   // forceGemini: routes this specific call to Gemini 2.5 Flash
   const forceGemini = params.forceGemini === true;
-  const model = forceGemini
+  // forceOpenRouter: routes to uncensored Dolphin/Nous Hermes via OpenRouter
+  const forceOpenRouter = params.forceOpenRouter === true && !!OPENROUTER_API_KEY;
+  // OpenRouter uncensored model cascade for security builds:
+  // Primary: Dolphin Mistral 24B Venice (free, uncensored, 32K context)
+  // The model ID includes :free suffix for the free tier
+  const OPENROUTER_UNCENSORED_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
+  const model = forceOpenRouter
+    ? OPENROUTER_UNCENSORED_MODEL
+    : forceGemini
     ? "gemini-2.5-flash"
     : useOpenAI
     ? (modelPreference === "fast" ? "gpt-4.1-nano" : modelPreference === "premium" ? "gpt-4.1" : "gpt-4.1-mini")
@@ -465,14 +486,19 @@ async function _invokeLLMWithRetry(
   const usingUserKey = !!params.userApiKey;
   // Determine system tag: explicit tag > priority-based default
   const systemTag = params.systemTag || (priority === "chat" ? "chat" : "misc");
-  // When forceGemini, skip OpenAI key pool entirely — use free Gemini API
-  const keyHandle = (!usingUserKey && useOpenAI && !forceGemini) ? acquireKey(systemTag) : null;
-  const apiKey = forceGemini
+  // When forceGemini or forceOpenRouter, skip OpenAI key pool entirely
+  const keyHandle = (!usingUserKey && useOpenAI && !forceGemini && !forceOpenRouter) ? acquireKey(systemTag) : null;
+  const apiKey = forceOpenRouter
+    ? OPENROUTER_API_KEY
+    : forceGemini
     ? GEMINI_API_KEY
     : usingUserKey ? params.userApiKey! : (keyHandle ? keyHandle.key : getLegacyApiKey());
 
   if (usingUserKey) {
     log.info("Using user's personal API key", { system: systemTag, model });
+  }
+  if (forceOpenRouter) {
+    log.info(`[LLM] ${systemTag}: Routing to OpenRouter uncensored model: ${model}`);
   }
 
   // Add fetch timeout to prevent hanging requests (5 minutes for chat, 2 minutes for background)
@@ -482,15 +508,23 @@ async function _invokeLLMWithRetry(
 
   let response: Response;
   try {
-    const apiUrl = forceGemini
+    const apiUrl = forceOpenRouter
+      ? "https://openrouter.ai/api/v1/chat/completions"
+      : forceGemini
       ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
       : resolveApiUrl();
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    };
+    // OpenRouter requires these headers for proper routing and app identification
+    if (forceOpenRouter) {
+      headers["HTTP-Referer"] = "https://archibaldtitan.com";
+      headers["X-Title"] = "Archibald Titan";
+    }
     response = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -616,6 +650,12 @@ async function _invokeLLMWithRetry(
   if (!response.ok) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
     const errorText = await response.text();
+    // If OpenRouter fails, fall back to OpenAI
+    if (forceOpenRouter && useOpenAI) {
+      log.warn(`[LLM] ${systemTag}: OpenRouter failed (${response.status}), falling back to OpenAI: ${errorText.slice(0, 200)}`);
+      const fallbackParams = { ...params, forceOpenRouter: false };
+      return _invokeLLMWithRetry(fallbackParams, priority, 0);
+    }
     throw new Error(
       `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
     );
