@@ -3412,4 +3412,68 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   binLookupTool,
   cardValidateTool,
   binReverseLookupTool,
+  // Credentials & Fetching
+  listCredentials,
+  revealCredential,
+  exportCredentials,
+  createFetchJob,
+  listJobs,
+  getJobDetails,
+  listProviders,
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+  saveCredential,
+  // Leak Scanner
+  startLeakScan,
+  getLeakScanResults,
+  // Vault
+  listVaultEntries,
+  addVaultEntry,
+  // Bulk Sync
+  triggerBulkSync,
+  getBulkSyncStatus,
+  // Team Management
+  listTeamMembers,
+  addTeamMember,
+  removeTeamMember,
+  updateTeamMemberRole,
+  // Scheduling
+  listSchedules,
+  createSchedule,
+  deleteSchedule,
+  // Watchdog & Health
+  getWatchdogSummary,
+  checkProviderHealth,
+  getRecommendations,
+  getAuditLogs,
+  getPlanUsage,
+  // Memory
+  memorySaveFactTool,
+  memoryListFactsTool,
+  memoryDeleteFactTool,
+  // Autonomous / Channel Status
+  getAutonomousStatus,
+  getChannelStatus,
+  refreshVaultBridge,
+  getVaultBridgeInfo,
+  // Business Modules
+  getBusinessModuleStatus,
+  getBusinessVerticalsList,
+  triggerBusinessModuleGeneration,
+  // App Research & Clone
+  appResearch,
+  appClone,
+  websiteReplicate,
+  // Auto-Fix
+  autoFixVulnerability,
+  autoFixAll,
+  // SEO
+  seoGetHealthScoreTool,
+  // Site Monitor
+  siteMonitorListSitesTool,
+  // Storage
+  storageGetStatsTool,
+  // Voice
+  voiceTranscribeTool,
 ];

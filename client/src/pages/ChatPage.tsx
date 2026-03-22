@@ -955,6 +955,7 @@ export default function ChatPage() {
   // Voice Mode State (full-screen voice assistant)
   const [voiceModeActive, setVoiceModeActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<number | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -1034,8 +1035,10 @@ export default function ChatPage() {
       source.onended = () => {
         audioSourceRef.current = null;
         setIsSpeaking(false);
+        setSpeakingMsgId(null);
+        // Always reset voiceStatus — in voice mode, restart listening after a short pause
+        setVoiceStatus('idle');
         if (voiceModeRef.current) {
-          setVoiceStatus('idle');
           setTimeout(() => {
             if (voiceModeRef.current) {
               startRecording();
@@ -1049,8 +1052,23 @@ export default function ChatPage() {
     } catch (err) {
       console.error('[TTS] Error:', err);
       setIsSpeaking(false);
-      if (voiceModeRef.current) setVoiceStatus('idle');
+      setSpeakingMsgId(null);
+      setVoiceStatus('idle'); // always reset on error
     }
+  };
+
+  // Speak a specific message by ID
+  const speakMessage = (msgId: number, text: string) => {
+    if (speakingMsgId === msgId) {
+      // Already speaking this message — stop it
+      stopTtsPlayback();
+      setIsSpeaking(false);
+      setSpeakingMsgId(null);
+      if (!voiceModeRef.current) setVoiceStatus('idle');
+      return;
+    }
+    setSpeakingMsgId(msgId);
+    speakText(text);
   };
 
   // Enter voice mode
@@ -1080,6 +1098,7 @@ export default function ChatPage() {
     stopTtsPlayback();
     // Reset all voice state
     setIsSpeaking(false);
+    setSpeakingMsgId(null);
     setIsRecording(false);
     setRecordingDuration(0);
     setVoiceStatus('idle');
@@ -2594,6 +2613,22 @@ export default function ChatPage() {
                         {msg.role === "assistant" && (
                           <div className="flex items-center gap-1 mt-1 ml-1">
                             <CopyButton text={msg.content} />
+                            {/* Speak button */}
+                            <button
+                              onClick={() => speakMessage(msg.id, msg.content)}
+                              title={speakingMsgId === msg.id ? 'Stop speaking' : 'Read aloud'}
+                              className={`p-1 rounded-md transition-colors ${
+                                speakingMsgId === msg.id
+                                  ? 'text-purple-400 bg-purple-500/20 hover:bg-purple-500/30'
+                                  : 'text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10'
+                              }`}
+                            >
+                              {speakingMsgId === msg.id ? (
+                                <VolumeX className="h-3.5 w-3.5" />
+                              ) : (
+                                <Volume2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
                           </div>
                         )}
                       </div>
@@ -2674,14 +2709,21 @@ export default function ChatPage() {
                         </div>
                         {/* ── Titan's Inner Monologue ── always visible when reasoning events arrive */}
                         {streamEvents.filter(e => e.reasoning).length > 0 && (
-                          <div className="mb-3 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2.5">
-                            <div className="flex items-center gap-1.5 mb-1.5">
-                              <Cpu className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                          <div className="mb-3 rounded-xl border border-purple-500/40 bg-gradient-to-b from-purple-950/50 to-purple-900/20 px-3 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div className="relative shrink-0">
+                                <Cpu className="h-3.5 w-3.5 text-purple-400" />
+                                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                              </div>
                               <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">Titan&apos;s thoughts</span>
+                              <span className="ml-auto text-[10px] text-purple-500/60">{streamEvents.filter(e => e.reasoning).length} step{streamEvents.filter(e => e.reasoning).length !== 1 ? 's' : ''}</span>
                             </div>
-                            <div className="space-y-1.5 max-h-[180px] overflow-y-auto scrollbar-thin">
+                            <div className="space-y-2 max-h-[260px] overflow-y-auto scrollbar-thin">
                               {streamEvents.filter(e => e.reasoning).map((evt, i) => (
-                                <p key={i} className="text-sm text-purple-200 leading-relaxed italic">{evt.message}</p>
+                                <div key={i} className="flex items-start gap-2">
+                                  <span className="text-purple-500/50 text-[10px] font-mono mt-0.5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                                  <p className="text-sm text-purple-100/90 leading-relaxed">{evt.message}</p>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -3729,6 +3771,7 @@ export default function ChatPage() {
                 onClick={() => {
                   stopTtsPlayback();
                   setIsSpeaking(false);
+                  setSpeakingMsgId(null);
                   setVoiceStatus('idle');
                 }}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border/50 text-muted-foreground hover:bg-muted transition-all text-sm font-medium"

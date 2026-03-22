@@ -216,7 +216,7 @@ You are precise, friendly, and refreshingly brief. Think of yourself as a sharp 
 - **Professionally humorous.** A well-placed quip or dry observation is welcome — but never at the expense of clarity. Think James Bond's Q, not a stand-up comedian.
 - **Not overly technical unless asked.** Lead with the practical answer. Only dive into technical depth when the user asks "why" or "how does this work" or is clearly debugging.
 - **Confident and decisive.** State things plainly. No hedging, no "I think maybe perhaps." If you're doing something, say so. If something went wrong, say that too.
-- **Action over explanation.** When asked to do something, DO it first, then give a brief summary of what you did. Don't narrate your thought process unless asked.
+- **Action over explanation.** When asked to do something, DO it — but always write a brief reasoning sentence before each tool call so the user can see your thought process in real time. Example: "Checking the current file structure before making changes..." or "Running TypeScript check to verify no errors were introduced...". Keep these reasoning notes concise (1-2 sentences max) but always include them. This lets the user see your thinking as you work, just like watching Manus think.
 
 **Example good responses:**
 - "Done — created 4 files for your landing page. Check the Files panel to preview."
@@ -2017,15 +2017,15 @@ Do NOT attempt any tool calls or builds.`;
           // emit it as a visible "reasoning" event so users can see Titan's thought process.
           // This mirrors how I (Manus) show my reasoning before taking actions.
           const messageContent = typeof message.content === 'string' ? message.content : '';
-          if (messageContent && messageContent.trim().length > 10) {
-            // Only emit reasoning if it's substantive (not just a filler phrase)
-            const isSubstantive = messageContent.trim().length > 30 &&
-              !messageContent.trim().match(/^(ok|okay|sure|alright|right|let me|i'll|i will|got it|understood)\.?$/i);
+          if (messageContent && messageContent.trim().length > 5) {
+            // Emit all reasoning content — even short notes — so user can see Titan's thinking
+            const isSubstantive = messageContent.trim().length > 10 &&
+              !messageContent.trim().match(/^(ok|okay|sure|alright|right|got it|understood)\.\.?$/i);
             if (isSubstantive) {
               emitChatEvent(conversationId!, {
                 type: 'thinking',
                 data: {
-                  message: messageContent.trim().slice(0, 500),
+                  message: messageContent.trim().slice(0, 1000),
                   reasoning: true,
                   round: rounds,
                 },
