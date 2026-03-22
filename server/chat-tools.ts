@@ -3206,19 +3206,18 @@ export const TITAN_TOOLS: Tool[] = [
   checkCardTool,
   checkBinTool,
   // New Titan Platform Tools
+  // Evilginx — run_command covers list_phishlets/sessions/lures
   evilginxConnectTool,
   evilginxRunCommandTool,
-  evilginxListPhishletsTool,
-  evilginxListSessionsTool,
-  evilginxListLuresTool,
+  // Metasploit — run_command covers list_sessions/search_modules
   metasploitTestConnectionTool,
   metasploitRunCommandTool,
-  metasploitListSessionsTool,
-  metasploitSearchModulesTool,
+  // Other offensive tools
   argusTestConnectionTool,
   astraTestConnectionTool,
   blackeyeTestConnectionTool,
   blackeyeRunCommandTool,
+  // Platform tools
   contentCreatorGetCampaignsTool,
   siteMonitorListSitesTool,
   totpVaultListTool,
@@ -3241,25 +3240,16 @@ export const TITAN_TOOLS: Tool[] = [
   memoryDeleteFactTool,
   // Tor Browser
   torGetStatusTool,
-  torNewCircuitTool,
-  torInstallTool,
   torSetActiveTool,
-  torSetFirewallTool,
   // VPN Chain
   vpnChainGetChainTool,
-  vpnChainAddHopTool,
-  vpnChainTestChainTool,
   vpnChainSetActiveTool,
   // Proxy Maker
   proxyMakerGetPoolTool,
-  proxyMakerScrapeProxiesTool,
-  proxyMakerHealthCheckTool,
-  proxyMakerSetRotationTool,
   proxyMakerDeployProxyTool,
   // BIN Checker
   binLookupTool,
   cardValidateTool,
-  binReverseLookupTool,
 ];
 
 // Focused tool subset for build/research requests — fewer tools = less model confusion
