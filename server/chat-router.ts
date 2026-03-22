@@ -26,8 +26,9 @@ import {
   users,
 } from "../drizzle/schema";
 import { PROVIDERS } from "../shared/fetcher";
-import { TITAN_TOOLS, BUILDER_TOOLS, EXTERNAL_BUILD_TOOLS } from "./chat-tools";
-// NOTE: EXTERNAL_BUILD_TOOLS is the focused toolset for user-facing project builds
+import { TITAN_TOOLS, BUILDER_TOOLS } from "./chat-tools";
+import { selectToolsForRequest } from "./tool-selector";
+// NOTE: selectToolsForRequest picks a context-aware subset of EXTERNAL_BUILD_TOOLS per request (max 128)
 import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild, consumePendingInjections } from "./chat-stream";
 import { executeToolCall } from "./chat-executor";
 import {
@@ -1610,9 +1611,9 @@ Do NOT attempt any tool calls or builds.`;
 
       // Choose tool set:
       // - Self-build: BUILDER_TOOLS (self_modify_file, NO sandbox tools)
-      // - External build: EXTERNAL_BUILD_TOOLS (focused builder tools — create_file, sandbox, web research, GitHub)
-      // - General chat: TITAN_TOOLS (full platform access, gated by membership/credits)
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? EXTERNAL_BUILD_TOOLS : TITAN_TOOLS);
+      //       // - External build: selectToolsForRequest() picks relevant subset of EXTERNAL_BUILD_TOOLS (max 128)
+      // - Titan: TITAN_TOOLS (full tool suite)
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message) : TITAN_TOOLS);
 
       // For general chat: if user attached a file, force read_uploaded_file first
       // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
