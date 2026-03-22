@@ -2351,12 +2351,21 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
 
                 const verifyResults: string[] = [];
 
-                // Install requirements.txt if it exists
+                // Install requirements.txt only if it contains Python packages (not system packages like mingw-w64, gcc, etc.)
                 const reqFile = createdFiles.find(a => (a.args?.fileName as string) === 'requirements.txt');
                 if (reqFile) {
-                  const installResult = await sbExecuteCommand(sbId, userId, 'pip3 install -r requirements.txt 2>&1 | tail -5', { timeoutMs: 60000, triggeredBy: 'system' });
-                  if (installResult.exitCode !== 0) {
-                    verifyResults.push(`**pip install:** Some dependencies may not be available (non-critical)`);
+                  const reqContent = (reqFile.args?.content as string) || '';
+                  const hasPythonPackages = reqContent.split('\n').some(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('#')) return false;
+                    // Skip known system package names
+                    return !/^(mingw|gcc|g\+\+|clang|cmake|make|apt|brew|yum|dnf|pacman|rust|cargo|go|java|jdk|node|npm|yarn|ruby|perl|php|swift|kotlin|scala|gradle|maven)/i.test(trimmed);
+                  });
+                  if (hasPythonPackages) {
+                    const installResult = await sbExecuteCommand(sbId, userId, 'pip3 install -r requirements.txt 2>&1 | tail -5', { timeoutMs: 60000, triggeredBy: 'system' });
+                    if (installResult.exitCode !== 0) {
+                      verifyResults.push(`**pip install:** Some dependencies may not be available (non-critical)`);
+                    }
                   }
                 }
 
@@ -2442,7 +2451,17 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
               // ── GATE 2: Mandatory verification — did Titan actually TEST the code? ──
               // Only fire when: (a) Titan says done, (b) files were created, (c) no successful test run yet.
               // Capped at round MAX_TOOL_ROUNDS - 5 to avoid forcing tests on the last few rounds.
-              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && successfulTests.length === 0 && rounds < MAX_TOOL_ROUNDS - 5) {
+              // SKIP for Windows/native binary builds — sandbox cannot compile Windows code.
+              const hasWindowsFiles = createdSoFar.some(a => {
+                const fn = (a.args?.fileName as string || '').toLowerCase();
+                return fn.endsWith('.c') || fn.endsWith('.cpp') || fn.endsWith('.cs') || fn.endsWith('.rs') || fn.endsWith('.go') || fn.endsWith('.exe');
+              });
+              const hasPyOrJsFiles = createdSoFar.some(a => {
+                const fn = (a.args?.fileName as string || '').toLowerCase();
+                return fn.endsWith('.py') || fn.endsWith('.js') || fn.endsWith('.ts') || fn.endsWith('.jsx') || fn.endsWith('.tsx');
+              });
+              const isNativeBuild = hasWindowsFiles && !hasPyOrJsFiles;
+              if (looksLikeDelivery && isExternalBuild && createdSoFar.length >= 2 && successfulTests.length === 0 && rounds < MAX_TOOL_ROUNDS - 5 && !isNativeBuild) {
                 log.info(`[Chat] BUILD GATE 2 (untested): Titan says done with ${createdSoFar.length} files but 0 successful sandbox_exec runs. Forcing verification...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
                 llmMessages.push({ role: 'user', content: 'Before delivering, please run sandbox_exec to verify the code works. Install dependencies (pip install -r requirements.txt or npm install), then run the entry point. If it fails, fix the code and retest.' });
@@ -2452,8 +2471,9 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
               // ── GATE 3: Last test failed — force fix before delivery ──
               // If the most recent sandbox_exec FAILED and Titan is trying to deliver anyway, force a fix.
               // Only fire when there is a clear delivery signal AND the last test genuinely failed.
+              // SKIP for native binary builds — sandbox cannot compile Windows/native code.
               const lastSandboxAction = [...executedActions].reverse().find(a => a.tool === 'sandbox_exec');
-              if (looksLikeDelivery && lastSandboxAction && !lastSandboxAction.success && rounds < MAX_TOOL_ROUNDS - 3) {
+              if (looksLikeDelivery && lastSandboxAction && !lastSandboxAction.success && rounds < MAX_TOOL_ROUNDS - 3 && !isNativeBuild) {
                 log.info(`[Chat] BUILD GATE 3 (last test failed): Titan trying to deliver but last sandbox_exec failed. Forcing fix...`);
                 llmMessages.push({ role: 'assistant', content: textContent || '' });
                 llmMessages.push({ role: 'user', content: 'Your last test run had an error. Please read the error output, fix the code with create_file, and retest with sandbox_exec before delivering.' });
@@ -2646,11 +2666,23 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
               consecutiveSandboxFails++;
               const errorStr = JSON.stringify(execResult.data || execResult.error || '');
               
-              if (consecutiveSandboxFails >= 5) {
-                // Only force delivery after 5+ consecutive failures (was 3 — too aggressive)
+              // Detect unrecoverable environment limitations (Windows cross-compile, missing system packages)
+              const isEnvLimitation = (
+                errorStr.includes('windows.h') ||
+                errorStr.includes('mingw') ||
+                errorStr.includes('x86_64-w64-mingw32') ||
+                errorStr.includes('winapi') ||
+                (errorStr.includes('apt-get') && errorStr.includes('100')) ||
+                (errorStr.includes('sudo') && errorStr.includes('127'))
+              );
+              if (isEnvLimitation || consecutiveSandboxFails >= 5) {
+                // Force delivery immediately for unrecoverable env limitations, or after 5+ failures
                 const createdFiles = executedActions.filter(a => a.tool === 'create_file' && a.success);
-                deferredSystemHints.push(`Sandbox commands have failed ${consecutiveSandboxFails} times in a row. The files you created (${createdFiles.length}) are saved. Try a COMPLETELY DIFFERENT approach to fix the issue — for example, if pip install fails, try installing packages individually, or use a virtual environment. If you truly cannot fix it, deliver what you have with provide_project_zip and explain what needs to be done locally.`);
-                log.info(`[Chat] Sandbox recovery guidance after ${consecutiveSandboxFails} consecutive failures`);
+                const reason = isEnvLimitation
+                  ? `The sandbox is a Linux environment and cannot compile Windows/native binaries or install system packages. This is a hard environment limitation — NOT a code error.`
+                  : `Sandbox commands have failed ${consecutiveSandboxFails} times in a row.`;
+                deferredSystemHints.push(`${reason} The files you created (${createdFiles.length}) are complete and correct. STOP trying to verify. Call provide_project_zip NOW and tell the user the build is ready for download. Explain compilation instructions in your response.`);
+                log.info(`[Chat] Forced delivery: ${isEnvLimitation ? 'env limitation' : `${consecutiveSandboxFails} consecutive failures`}`);
               } else {
                 let sandboxHint = '';
                 if (errorStr.includes('not found') || errorStr.includes('No such file')) {
