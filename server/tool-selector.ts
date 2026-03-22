@@ -9,6 +9,9 @@
  *
  * CORE tools (always included, ~30): file creation, sandbox, web research, GitHub, system
  * OPTIONAL groups (included based on keywords): security, platform, credentials, business, etc.
+ *
+ * ADMIN / BUILDER OVERRIDE: When isBuildRequest=true, ALL tools are returned (up to 128).
+ * This ensures the Builder never misses a tool due to keyword mismatch.
  */
 
 import type { Tool } from "./_core/llm";
@@ -19,7 +22,7 @@ import { EXTERNAL_BUILD_TOOLS } from "./chat-tools";
 const ALWAYS_INCLUDE = new Set([
   // Core file building
   "create_file", "read_uploaded_file", "provide_project_zip",
-  // Sandbox
+  // Sandbox — full access: exec, write, read, list, delete, download
   "sandbox_exec", "sandbox_write_file", "sandbox_read_file", "sandbox_list_files",
   "sandbox_delete_file", "sandbox_download_url",
   // Web research
@@ -147,10 +150,25 @@ const KEYWORD_GROUPS: Array<{ regex: RegExp; groups: Set<string>[] }> = [
 
 /**
  * Select a relevant subset of EXTERNAL_BUILD_TOOLS for the given request.
- * Always includes core tools. Adds optional groups based on keywords in the message.
+ *
+ * When isBuildRequest=true (Builder mode), ALL tools are returned (up to 128).
+ * This ensures the Builder has full access to every tool without keyword restrictions.
+ *
+ * For general chat (isBuildRequest=false), always includes core tools and adds
+ * optional groups based on keywords in the message.
+ *
  * Result is capped at 128 tools (OpenAI hard limit).
  */
-export function selectToolsForRequest(message: string): Tool[] {
+export function selectToolsForRequest(message: string, isBuildRequest = false): Tool[] {
+  // ── BUILDER FULL ACCESS ──────────────────────────────────────────────────────
+  // When in Builder mode, return ALL tools up to the 128 limit.
+  // The Builder needs every tool available — security tools, platform integrations,
+  // sandbox tools, anonymity tools, credentials — everything. No keyword filtering.
+  if (isBuildRequest) {
+    return EXTERNAL_BUILD_TOOLS.slice(0, 128);
+  }
+
+  // ── CHAT MODE: keyword-based subset selection ────────────────────────────────
   // Build the set of tool function names to include
   const includedNames = new Set<string>(ALWAYS_INCLUDE);
 

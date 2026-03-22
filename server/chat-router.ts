@@ -1611,9 +1611,10 @@ Do NOT attempt any tool calls or builds.`;
 
       // Choose tool set:
       // - Self-build: BUILDER_TOOLS (self_modify_file, NO sandbox tools)
-      //       // - External build: selectToolsForRequest() picks relevant subset of EXTERNAL_BUILD_TOOLS (max 128)
+      // - External build: selectToolsForRequest(msg, true) returns ALL EXTERNAL_BUILD_TOOLS (full Builder access)
       // - Titan: TITAN_TOOLS (full tool suite)
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message) : TITAN_TOOLS);
+      // NOTE: isBuildRequest=true bypasses keyword filtering — Builder gets every tool, no exceptions.
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : TITAN_TOOLS);
 
       // For general chat: if user attached a file, force read_uploaded_file first
       // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
@@ -1786,8 +1787,11 @@ Do NOT attempt any tool calls or builds.`;
           // General chat: nano (no tools = fast default)
           // Non-build with tools: mini (default for tool-calling)
           const msgLower = input.message.toLowerCase();
+          // Security build detection — expanded keyword list covering all offensive security topics.
+          // Admin users ALWAYS get the uncensored model for ALL build requests (not just security ones).
           const isSecurityBuild = isBuildRequest && (
-            /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|auth|oauth|jwt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|audit|hardening|zero.?trust|nist|mitre|owasp|keylog|keylogger|rat\b|remote.?access.?trojan|c2|command.?and.?control|implant|payload|backdoor|rootkit|ransomware|spyware|trojan|botnet|worm|virus|shellcode|stager|dropper|loader|exfil|lateral.?movement|privilege.?escal|privesc|persistence|evasion|obfuscat|bypass|av.?bypass|edr.?bypass|hook|inject|dll.?inject|process.?hollow|heap.?spray|rop.?chain|buffer.?overflow|heap.?overflow|use.?after.?free|zero.?day|0day|phish|spear.?phish|credential.?harvest|password.?spray|pass.?the.?hash|mimikatz|cobalt.?strike|metasploit|meterpreter|beacon|stealthy|stealth|covert|hidden|undetect)\b/i.test(input.message)
+            isAdmin || // Admin users: always treat as security build for uncensored model routing
+            /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|auth|oauth|jwt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|audit|hardening|zero.?trust|nist|mitre|owasp|keylog|keylogger|rat\b|remote.?access.?trojan|c2|command.?and.?control|implant|payload|backdoor|rootkit|ransomware|spyware|trojan|botnet|worm|virus|shellcode|stager|dropper|loader|exfil|lateral.?movement|privilege.?escal|privesc|persistence|evasion|obfuscat|bypass|av.?bypass|edr.?bypass|hook|inject|dll.?inject|process.?hollow|heap.?spray|rop.?chain|buffer.?overflow|heap.?overflow|use.?after.?free|zero.?day|0day|phish|spear.?phish|credential.?harvest|password.?spray|pass.?the.?hash|mimikatz|cobalt.?strike|metasploit|meterpreter|beacon|stealthy|stealth|covert|hidden|undetect|hacking|hacker|hack|crack|brute|dump|harvest|sniff|intercept|mitm|man.?in.?the.?middle|arp.?poison|dns.?spoof|packet|wireshark|nmap|masscan|gobuster|dirb|nikto|burp|sqlmap|hydra|john|hashcat|aircrack|wifite|evil.?twin|deauth|wpa|wep|wps|bluetooth|rfid|nfc|social.?engineer|pretexting|vishing|smishing|spear|watering.?hole|supply.?chain|typosquat|domain.?front|cdn.?front|tunnel|covert.?channel|steganograph|anti.?forensic|artifact|wipe|shred|timestomp|log.?clear|event.?log|shadow.?copy|vss|lsass|sam.?database|ntds|kerberos|kerberoast|asreproast|golden.?ticket|silver.?ticket|dcsync|dcshadow|bloodhound|sharphound|powerview|empire|covenant|sliver|havoc|brute.?ratel|nighthawk|deimos|merlin|poshc2|mythic|caldera|atomic.?red|red.?team|blue.?team|purple.?team|ctf|capture.?the.?flag|htb|hackthebox|tryhackme|vulnhub|offensive|defensive|incident.?response|digital.?forensic|reverse.?engineer|disassembl|debugg|binary.?analysis|fuzzing|afl|libfuzzer|boofuzz|peach|spike|sulley)\b/i.test(input.message)
           );
           const isComplexBuild = isBuildRequest && (
             /\b(enterprise|production|professional|advanced|full.?stack|microservice|api.?gateway|distributed|scalable|high.?availability|real.?time|websocket|graphql|grpc|kubernetes|docker|ci.?cd|pipeline)\b/i.test(input.message)
@@ -1797,9 +1801,10 @@ Do NOT attempt any tool calls or builds.`;
           //   - Venice mistral-31-24b (with tools) or venice-uncensored-role-play (chat only)
           //   - Falls back to OpenRouter Dolphin free, then OpenAI gpt-4.1
           // forceOpenRouter flag triggers the Venice → OpenRouter → OpenAI fallback chain.
+          // Admin users ALWAYS use the uncensored model for ALL build requests.
           const useOpenRouterForSecurity = isSecurityBuild && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
           if (isSecurityBuild) {
-            // Security builds: try OpenRouter uncensored first, fall back to gpt-4.1
+            // Security builds (and ALL admin builds): use uncensored model at premium tier
             modelTier = "premium";
           } else if (isBuildRequest) {
             // ALL other build requests use the stronger model — code quality matters

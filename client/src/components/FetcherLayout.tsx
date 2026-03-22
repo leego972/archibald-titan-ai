@@ -161,6 +161,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_15_r2c7"), label: "Evilginx 3", path: "/evilginx", titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "BlackEye", path: "/blackeye", titanOnly: true },
       { icon: featureIcon("icon_41_r6c1"), label: "Metasploit", path: "/metasploit", titanOnly: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Exploit Pack", path: "/exploitpack", titanOnly: true, isNew: true },
       // ── Titan Storage Add-on ──────────────────────────────────────────────
       { icon: featureIcon("icon_31_r4c7"), label: t("nav.titanStorage"), path: "/storage", isNew: true },
       // ── Privacy & Anonymity ───────────────────────────────────────────────
@@ -266,7 +267,7 @@ const allMenuItemPaths = [
   "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
   "/fetcher/api-analytics", "/fetcher/cli", "/fetcher/git-bash", "/fetcher/download-app",
   "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
-  "/tor", "/vpn-chain", "/proxy-maker", "/bin-checker",
+  "/tor", "/vpn-chain", "/proxy-maker", "/bin-checker", "/exploitpack",
 ];
 
 const SIDEBAR_WIDTH_KEY = "fetcher-sidebar-width";
