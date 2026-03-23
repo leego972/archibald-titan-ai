@@ -319,55 +319,81 @@ export const INTERNAL_TIERS: PricingTier[] = [
 // - A Pro user can send ~5,000 chat messages OR ~1,000 builder tasks per month.
 // - Enterprise (250,000 credits/mo) = ~5,000 builder tasks — power user territory.
 
+// COST PHILOSOPHY — Compute-Weighted, One Charge Per Full User Action:
+//
+// Credits represent real compute units. The cost of each action reflects the
+// actual resources consumed: LLM tokens, SSH compute time, external API calls,
+// and server-side processing. This mirrors how professional AI platforms like
+// Manus, Devin, and Cursor charge — by what the system actually does, not
+// arbitrary flat rates.
+//
+// WEIGHT TIERS:
+//   Micro    (5)   — Single API ping, passive lookup
+//   Light    (15)  — Simple fetch, sync, short AI call
+//   Standard (25)  — Chat message, voice, basic AI action
+//   Medium   (75)  — Full tool call, GitHub op, credential fetch
+//   Heavy    (150) — SEO run, blog gen, security scan, site monitor
+//   Intense  (300) — VPN/proxy build, marketing run, grant apply
+//   Power    (500) — Image gen, business plan, Blackeye session
+//   Elite    (750) — Evilginx full session, advanced exploit
+//   Max      (1000)— Metasploit chain, full site clone, video gen
+//   Extreme  (2000)— Full site replication job
+//
+// ONE ACTION = ONE CHARGE:
+//   Internal sub-calls (SSH hops, API retries, tool iterations) within a
+//   single user-initiated action do NOT add extra charges. The router
+//   deducts once at the top of the action, before execution begins.
+//   For complexity-scaled actions (e.g. VPN hop count), use consumeCreditsAmount().
+
 export const CREDIT_COSTS = {
   // ── Core AI ──────────────────────────────────────────────────────────
-  chat_message: 10,              // 10 credits per chat message (~5,000 chats/mo on Pro)
-  builder_action: 50,            // 50 credits per builder tool action (~1,000 tasks/mo on Pro)
-  voice_action: 25,              // 25 credits per voice transcription (Whisper API)
-  image_generation: 200,         // 200 credits per AI image (DALL-E / Replicate)
-  video_generation: 500,         // 500 credits per AI video generation
+  chat_message: 25,              // Standard — LLM inference + context window processing
+  builder_action: 75,            // Medium — full tool call cycle (read/write/exec/plan)
+  voice_action: 25,              // Standard — Whisper transcription (short audio clip)
+  image_generation: 500,         // Power — DALL-E / Replicate GPU diffusion compute
+  video_generation: 1000,        // Max — video diffusion model, very high GPU cost
 
   // ── Credential & Fetch ───────────────────────────────────────────────
-  fetch_action: 5,               // 5 credits per credential fetch (very cheap — core feature)
-  github_action: 30,             // 30 credits per GitHub repo create or push
-  import_action: 15,             // 15 credits per credential import batch
+  fetch_action: 15,              // Light — stealth browser + CAPTCHA solve + parse
+  github_action: 75,             // Medium — GitHub API call + repo mutation
+  import_action: 25,             // Standard — batch parse + validate + store
 
   // ── Clone & Replicate ────────────────────────────────────────────────
-  clone_action: 1000,            // 1,000 credits per website clone (Cyber+ / Titan only)
-  replicate_action: 500,         // 500 credits per site replication job
+  clone_action: 1000,            // Max — full site clone pipeline (Cyber+ / Titan only)
+  replicate_action: 2000,        // Extreme — full site replication job
 
   // ── SEO & Content ────────────────────────────────────────────────────
-  seo_run: 150,                  // 150 credits per SEO optimisation run
-  blog_generate: 100,            // 100 credits per AI blog post generation
-  content_generate: 100,         // 100 credits per content piece (social, email, etc.)
-  marketing_run: 200,            // 200 credits per marketing engine cycle
-  advertising_run: 200,          // 200 credits per advertising cycle / campaign trigger
+  seo_run: 150,                  // Heavy — crawl + LLM analysis + recommendations
+  blog_generate: 150,            // Heavy — long-form LLM generation + formatting
+  content_generate: 75,          // Medium — short-form AI content (social, email)
+  marketing_run: 300,            // Intense — multi-step campaign generation cycle
+  advertising_run: 300,          // Intense — ad copy + targeting + creative cycle
 
   // ── Security Tools (Cyber tier) ──────────────────────────────────────
-  security_scan: 100,            // 100 credits per security scan / health check
-  metasploit_action: 500,        // 500 credits per Metasploit module run / exploit
-  evilginx_action: 400,          // 400 credits per Evilginx phishlet / lure / session action
-  blackeye_action: 300,          // 300 credits per Blackeye phishing page action
+  security_scan: 150,            // Heavy — active scan + AI vulnerability analysis
+  metasploit_action: 1000,       // Max — module load + exploit execution chain
+  evilginx_action: 750,          // Elite — phishlet/lure deploy + session capture
+  blackeye_action: 500,          // Power — phishing page deploy + listener setup
 
   // ── VPN & Proxies ────────────────────────────────────────────────────
-  vpn_generate: 150,             // 150 credits per VPN proxy generation
+  vpn_generate: 300,             // Intense — SSH provisioning + WireGuard/proxy config
 
   // ── Grants & Business ────────────────────────────────────────────────
-  grant_match: 50,               // 50 credits per AI grant matching run
-  grant_apply: 150,              // 150 credits per grant application submission
-  business_plan_generate: 300,   // 300 credits per AI business plan generation
+  grant_match: 75,               // Medium — AI grant database search + scoring
+  grant_apply: 300,              // Intense — full application generation + submit
+  business_plan_generate: 500,   // Power — multi-section LLM business plan
 
   // ── Marketplace ──────────────────────────────────────────────────────
-  marketplace_list: 50,          // 50 credits to list an item for sale
-  marketplace_feature: 200,      // 200 credits to feature / boost a listing
+  marketplace_list: 25,          // Standard — listing creation + indexing
+  marketplace_feature: 150,      // Heavy — boost + promotion placement
 
   // ── Site Monitor & Sandbox ───────────────────────────────────────────
-  site_monitor_add: 50,          // 50 credits to add a new monitored site
-  sandbox_run: 50,               // 50 credits per sandbox environment execution
+  site_monitor_add: 25,          // Standard — register site + first health check
+  sandbox_run: 75,               // Medium — container spawn + code execution
 
   // ── Affiliate & API ──────────────────────────────────────────────────
-  affiliate_action: 20,          // 20 credits per affiliate link / campaign create
-  api_call: 5,                   // 5 credits per external API call via the platform
+  affiliate_action: 15,          // Light — link/campaign creation + tracking setup
+  api_call: 5,                   // Micro — single external API call
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

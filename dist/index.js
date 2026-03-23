@@ -4290,73 +4290,73 @@ var init_pricing = __esm({
     ];
     CREDIT_COSTS = {
       // ── Core AI ──────────────────────────────────────────────────────────
-      chat_message: 10,
-      // 10 credits per chat message (~5,000 chats/mo on Pro)
-      builder_action: 50,
-      // 50 credits per builder tool action (~1,000 tasks/mo on Pro)
+      chat_message: 25,
+      // Standard — LLM inference + context window processing
+      builder_action: 75,
+      // Medium — full tool call cycle (read/write/exec/plan)
       voice_action: 25,
-      // 25 credits per voice transcription (Whisper API)
-      image_generation: 200,
-      // 200 credits per AI image (DALL-E / Replicate)
-      video_generation: 500,
-      // 500 credits per AI video generation
+      // Standard — Whisper transcription (short audio clip)
+      image_generation: 500,
+      // Power — DALL-E / Replicate GPU diffusion compute
+      video_generation: 1e3,
+      // Max — video diffusion model, very high GPU cost
       // ── Credential & Fetch ───────────────────────────────────────────────
-      fetch_action: 5,
-      // 5 credits per credential fetch (very cheap — core feature)
-      github_action: 30,
-      // 30 credits per GitHub repo create or push
-      import_action: 15,
-      // 15 credits per credential import batch
+      fetch_action: 15,
+      // Light — stealth browser + CAPTCHA solve + parse
+      github_action: 75,
+      // Medium — GitHub API call + repo mutation
+      import_action: 25,
+      // Standard — batch parse + validate + store
       // ── Clone & Replicate ────────────────────────────────────────────────
       clone_action: 1e3,
-      // 1,000 credits per website clone (Cyber+ / Titan only)
-      replicate_action: 500,
-      // 500 credits per site replication job
+      // Max — full site clone pipeline (Cyber+ / Titan only)
+      replicate_action: 2e3,
+      // Extreme — full site replication job
       // ── SEO & Content ────────────────────────────────────────────────────
       seo_run: 150,
-      // 150 credits per SEO optimisation run
-      blog_generate: 100,
-      // 100 credits per AI blog post generation
-      content_generate: 100,
-      // 100 credits per content piece (social, email, etc.)
-      marketing_run: 200,
-      // 200 credits per marketing engine cycle
-      advertising_run: 200,
-      // 200 credits per advertising cycle / campaign trigger
+      // Heavy — crawl + LLM analysis + recommendations
+      blog_generate: 150,
+      // Heavy — long-form LLM generation + formatting
+      content_generate: 75,
+      // Medium — short-form AI content (social, email)
+      marketing_run: 300,
+      // Intense — multi-step campaign generation cycle
+      advertising_run: 300,
+      // Intense — ad copy + targeting + creative cycle
       // ── Security Tools (Cyber tier) ──────────────────────────────────────
-      security_scan: 100,
-      // 100 credits per security scan / health check
-      metasploit_action: 500,
-      // 500 credits per Metasploit module run / exploit
-      evilginx_action: 400,
-      // 400 credits per Evilginx phishlet / lure / session action
-      blackeye_action: 300,
-      // 300 credits per Blackeye phishing page action
+      security_scan: 150,
+      // Heavy — active scan + AI vulnerability analysis
+      metasploit_action: 1e3,
+      // Max — module load + exploit execution chain
+      evilginx_action: 750,
+      // Elite — phishlet/lure deploy + session capture
+      blackeye_action: 500,
+      // Power — phishing page deploy + listener setup
       // ── VPN & Proxies ────────────────────────────────────────────────────
-      vpn_generate: 150,
-      // 150 credits per VPN proxy generation
+      vpn_generate: 300,
+      // Intense — SSH provisioning + WireGuard/proxy config
       // ── Grants & Business ────────────────────────────────────────────────
-      grant_match: 50,
-      // 50 credits per AI grant matching run
-      grant_apply: 150,
-      // 150 credits per grant application submission
-      business_plan_generate: 300,
-      // 300 credits per AI business plan generation
+      grant_match: 75,
+      // Medium — AI grant database search + scoring
+      grant_apply: 300,
+      // Intense — full application generation + submit
+      business_plan_generate: 500,
+      // Power — multi-section LLM business plan
       // ── Marketplace ──────────────────────────────────────────────────────
-      marketplace_list: 50,
-      // 50 credits to list an item for sale
-      marketplace_feature: 200,
-      // 200 credits to feature / boost a listing
+      marketplace_list: 25,
+      // Standard — listing creation + indexing
+      marketplace_feature: 150,
+      // Heavy — boost + promotion placement
       // ── Site Monitor & Sandbox ───────────────────────────────────────────
-      site_monitor_add: 50,
-      // 50 credits to add a new monitored site
-      sandbox_run: 50,
-      // 50 credits per sandbox environment execution
+      site_monitor_add: 25,
+      // Standard — register site + first health check
+      sandbox_run: 75,
+      // Medium — container spawn + code execution
       // ── Affiliate & API ──────────────────────────────────────────────────
-      affiliate_action: 20,
-      // 20 credits per affiliate link / campaign create
+      affiliate_action: 15,
+      // Light — link/campaign creation + tracking setup
       api_call: 5
-      // 5 credits per external API call via the platform
+      // Micro — single external API call
     };
     CREDIT_PACKS = [
       {
@@ -4933,6 +4933,7 @@ __export(credit_service_exports, {
   adminAdjustCredits: () => adminAdjustCredits,
   checkCredits: () => checkCredits,
   consumeCredits: () => consumeCredits,
+  consumeCreditsAmount: () => consumeCreditsAmount,
   getCreditBalance: () => getCreditBalance,
   getCreditHistory: () => getCreditHistory,
   processDailyLoginBonus: () => processDailyLoginBonus,
@@ -5079,6 +5080,73 @@ async function consumeCredits(userId, action, description) {
       amount: -cost2,
       type: txType,
       description: description || `${action}: -${cost2} credits`,
+      balanceAfter: newBalance
+    });
+    return { success: true, balanceAfter: newBalance };
+  });
+}
+async function consumeCreditsAmount(userId, amount, action, description) {
+  if (amount <= 0) return { success: true, balanceAfter: 0 };
+  const db = await getDb();
+  if (!db) return { success: false, balanceAfter: 0 };
+  await ensureBalance(userId);
+  const validTxTypes = /* @__PURE__ */ new Set([
+    "chat_message",
+    "builder_action",
+    "voice_action",
+    "image_generation",
+    "video_generation",
+    "fetch_action",
+    "github_action",
+    "import_action",
+    "clone_action",
+    "replicate_action",
+    "seo_run",
+    "blog_generate",
+    "content_generate",
+    "marketing_run",
+    "advertising_run",
+    "security_scan",
+    "metasploit_action",
+    "evilginx_action",
+    "blackeye_action",
+    "grant_match",
+    "grant_apply",
+    "business_plan_generate",
+    "marketplace_list",
+    "marketplace_feature",
+    "site_monitor_add",
+    "sandbox_run",
+    "affiliate_action",
+    "api_call",
+    "vpn_generate"
+  ]);
+  const txType = validTxTypes.has(action) ? action : "chat_message";
+  return await db.transaction(async (tx) => {
+    const bal = await tx.select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited }).from(creditBalances).where(eq8(creditBalances.userId, userId)).for("update").limit(1);
+    if (bal.length === 0) return { success: false, balanceAfter: 0 };
+    if (bal[0].isUnlimited) {
+      await tx.insert(creditTransactions).values({
+        userId,
+        amount: 0,
+        type: txType,
+        description: description || `${action}: ${amount} credits (unlimited account)`,
+        balanceAfter: bal[0].credits
+      });
+      return { success: true, balanceAfter: bal[0].credits };
+    }
+    if (bal[0].credits < amount) return { success: false, balanceAfter: bal[0].credits };
+    await tx.update(creditBalances).set({
+      credits: sql4`${creditBalances.credits} - ${amount}`,
+      lifetimeCreditsUsed: sql4`${creditBalances.lifetimeCreditsUsed} + ${amount}`
+    }).where(eq8(creditBalances.userId, userId));
+    const updated = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq8(creditBalances.userId, userId)).limit(1);
+    const newBalance = updated[0]?.credits ?? 0;
+    await tx.insert(creditTransactions).values({
+      userId,
+      amount: -amount,
+      type: txType,
+      description: description || `${action}: -${amount} credits`,
       balanceAfter: newBalance
     });
     return { success: true, balanceAfter: newBalance };
@@ -30682,7 +30750,7 @@ var init_tor_router = __esm({
         const node = await getActiveNode2(ctx.user.id);
         if (!node) throw new TRPCError12({ code: "BAD_REQUEST", message: "No active Tor node." });
         try {
-          await consumeCredits(ctx.user.id, "vpn_generate", `Tor: run command through circuit`);
+          await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Tor: run command through circuit`);
         } catch {
         }
         const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
@@ -75150,8 +75218,9 @@ var vpnChainRouter = router({
     if (readyHops.length === 0) {
       throw new TRPCError42({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
     }
+    const buildCost = 300 + readyHops.length * 100;
     try {
-      await consumeCredits(ctx.user.id, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain`);
+      await consumeCreditsAmount(ctx.user.id, buildCost, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain (${buildCost} credits)`);
     } catch {
     }
     const result = await buildChainTunnels(ctx.user.id, readyHops);
@@ -75328,17 +75397,23 @@ var vpnChainRouter = router({
       if (readyHops.length === 0) {
         throw new TRPCError42({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
       }
-      try {
-        await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: activate chain");
-      } catch {
-      }
       const allLinked = readyHops.every((h) => h.chainLinked);
       if (!allLinked) {
+        const activateBuildCost = 300 + readyHops.length * 100;
+        try {
+          await consumeCreditsAmount(ctx.user.id, activateBuildCost, "vpn_generate", `VPN Chain: activate + build ${readyHops.length}-hop chain (${activateBuildCost} credits)`);
+        } catch {
+        }
         const result = await buildChainTunnels(ctx.user.id, readyHops);
         if (!result.success) {
           throw new TRPCError42({ code: "INTERNAL_SERVER_ERROR", message: `Chain build failed: ${result.message}` });
         }
         await saveHops(ctx.user.id, hops);
+      } else {
+        try {
+          await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", "VPN Chain: activate (already built)");
+        } catch {
+        }
       }
     } else {
       const hops = await getHops(ctx.user.id);
@@ -75631,7 +75706,7 @@ var proxyMakerRouter = router({
     node.status = "deploying";
     await saveNodes6(ctx.user.id, nodes);
     try {
-      await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node ${node.label}`);
+      await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node "${node.label}"`);
     } catch {
     }
     try {
@@ -75787,7 +75862,7 @@ var proxyMakerRouter = router({
     if (!node) throw new TRPCError43({ code: "NOT_FOUND", message: "Node not found." });
     if (!node.publicIp) return { success: false, message: "Deploy node first." };
     try {
-      await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: test proxy ${node.label}`);
+      await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Proxy Maker: test proxy "${node.label}"`);
     } catch {
     }
     const script = `curl -s --max-time 10 --socks5 127.0.0.1:1080 "${input.testUrl}" 2>&1 || echo PROXY_TEST_FAILED`;

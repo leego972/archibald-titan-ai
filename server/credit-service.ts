@@ -240,6 +240,76 @@ export async function consumeCredits(
   });
 }
 
+// ─── Consume a custom credit amount (for tiered/scaled actions) ──────────────
+/**
+ * Like consumeCredits but accepts a custom cost instead of the fixed CREDIT_COSTS lookup.
+ * Use this for actions whose cost scales with complexity (e.g. hop count, node count).
+ * The action key is still used for transaction logging and type tracking.
+ */
+export async function consumeCreditsAmount(
+  userId: number,
+  amount: number,
+  action: CreditActionType,
+  description?: string
+): Promise<{ success: boolean; balanceAfter: number }> {
+  if (amount <= 0) return { success: true, balanceAfter: 0 };
+  const db = await getDb();
+  if (!db) return { success: false, balanceAfter: 0 };
+
+  await ensureBalance(userId);
+
+  const validTxTypes = new Set([
+    "chat_message", "builder_action", "voice_action", "image_generation", "video_generation",
+    "fetch_action", "github_action", "import_action", "clone_action", "replicate_action",
+    "seo_run", "blog_generate", "content_generate", "marketing_run", "advertising_run",
+    "security_scan", "metasploit_action", "evilginx_action", "blackeye_action",
+    "grant_match", "grant_apply", "business_plan_generate",
+    "marketplace_list", "marketplace_feature",
+    "site_monitor_add", "sandbox_run",
+    "affiliate_action", "api_call", "vpn_generate",
+  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txType = (validTxTypes.has(action) ? action : "chat_message") as any;
+
+  return await db.transaction(async (tx) => {
+    const bal = await tx
+      .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+      .from(creditBalances)
+      .where(eq(creditBalances.userId, userId))
+      .for("update")
+      .limit(1);
+    if (bal.length === 0) return { success: false, balanceAfter: 0 };
+    if (bal[0].isUnlimited) {
+      await tx.insert(creditTransactions).values({
+        userId, amount: 0, type: txType,
+        description: description || `${action}: ${amount} credits (unlimited account)`,
+        balanceAfter: bal[0].credits,
+      });
+      return { success: true, balanceAfter: bal[0].credits };
+    }
+    if (bal[0].credits < amount) return { success: false, balanceAfter: bal[0].credits };
+    await tx
+      .update(creditBalances)
+      .set({
+        credits: sql`${creditBalances.credits} - ${amount}`,
+        lifetimeCreditsUsed: sql`${creditBalances.lifetimeCreditsUsed} + ${amount}`,
+      })
+      .where(eq(creditBalances.userId, userId));
+    const updated = await tx
+      .select({ credits: creditBalances.credits })
+      .from(creditBalances)
+      .where(eq(creditBalances.userId, userId))
+      .limit(1);
+    const newBalance = updated[0]?.credits ?? 0;
+    await tx.insert(creditTransactions).values({
+      userId, amount: -amount, type: txType,
+      description: description || `${action}: -${amount} credits`,
+      balanceAfter: newBalance,
+    });
+    return { success: true, balanceAfter: newBalance };
+  });
+}
+
 // ─── Add Credits ───────────────────────────────────────────────────
 
 export async function addCredits(

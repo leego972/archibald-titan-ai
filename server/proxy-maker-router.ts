@@ -18,7 +18,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
-import { consumeCredits } from "./credit-service";
+import { consumeCredits, consumeCreditsAmount } from "./credit-service";
 import { execSSHCommand, type SSHConfig } from "./titan-server";
 import { createLogger } from "./_core/logger.js";
 
@@ -216,7 +216,8 @@ export const proxyMakerRouter = router({
       const node = nodes[idx];
       node.status = "deploying";
       await saveNodes(ctx.user.id, nodes);
-      try { await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node ${node.label}`); } catch {}
+      // Intense (300) — full VPS provisioning + 3proxy install + config via SSH
+      try { await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node "${node.label}"`); } catch {}
       try {
         const output = await execSSHCommand(nodeToSSH(node), INSTALL_3PROXY, 180000, ctx.user.id);
         if (!output.includes("PROXY_OK")) {
@@ -381,7 +382,8 @@ export const proxyMakerRouter = router({
       const node = nodes.find(n => n.id === input.nodeId);
       if (!node) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       if (!node.publicIp) return { success: false, message: "Deploy node first." };
-      try { await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: test proxy ${node.label}`); } catch {}
+      // Medium (75) — lightweight SSH curl test through existing proxy
+      try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Proxy Maker: test proxy "${node.label}"`); } catch {}
       const script = `curl -s --max-time 10 --socks5 127.0.0.1:1080 "${input.testUrl}" 2>&1 || echo PROXY_TEST_FAILED`;
       try {
         const output = await execSSHCommand(nodeToSSH(node), script, 20000, ctx.user.id);
