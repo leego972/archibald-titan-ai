@@ -184,6 +184,7 @@ export async function consumeCredits(
     "marketplace_list", "marketplace_feature",
     "site_monitor_add", "sandbox_run",
     "affiliate_action", "api_call", "vpn_generate",
+    "isolated_browser",
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txType = (validTxTypes.has(action) ? action : "chat_message") as any;
@@ -342,6 +343,7 @@ export async function consumeCreditsAmount(
     "marketplace_list", "marketplace_feature",
     "site_monitor_add", "sandbox_run",
     "affiliate_action", "api_call", "vpn_generate",
+    "isolated_browser",
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txType = (validTxTypes.has(action) ? action : "chat_message") as any;

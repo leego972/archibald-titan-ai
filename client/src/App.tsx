@@ -139,6 +139,7 @@ import TitanStoragePage from "./pages/TitanStoragePage";
 // Privacy & Anonymity Tools
 import TorPage from "./pages/TorPage";
 import VpnChainPage from "./pages/VpnChainPage";
+import IsolatedBrowserPage from "./pages/IsolatedBrowserPage";
 import ProxyMakerPage from "./pages/ProxyMakerPage";
 import ProxyRotationPage from "./pages/ProxyRotationPage";
 import IPRotationPage from "./pages/IPRotationPage";
@@ -244,6 +245,7 @@ function DashboardRouter() {
         {/* Privacy & Anonymity Tools */}
         <Route path="/tor" component={TorPage} />
         <Route path="/vpn-chain" component={VpnChainPage} />
+        <Route path="/isolated-browser" component={IsolatedBrowserPage} />
         <Route path="/proxy-maker" component={ProxyMakerPage} />
         <Route path="/proxy-rotation" component={ProxyRotationPage} />
         <Route path="/ip-rotation" component={IPRotationPage} />
@@ -333,6 +335,7 @@ function Router() {
       <Route path="/storage" component={DashboardRouter} />
       <Route path="/tor" component={DashboardRouter} />
       <Route path="/vpn-chain" component={DashboardRouter} />
+      <Route path="/isolated-browser" component={DashboardRouter} />
       <Route path="/proxy-maker" component={DashboardRouter} />
       <Route path="/proxy-rotation" component={DashboardRouter} />
       <Route path="/ip-rotation" component={DashboardRouter} />

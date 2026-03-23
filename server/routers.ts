@@ -65,6 +65,7 @@ import { ipRotationRouter } from "./ip-rotation-router";
 import { webAgentRouter } from "./web-agent-router";
 import { vpnRouter } from "./vpn-router";
 import { escalationRouter } from "./escalation-router";
+import { isolatedBrowserRouter } from "./isolated-browser-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -156,8 +157,10 @@ export const appRouter = router({
   ipRotation: ipRotationRouter,
   webAgent: webAgentRouter,
   vpn: vpnRouter,
-  // ── Credit Escalation Funnel ─────────────────────────────────────────
+  // ── Credit Escalation Funnel ─────────────────────────────────────────────────────────
   escalation: escalationRouter,
+  // ── Titan Isolated Browser ─────────────────────────────────────────────────────────
+  isolatedBrowser: isolatedBrowserRouter,
 });
 
 export type AppRouter = typeof appRouter;

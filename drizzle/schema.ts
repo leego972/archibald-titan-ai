@@ -846,9 +846,12 @@ export const creditTransactions = mysqlTable("credit_transactions", {
     // ── Site monitor & sandbox ─────────────────────────────────────────────
     "site_monitor_add",
     "sandbox_run",
-    // ── Affiliate & API ──────────────────────────────────────────────────────
+    // ── Affiliate & API ──────────────────────────────────────────────────────────
     "affiliate_action",
     "api_call",
+    "vpn_generate",
+    // ── Isolated Browser ─────────────────────────────────────────────────────────
+    "isolated_browser",
   ]).notNull(),
   description: text("description"),
   balanceAfter: int("balanceAfter").notNull(),

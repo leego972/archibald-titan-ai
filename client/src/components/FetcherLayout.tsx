@@ -168,6 +168,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_31_r4c7"), label: t("nav.titanStorage"), path: "/storage", isNew: true },
       // ── Privacy & Anonymity ───────────────────────────────────────────────
       { icon: featureIcon("icon_38_r5c6"), label: "Tor Browser", path: "/tor", isNew: true, titanOnly: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Isolated Browser", path: "/isolated-browser", isNew: true, isCyber: true },
       { icon: featureIcon("icon_15_r2c7"), label: "VPN Chain", path: "/vpn-chain", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_16_r2c8"), label: "Proxy Maker", path: "/proxy-maker", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "Proxy Rotation", path: "/proxy-rotation", isNew: true },
