@@ -347,20 +347,20 @@ export const INTERNAL_TIERS: PricingTier[] = [
 
 export const CREDIT_COSTS = {
   // ── Core AI ──────────────────────────────────────────────────────────
-  chat_message: 25,              // Standard — LLM inference + context window processing
-  builder_action: 75,            // Medium — full tool call cycle (read/write/exec/plan)
+  chat_message: 10,                           // Standard — LLM inference + context window processing
+  builder_action: 50,                       // Medium — full tool call cycle (read/write/exec/plan)
   voice_action: 25,              // Standard — Whisper transcription (short audio clip)
   image_generation: 500,         // Power — DALL-E / Replicate GPU diffusion compute
   video_generation: 1000,        // Max — video diffusion model, very high GPU cost
 
   // ── Credential & Fetch ───────────────────────────────────────────────
-  fetch_action: 15,              // Light — stealth browser + CAPTCHA solve + parse
+  fetch_action: 5,                            // Light — stealth browser + CAPTCHA solve + parse
   github_action: 75,             // Medium — GitHub API call + repo mutation
   import_action: 25,             // Standard — batch parse + validate + store
 
   // ── Clone & Replicate ────────────────────────────────────────────────
-  clone_action: 1000,            // Max — full site clone pipeline (Cyber+ / Titan only)
-  replicate_action: 2000,        // Extreme — full site replication job
+  clone_action: 1000,                                 // Max — full site clone pipeline (Cyber+ / Titan only)
+  replicate_action: 1000,              // Extreme — full site replication job
 
   // ── SEO & Content ────────────────────────────────────────────────────
   seo_run: 150,                  // Heavy — crawl + LLM analysis + recommendations
