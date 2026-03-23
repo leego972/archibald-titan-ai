@@ -896,6 +896,36 @@ async function startServer() {
       setInterval(runSelfImproveCycle, SELF_IMPROVE_INTERVAL);
     }, SELF_IMPROVE_INITIAL_DELAY);
   });
+
+  // Venice Connection Pre-Warming
+  // Send a minimal request to Venice 45s after startup to establish a warm
+  // TCP connection. Eliminates cold-start penalty on first admin message.
+  setTimeout(async () => {
+    try {
+      log.info('[Warmup] Pre-warming Venice connection...');
+      const warmupRes = await fetch('https://api.venice.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'authorization': 'Bearer ' + process.env.VENICE_API_KEY,
+        },
+        body: JSON.stringify({
+          model: 'mistral-31-24b',
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+          temperature: 0,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (warmupRes.ok) {
+        log.info('[Warmup] Venice connection pre-warmed successfully');
+      } else {
+        log.warn('[Warmup] Venice warmup returned ' + warmupRes.status + ' - non-fatal');
+      }
+    } catch (err) {
+      log.warn('[Warmup] Venice pre-warm failed (non-fatal):', { error: String(err) });
+    }
+  }, 45_000);
 }
 
 function scheduleMonthlyRefill() {
