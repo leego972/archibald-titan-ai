@@ -9,7 +9,11 @@
 import { eq, sql, desc } from "drizzle-orm";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions, users } from "../drizzle/schema";
-import { PRICING_TIERS, CREDIT_COSTS, type PlanId, type CreditActionType } from "../shared/pricing";
+import {
+  PRICING_TIERS, CREDIT_COSTS,
+  DAILY_FREE_CREDITS_PLAN,
+  type PlanId, type CreditActionType
+} from "../shared/pricing";
 import { getUserPlan } from "./subscription-gate";
 import { isAdminRole } from '@shared/const';
 import {
@@ -25,6 +29,9 @@ export interface CreditBalanceInfo {
   lifetimeUsed: number;
   lifetimeAdded: number;
   lastRefillAt: Date | null;
+  /** Free tier only — separate daily pool that resets every 24h, used before paid credits */
+  dailyFreeCredits: number;
+  dailyFreeLastGrantedAt: Date | null;
 }
 
 export interface CreditCheckResult {
@@ -88,7 +95,7 @@ async function ensureBalance(userId: number): Promise<void> {
 export async function getCreditBalance(userId: number): Promise<CreditBalanceInfo> {
   const db = await getDb();
   if (!db) {
-    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null };
+    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null, dailyFreeCredits: 0, dailyFreeLastGrantedAt: null };
   }
 
   await ensureBalance(userId);
@@ -100,7 +107,7 @@ export async function getCreditBalance(userId: number): Promise<CreditBalanceInf
     .limit(1);
 
   if (result.length === 0) {
-    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null };
+    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null, dailyFreeCredits: 0, dailyFreeLastGrantedAt: null };
   }
 
   const bal = result[0];
@@ -110,6 +117,8 @@ export async function getCreditBalance(userId: number): Promise<CreditBalanceInf
     lifetimeUsed: bal.lifetimeCreditsUsed,
     lifetimeAdded: bal.lifetimeCreditsAdded,
     lastRefillAt: bal.lastRefillAt,
+    dailyFreeCredits: bal.dailyFreeCredits ?? 0,
+    dailyFreeLastGrantedAt: bal.dailyFreeLastGrantedAt ?? null,
   };
 }
 
@@ -183,7 +192,11 @@ export async function consumeCredits(
   return await db.transaction(async (tx) => {
     // Lock the row with SELECT ... FOR UPDATE to prevent concurrent deductions
     const bal = await tx
-      .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+      .select({
+        credits: creditBalances.credits,
+        isUnlimited: creditBalances.isUnlimited,
+        dailyFreeCredits: creditBalances.dailyFreeCredits,
+      })
       .from(creditBalances)
       .where(eq(creditBalances.userId, userId))
       .for("update")
@@ -205,6 +218,68 @@ export async function consumeCredits(
 
     const cost = CREDIT_COSTS[action];
 
+    // ── Daily Free Credits (Free Tier Only) ───────────────────────────────────────────────────────────────────────────
+    // If the user has daily free credits, drain those first before touching paid credits.
+    // Paid plan users never have dailyFreeCredits > 0 — this only fires for Free tier.
+    const dailyFree = bal[0].dailyFreeCredits ?? 0;
+    if (dailyFree > 0) {
+      const freeDeduct = Math.min(dailyFree, cost);
+      const remainingCost = cost - freeDeduct;
+
+      // Deduct from daily free pool first
+      await tx
+        .update(creditBalances)
+        .set({ dailyFreeCredits: sql`${creditBalances.dailyFreeCredits} - ${freeDeduct}` })
+        .where(eq(creditBalances.userId, userId));
+
+      // If daily free covered the full cost, done — no paid credits consumed
+      if (remainingCost === 0) {
+        await tx.insert(creditTransactions).values({
+          userId,
+          amount: 0,
+          type: txType,
+          description: description || `${action}: -${cost} daily free credits (no paid credits used)`,
+          balanceAfter: bal[0].credits,
+        });
+        return { success: true, balanceAfter: bal[0].credits };
+      }
+
+      // Daily free partially covered it — deduct the remainder from paid credits
+      if (bal[0].credits < remainingCost) {
+        // Undo the daily free deduction since we can't complete the full action
+        await tx
+          .update(creditBalances)
+          .set({ dailyFreeCredits: sql`${creditBalances.dailyFreeCredits} + ${freeDeduct}` })
+          .where(eq(creditBalances.userId, userId));
+        return { success: false, balanceAfter: bal[0].credits };
+      }
+
+      await tx
+        .update(creditBalances)
+        .set({
+          credits: sql`${creditBalances.credits} - ${remainingCost}`,
+          lifetimeCreditsUsed: sql`${creditBalances.lifetimeCreditsUsed} + ${remainingCost}`,
+        })
+        .where(eq(creditBalances.userId, userId));
+
+      const updatedPartial = await tx
+        .select({ credits: creditBalances.credits })
+        .from(creditBalances)
+        .where(eq(creditBalances.userId, userId))
+        .limit(1);
+      const partialBalance = updatedPartial[0]?.credits ?? 0;
+
+      await tx.insert(creditTransactions).values({
+        userId,
+        amount: -remainingCost,
+        type: txType,
+        description: description || `${action}: -${freeDeduct} daily free + -${remainingCost} paid credits`,
+        balanceAfter: partialBalance,
+      });
+      return { success: true, balanceAfter: partialBalance };
+    }
+
+    // ── Standard paid credit deduction ───────────────────────────────────────────────────────────────────────────
     if (bal[0].credits < cost) {
       return { success: false, balanceAfter: bal[0].credits };
     }

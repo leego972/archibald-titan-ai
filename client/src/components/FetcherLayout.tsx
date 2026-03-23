@@ -77,6 +77,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
+import { OutOfCreditsModal } from "./OutOfCreditsModal";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { TitanLogo } from "./TitanLogo";
@@ -527,6 +528,15 @@ function FetcherLayoutContent({
   const menuGroups = buildMenuGroups(t);
   const [isResizing, setIsResizing] = useState(false);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [showOutOfCredits, setShowOutOfCredits] = useState(false);
+  // Grant daily free credits to free tier users on mount (silently)
+  const grantDailyFree = trpc.escalation.grantDailyFreeCredits.useMutation();
+  useEffect(() => {
+    if (user && sub?.planId === "free") {
+      grantDailyFree.mutate();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const allMenuItems = menuGroups.flatMap((g) => g.items);
   const activeMenuItem = allMenuItems.find(
@@ -576,6 +586,7 @@ function FetcherLayoutContent({
 
   return (
     <>
+      <OutOfCreditsModal open={showOutOfCredits} onClose={() => setShowOutOfCredits(false)} />
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"

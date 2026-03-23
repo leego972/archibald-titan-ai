@@ -174,6 +174,7 @@ __export(schema_exports, {
   credentialImports: () => credentialImports,
   credentialWatches: () => credentialWatches,
   creditBalances: () => creditBalances,
+  creditEscalation: () => creditEscalation,
   creditTransactions: () => creditTransactions,
   crowdfundingCampaigns: () => crowdfundingCampaigns,
   crowdfundingComments: () => crowdfundingComments,
@@ -249,7 +250,7 @@ __export(schema_exports, {
   webhooks: () => webhooks
 });
 import { boolean as boolean2, int as int2, json as json2, mysqlEnum as mysqlEnum2, mysqlTable as mysqlTable2, text as text2, timestamp as timestamp2, varchar as varchar2 } from "drizzle-orm/mysql-core";
-var users, passwordResetTokens, identityProviders, fetcherJobs, fetcherTasks, fetcherCredentials, fetcherSettings, fetcherKillSwitch, fetcherProxies, releases, contactSubmissions, subscriptions, downloadTokens, downloadAuditLog, apiKeys, teamMembers, auditLogs, dashboardLayouts, credentialWatches, credentialHistory, bulkSyncJobs, syncSchedules, providerHealthSnapshots, fetchRecommendations, leakScans, leakFindings, providerOnboarding, vaultItems, vaultAccessLog, webhooks, webhookDeliveryLogs, apiUsageLogs, systemSnapshots, snapshotFiles, selfModificationLog, chatConversations, chatMessages, builderActivityLog, improvementTasks, creditBalances, creditTransactions, desktopLicenses, credentialImports, totpSecrets, notificationChannels, companies, businessPlans, grantOpportunities, grantApplications, grantMatches, crowdfundingCampaigns, crowdfundingRewards, crowdfundingContributions, crowdfundingUpdates, crowdfundingComments, sandboxes, sandboxCommands, sandboxFiles, replicateProjects, marketingBudgets, marketingCampaigns, marketingContent, marketingPerformance, marketingActivityLog, marketingSettings, customProviders, affiliatePartners, affiliateClicks, referralCodes, referralConversions, affiliatePayouts, affiliateOutreach, affiliateDiscoveries, affiliateDiscoveryRuns, affiliateApplications, blogPosts, blogCategories, userSecrets, marketplaceListings, marketplacePurchases, marketplaceReviews, sellerProfiles, cryptoPayments, platformRevenue, sellerPayoutMethods, monitoredSites, healthChecks, siteIncidents, repairLogs, adminActivityLog, contentCreatorCampaigns, contentCreatorPieces, contentCreatorSchedules, contentCreatorAnalytics, userMemory, webAgentTasks, webAgentCredentials;
+var users, passwordResetTokens, identityProviders, fetcherJobs, fetcherTasks, fetcherCredentials, fetcherSettings, fetcherKillSwitch, fetcherProxies, releases, contactSubmissions, subscriptions, downloadTokens, downloadAuditLog, apiKeys, teamMembers, auditLogs, dashboardLayouts, credentialWatches, credentialHistory, bulkSyncJobs, syncSchedules, providerHealthSnapshots, fetchRecommendations, leakScans, leakFindings, providerOnboarding, vaultItems, vaultAccessLog, webhooks, webhookDeliveryLogs, apiUsageLogs, systemSnapshots, snapshotFiles, selfModificationLog, chatConversations, chatMessages, builderActivityLog, improvementTasks, creditBalances, creditTransactions, desktopLicenses, credentialImports, totpSecrets, notificationChannels, companies, businessPlans, grantOpportunities, grantApplications, grantMatches, crowdfundingCampaigns, crowdfundingRewards, crowdfundingContributions, crowdfundingUpdates, crowdfundingComments, sandboxes, sandboxCommands, sandboxFiles, replicateProjects, marketingBudgets, marketingCampaigns, marketingContent, marketingPerformance, marketingActivityLog, marketingSettings, customProviders, affiliatePartners, affiliateClicks, referralCodes, referralConversions, affiliatePayouts, affiliateOutreach, affiliateDiscoveries, affiliateDiscoveryRuns, affiliateApplications, blogPosts, blogCategories, userSecrets, marketplaceListings, marketplacePurchases, marketplaceReviews, sellerProfiles, cryptoPayments, platformRevenue, sellerPayoutMethods, monitoredSites, healthChecks, siteIncidents, repairLogs, adminActivityLog, contentCreatorCampaigns, contentCreatorPieces, contentCreatorSchedules, contentCreatorAnalytics, userMemory, webAgentTasks, webAgentCredentials, creditEscalation;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -899,6 +900,13 @@ var init_schema = __esm({
       // last daily login bonus claim
       loginBonusThisMonth: int2("loginBonusThisMonth").notNull().default(0),
       // cumulative login bonus credits this month (cap: 150)
+      // Daily free credits — FREE TIER ONLY. Separate pool, resets every 24h, does not accumulate.
+      // Granted automatically on first action each day. Used before paid credits.
+      // Paid plan users do NOT receive daily free credits — they have their monthly allocation.
+      dailyFreeCredits: int2("dailyFreeCredits").notNull().default(0),
+      // current daily free balance (max 375, resets daily, free tier only)
+      dailyFreeLastGrantedAt: timestamp2("dailyFreeLastGrantedAt"),
+      // last time daily free credits were granted (free tier only)
       createdAt: timestamp2("createdAt").defaultNow().notNull(),
       updatedAt: timestamp2("updatedAt").defaultNow().onUpdateNow().notNull()
     });
@@ -2195,6 +2203,35 @@ var init_schema = __esm({
       password: text2("password").notNull(),
       totpSecret: text2("totpSecret"),
       notes: text2("notes"),
+      createdAt: timestamp2("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp2("updatedAt").defaultNow().onUpdateNow().notNull()
+    });
+    creditEscalation = mysqlTable2("credit_escalation", {
+      id: int2("id").autoincrement().primaryKey(),
+      userId: int2("userId").notNull().unique(),
+      // Boost pack tracking — resets each billing cycle
+      boostPacksBought: int2("boostPacksBought").notNull().default(0),
+      // max 3 per cycle
+      // Membership doubling tracking — resets each billing cycle
+      doublesThisCycle: int2("doublesThisCycle").notNull().default(0),
+      // how many times doubled this cycle
+      currentDoubledPlanId: varchar2("currentDoubledPlanId", { length: 32 }),
+      // e.g. "pro_doubled_2x"
+      doubledPriceUsd: int2("doubledPriceUsd").notNull().default(0),
+      // current monthly charge in cents (e.g. 6000 = $60)
+      // Billing cycle anchor — used to detect when month rolls over
+      billingCycleStart: timestamp2("billingCycleStart").notNull().defaultNow(),
+      billingCycleEnd: timestamp2("billingCycleEnd"),
+      // set from Stripe subscription period end
+      // Downgrade state — user chose to downgrade, pending next cycle
+      pendingDowngradePlan: mysqlEnum2("pendingDowngradePlan", ["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"]),
+      pendingDowngradeAt: timestamp2("pendingDowngradeAt"),
+      // when the downgrade was requested
+      // Flags
+      hasBeenOfferedDouble: boolean2("hasBeenOfferedDouble").notNull().default(false),
+      // shown the double offer this cycle
+      cycleResetAt: timestamp2("cycleResetAt"),
+      // last time this record was reset for a new cycle
       createdAt: timestamp2("createdAt").defaultNow().notNull(),
       updatedAt: timestamp2("updatedAt").defaultNow().onUpdateNow().notNull()
     });
@@ -4047,7 +4084,7 @@ var init_proxy_manager = __esm({
 });
 
 // shared/pricing.ts
-var PRICING_TIERS, INTERNAL_TIERS, CREDIT_COSTS, CREDIT_PACKS;
+var PRICING_TIERS, INTERNAL_TIERS, CREDIT_COSTS, CREDIT_PACKS, PLAN_DOUBLE_MAP, MAX_BOOST_PACKS_PER_CYCLE, MAX_DOUBLES_PER_CYCLE, DAILY_FREE_CREDITS_AMOUNT, DAILY_FREE_CREDITS_RESET_HOURS, DAILY_FREE_CREDITS_PLAN;
 var init_pricing = __esm({
   "shared/pricing.ts"() {
     "use strict";
@@ -4390,6 +4427,53 @@ var init_pricing = __esm({
         upgradeNudge: "Enterprise gives 250,000 credits/mo for $99 \u2014 5x more credits! Upgrading saves you money."
       }
     ];
+    PLAN_DOUBLE_MAP = {
+      pro: {
+        basePlanId: "pro",
+        basePriceUsd: 29,
+        doubledPriceUsd: 58,
+        doubledCredits: 1e5,
+        label: "Pro 2x",
+        description: "Double your Pro plan \u2014 100,000 credits for $58/mo until your cycle resets"
+      },
+      enterprise: {
+        basePlanId: "enterprise",
+        basePriceUsd: 99,
+        doubledPriceUsd: 198,
+        doubledCredits: 5e5,
+        label: "Enterprise 2x",
+        description: "Double your Enterprise plan \u2014 500,000 credits for $198/mo until your cycle resets"
+      },
+      cyber: {
+        basePlanId: "cyber",
+        basePriceUsd: 199,
+        doubledPriceUsd: 398,
+        doubledCredits: 15e5,
+        label: "Cyber 2x",
+        description: "Double your Cyber plan \u2014 1,500,000 credits for $398/mo until your cycle resets"
+      },
+      cyber_plus: {
+        basePlanId: "cyber_plus",
+        basePriceUsd: 499,
+        doubledPriceUsd: 998,
+        doubledCredits: 6e6,
+        label: "Cyber+ 2x",
+        description: "Double your Cyber+ plan \u2014 6,000,000 credits for $998/mo until your cycle resets"
+      },
+      titan: {
+        basePlanId: "titan",
+        basePriceUsd: 4999,
+        doubledPriceUsd: 9998,
+        doubledCredits: 2e7,
+        label: "Titan 2x",
+        description: "Double your Titan plan \u2014 20,000,000 credits for $9,998/mo until your cycle resets"
+      }
+    };
+    MAX_BOOST_PACKS_PER_CYCLE = 3;
+    MAX_DOUBLES_PER_CYCLE = 3;
+    DAILY_FREE_CREDITS_AMOUNT = 375;
+    DAILY_FREE_CREDITS_RESET_HOURS = 24;
+    DAILY_FREE_CREDITS_PLAN = "free";
   }
 });
 
@@ -4972,12 +5056,12 @@ async function ensureBalance(userId) {
 async function getCreditBalance(userId) {
   const db = await getDb();
   if (!db) {
-    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null };
+    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null, dailyFreeCredits: 0, dailyFreeLastGrantedAt: null };
   }
   await ensureBalance(userId);
   const result = await db.select().from(creditBalances).where(eq8(creditBalances.userId, userId)).limit(1);
   if (result.length === 0) {
-    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null };
+    return { credits: 0, isUnlimited: false, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null, dailyFreeCredits: 0, dailyFreeLastGrantedAt: null };
   }
   const bal = result[0];
   return {
@@ -4985,7 +5069,9 @@ async function getCreditBalance(userId) {
     isUnlimited: bal.isUnlimited,
     lifetimeUsed: bal.lifetimeCreditsUsed,
     lifetimeAdded: bal.lifetimeCreditsAdded,
-    lastRefillAt: bal.lastRefillAt
+    lastRefillAt: bal.lastRefillAt,
+    dailyFreeCredits: bal.dailyFreeCredits ?? 0,
+    dailyFreeLastGrantedAt: bal.dailyFreeLastGrantedAt ?? null
   };
 }
 async function checkCredits(userId, action) {
@@ -5053,7 +5139,11 @@ async function consumeCredits(userId, action, description) {
   ]);
   const txType = validTxTypes.has(action) ? action : "chat_message";
   return await db.transaction(async (tx) => {
-    const bal = await tx.select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited }).from(creditBalances).where(eq8(creditBalances.userId, userId)).for("update").limit(1);
+    const bal = await tx.select({
+      credits: creditBalances.credits,
+      isUnlimited: creditBalances.isUnlimited,
+      dailyFreeCredits: creditBalances.dailyFreeCredits
+    }).from(creditBalances).where(eq8(creditBalances.userId, userId)).for("update").limit(1);
     if (bal.length === 0) return { success: false, balanceAfter: 0 };
     if (bal[0].isUnlimited) {
       await tx.insert(creditTransactions).values({
@@ -5066,6 +5156,40 @@ async function consumeCredits(userId, action, description) {
       return { success: true, balanceAfter: bal[0].credits };
     }
     const cost2 = CREDIT_COSTS[action];
+    const dailyFree = bal[0].dailyFreeCredits ?? 0;
+    if (dailyFree > 0) {
+      const freeDeduct = Math.min(dailyFree, cost2);
+      const remainingCost = cost2 - freeDeduct;
+      await tx.update(creditBalances).set({ dailyFreeCredits: sql4`${creditBalances.dailyFreeCredits} - ${freeDeduct}` }).where(eq8(creditBalances.userId, userId));
+      if (remainingCost === 0) {
+        await tx.insert(creditTransactions).values({
+          userId,
+          amount: 0,
+          type: txType,
+          description: description || `${action}: -${cost2} daily free credits (no paid credits used)`,
+          balanceAfter: bal[0].credits
+        });
+        return { success: true, balanceAfter: bal[0].credits };
+      }
+      if (bal[0].credits < remainingCost) {
+        await tx.update(creditBalances).set({ dailyFreeCredits: sql4`${creditBalances.dailyFreeCredits} + ${freeDeduct}` }).where(eq8(creditBalances.userId, userId));
+        return { success: false, balanceAfter: bal[0].credits };
+      }
+      await tx.update(creditBalances).set({
+        credits: sql4`${creditBalances.credits} - ${remainingCost}`,
+        lifetimeCreditsUsed: sql4`${creditBalances.lifetimeCreditsUsed} + ${remainingCost}`
+      }).where(eq8(creditBalances.userId, userId));
+      const updatedPartial = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq8(creditBalances.userId, userId)).limit(1);
+      const partialBalance = updatedPartial[0]?.credits ?? 0;
+      await tx.insert(creditTransactions).values({
+        userId,
+        amount: -remainingCost,
+        type: txType,
+        description: description || `${action}: -${freeDeduct} daily free + -${remainingCost} paid credits`,
+        balanceAfter: partialBalance
+      });
+      return { success: true, balanceAfter: partialBalance };
+    }
     if (bal[0].credits < cost2) {
       return { success: false, balanceAfter: bal[0].credits };
     }
@@ -18656,9 +18780,9 @@ async function appendBuildLog(projectId, entry) {
   const db = await getDb();
   if (!db) return;
   const [project] = await db.select({ buildLog: replicateProjects.buildLog }).from(replicateProjects).where(eq25(replicateProjects.id, projectId));
-  const log88 = project?.buildLog ?? [];
-  log88.push(entry);
-  await db.update(replicateProjects).set({ buildLog: log88 }).where(eq25(replicateProjects.id, projectId));
+  const log89 = project?.buildLog ?? [];
+  log89.push(entry);
+  await db.update(replicateProjects).set({ buildLog: log89 }).where(eq25(replicateProjects.id, projectId));
 }
 var init_replicate_engine = __esm({
   "server/replicate-engine.ts"() {
@@ -46453,18 +46577,18 @@ var blog_seed_exports = {};
 __export(blog_seed_exports, {
   seedBlogPosts: () => seedBlogPosts
 });
-import { eq as eq85, sql as sql39 } from "drizzle-orm";
+import { eq as eq86, sql as sql39 } from "drizzle-orm";
 async function seedBlogPosts() {
   const db = await getDb();
   if (!db) {
-    log86.info("[BlogSeed] DB not available, skipping");
+    log87.info("[BlogSeed] DB not available, skipping");
     return 0;
   }
   const posts = blog_seed_data_default;
   let inserted = 0;
   for (const post of posts) {
     try {
-      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq85(blogPosts.slug, post.slug)).limit(1);
+      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq86(blogPosts.slug, post.slug)).limit(1);
       if (existing.length > 0) continue;
       const wordCount = post.content.split(/\s+/).length;
       const readingTime = Math.ceil(wordCount / 200);
@@ -46494,7 +46618,7 @@ async function seedBlogPosts() {
       inserted++;
     } catch (err) {
       if (err?.code === "ER_DUP_ENTRY") continue;
-      log86.error(`[BlogSeed] Failed to insert "${post.slug}":`, { error: getErrorMessage(err) });
+      log87.error(`[BlogSeed] Failed to insert "${post.slug}":`, { error: getErrorMessage(err) });
     }
   }
   if (inserted > 0) {
@@ -46502,17 +46626,17 @@ async function seedBlogPosts() {
     for (const cat of categories) {
       try {
         const name = cat.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-        const existing = await db.select().from(blogCategories).where(eq85(blogCategories.slug, cat)).limit(1);
+        const existing = await db.select().from(blogCategories).where(eq86(blogCategories.slug, cat)).limit(1);
         if (existing.length === 0) {
-          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq85(blogPosts.category, cat));
+          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq86(blogPosts.category, cat));
           await db.insert(blogCategories).values({
             name,
             slug: cat,
             postCount: count10
           });
         } else {
-          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq85(blogPosts.category, cat));
-          await db.update(blogCategories).set({ postCount: count10 }).where(eq85(blogCategories.slug, cat));
+          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq86(blogPosts.category, cat));
+          await db.update(blogCategories).set({ postCount: count10 }).where(eq86(blogCategories.slug, cat));
         }
       } catch (err) {
       }
@@ -46520,7 +46644,7 @@ async function seedBlogPosts() {
   }
   return inserted;
 }
-var log86;
+var log87;
 var init_blog_seed = __esm({
   "server/blog-seed.ts"() {
     "use strict";
@@ -46529,7 +46653,7 @@ var init_blog_seed = __esm({
     init_blog_seed_data();
     init_logger();
     init_errors();
-    log86 = createLogger("BlogSeed");
+    log87 = createLogger("BlogSeed");
   }
 });
 
@@ -51910,20 +52034,20 @@ function auditLogsToCsv(logs) {
     }
     return str;
   }
-  const rows = logs.map((log88) => {
-    const timestamp3 = log88.createdAt instanceof Date ? log88.createdAt.toISOString() : String(log88.createdAt);
-    const details = log88.details && typeof log88.details === "object" ? JSON.stringify(log88.details) : "";
+  const rows = logs.map((log89) => {
+    const timestamp3 = log89.createdAt instanceof Date ? log89.createdAt.toISOString() : String(log89.createdAt);
+    const details = log89.details && typeof log89.details === "object" ? JSON.stringify(log89.details) : "";
     return [
-      log88.id,
+      log89.id,
       timestamp3,
-      log88.userId,
-      escapeField(log88.userName),
-      escapeField(log88.userEmail),
-      escapeField(log88.action),
-      escapeField(log88.resource),
-      escapeField(log88.resourceId),
+      log89.userId,
+      escapeField(log89.userName),
+      escapeField(log89.userEmail),
+      escapeField(log89.action),
+      escapeField(log89.resource),
+      escapeField(log89.resourceId),
       escapeField(details),
-      escapeField(log88.ipAddress)
+      escapeField(log89.ipAddress)
     ].join(",");
   });
   return [header, ...rows].join("\n");
@@ -54416,9 +54540,9 @@ function registerV5ApiRoutes(app) {
       const limit = Math.min(parseInt(req.query.limit) || 1e3, 1e4);
       const result = await queryAuditLogs2({ limit, offset: 0 });
       const header = "ID,Timestamp,User,Action,Resource,Details";
-      const rows = result.logs.map((log88) => {
-        const details = typeof log88.details === "object" ? JSON.stringify(log88.details).replace(/"/g, '""') : log88.details || "";
-        return `${log88.id},${log88.createdAt},"${log88.userName || ""}","${log88.action}","${log88.resource || ""}","${details}"`;
+      const rows = result.logs.map((log89) => {
+        const details = typeof log89.details === "object" ? JSON.stringify(log89.details).replace(/"/g, '""') : log89.details || "";
+        return `${log89.id},${log89.createdAt},"${log89.userName || ""}","${log89.action}","${log89.resource || ""}","${details}"`;
       });
       const csv = [header, ...rows].join("\n");
       res.setHeader("Content-Type", "text/csv");
@@ -55468,25 +55592,25 @@ var adminActivityLogRouter = router({
       offset: 0
     });
     const header = "ID,Timestamp,Admin ID,Admin Email,Admin Role,Action,Category,Target User ID,Target User Email,Success,IP Address";
-    const rows = result.logs.map((log88) => {
-      const ts = log88.createdAt instanceof Date ? log88.createdAt.toISOString() : String(log88.createdAt);
+    const rows = result.logs.map((log89) => {
+      const ts = log89.createdAt instanceof Date ? log89.createdAt.toISOString() : String(log89.createdAt);
       const esc = (v) => {
         if (!v) return "";
         const s = String(v);
         return s.includes(",") || s.includes('"') || s.includes("\n") ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
       return [
-        log88.id,
+        log89.id,
         ts,
-        log88.adminId,
-        esc(log88.adminEmail),
-        esc(log88.adminRole),
-        esc(log88.action),
-        esc(log88.category),
-        log88.targetUserId ?? "",
-        esc(log88.targetUserEmail),
-        log88.success ? "true" : "false",
-        esc(log88.ipAddress)
+        log89.adminId,
+        esc(log89.adminEmail),
+        esc(log89.adminRole),
+        esc(log89.action),
+        esc(log89.category),
+        log89.targetUserId ?? "",
+        esc(log89.targetUserEmail),
+        log89.success ? "true" : "false",
+        esc(log89.ipAddress)
       ].join(",");
     });
     return {
@@ -61572,16 +61696,16 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86 } = await import("drizzle-orm");
+      const { eq: eq87 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
-      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq86(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq87(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
       if (!payment) throw new TRPCError28({ code: "NOT_FOUND" });
       if (payment.status === "pending" && isBinancePayConfigured()) {
         try {
           const binanceStatus = await queryOrderStatus(input.merchantTradeNo);
           if (binanceStatus?.data?.status === "PAID") {
-            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq86(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq87(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
             return { ...payment, status: "completed" };
           }
         } catch (err) {
@@ -61601,7 +61725,7 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2, platformRevenue: platformRevenue2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, sql: sql40 } = await import("drizzle-orm");
+      const { eq: eq87, sql: sql40 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) return { totalRevenue: 0, totalFees: 0, totalPayments: 0, completedPayments: 0 };
       const payments = await dbConn.select().from(cryptoPayments2);
@@ -61879,12 +62003,12 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
-    await db.update(sandboxes3).set({ name: input.name }).where(and66(eq86(sandboxes3.id, input.sandboxId), eq86(sandboxes3.userId, ctx.user.id)));
+    await db.update(sandboxes3).set({ name: input.name }).where(and67(eq87(sandboxes3.id, input.sandboxId), eq87(sandboxes3.userId, ctx.user.id)));
     return { success: true };
   }),
   /**
@@ -61934,14 +62058,14 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86 } = await import("drizzle-orm");
+    const { eq: eq87 } = await import("drizzle-orm");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
     const envVars = { ...sandbox.envVars || {} };
     delete envVars[input.key];
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
-    await db.update(sandboxes3).set({ envVars }).where(eq86(sandboxes3.id, input.sandboxId));
+    await db.update(sandboxes3).set({ envVars }).where(eq87(sandboxes3.id, input.sandboxId));
     return { success: true };
   }),
   /**
@@ -62066,13 +62190,13 @@ var sandboxRouter = router({
   projectFiles: protectedProcedure.input(z34.object({ conversationId: z34.number().int().optional() }).optional()).query(async ({ ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66, desc: desc52 } = await import("drizzle-orm");
+    const { eq: eq87, and: and67, desc: desc52 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { files: [], projects: [] };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { files: [], projects: [] };
     const sbId = sandboxes3[0].id;
-    const allFiles = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sbId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+    const allFiles = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.sandboxId, sbId), eq87(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
     const projectMap = /* @__PURE__ */ new Map();
     for (const file of allFiles) {
       const parts = file.filePath.split("/");
@@ -62105,12 +62229,12 @@ var sandboxRouter = router({
   projectFileContent: protectedProcedure.input(z34.object({ fileId: z34.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { content: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { content: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.id, input.fileId), eq87(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { content: null, error: "File not found" };
     if (file.content) {
       return { content: file.content, path: file.filePath };
@@ -62133,12 +62257,12 @@ var sandboxRouter = router({
   projectFileDownloadUrl: protectedProcedure.input(z34.object({ fileId: z34.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { url: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { url: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.id, input.fileId), eq87(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { url: null, error: "File not found" };
     if (file.s3Key) {
       try {
@@ -62155,12 +62279,12 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, and: and66 } = await import("drizzle-orm");
+      const { eq: eq87, and: and67 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, error: "No sandbox found" };
-      const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+      const [file] = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.id, input.fileId), eq87(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
       if (!file) return { success: false, error: "File not found" };
       if (file.s3Key) {
         try {
@@ -62169,7 +62293,7 @@ var sandboxRouter = router({
         } catch {
         }
       }
-      await db.delete(sandboxFiles2).where(eq86(sandboxFiles2.id, input.fileId));
+      await db.delete(sandboxFiles2).where(eq87(sandboxFiles2.id, input.fileId));
       return { success: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -62181,29 +62305,29 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, and: and66, like: like8, notLike, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq87, and: and67, like: like8, notLike, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found \u2014 please create a project first" };
       let allFiles = [];
       if (input.projectName === "Ungrouped" || input.projectName === "general") {
-        allFiles = await db.select().from(sandboxFiles2).where(and66(
-          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        allFiles = await db.select().from(sandboxFiles2).where(and67(
+          eq87(sandboxFiles2.sandboxId, sandboxes3[0].id),
           notLike(sandboxFiles2.filePath, "%/%")
         ));
       } else {
-        const files = await db.select().from(sandboxFiles2).where(and66(
-          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        const files = await db.select().from(sandboxFiles2).where(and67(
+          eq87(sandboxFiles2.sandboxId, sandboxes3[0].id),
           like8(sandboxFiles2.filePath, `${input.projectName}/%`)
         ));
-        const exactFiles = await db.select().from(sandboxFiles2).where(and66(
-          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq86(sandboxFiles2.filePath, input.projectName)
+        const exactFiles = await db.select().from(sandboxFiles2).where(and67(
+          eq87(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq87(sandboxFiles2.filePath, input.projectName)
         ));
-        const byProjectName = await db.select().from(sandboxFiles2).where(and66(
-          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq86(sandboxFiles2.projectName, input.projectName)
+        const byProjectName = await db.select().from(sandboxFiles2).where(and67(
+          eq87(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq87(sandboxFiles2.projectName, input.projectName)
         ));
         const idSet = /* @__PURE__ */ new Set();
         allFiles = [...files, ...exactFiles, ...byProjectName].filter((f) => {
@@ -62236,14 +62360,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, and: and66, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq87, and: and67, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
-      const files = await db.select().from(sandboxFiles2).where(and66(
+      const files = await db.select().from(sandboxFiles2).where(and67(
         inArray3(sandboxFiles2.id, input.fileIds),
-        eq86(sandboxFiles2.sandboxId, sandboxes3[0].id)
+        eq87(sandboxFiles2.sandboxId, sandboxes3[0].id)
       ));
       if (files.length === 0) return { success: false, deleted: 0, error: "No matching files found" };
       for (const file of files) {
@@ -62269,14 +62393,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq87, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
       let totalDeleted = 0;
       for (const sb of sandboxes3) {
-        const allFiles = await db.select().from(sandboxFiles2).where(eq86(sandboxFiles2.sandboxId, sb.id));
+        const allFiles = await db.select().from(sandboxFiles2).where(eq87(sandboxFiles2.sandboxId, sb.id));
         if (allFiles.length === 0) continue;
         for (const file of allFiles) {
           if (file.s3Key) {
@@ -68885,12 +69009,12 @@ var marketplaceRouter = router({
         const dbInstance = await getDb();
         if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
         const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
+        const { eq: eq87, sql: sqlOp } = await import("drizzle-orm");
         await dbInstance.update(creditBalances3).set({
           credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
           lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-        }).where(eq86(creditBalances3.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+        }).where(eq87(creditBalances3.userId, ctx.user.id));
+        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
         await dbInstance.insert(creditTransactions3).values({
           userId: ctx.user.id,
           amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -69008,12 +69132,12 @@ var marketplaceRouter = router({
       const dbInstance = await getDb();
       if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
       const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
+      const { eq: eq87, sql: sqlOp } = await import("drizzle-orm");
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-      }).where(eq86(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq87(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -69203,9 +69327,9 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, sql: sql40 } = await import("drizzle-orm");
+    const { eq: eq87, sql: sql40 } = await import("drizzle-orm");
     return await dbInstance.transaction(async (tx) => {
-      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
+      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
       if (buyerBal.length === 0) throw new TRPCError31({ code: "BAD_REQUEST", message: "No credit balance found" });
       if (buyerBal[0].credits < listing.priceCredits && !buyerBal[0].isUnlimited) {
         throw new TRPCError31({ code: "BAD_REQUEST", message: `Insufficient credits. Need ${listing.priceCredits}, have ${buyerBal[0].credits}` });
@@ -69214,9 +69338,9 @@ var marketplaceRouter = router({
         await tx.update(creditBalances3).set({
           credits: sql40`${creditBalances3.credits} - ${listing.priceCredits}`,
           lifetimeCreditsUsed: sql40`${creditBalances3.lifetimeCreditsUsed} + ${listing.priceCredits}`
-        }).where(eq86(creditBalances3.userId, ctx.user.id));
+        }).where(eq87(creditBalances3.userId, ctx.user.id));
       }
-      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
       const buyerBalanceAfter = updatedBal[0]?.credits ?? 0;
       await tx.insert(creditTransactions3).values({
         userId: ctx.user.id,
@@ -69227,16 +69351,16 @@ var marketplaceRouter = router({
       });
       const sellerShare = Math.floor(listing.priceCredits * (1 - PLATFORM_COMMISSION_RATE));
       if (sellerShare > 0) {
-        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
+        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
         if (sellerBal.length === 0) {
           await tx.insert(creditBalances3).values({ userId: listing.sellerId, credits: sellerShare, lifetimeCreditsAdded: sellerShare });
         } else {
           await tx.update(creditBalances3).set({
             credits: sql40`${creditBalances3.credits} + ${sellerShare}`,
             lifetimeCreditsAdded: sql40`${creditBalances3.lifetimeCreditsAdded} + ${sellerShare}`
-          }).where(eq86(creditBalances3.userId, listing.sellerId));
+          }).where(eq87(creditBalances3.userId, listing.sellerId));
         }
-        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, listing.sellerId)).limit(1);
+        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, listing.sellerId)).limit(1);
         await tx.insert(creditTransactions3).values({
           userId: listing.sellerId,
           amount: sellerShare,
@@ -69504,13 +69628,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq87, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${FEATURE_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${FEATURE_COST}`
-      }).where(eq86(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq87(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -FEATURE_COST,
@@ -69519,7 +69643,7 @@ var marketplaceRouter = router({
         balanceAfter: updatedBal[0]?.credits ?? 0
       });
     }
-    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq86(marketplaceListings2.id, input.listingId));
+    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq87(marketplaceListings2.id, input.listingId));
     return { success: true, cost: FEATURE_COST, message: "Listing featured for 30 days" };
   }),
   /** Boost a listing — costs 200 credits, increases visibility for 7 days */
@@ -69536,13 +69660,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq87, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${BOOST_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${BOOST_COST}`
-      }).where(eq86(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq87(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -BOOST_COST,
@@ -69553,7 +69677,7 @@ var marketplaceRouter = router({
     }
     await dbInstance.update(marketplaceListings2).set({
       viewCount: sqlOp`${marketplaceListings2.viewCount} + 100`
-    }).where(eq86(marketplaceListings2.id, input.listingId));
+    }).where(eq87(marketplaceListings2.id, input.listingId));
     return { success: true, cost: BOOST_COST, message: "Listing boosted for 7 days" };
   }),
   /** Verify seller — costs 1000 credits, gets verified badge permanently */
@@ -69569,13 +69693,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq87, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${VERIFY_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${VERIFY_COST}`
-      }).where(eq86(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq87(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq87(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -VERIFY_COST,
@@ -69605,8 +69729,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) return [];
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86 } = await import("drizzle-orm");
-    return database.select().from(sellerPayoutMethods3).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
+    const { eq: eq87 } = await import("drizzle-orm");
+    return database.select().from(sellerPayoutMethods3).where(eq87(sellerPayoutMethods3.userId, ctx.user.id));
   }),
   /** Add a new payout method */
   addPayoutMethod: protectedProcedure.input(z43.object({
@@ -69627,8 +69751,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerProfiles: sellerProfiles3, sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
-    const profiles = await database.select().from(sellerProfiles3).where(eq86(sellerProfiles3.userId, ctx.user.id)).limit(1);
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
+    const profiles = await database.select().from(sellerProfiles3).where(eq87(sellerProfiles3.userId, ctx.user.id)).limit(1);
     if (profiles.length === 0) throw new TRPCError31({ code: "FORBIDDEN", message: "You must be a registered seller to add payout methods" });
     const seller = profiles[0];
     if (input.methodType === "bank_transfer") {
@@ -69641,9 +69765,9 @@ var marketplaceRouter = router({
       }
     }
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq87(sellerPayoutMethods3.userId, ctx.user.id));
     }
-    const existing = await database.select().from(sellerPayoutMethods3).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
+    const existing = await database.select().from(sellerPayoutMethods3).where(eq87(sellerPayoutMethods3.userId, ctx.user.id));
     const shouldBeDefault = existing.length === 0 || input.isDefault;
     let stripeConnectAccountId;
     if (input.methodType === "stripe_connect") {
@@ -69730,11 +69854,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and67(eq87(sellerPayoutMethods3.id, input.id), eq87(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0) throw new TRPCError31({ code: "NOT_FOUND", message: "Payout method not found" });
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq87(sellerPayoutMethods3.userId, ctx.user.id));
     }
     const updateData = {};
     if (input.label !== void 0) updateData.label = input.label;
@@ -69746,7 +69870,7 @@ var marketplaceRouter = router({
     if (input.bankSwiftBic !== void 0) updateData.bankSwiftBic = input.bankSwiftBic;
     if (input.paypalEmail !== void 0) updateData.paypalEmail = input.paypalEmail;
     if (input.isDefault !== void 0) updateData.isDefault = input.isDefault;
-    await database.update(sellerPayoutMethods3).set(updateData).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id)));
+    await database.update(sellerPayoutMethods3).set(updateData).where(and67(eq87(sellerPayoutMethods3.id, input.id), eq87(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Delete a payout method */
@@ -69754,8 +69878,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
-    await database.delete(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id)));
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
+    await database.delete(sellerPayoutMethods3).where(and67(eq87(sellerPayoutMethods3.id, input.id), eq87(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Get Stripe Connect onboarding link (for incomplete onboarding) */
@@ -69763,8 +69887,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, and: and66 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.payoutMethodId), eq86(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq87, and: and67 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and67(eq87(sellerPayoutMethods3.id, input.payoutMethodId), eq87(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0 || !methods[0].stripeConnectAccountId) {
       throw new TRPCError31({ code: "NOT_FOUND", message: "Stripe Connect payout method not found" });
     }
@@ -69788,11 +69912,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database) return { users: [], files: [] };
     const { marketplaceListings: marketplaceListings2, sellerProfiles: sellerProfiles3, users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq86, isNotNull: isNotNull4 } = await import("drizzle-orm");
+    const { eq: eq87, isNotNull: isNotNull4 } = await import("drizzle-orm");
     if (input.userId) {
-      const profiles = await database.select().from(sellerProfiles3).where(eq86(sellerProfiles3.userId, input.userId)).limit(1);
+      const profiles = await database.select().from(sellerProfiles3).where(eq87(sellerProfiles3.userId, input.userId)).limit(1);
       if (profiles.length === 0) return { users: [], files: [] };
-      const listings = await database.select().from(marketplaceListings2).where(eq86(marketplaceListings2.sellerId, profiles[0].id));
+      const listings = await database.select().from(marketplaceListings2).where(eq87(marketplaceListings2.sellerId, profiles[0].id));
       return {
         users: [],
         files: listings.filter((l) => l.fileUrl).map((l) => ({
@@ -69812,7 +69936,7 @@ var marketplaceRouter = router({
     const allProfiles = await database.select().from(sellerProfiles3);
     const userFiles = [];
     for (const profile of allProfiles) {
-      const listings = await database.select().from(marketplaceListings2).where(eq86(marketplaceListings2.sellerId, profile.id));
+      const listings = await database.select().from(marketplaceListings2).where(eq87(marketplaceListings2.sellerId, profile.id));
       const filesCount = listings.filter((l) => l.fileUrl).length;
       if (filesCount > 0) {
         userFiles.push({
@@ -78462,6 +78586,302 @@ var vpnRouter = router({
   })
 });
 
+// server/escalation-router.ts
+init_trpc();
+init_db();
+init_schema();
+init_subscription_gate();
+init_credit_service();
+init_logger();
+init_pricing();
+import { z as z63 } from "zod";
+import { TRPCError as TRPCError46 } from "@trpc/server";
+import { eq as eq81 } from "drizzle-orm";
+var log74 = createLogger("Escalation");
+async function getOrCreateEscalation(userId) {
+  const db = await getDb();
+  if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const existing = await db.select().from(creditEscalation).where(eq81(creditEscalation.userId, userId)).limit(1);
+  if (existing.length > 0) return existing[0];
+  await db.insert(creditEscalation).values({ userId });
+  const created = await db.select().from(creditEscalation).where(eq81(creditEscalation.userId, userId)).limit(1);
+  return created[0];
+}
+async function resetEscalationCycle(userId) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(creditEscalation).set({
+    boostPacksBought: 0,
+    doublesThisCycle: 0,
+    currentDoubledPlanId: null,
+    doubledPriceUsd: 0,
+    hasBeenOfferedDouble: false,
+    cycleResetAt: /* @__PURE__ */ new Date()
+  }).where(eq81(creditEscalation.userId, userId));
+}
+function isCycleExpired(billingCycleEnd) {
+  if (!billingCycleEnd) return false;
+  return /* @__PURE__ */ new Date() > billingCycleEnd;
+}
+var escalationRouter = router({
+  /**
+   * Get the current escalation state for the logged-in user.
+   * Returns everything the frontend needs to render the correct modal step.
+   */
+  getState: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const plan = await getUserPlan(userId);
+    const balance = await getCreditBalance(userId);
+    const escalation = await getOrCreateEscalation(userId);
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (isCycleExpired(escalation.billingCycleEnd)) {
+      await resetEscalationCycle(userId);
+      const fresh = await getOrCreateEscalation(userId);
+      return buildState(plan.planId, balance, fresh);
+    }
+    return buildState(plan.planId, balance, escalation);
+  }),
+  /**
+   * Grant daily free credits to a Free tier user.
+   * Called automatically when a free user opens the app or makes their first action of the day.
+   * Resets the daily pool (does NOT add to existing — unused credits are discarded).
+   */
+  grantDailyFreeCredits: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const plan = await getUserPlan(userId);
+    if (plan.planId !== DAILY_FREE_CREDITS_PLAN) {
+      return { granted: false, reason: "Daily free credits are only available on the Free plan." };
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    const bal = await db.select({ dailyFreeCredits: creditBalances.dailyFreeCredits, dailyFreeLastGrantedAt: creditBalances.dailyFreeLastGrantedAt }).from(creditBalances).where(eq81(creditBalances.userId, userId)).limit(1);
+    if (bal.length === 0) {
+      throw new TRPCError46({ code: "NOT_FOUND", message: "Credit balance not found." });
+    }
+    const lastGranted = bal[0].dailyFreeLastGrantedAt;
+    const now = /* @__PURE__ */ new Date();
+    const hoursSinceLast = lastGranted ? (now.getTime() - lastGranted.getTime()) / (1e3 * 60 * 60) : DAILY_FREE_CREDITS_RESET_HOURS + 1;
+    if (hoursSinceLast < DAILY_FREE_CREDITS_RESET_HOURS) {
+      const hoursRemaining = Math.ceil(DAILY_FREE_CREDITS_RESET_HOURS - hoursSinceLast);
+      return {
+        granted: false,
+        reason: `Daily free credits already granted. Resets in ${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"}.`,
+        currentDailyFree: bal[0].dailyFreeCredits,
+        resetsInHours: hoursRemaining
+      };
+    }
+    await db.update(creditBalances).set({
+      dailyFreeCredits: DAILY_FREE_CREDITS_AMOUNT,
+      dailyFreeLastGrantedAt: now
+    }).where(eq81(creditBalances.userId, userId));
+    log74.info(`Granted ${DAILY_FREE_CREDITS_AMOUNT} daily free credits to free tier user ${userId}`);
+    return {
+      granted: true,
+      amount: DAILY_FREE_CREDITS_AMOUNT,
+      message: `${DAILY_FREE_CREDITS_AMOUNT} daily free credits granted \u2014 good for ~5 tasks today!`
+    };
+  }),
+  /**
+   * Buy a boost pack (paid tiers only, max 3 per billing cycle).
+   * Credits are added immediately. Stripe charge is handled client-side before calling this.
+   */
+  buyBoostPack: protectedProcedure.input(z63.object({
+    packId: z63.string(),
+    stripePaymentIntentId: z63.string()
+  })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+    const plan = await getUserPlan(userId);
+    if (plan.planId === "free") {
+      throw new TRPCError46({
+        code: "FORBIDDEN",
+        message: "Boost packs are available on paid plans only. Upgrade to Pro or higher to unlock boost packs."
+      });
+    }
+    const pack = CREDIT_PACKS.find((p) => p.id === input.packId);
+    if (!pack) throw new TRPCError46({ code: "NOT_FOUND", message: "Boost pack not found." });
+    const escalation = await getOrCreateEscalation(userId);
+    if (isCycleExpired(escalation.billingCycleEnd)) {
+      await resetEscalationCycle(userId);
+    }
+    const freshEscalation = await getOrCreateEscalation(userId);
+    if (freshEscalation.boostPacksBought >= MAX_BOOST_PACKS_PER_CYCLE) {
+      throw new TRPCError46({
+        code: "FORBIDDEN",
+        message: `You've already purchased ${MAX_BOOST_PACKS_PER_CYCLE} boost packs this billing cycle. Consider upgrading your plan for more monthly credits.`
+      });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    await addCredits(userId, pack.credits, "pack_purchase", `Boost pack: ${pack.name} (+${pack.credits.toLocaleString()} credits)`, input.stripePaymentIntentId);
+    await db.update(creditEscalation).set({ boostPacksBought: freshEscalation.boostPacksBought + 1 }).where(eq81(creditEscalation.userId, userId));
+    const newCount = freshEscalation.boostPacksBought + 1;
+    const packsRemaining = MAX_BOOST_PACKS_PER_CYCLE - newCount;
+    log74.info(`User ${userId} bought boost pack ${pack.id} (${newCount}/${MAX_BOOST_PACKS_PER_CYCLE} this cycle)`);
+    return {
+      success: true,
+      creditsAdded: pack.credits,
+      boostPacksBought: newCount,
+      packsRemaining,
+      offerUpgrade: packsRemaining === 0
+      // prompt upgrade offer after 3rd pack
+    };
+  }),
+  /**
+   * Accept the membership doubling offer (paid tiers only).
+   * Charges the user the doubled rate immediately via Stripe.
+   * Credits for the doubled allocation are added immediately.
+   */
+  acceptDoubleUpgrade: protectedProcedure.input(z63.object({
+    stripePaymentIntentId: z63.string()
+    // charged client-side first
+  })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+    const plan = await getUserPlan(userId);
+    if (plan.planId === "free") {
+      throw new TRPCError46({
+        code: "FORBIDDEN",
+        message: "Plan doubling is available on paid plans only."
+      });
+    }
+    const doubleOffer = PLAN_DOUBLE_MAP[plan.planId];
+    if (!doubleOffer) {
+      throw new TRPCError46({ code: "BAD_REQUEST", message: "No doubling offer available for your plan." });
+    }
+    const escalation = await getOrCreateEscalation(userId);
+    if (isCycleExpired(escalation.billingCycleEnd)) {
+      await resetEscalationCycle(userId);
+    }
+    const freshEscalation = await getOrCreateEscalation(userId);
+    if (freshEscalation.doublesThisCycle >= MAX_DOUBLES_PER_CYCLE) {
+      throw new TRPCError46({
+        code: "FORBIDDEN",
+        message: `You've already doubled your plan ${MAX_DOUBLES_PER_CYCLE} times this cycle. Your credits will refresh when your billing cycle resets.`
+      });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    const creditsToAdd = doubleOffer.doubledCredits;
+    await addCredits(
+      userId,
+      creditsToAdd,
+      "pack_purchase",
+      `Plan doubled: ${doubleOffer.label} \u2014 +${creditsToAdd.toLocaleString()} credits at $${doubleOffer.doubledPriceUsd}/mo`,
+      input.stripePaymentIntentId
+    );
+    const newDoubles = freshEscalation.doublesThisCycle + 1;
+    await db.update(creditEscalation).set({
+      doublesThisCycle: newDoubles,
+      currentDoubledPlanId: `${plan.planId}_doubled_${newDoubles}x`,
+      doubledPriceUsd: doubleOffer.doubledPriceUsd,
+      hasBeenOfferedDouble: true
+    }).where(eq81(creditEscalation.userId, userId));
+    log74.info(`User ${userId} accepted plan double (${newDoubles}/${MAX_DOUBLES_PER_CYCLE}) \u2014 ${doubleOffer.label}`);
+    return {
+      success: true,
+      creditsAdded: creditsToAdd,
+      doublesThisCycle: newDoubles,
+      doublesRemaining: MAX_DOUBLES_PER_CYCLE - newDoubles,
+      newMonthlyRate: doubleOffer.doubledPriceUsd,
+      label: doubleOffer.label
+    };
+  }),
+  /**
+   * Downgrade to a lower plan.
+   * Charges the new lower rate immediately via Stripe.
+   * Credits do NOT refill — only refill when billing cycle rolls over.
+   */
+  downgrade: protectedProcedure.input(z63.object({
+    targetPlan: z63.enum(["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"]),
+    stripeSubscriptionId: z63.string().optional()
+  })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+    const plan = await getUserPlan(userId);
+    const planOrder = ["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"];
+    const currentIdx = planOrder.indexOf(plan.planId);
+    const targetIdx = planOrder.indexOf(input.targetPlan);
+    if (targetIdx >= currentIdx) {
+      throw new TRPCError46({
+        code: "BAD_REQUEST",
+        message: "Use the upgrade flow to move to a higher plan."
+      });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(creditEscalation).set({
+      pendingDowngradePlan: input.targetPlan,
+      pendingDowngradeAt: /* @__PURE__ */ new Date()
+    }).where(eq81(creditEscalation.userId, userId));
+    log74.info(`User ${userId} initiated downgrade from ${plan.planId} to ${input.targetPlan}`);
+    return {
+      success: true,
+      message: `Downgrade to ${input.targetPlan} recorded. Your current credits remain until your billing cycle resets, then you'll receive ${input.targetPlan} credits.`,
+      currentPlan: plan.planId,
+      targetPlan: input.targetPlan,
+      creditsRefreshNote: "Your credits will refresh to the new plan allocation when your current billing cycle ends."
+    };
+  }),
+  /**
+   * Sync billing cycle end date from Stripe webhook data.
+   * Called by the Stripe webhook handler when a subscription is updated.
+   */
+  syncBillingCycle: protectedProcedure.input(z63.object({ billingCycleEnd: z63.string() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+    const db = await getDb();
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    const cycleEnd = new Date(input.billingCycleEnd);
+    await db.update(creditEscalation).set({ billingCycleEnd: cycleEnd }).where(eq81(creditEscalation.userId, userId));
+    if (/* @__PURE__ */ new Date() > cycleEnd) {
+      await resetEscalationCycle(userId);
+    }
+    return { success: true };
+  })
+});
+function buildState(planId, balance, escalation) {
+  const isFreeTier = planId === DAILY_FREE_CREDITS_PLAN;
+  const boostPacksBought = escalation.boostPacksBought ?? 0;
+  const doublesThisCycle = escalation.doublesThisCycle ?? 0;
+  const packsRemaining = MAX_BOOST_PACKS_PER_CYCLE - boostPacksBought;
+  const doublesRemaining = MAX_DOUBLES_PER_CYCLE - doublesThisCycle;
+  const doubleOffer = !isFreeTier ? PLAN_DOUBLE_MAP[planId] ?? null : null;
+  let funnelStep = "none";
+  if (balance.credits <= 0 && !balance.isUnlimited) {
+    if (isFreeTier) {
+      funnelStep = "upgrade_required";
+    } else if (packsRemaining > 0) {
+      funnelStep = "boost_packs";
+    } else if (doublesRemaining > 0 && doubleOffer) {
+      funnelStep = "double_offer";
+    } else {
+      funnelStep = "maxed_out";
+    }
+  }
+  return {
+    planId,
+    isFreeTier,
+    credits: balance.credits,
+    isUnlimited: balance.isUnlimited,
+    // Boost pack state
+    boostPacksBought,
+    packsRemaining,
+    maxPacksPerCycle: MAX_BOOST_PACKS_PER_CYCLE,
+    canBuyBoostPack: !isFreeTier && packsRemaining > 0,
+    // Doubling state
+    doublesThisCycle,
+    doublesRemaining,
+    maxDoublesPerCycle: MAX_DOUBLES_PER_CYCLE,
+    canDoubleUpgrade: !isFreeTier && doublesRemaining > 0 && doubleOffer !== null,
+    doubleOffer,
+    // Billing cycle
+    billingCycleEnd: escalation.billingCycleEnd,
+    pendingDowngradePlan: escalation.pendingDowngradePlan,
+    // Funnel state
+    funnelStep,
+    // Available boost packs to show in UI
+    availablePacks: isFreeTier ? [] : CREDIT_PACKS
+  };
+}
+
 // server/routers.ts
 var appRouter = router({
   files: filesRouter,
@@ -78551,7 +78971,9 @@ var appRouter = router({
   proxyRotation: proxyRotationRouter,
   ipRotation: ipRotationRouter,
   webAgent: webAgentRouter,
-  vpn: vpnRouter
+  vpn: vpnRouter,
+  // ── Credit Escalation Funnel ─────────────────────────────────────────
+  escalation: escalationRouter
 });
 
 // server/_core/serve-static.ts
@@ -78560,11 +78982,11 @@ init_logger();
 import express from "express";
 import fs7 from "fs";
 import path6 from "path";
-var log74 = createLogger("Static");
+var log75 = createLogger("Static");
 function serveStatic(app) {
   const distPath = process.env.NODE_ENV === "development" ? path6.resolve(import.meta.dirname, "../..", "dist", "public") : path6.resolve(import.meta.dirname, "public");
   if (!fs7.existsSync(distPath)) {
-    log74.error(`Could not find the build directory: ${distPath}, make sure to build the client first`);
+    log75.error(`Could not find the build directory: ${distPath}, make sure to build the client first`);
   }
   app.use(
     express.static(distPath, {
@@ -78599,7 +79021,7 @@ init_db();
 init_schema();
 import bcrypt3 from "bcryptjs";
 import crypto20 from "crypto";
-import { eq as eq81, and as and64, isNotNull as isNotNull3 } from "drizzle-orm";
+import { eq as eq82, and as and65, isNotNull as isNotNull3 } from "drizzle-orm";
 init_const();
 init_env();
 init_notification();
@@ -78607,7 +79029,7 @@ init_notification();
 // server/email-service.ts
 init_notification();
 init_logger();
-var log75 = createLogger("EmailService");
+var log76 = createLogger("EmailService");
 function wrapInTemplate(title, bodyHtml) {
   return `<!DOCTYPE html>
 <html>
@@ -78690,10 +79112,10 @@ This link expires in 1 hour.
 
 Please forward this to the user or they can use the link directly if they have access to the app.`
     });
-    log75.info(`[Email Service] Password reset email queued for ${email}`);
+    log76.info(`[Email Service] Password reset email queued for ${email}`);
     return true;
   } catch (error) {
-    log75.error(`[Email Service] Failed to send password reset email to ${email}:`, { error: String(error) });
+    log76.error(`[Email Service] Failed to send password reset email to ${email}:`, { error: String(error) });
     return false;
   }
 }
@@ -78732,10 +79154,10 @@ Verification link: ${verifyUrl}
 
 This link expires in 24 hours.`
     });
-    log75.info(`[Email Service] Verification email queued for ${email}`);
+    log76.info(`[Email Service] Verification email queued for ${email}`);
     return true;
   } catch (error) {
-    log75.error(`[Email Service] Failed to send verification email to ${email}:`, { error: String(error) });
+    log76.error(`[Email Service] Failed to send verification email to ${email}:`, { error: String(error) });
     return false;
   }
 }
@@ -78744,7 +79166,7 @@ This link expires in 24 hours.`
 init_logger();
 init_security_fortress();
 init_const();
-var log76 = createLogger("EmailAuthRouter");
+var log77 = createLogger("EmailAuthRouter");
 var SALT_ROUNDS = 12;
 var MIN_PASSWORD_LENGTH = 8;
 var MAX_PASSWORD_LENGTH = 128;
@@ -78839,7 +79261,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const normalizedEmail = email.trim().toLowerCase();
-      const existing = await db.select({ id: users.id }).from(users).where(eq81(users.email, normalizedEmail)).limit(1);
+      const existing = await db.select({ id: users.id }).from(users).where(eq82(users.email, normalizedEmail)).limit(1);
       if (existing.length > 0) {
         return res.status(409).json({ error: "An account with this email already exists. Please sign in instead." });
       }
@@ -78856,7 +79278,7 @@ function registerEmailAuthRoutes(app) {
         const existingUsers = await db.select({ id: users.id }).from(users).limit(1);
         if (existingUsers.length === 0) {
           role = "admin";
-          log76.info(`[EmailAuth] First user auto-promoted to admin: ${normalizedEmail}`);
+          log77.info(`[EmailAuth] First user auto-promoted to admin: ${normalizedEmail}`);
         }
       }
       const verificationToken = crypto20.randomBytes(48).toString("hex");
@@ -78879,7 +79301,7 @@ function registerEmailAuthRoutes(app) {
       });
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      const newUser = await db.select().from(users).where(eq81(users.openId, openId)).limit(1);
+      const newUser = await db.select().from(users).where(eq82(users.openId, openId)).limit(1);
       if (newUser[0]) {
         await db.insert(identityProviders).values({
           userId: newUser[0].id,
@@ -78890,7 +79312,7 @@ function registerEmailAuthRoutes(app) {
           linkedAt: /* @__PURE__ */ new Date(),
           lastUsedAt: /* @__PURE__ */ new Date()
         }).catch(() => {
-          log76.warn("[Email Auth] Failed to auto-link email provider");
+          log77.warn("[Email Auth] Failed to auto-link email provider");
         });
       }
       const baseUrl = req.headers.origin || getPublicOrigin(req);
@@ -78900,7 +79322,7 @@ function registerEmailAuthRoutes(app) {
         name?.trim() || normalizedEmail.split("@")[0],
         verifyUrl
       ).catch(() => {
-        log76.warn("[Email Auth] Failed to send verification email");
+        log77.warn("[Email Auth] Failed to send verification email");
       });
       return res.json({
         success: true,
@@ -78914,7 +79336,7 @@ function registerEmailAuthRoutes(app) {
         } : null
       });
     } catch (error) {
-      log76.error("[Email Auth] Registration failed:", { error: String(error) });
+      log77.error("[Email Auth] Registration failed:", { error: String(error) });
       return res.status(500).json({ error: "Registration failed. Please try again." });
     }
   });
@@ -78930,8 +79352,8 @@ function registerEmailAuthRoutes(app) {
       }
       const normalizedEmail = email.trim().toLowerCase();
       const result = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(
-        and64(
-          eq81(users.email, normalizedEmail),
+        and65(
+          eq82(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -78953,9 +79375,9 @@ function registerEmailAuthRoutes(app) {
         user.name || user.email,
         resetUrl
       ).catch(() => {
-        log76.warn("[Password Reset] Failed to send email");
+        log77.warn("[Password Reset] Failed to send email");
       });
-      log76.info(`[Password Reset] Token generated for ${user.email}: ${resetUrl}`);
+      log77.info(`[Password Reset] Token generated for ${user.email}: ${resetUrl}`);
       return res.json({
         success: true,
         message: "If an account with that email exists, a password reset link has been sent.",
@@ -78964,7 +79386,7 @@ function registerEmailAuthRoutes(app) {
         resetUrl
       });
     } catch (error) {
-      log76.error("[Password Reset] Request failed:", { error: String(error) });
+      log77.error("[Password Reset] Request failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to process password reset request. Please try again." });
     }
   });
@@ -78983,7 +79405,7 @@ function registerEmailAuthRoutes(app) {
         userId: passwordResetTokens.userId,
         expiresAt: passwordResetTokens.expiresAt,
         usedAt: passwordResetTokens.usedAt
-      }).from(passwordResetTokens).where(eq81(passwordResetTokens.token, token)).limit(1);
+      }).from(passwordResetTokens).where(eq82(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link", valid: false });
       }
@@ -78994,13 +79416,13 @@ function registerEmailAuthRoutes(app) {
       if (/* @__PURE__ */ new Date() > resetToken.expiresAt) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one.", valid: false });
       }
-      const userResult = await db.select({ email: users.email }).from(users).where(eq81(users.id, resetToken.userId)).limit(1);
+      const userResult = await db.select({ email: users.email }).from(users).where(eq82(users.id, resetToken.userId)).limit(1);
       return res.json({
         valid: true,
         email: userResult[0]?.email || "your account"
       });
     } catch (error) {
-      log76.error("[Password Reset] Token verification failed:", { error: String(error) });
+      log77.error("[Password Reset] Token verification failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to verify token", valid: false });
     }
   });
@@ -79023,7 +79445,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(passwordResetTokens).where(eq81(passwordResetTokens.token, token)).limit(1);
+      const result = await db.select().from(passwordResetTokens).where(eq82(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link" });
       }
@@ -79035,15 +79457,15 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
       }
       const passwordHash = await bcrypt3.hash(password, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, resetToken.userId));
-      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq81(passwordResetTokens.id, resetToken.id));
-      log76.info(`[Password Reset] Password successfully reset for userId: ${resetToken.userId}`);
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq82(users.id, resetToken.userId));
+      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq82(passwordResetTokens.id, resetToken.id));
+      log77.info(`[Password Reset] Password successfully reset for userId: ${resetToken.userId}`);
       return res.json({
         success: true,
         message: "Your password has been reset successfully. You can now sign in with your new password."
       });
     } catch (error) {
-      log76.error("[Password Reset] Reset failed:", { error: String(error) });
+      log77.error("[Password Reset] Reset failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to reset password. Please try again." });
     }
   });
@@ -79071,8 +79493,8 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const result = await db.select().from(users).where(
-        and64(
-          eq81(users.email, normalizedEmail),
+        and65(
+          eq82(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -79089,7 +79511,7 @@ function registerEmailAuthRoutes(app) {
       clearFailedAttempts(clientIp, normalizedEmail);
       const geoCheck = await checkGeoAnomaly(user.id, clientIp);
       if (geoCheck.suspicious) {
-        log76.warn(`[EmailAuth] Geo-anomaly for user ${user.id}: ${geoCheck.warning}`);
+        log77.warn(`[EmailAuth] Geo-anomaly for user ${user.id}: ${geoCheck.warning}`);
         await trackIncident(user.id, "impossible_travel", isAdminRole(user.role));
       }
       if (user.twoFactorEnabled && user.twoFactorSecret) {
@@ -79110,9 +79532,9 @@ function registerEmailAuthRoutes(app) {
       const loginUpdate = { lastSignedIn: /* @__PURE__ */ new Date() };
       if (!isAdminRole(user.role) && (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail) || user.openId === ENV.ownerOpenId || user.id === 1)) {
         loginUpdate.role = normalizedEmail === ENV.headAdminEmail ? "head_admin" : "admin";
-        log76.info(`[EmailAuth] Auto-promoted user to ${loginUpdate.role} on login: ${normalizedEmail}`);
+        log77.info(`[EmailAuth] Auto-promoted user to ${loginUpdate.role} on login: ${normalizedEmail}`);
       }
-      await db.update(users).set(loginUpdate).where(eq81(users.id, user.id));
+      await db.update(users).set(loginUpdate).where(eq82(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || normalizedEmail.split("@")[0],
         expiresInMs: ONE_YEAR_MS
@@ -79120,10 +79542,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and64(
-          eq81(identityProviders.userId, user.id),
-          eq81(identityProviders.provider, "email"),
-          eq81(identityProviders.providerAccountId, normalizedEmail)
+        and65(
+          eq82(identityProviders.userId, user.id),
+          eq82(identityProviders.provider, "email"),
+          eq82(identityProviders.providerAccountId, normalizedEmail)
         )
       ).catch(() => {
       });
@@ -79137,7 +79559,7 @@ function registerEmailAuthRoutes(app) {
         }
       });
     } catch (error) {
-      log76.error("[Email Auth] Login failed:", { error: String(error) });
+      log77.error("[Email Auth] Login failed:", { error: String(error) });
       return res.status(500).json({ error: "Login failed. Please try again." });
     }
   });
@@ -79169,7 +79591,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq81(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq82(users.id, sessionUser.id)).limit(1);
       if (result.length === 0 || !result[0].passwordHash) {
         return res.status(400).json({ error: "Password change is not available for OAuth accounts. Please use your OAuth provider to manage your password." });
       }
@@ -79179,10 +79601,10 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Current password is incorrect" });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, user.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq82(users.id, user.id));
       return res.json({ success: true, message: "Password changed successfully" });
     } catch (error) {
-      log76.error("[Email Auth] Change password failed:", { error: String(error) });
+      log77.error("[Email Auth] Change password failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to change password. Please try again." });
     }
   });
@@ -79211,7 +79633,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq81(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq82(users.id, sessionUser.id)).limit(1);
       if (result.length === 0) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -79219,10 +79641,10 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "You already have a password set. Use the change password form instead." });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, sessionUser.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq82(users.id, sessionUser.id));
       return res.json({ success: true, message: "Password set successfully. You can now use it to log in to the desktop app." });
     } catch (error) {
-      log76.error("[Email Auth] Set password failed:", { error: String(error) });
+      log77.error("[Email Auth] Set password failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to set password. Please try again." });
     }
   });
@@ -79257,17 +79679,17 @@ function registerEmailAuthRoutes(app) {
           return res.status(400).json({ error: "Invalid email format" });
         }
         const normalizedEmail = newEmail.trim().toLowerCase();
-        const existing = await db.select({ id: users.id }).from(users).where(eq81(users.email, normalizedEmail)).limit(1);
+        const existing = await db.select({ id: users.id }).from(users).where(eq82(users.email, normalizedEmail)).limit(1);
         if (existing.length > 0 && existing[0].id !== sessionUser.id) {
           return res.status(409).json({ error: "This email is already in use by another account" });
         }
         updates.email = normalizedEmail;
       }
-      await db.update(users).set(updates).where(eq81(users.id, sessionUser.id));
-      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq81(users.id, sessionUser.id)).limit(1);
+      await db.update(users).set(updates).where(eq82(users.id, sessionUser.id));
+      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq82(users.id, sessionUser.id)).limit(1);
       return res.json({ success: true, user: updated[0] || null });
     } catch (error) {
-      log76.error("[Email Auth] Update profile failed:", { error: String(error) });
+      log77.error("[Email Auth] Update profile failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to update profile. Please try again." });
     }
   });
@@ -79281,7 +79703,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available", verified: false });
       }
-      const result = await db.select().from(users).where(eq81(users.emailVerificationToken, token)).limit(1);
+      const result = await db.select().from(users).where(eq82(users.emailVerificationToken, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired verification link", verified: false });
       }
@@ -79297,8 +79719,8 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: null,
         emailVerificationExpires: null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq81(users.id, user.id));
-      log76.info(`[Email Auth] Email verified for userId: ${user.id}, email: ${user.email}`);
+      }).where(eq82(users.id, user.id));
+      log77.info(`[Email Auth] Email verified for userId: ${user.id}, email: ${user.email}`);
       await notifyOwner({
         title: `New Verified User: ${user.name || user.email}`,
         content: `${user.name || user.email} (${user.email}) has verified their email and is now an active user.`
@@ -79309,7 +79731,7 @@ function registerEmailAuthRoutes(app) {
         message: "Your email has been verified successfully! You can now access all features."
       });
     } catch (error) {
-      log76.error("[Email Auth] Email verification failed:", { error: String(error) });
+      log77.error("[Email Auth] Email verification failed:", { error: String(error) });
       return res.status(500).json({ error: "Verification failed. Please try again.", verified: false });
     }
   });
@@ -79324,7 +79746,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq81(users.email, normalizedEmail)).limit(1);
+      const result = await db.select().from(users).where(eq82(users.email, normalizedEmail)).limit(1);
       if (result.length === 0 || result[0].emailVerified) {
         return res.json({ success: true, message: "If an account exists with that email, a verification link has been sent." });
       }
@@ -79335,7 +79757,7 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: verificationToken,
         emailVerificationExpires: verificationExpires,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq81(users.id, user.id));
+      }).where(eq82(users.id, user.id));
       const baseUrl = req.headers.origin || getPublicOrigin(req);
       const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
       await sendVerificationEmail(
@@ -79343,11 +79765,11 @@ function registerEmailAuthRoutes(app) {
         user.name || normalizedEmail.split("@")[0],
         verifyUrl
       ).catch(() => {
-        log76.warn("[Email Auth] Failed to resend verification email");
+        log77.warn("[Email Auth] Failed to resend verification email");
       });
       return res.json({ success: true, message: "If an account exists with that email, a verification link has been sent." });
     } catch (error) {
-      log76.error("[Email Auth] Resend verification failed:", { error: String(error) });
+      log77.error("[Email Auth] Resend verification failed:", { error: String(error) });
       return res.status(500).json({ error: "Failed to resend verification. Please try again." });
     }
   });
@@ -79372,7 +79794,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq81(users.id, pending.userId)).limit(1);
+      const result = await db.select().from(users).where(eq82(users.id, pending.userId)).limit(1);
       if (result.length === 0) {
         pendingTwoFactorLogins.delete(twoFactorToken);
         return res.status(401).json({ error: "User not found" });
@@ -79396,7 +79818,7 @@ function registerEmailAuthRoutes(app) {
             usedBackupCode = true;
             const updatedCodes = [...user.twoFactorBackupCodes];
             updatedCodes.splice(i, 1);
-            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq81(users.id, user.id));
+            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq82(users.id, user.id));
             break;
           }
         }
@@ -79405,7 +79827,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Invalid verification code" });
       }
       pendingTwoFactorLogins.delete(twoFactorToken);
-      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq81(users.id, user.id));
+      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq82(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(pending.openId, {
         name: pending.name,
         expiresInMs: ONE_YEAR_MS
@@ -79413,10 +79835,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and64(
-          eq81(identityProviders.userId, user.id),
-          eq81(identityProviders.provider, "email"),
-          eq81(identityProviders.providerAccountId, pending.email)
+        and65(
+          eq82(identityProviders.userId, user.id),
+          eq82(identityProviders.provider, "email"),
+          eq82(identityProviders.providerAccountId, pending.email)
         )
       ).catch(() => {
       });
@@ -79431,7 +79853,7 @@ function registerEmailAuthRoutes(app) {
         }
       });
     } catch (error) {
-      log76.error("[Email Auth] 2FA verification failed:", { error: String(error) });
+      log77.error("[Email Auth] 2FA verification failed:", { error: String(error) });
       return res.status(500).json({ error: "Two-factor verification failed. Please try again." });
     }
   });
@@ -79456,7 +79878,7 @@ function registerEmailAuthRoutes(app) {
       }
       const db = await getDb();
       if (!db) return res.status(500).json({ error: "Database not available" });
-      const result = await db.select().from(users).where(and64(eq81(users.email, normalizedEmail), isNotNull3(users.passwordHash))).limit(1);
+      const result = await db.select().from(users).where(and65(eq82(users.email, normalizedEmail), isNotNull3(users.passwordHash))).limit(1);
       if (result.length === 0) {
         recordFailedAttempt(clientIp, normalizedEmail);
         return res.status(401).json({ error: "Invalid email or password" });
@@ -79483,17 +79905,17 @@ function registerEmailAuthRoutes(app) {
       if (!isAdminRole(user.role) && (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail) || user.openId === ENV.ownerOpenId || user.id === 1)) {
         loginUpdate.role = normalizedEmail === ENV.headAdminEmail ? "head_admin" : "admin";
       }
-      await db.update(users).set(loginUpdate).where(eq81(users.id, user.id));
+      await db.update(users).set(loginUpdate).where(eq82(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || normalizedEmail.split("@")[0],
         expiresInMs: ONE_YEAR_MS
       });
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and64(
-        eq81(identityProviders.userId, user.id),
-        eq81(identityProviders.provider, "email"),
-        eq81(identityProviders.providerAccountId, normalizedEmail)
+      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and65(
+        eq82(identityProviders.userId, user.id),
+        eq82(identityProviders.provider, "email"),
+        eq82(identityProviders.providerAccountId, normalizedEmail)
       )).catch(() => {
       });
       return res.json({
@@ -79501,7 +79923,7 @@ function registerEmailAuthRoutes(app) {
         user: { id: user.id, name: user.name, email: user.email, role: user.role }
       });
     } catch (error) {
-      log76.error("[Desktop Login] Login failed:", { error: String(error) });
+      log77.error("[Desktop Login] Login failed:", { error: String(error) });
       return res.status(500).json({ error: "Login failed. Please try again." });
     }
   });
@@ -79511,12 +79933,12 @@ function registerEmailAuthRoutes(app) {
 init_db();
 init_schema();
 import crypto21 from "crypto";
-import { eq as eq82, and as and65 } from "drizzle-orm";
+import { eq as eq83, and as and66 } from "drizzle-orm";
 init_const();
 init_env();
 init_logger();
 init_const();
-var log77 = createLogger("SocialAuthRouter");
+var log78 = createLogger("SocialAuthRouter");
 var MANUS_ORIGIN = "https://archibaldtitan.com";
 function getOAuthCallbackOrigin() {
   if (ENV.publicUrl) return ENV.publicUrl.replace(/\/$/, "");
@@ -79580,7 +80002,7 @@ function validateOAuthState(stateParam, provider, req) {
   if (memState && memState.provider === provider) {
     pendingStates.delete(stateParam);
     if (Date.now() <= memState.expiresAt) {
-      log77.info(`[OAuth State] Validated via in-memory map (provider=${provider})`);
+      log78.info(`[OAuth State] Validated via in-memory map (provider=${provider})`);
       return { returnPath: memState.returnPath, mode: memState.mode, source: "memory" };
     }
   }
@@ -79588,10 +80010,10 @@ function validateOAuthState(stateParam, provider, req) {
   const cookieVal = cookies[STATE_COOKIE_NAME];
   const cookieState = parseStateCookie(cookieVal);
   if (cookieState && cookieState.state === stateParam && cookieState.provider === provider) {
-    log77.info(`[OAuth State] Validated via signed cookie (provider=${provider}) \u2014 server likely restarted since auth started`);
+    log78.info(`[OAuth State] Validated via signed cookie (provider=${provider}) \u2014 server likely restarted since auth started`);
     return { returnPath: cookieState.returnPath, mode: cookieState.mode, source: "cookie" };
   }
-  log77.warn(`[OAuth State] BOTH layers failed for provider=${provider}, state=${stateParam.substring(0, 8)}...`);
+  log78.warn(`[OAuth State] BOTH layers failed for provider=${provider}, state=${stateParam.substring(0, 8)}...`);
   return null;
 }
 async function exchangeGitHubCode(code, redirectUri) {
@@ -79657,23 +80079,23 @@ async function getGoogleUser(accessToken) {
 async function findOrCreateOAuthUser(opts) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and65(eq82(identityProviders.provider, opts.provider), eq82(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
+  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and66(eq83(identityProviders.provider, opts.provider), eq83(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
   if (existingLink.length > 0) {
-    const user = await db.select().from(users).where(eq82(users.id, existingLink[0].userId)).limit(1);
+    const user = await db.select().from(users).where(eq83(users.id, existingLink[0].userId)).limit(1);
     if (user.length > 0) {
-      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and65(eq82(identityProviders.provider, opts.provider), eq82(identityProviders.providerAccountId, opts.providerAccountId)));
+      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and66(eq83(identityProviders.provider, opts.provider), eq83(identityProviders.providerAccountId, opts.providerAccountId)));
       const updateFields = { lastSignedIn: /* @__PURE__ */ new Date() };
       if (!isAdminRole(user[0].role) && shouldBeAdmin(user[0].openId, user[0].email, user[0].id)) {
         updateFields.role = user[0].email && user[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
-        log77.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${user[0].email || user[0].openId}`);
+        log78.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${user[0].email || user[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq82(users.id, user[0].id));
+      await db.update(users).set(updateFields).where(eq83(users.id, user[0].id));
       const effectiveRole = updateFields.role || user[0].role;
       return { userId: user[0].id, openId: user[0].openId, name: user[0].name || "", isNew: false };
     }
   }
   if (opts.email) {
-    const existingUser = await db.select().from(users).where(eq82(users.email, opts.email.toLowerCase())).limit(1);
+    const existingUser = await db.select().from(users).where(eq83(users.email, opts.email.toLowerCase())).limit(1);
     if (existingUser.length > 0) {
       await db.insert(identityProviders).values({
         userId: existingUser[0].id,
@@ -79688,9 +80110,9 @@ async function findOrCreateOAuthUser(opts) {
       const updateFields = { lastSignedIn: /* @__PURE__ */ new Date() };
       if (!isAdminRole(existingUser[0].role) && shouldBeAdmin(existingUser[0].openId, existingUser[0].email, existingUser[0].id)) {
         updateFields.role = existingUser[0].email && existingUser[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
-        log77.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${existingUser[0].email || existingUser[0].openId}`);
+        log78.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${existingUser[0].email || existingUser[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq82(users.id, existingUser[0].id));
+      await db.update(users).set(updateFields).where(eq83(users.id, existingUser[0].id));
       return { userId: existingUser[0].id, openId: existingUser[0].openId, name: existingUser[0].name || "", isNew: false };
     }
   }
@@ -79706,7 +80128,7 @@ async function findOrCreateOAuthUser(opts) {
     const existingUsers = await db.select({ id: users.id }).from(users).limit(1);
     if (existingUsers.length === 0) {
       role = "admin";
-      log77.info(`[Auth] First user auto-promoted to admin: ${opts.email || openId}`);
+      log78.info(`[Auth] First user auto-promoted to admin: ${opts.email || openId}`);
     }
   }
   const displayName = opts.name || (opts.email ? opts.email.split("@")[0] : "User");
@@ -79719,7 +80141,7 @@ async function findOrCreateOAuthUser(opts) {
     emailVerified: true,
     lastSignedIn: /* @__PURE__ */ new Date()
   });
-  const newUser = await db.select().from(users).where(eq82(users.openId, openId)).limit(1);
+  const newUser = await db.select().from(users).where(eq83(users.openId, openId)).limit(1);
   if (newUser.length === 0) throw new Error("Failed to create user");
   await db.insert(identityProviders).values({
     userId: newUser[0].id,
@@ -79738,20 +80160,20 @@ async function issueSessionAndRedirect(req, res, result, returnPath, logPrefix, 
   const publicOrigin = getPublicOrigin2();
   const callbackOrigin = getOAuthCallbackOrigin();
   const isCrossDomain = callbackOrigin !== publicOrigin;
-  log77.info(`[Auth] publicOrigin=${publicOrigin}, callbackOrigin=${callbackOrigin}, isCrossDomain=${isCrossDomain}`);
+  log78.info(`[Auth] publicOrigin=${publicOrigin}, callbackOrigin=${callbackOrigin}, isCrossDomain=${isCrossDomain}`);
   res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: ".archibaldtitan.com" });
   res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true });
   if (isCrossDomain) {
     const oneTimeToken = crypto21.randomBytes(32).toString("hex");
     pendingTokens.set(oneTimeToken, { sessionToken, returnPath, expiresAt: Date.now() + 2 * 60 * 1e3 });
-    log77.info(`${logPrefix} ${logDetail} \u2192 user ${result.userId} (${result.isNew ? "new" : "existing"}) \u2192 cross-domain token exchange`);
+    log78.info(`${logPrefix} ${logDetail} \u2192 user ${result.userId} (${result.isNew ? "new" : "existing"}) \u2192 cross-domain token exchange`);
     return res.redirect(302, `${publicOrigin}/api/auth/token-exchange?token=${oneTimeToken}&returnPath=${encodeURIComponent(returnPath)}`);
   } else {
     const cookieOptions = getSessionCookieOptions(req);
-    log77.info(`[Auth] Cookie options: ${JSON.stringify(cookieOptions)}, cookieName=${COOKIE_NAME}, tokenLength=${sessionToken.length}`);
-    log77.info(`[Auth] req.protocol=${req.protocol}, x-forwarded-proto=${req.headers["x-forwarded-proto"]}, hostname=${req.hostname}`);
+    log78.info(`[Auth] Cookie options: ${JSON.stringify(cookieOptions)}, cookieName=${COOKIE_NAME}, tokenLength=${sessionToken.length}`);
+    log78.info(`[Auth] req.protocol=${req.protocol}, x-forwarded-proto=${req.headers["x-forwarded-proto"]}, hostname=${req.hostname}`);
     res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-    log77.info(`${logPrefix} ${logDetail} \u2192 user ${result.userId} (${result.isNew ? "new" : "existing"}) \u2192 redirecting to ${publicOrigin}${returnPath}`);
+    log78.info(`${logPrefix} ${logDetail} \u2192 user ${result.userId} (${result.isNew ? "new" : "existing"}) \u2192 redirecting to ${publicOrigin}${returnPath}`);
     return res.redirect(302, `${publicOrigin}${returnPath}`);
   }
 }
@@ -79766,17 +80188,17 @@ function registerSocialAuthRoutes(app) {
     if (!token) return res.status(400).send("Missing token parameter");
     const pending = pendingTokens.get(token);
     if (!pending) {
-      log77.warn("[Token Exchange] Invalid or expired token");
+      log78.warn("[Token Exchange] Invalid or expired token");
       return redirectToLoginWithError(res, "Login session expired. Please try again.");
     }
     pendingTokens.delete(token);
     if (Date.now() > pending.expiresAt) {
-      log77.warn("[Token Exchange] Token expired");
+      log78.warn("[Token Exchange] Token expired");
       return redirectToLoginWithError(res, "Login session expired. Please try again.");
     }
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie(COOKIE_NAME, pending.sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-    log77.info(`[Token Exchange] Session cookie set, redirecting to ${returnPath}`);
+    log78.info(`[Token Exchange] Session cookie set, redirecting to ${returnPath}`);
     return res.redirect(302, returnPath);
   });
   app.get("/api/auth/github", (req, res) => {
@@ -79814,7 +80236,7 @@ function registerSocialAuthRoutes(app) {
     }
     const validated = validateOAuthState(state, "github", req);
     if (!validated) {
-      log77.warn(`[Social Auth] GitHub state validation failed (both layers). Redirecting to login.`);
+      log78.warn(`[Social Auth] GitHub state validation failed (both layers). Redirecting to login.`);
       return redirectToLoginWithError(res, "Your login session expired (likely due to a server update). Please try again \u2014 it will work immediately.");
     }
     res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: ".archibaldtitan.com" });
@@ -79833,7 +80255,7 @@ function registerSocialAuthRoutes(app) {
       });
       await issueSessionAndRedirect(req, res, result, validated.returnPath, "[Social Auth]", `GitHub login: ${ghUser.login} (${ghUser.email})`);
     } catch (error) {
-      log77.error("[Social Auth] GitHub callback failed:", { error: String(error) });
+      log78.error("[Social Auth] GitHub callback failed:", { error: String(error) });
       redirectToLoginWithError(res, "GitHub login failed. Please try again.");
     }
   });
@@ -79875,7 +80297,7 @@ function registerSocialAuthRoutes(app) {
     }
     const validated = validateOAuthState(state, "google", req);
     if (!validated) {
-      log77.warn(`[Social Auth] Google state validation failed (both layers). Redirecting to login.`);
+      log78.warn(`[Social Auth] Google state validation failed (both layers). Redirecting to login.`);
       return redirectToLoginWithError(res, "Your login session expired (likely due to a server update). Please try again \u2014 it will work immediately.");
     }
     res.clearCookie(STATE_COOKIE_NAME, { path: "/", httpOnly: true, domain: ".archibaldtitan.com" });
@@ -79894,7 +80316,7 @@ function registerSocialAuthRoutes(app) {
       });
       await issueSessionAndRedirect(req, res, result, validated.returnPath, "[Social Auth]", `Google login: ${googleUser.email}`);
     } catch (error) {
-      log77.error("[Social Auth] Google callback failed:", { error: String(error) });
+      log78.error("[Social Auth] Google callback failed:", { error: String(error) });
       redirectToLoginWithError(res, "Google login failed. Please try again.");
     }
   });
@@ -79913,9 +80335,9 @@ init_storage();
 init_db();
 init_db();
 init_schema();
-import { eq as eq83 } from "drizzle-orm";
+import { eq as eq84 } from "drizzle-orm";
 import crypto22 from "crypto";
-var log78 = createLogger("ModuleGenerator");
+var log79 = createLogger("ModuleGenerator");
 var MODULES_PER_CYCLE2 = 3;
 var MAX_MODULES_PER_CYCLE = 5;
 var GENERATION_DAY2 = 0;
@@ -79991,7 +80413,7 @@ async function getExistingTitles2() {
       titles.add(row.title.toLowerCase().trim());
     }
   } catch (err) {
-    log78.warn("Failed to fetch existing titles:", { error: getErrorMessage(err) });
+    log79.warn("Failed to fetch existing titles:", { error: getErrorMessage(err) });
   }
   return titles;
 }
@@ -79999,7 +80421,7 @@ async function getSellerUserId2(botOpenId) {
   try {
     const dbInst = await getDb();
     if (!dbInst) return null;
-    const rows = await dbInst.select({ id: users.id }).from(users).where(eq83(users.openId, botOpenId)).limit(1);
+    const rows = await dbInst.select({ id: users.id }).from(users).where(eq84(users.openId, botOpenId)).limit(1);
     return rows[0]?.id ?? null;
   } catch {
     return null;
@@ -80065,11 +80487,11 @@ IMPORTANT: Return ONLY valid JSON. No markdown code blocks. No explanation text.
     }
     const parsed = JSON.parse(jsonStr);
     if (!parsed.title || !parsed.description || !parsed.code) {
-      log78.warn("Generated module missing required fields");
+      log79.warn("Generated module missing required fields");
       return null;
     }
     if (existingTitles.has(parsed.title.toLowerCase().trim())) {
-      log78.warn(`Generated duplicate title: "${parsed.title}" \u2014 skipping`);
+      log79.warn(`Generated duplicate title: "${parsed.title}" \u2014 skipping`);
       return null;
     }
     const validCategories = ["modules", "exploits", "blueprints", "agents", "artifacts", "templates"];
@@ -80088,7 +80510,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown code blocks. No explanation text.
     }
     return parsed;
   } catch (err) {
-    log78.warn("Failed to parse generated module JSON:", { error: getErrorMessage(err) });
+    log79.warn("Failed to parse generated module JSON:", { error: getErrorMessage(err) });
     return null;
   }
 }
@@ -80147,7 +80569,7 @@ ${mod.code.slice(0, 3e3)}` }
       errors.push(`Code review failed: ${(typeof reviewRaw === "string" ? reviewRaw : "").trim()}`);
     }
   } catch (err) {
-    log78.warn("Code review LLM call failed:", { error: getErrorMessage(err) });
+    log79.warn("Code review LLM call failed:", { error: getErrorMessage(err) });
   }
   return { valid: errors.length === 0, errors };
 }
@@ -80212,15 +80634,15 @@ ${mod.readme || mod.longDescription}
       // Auto-approved since generated by Titan
       status: "active"
     });
-    log78.info(`Listed module "${mod.title}" (${listingUid}) under seller ${sellerUserId} for ${mod.priceCredits} credits`);
+    log79.info(`Listed module "${mod.title}" (${listingUid}) under seller ${sellerUserId} for ${mod.priceCredits} credits`);
     return { listingId: listing.id, slug: listingSlug };
   } catch (err) {
-    log78.error("Failed to upload and list module:", { error: getErrorMessage(err) });
+    log79.error("Failed to upload and list module:", { error: getErrorMessage(err) });
     return null;
   }
 }
 async function runModuleGenerationCycle() {
-  log78.info("\u2550\u2550\u2550 Starting weekly module generation cycle \u2550\u2550\u2550");
+  log79.info("\u2550\u2550\u2550 Starting weekly module generation cycle \u2550\u2550\u2550");
   const result = {
     modulesGenerated: 0,
     modulesListed: 0,
@@ -80229,10 +80651,10 @@ async function runModuleGenerationCycle() {
     errors: []
   };
   const existingTitles = await getExistingTitles2();
-  log78.info(`Found ${existingTitles.size} existing modules in marketplace`);
+  log79.info(`Found ${existingTitles.size} existing modules in marketplace`);
   for (let i = 0; i < MAX_MODULES_PER_CYCLE && result.modulesListed < MODULES_PER_CYCLE2; i++) {
     try {
-      log78.info(`Generating module ${i + 1}/${MAX_MODULES_PER_CYCLE}...`);
+      log79.info(`Generating module ${i + 1}/${MAX_MODULES_PER_CYCLE}...`);
       const mod = await generateModuleConcept(existingTitles, i + 1);
       if (!mod) {
         result.modulesFailed++;
@@ -80240,15 +80662,15 @@ async function runModuleGenerationCycle() {
         continue;
       }
       result.modulesGenerated++;
-      log78.info(`Generated concept: "${mod.title}" (${mod.language}, ${mod.priceCredits} credits)`);
+      log79.info(`Generated concept: "${mod.title}" (${mod.language}, ${mod.priceCredits} credits)`);
       const verification = await verifyModule(mod);
       if (!verification.valid) {
         result.modulesFailed++;
         result.errors.push(`"${mod.title}": Verification failed \u2014 ${verification.errors.join("; ")}`);
-        log78.warn(`Module "${mod.title}" failed verification:`, { errors: verification.errors });
+        log79.warn(`Module "${mod.title}" failed verification:`, { errors: verification.errors });
         continue;
       }
-      log78.info(`Module "${mod.title}" passed verification`);
+      log79.info(`Module "${mod.title}" passed verification`);
       const botOpenId = pickRandomSellerBot2();
       const sellerUserId = await getSellerUserId2(botOpenId);
       if (!sellerUserId) {
@@ -80278,18 +80700,18 @@ async function runModuleGenerationCycle() {
     } catch (err) {
       result.modulesFailed++;
       result.errors.push(`Attempt ${i + 1}: ${getErrorMessage(err)}`);
-      log78.error(`Module generation attempt ${i + 1} failed:`, { error: getErrorMessage(err) });
+      log79.error(`Module generation attempt ${i + 1} failed:`, { error: getErrorMessage(err) });
     }
   }
-  log78.info(`\u2550\u2550\u2550 Module generation cycle complete: ${result.modulesListed} listed, ${result.modulesFailed} failed \u2550\u2550\u2550`);
-  log78.info(`New modules: ${result.titles.join(", ") || "(none)"}`);
+  log79.info(`\u2550\u2550\u2550 Module generation cycle complete: ${result.modulesListed} listed, ${result.modulesFailed} failed \u2550\u2550\u2550`);
+  log79.info(`New modules: ${result.titles.join(", ") || "(none)"}`);
   return result;
 }
 var generatorInterval2 = null;
 var lastGenerationDate2 = "";
 function startModuleGeneratorScheduler() {
-  log78.info("[ModuleGenerator] Starting weekly module generator scheduler (Sundays 3-5 AM)...");
-  log78.info("[ModuleGenerator] Skipping startup cycle (cost optimization). Checking every 4h.");
+  log79.info("[ModuleGenerator] Starting weekly module generator scheduler (Sundays 3-5 AM)...");
+  log79.info("[ModuleGenerator] Skipping startup cycle (cost optimization). Checking every 4h.");
   generatorInterval2 = setInterval(async () => {
     try {
       const now = /* @__PURE__ */ new Date();
@@ -80298,12 +80720,12 @@ function startModuleGeneratorScheduler() {
       const todayStr = now.toISOString().slice(0, 10);
       if (dayOfWeek === GENERATION_DAY2 && hour >= GENERATION_HOUR_START2 && hour <= GENERATION_HOUR_END2 && lastGenerationDate2 !== todayStr) {
         lastGenerationDate2 = todayStr;
-        log78.info("[ModuleGenerator] Running weekly module generation cycle...");
+        log79.info("[ModuleGenerator] Running weekly module generation cycle...");
         const result = await runModuleGenerationCycle();
-        log78.info("[ModuleGenerator] Weekly cycle result:", result);
+        log79.info("[ModuleGenerator] Weekly cycle result:", result);
       }
     } catch (err) {
-      log78.error("[ModuleGenerator] Scheduled cycle failed:", { error: getErrorMessage(err) });
+      log79.error("[ModuleGenerator] Scheduled cycle failed:", { error: getErrorMessage(err) });
     }
   }, CHECK_INTERVAL_MS2);
 }
@@ -80318,8 +80740,8 @@ init_db();
 init_schema();
 init_logger();
 init_errors();
-import { eq as eq84 } from "drizzle-orm";
-var log79 = createLogger("BinancePayWebhook");
+import { eq as eq85 } from "drizzle-orm";
+var log80 = createLogger("BinancePayWebhook");
 function registerBinancePayWebhook(app) {
   app.post(
     "/api/webhooks/binance-pay",
@@ -80343,7 +80765,7 @@ function registerBinancePayWebhook(app) {
     async (req, res) => {
       try {
         if (!isBinancePayConfigured()) {
-          log79.warn("[BinancePay Webhook] Received webhook but Binance Pay not configured");
+          log80.warn("[BinancePay Webhook] Received webhook but Binance Pay not configured");
           res.json({ returnCode: "SUCCESS", returnMessage: null });
           return;
         }
@@ -80352,29 +80774,29 @@ function registerBinancePayWebhook(app) {
         const signature = req.headers["binancepay-signature"];
         const rawBody = req.rawBody || JSON.stringify(req.body);
         if (!timestamp3 || !nonce || !signature) {
-          log79.error("[BinancePay Webhook] Missing signature headers");
+          log80.error("[BinancePay Webhook] Missing signature headers");
           res.status(400).json({ returnCode: "FAIL", returnMessage: "Missing headers" });
           return;
         }
         const isValid = verifyWebhookSignature(timestamp3, nonce, rawBody, signature);
         if (!isValid) {
-          log79.error("[BinancePay Webhook] Invalid signature");
+          log80.error("[BinancePay Webhook] Invalid signature");
           res.status(401).json({ returnCode: "FAIL", returnMessage: "Invalid signature" });
           return;
         }
         const payload = req.body;
         const { bizType, bizStatus, data } = parseWebhookData(payload);
-        log79.info(`[BinancePay Webhook] Received: bizType=${bizType}, bizStatus=${bizStatus}`);
+        log80.info(`[BinancePay Webhook] Received: bizType=${bizType}, bizStatus=${bizStatus}`);
         if (bizType === "PAY" && bizStatus === "PAY_SUCCESS") {
           const merchantTradeNo = data.merchantTradeNo;
           if (!merchantTradeNo) {
-            log79.error("[BinancePay Webhook] No merchantTradeNo in webhook data");
+            log80.error("[BinancePay Webhook] No merchantTradeNo in webhook data");
             res.json({ returnCode: "SUCCESS", returnMessage: null });
             return;
           }
           const db = await getDb();
           if (!db) {
-            log79.error("[BinancePay Webhook] Database not available");
+            log80.error("[BinancePay Webhook] Database not available");
             res.json({ returnCode: "SUCCESS", returnMessage: null });
             return;
           }
@@ -80384,19 +80806,19 @@ function registerBinancePayWebhook(app) {
             cryptoAmount: String(data.orderAmount || data.paymentInfo?.orderAmount || "0"),
             paidAt: /* @__PURE__ */ new Date(),
             webhookData: JSON.stringify(data)
-          }).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo));
-          const [payment] = await db.select().from(cryptoPayments).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
+          }).where(eq85(cryptoPayments.merchantTradeNo, merchantTradeNo));
+          const [payment] = await db.select().from(cryptoPayments).where(eq85(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
           if (payment && payment.campaignId) {
             const { crowdfundingCampaigns: crowdfundingCampaigns2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq84(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
+            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq85(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
             if (campaign) {
               const newAmount = (campaign.currentAmount || 0) + Math.round(parseFloat(payment.creatorAmount || "0") * 100) / 100;
               const newBackers = (campaign.backerCount || 0) + 1;
               await db.update(crowdfundingCampaigns2).set({
                 currentAmount: Math.round(newAmount),
                 backerCount: newBackers
-              }).where(eq84(crowdfundingCampaigns2.id, payment.campaignId));
-              log79.info(`[BinancePay Webhook] Campaign #${payment.campaignId} updated: +$${payment.creatorAmount}, backers=${newBackers}`);
+              }).where(eq85(crowdfundingCampaigns2.id, payment.campaignId));
+              log80.info(`[BinancePay Webhook] Campaign #${payment.campaignId} updated: +$${payment.creatorAmount}, backers=${newBackers}`);
             }
             try {
               const { platformRevenue: platformRevenue2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -80409,35 +80831,35 @@ function registerBinancePayWebhook(app) {
                 description: `Platform fee from crypto contribution to campaign #${payment.campaignId}`
               });
             } catch (err) {
-              log79.error("[BinancePay Webhook] Failed to record revenue:", { error: String(err) });
+              log80.error("[BinancePay Webhook] Failed to record revenue:", { error: String(err) });
             }
           }
-          log79.info(`[BinancePay Webhook] Payment ${merchantTradeNo} completed successfully`);
+          log80.info(`[BinancePay Webhook] Payment ${merchantTradeNo} completed successfully`);
         } else if (bizType === "PAY" && bizStatus === "PAY_CLOSED") {
           const merchantTradeNo = data.merchantTradeNo;
           if (merchantTradeNo) {
             const db = await getDb();
             if (db) {
-              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo));
+              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq85(cryptoPayments.merchantTradeNo, merchantTradeNo));
             }
           }
-          log79.info(`[BinancePay Webhook] Payment closed/expired`);
+          log80.info(`[BinancePay Webhook] Payment closed/expired`);
         }
         res.json({ returnCode: "SUCCESS", returnMessage: null });
       } catch (err) {
-        log79.error("[BinancePay Webhook] Error:", { error: String(getErrorMessage(err)) });
+        log80.error("[BinancePay Webhook] Error:", { error: String(getErrorMessage(err)) });
         res.json({ returnCode: "SUCCESS", returnMessage: null });
       }
     }
   );
-  log79.info("[BinancePay] Webhook registered at /api/webhooks/binance-pay");
+  log80.info("[BinancePay] Webhook registered at /api/webhooks/binance-pay");
 }
 
 // server/storage-upload-handler.ts
 init_logger();
 init_storage_service();
 init_const();
-var log80 = createLogger("StorageUploadHandler");
+var log81 = createLogger("StorageUploadHandler");
 var MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 function getUserFromRequest(req) {
   const user = req.user;
@@ -80518,7 +80940,7 @@ function registerStorageUploadRoutes(app) {
                 { feature, featureResourceId, tags },
                 user.role
               );
-              log80.info(
+              log81.info(
                 `[StorageUpload] ${isAdmin2 ? "[ADMIN]" : ""} User ${user.id} uploaded ${fileName} (${fileBuffer.length} bytes)`
               );
               res.json({
@@ -80533,20 +80955,20 @@ function registerStorageUploadRoutes(app) {
                 }
               });
             } catch (err) {
-              log80.error(`[StorageUpload] Upload error: ${err.message}`);
+              log81.error(`[StorageUpload] Upload error: ${err.message}`);
               res.status(400).json({ message: err.message || "Upload failed" });
             }
             resolve3();
           });
           bb.on("error", (err) => {
-            log80.error(`[StorageUpload] Busboy error: ${err.message}`);
+            log81.error(`[StorageUpload] Busboy error: ${err.message}`);
             res.status(500).json({ message: "Failed to process upload" });
             resolve3();
           });
           req.pipe(bb);
         });
       } catch (err) {
-        log80.error(`[StorageUpload] Unexpected error: ${err.message}`);
+        log81.error(`[StorageUpload] Unexpected error: ${err.message}`);
         return res.status(500).json({ message: err.message || "Internal error" });
       }
     }
@@ -80566,7 +80988,7 @@ function registerStorageUploadRoutes(app) {
         const { url, file } = await getDownloadUrl(user.id, fileId, 3600, user.role);
         return res.json({ url, file_name: file.originalName });
       } catch (err) {
-        log80.error(`[StorageDownload] Error: ${err.message}`);
+        log81.error(`[StorageDownload] Error: ${err.message}`);
         return res.status(404).json({ message: err.message || "File not found" });
       }
     }
@@ -80580,23 +81002,23 @@ function registerStorageUploadRoutes(app) {
         if (!isAdminRole(user.role)) return res.status(403).json({ message: "Admin access required" });
         const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { storageFiles: storageFiles2 } = await Promise.resolve().then(() => (init_storage_schema(), storage_schema_exports));
-        const { eq: eq86, and: and66, desc: desc52 } = await import("drizzle-orm");
+        const { eq: eq87, and: and67, desc: desc52 } = await import("drizzle-orm");
         const db = await getDb2();
         if (!db) return res.status(503).json({ message: "Database unavailable" });
         const userId = req.query.userId ? parseInt(req.query.userId) : void 0;
         const limit = Math.min(parseInt(req.query.limit) || 200, 500);
         const offset = parseInt(req.query.offset) || 0;
-        const conditions = [eq86(storageFiles2.isDeleted, false)];
-        if (userId && !isNaN(userId)) conditions.push(eq86(storageFiles2.userId, userId));
-        const files = await db.select().from(storageFiles2).where(and66(...conditions)).orderBy(desc52(storageFiles2.createdAt)).limit(limit).offset(offset);
+        const conditions = [eq87(storageFiles2.isDeleted, false)];
+        if (userId && !isNaN(userId)) conditions.push(eq87(storageFiles2.userId, userId));
+        const files = await db.select().from(storageFiles2).where(and67(...conditions)).orderBy(desc52(storageFiles2.createdAt)).limit(limit).offset(offset);
         return res.json({ files, count: files.length });
       } catch (err) {
-        log80.error(`[StorageAdmin] Error listing files: ${err.message}`);
+        log81.error(`[StorageAdmin] Error listing files: ${err.message}`);
         return res.status(500).json({ message: err.message || "Internal error" });
       }
     }
   );
-  log80.info(
+  log81.info(
     "[StorageUploadHandler] Routes registered: POST /api/storage/upload, GET /api/storage/download/:fileId, GET /api/storage/admin/files"
   );
 }
@@ -80612,7 +81034,7 @@ init_storage();
 init_logger();
 init_security_fortress();
 import crypto23 from "crypto";
-var log81 = createLogger("ChatUpload");
+var log82 = createLogger("ChatUpload");
 function hasExternalStorage() {
   return !!(process.env.AWS_S3_BUCKET || process.env.BUILT_IN_FORGE_API_URL && process.env.BUILT_IN_FORGE_API_KEY);
 }
@@ -80663,7 +81085,7 @@ function registerChatUploadRoute(app) {
       }
       const row = rows[0];
       if (row.userId !== userId) {
-        log81.warn(`[Chat Upload] Unauthorized access attempt: user ${userId} tried to access file owned by user ${row.userId}`);
+        log82.warn(`[Chat Upload] Unauthorized access attempt: user ${userId} tried to access file owned by user ${row.userId}`);
         return res.status(403).json({ error: "Access denied" });
       }
       const mimeType = row.mimeType || "application/octet-stream";
@@ -80679,7 +81101,7 @@ function registerChatUploadRoute(app) {
       res.setHeader("Cache-Control", "private, max-age=86400");
       res.send(data);
     } catch (err) {
-      log81.error("[Chat Upload] Serve error:", { error: String(err) });
+      log82.error("[Chat Upload] Serve error:", { error: String(err) });
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to serve file" });
       }
@@ -80711,7 +81133,7 @@ function registerChatUploadRoute(app) {
           const content = fileBuffer.toString("utf-8");
           const scan = await scanFileForMalware(content, `chat-upload-${Date.now()}`, ctx.user.id);
           if (!scan.safe) {
-            log81.error(`[Chat Upload] Malware detected (risk: ${scan.riskScore}/100)`);
+            log82.error(`[Chat Upload] Malware detected (risk: ${scan.riskScore}/100)`);
             await trackIncident(ctx.user.id, "malware_upload");
             return res.status(403).json({
               error: "File rejected: suspicious code patterns detected.",
@@ -80727,24 +81149,24 @@ function registerChatUploadRoute(app) {
             const result = await storagePut(fileKey, fileBuffer, fileMimeType, originalFileName);
             url = result.url;
           } else {
-            log81.info("[Chat Upload] No external storage configured, using database fallback");
+            log82.info("[Chat Upload] No external storage configured, using database fallback");
             url = await storeInDatabase(ctx.user.id, fileKey, originalFileName, fileMimeType, fileBuffer);
           }
           res.json({ url, mimeType: fileMimeType, size: fileBuffer.length });
         } catch (err) {
-          log81.error("[Chat Upload] Upload failed:", { error: String(err) });
+          log82.error("[Chat Upload] Upload failed:", { error: String(err) });
           res.status(500).json({ error: "Failed to upload file" });
         }
       });
       bb.on("error", (err) => {
-        log81.error("[Chat Upload] Busboy error:", { error: String(err) });
+        log82.error("[Chat Upload] Busboy error:", { error: String(err) });
         if (!res.headersSent) {
           res.status(500).json({ error: "Upload processing failed" });
         }
       });
       req.pipe(bb);
     } catch (err) {
-      log81.error("[Chat Upload] Error:", { error: String(err) });
+      log82.error("[Chat Upload] Error:", { error: String(err) });
       if (!res.headersSent) {
         res.status(500).json({ error: "Internal server error" });
       }
@@ -80755,7 +81177,7 @@ function registerChatUploadRoute(app) {
 // server/project-download-router.ts
 import archiver from "archiver";
 init_logger();
-var log82 = createLogger("ProjectDownload");
+var log83 = createLogger("ProjectDownload");
 async function authenticateRequest(req, res) {
   try {
     const ctx = await createContext({ req, res, info: {} });
@@ -80776,10 +81198,10 @@ async function getUserSandboxId(userId) {
 async function getFileRecord(fileId, sandboxId) {
   const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq86, and: and66 } = await import("drizzle-orm");
+  const { eq: eq87, and: and67 } = await import("drizzle-orm");
   const db = await getDb2();
   if (!db) return null;
-  const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, fileId), eq86(sandboxFiles2.sandboxId, sandboxId))).limit(1);
+  const [file] = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.id, fileId), eq87(sandboxFiles2.sandboxId, sandboxId))).limit(1);
   return file || null;
 }
 async function getFileContent(file) {
@@ -80883,7 +81305,7 @@ function registerProjectDownloadRoutes(app) {
       res.setHeader("Content-Length", Buffer.byteLength(content, "utf-8"));
       res.send(content);
     } catch (err) {
-      log82.error("[ProjectDownload] Single file error:", { error: String(err) });
+      log83.error("[ProjectDownload] Single file error:", { error: String(err) });
       res.status(500).json({ error: "Download failed" });
     }
   });
@@ -80901,7 +81323,7 @@ function registerProjectDownloadRoutes(app) {
       }
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86, and: and66, inArray: inArray3, desc: desc52 } = await import("drizzle-orm");
+      const { eq: eq87, and: and67, inArray: inArray3, desc: desc52 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) {
         res.status(500).json({ error: "Database unavailable" });
@@ -80918,16 +81340,16 @@ function registerProjectDownloadRoutes(app) {
           res.status(400).json({ error: "No valid file IDs provided" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
+        files = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.sandboxId, sandboxId), eq87(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
       } else if (conversationParam) {
         const convId = parseInt(conversationParam, 10);
         if (isNaN(convId)) {
           res.status(400).json({ error: "Invalid conversationId" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0), eq86(sandboxFiles2.conversationId, convId))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.sandboxId, sandboxId), eq87(sandboxFiles2.isDirectory, 0), eq87(sandboxFiles2.conversationId, convId))).orderBy(desc52(sandboxFiles2.createdAt));
       } else if (projectParam) {
-        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.sandboxId, sandboxId), eq87(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
         files = files.filter((f) => {
           if (f.projectName) return f.projectName === projectParam;
           const parts = f.filePath.split("/");
@@ -80935,7 +81357,7 @@ function registerProjectDownloadRoutes(app) {
           return derivedName === projectParam;
         });
       } else if (allParam === "true") {
-        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and67(eq87(sandboxFiles2.sandboxId, sandboxId), eq87(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
       } else {
         res.status(400).json({ error: "Provide ?ids=1,2,3 or ?conversationId=N or ?project=name or ?all=true" });
         return;
@@ -80949,7 +81371,7 @@ function registerProjectDownloadRoutes(app) {
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(zipName)}"`);
       const archive = archiver("zip", { zlib: { level: 6 } });
       archive.on("error", (err) => {
-        log82.error("[ProjectDownload] ZIP archive error:", { error: String(err) });
+        log83.error("[ProjectDownload] ZIP archive error:", { error: String(err) });
         if (!res.headersSent) {
           res.status(500).json({ error: "ZIP creation failed" });
         }
@@ -80965,7 +81387,7 @@ function registerProjectDownloadRoutes(app) {
             addedCount++;
           }
         } catch (fileErr) {
-          log82.warn("[ProjectDownload] Skipping file:", { fileId: file.id, error: String(fileErr) });
+          log83.warn("[ProjectDownload] Skipping file:", { fileId: file.id, error: String(fileErr) });
         }
       }
       if (addedCount === 0) {
@@ -80976,9 +81398,9 @@ function registerProjectDownloadRoutes(app) {
         return;
       }
       await archive.finalize();
-      log82.info(`[ProjectDownload] ZIP created: ${addedCount} files for user ${userId}`);
+      log83.info(`[ProjectDownload] ZIP created: ${addedCount} files for user ${userId}`);
     } catch (err) {
-      log82.error("[ProjectDownload] ZIP download error:", { error: String(err) });
+      log83.error("[ProjectDownload] ZIP download error:", { error: String(err) });
       if (!res.headersSent) {
         res.status(500).json({ error: "Download failed" });
       }
@@ -80994,7 +81416,7 @@ init_errors();
 init_security_fortress();
 init_const();
 import crypto24 from "crypto";
-var log83 = createLogger("MarketplaceFiles");
+var log84 = createLogger("MarketplaceFiles");
 var MAX_MARKETPLACE_FILE_SIZE = 100 * 1024 * 1024;
 var ALLOWED_EXTENSIONS2 = {
   ".zip": "application/zip",
@@ -81074,9 +81496,9 @@ function registerMarketplaceFileRoutes(app) {
       if (database) {
         try {
           const { marketplaceListings: marketplaceListings2, marketplacePurchases: marketplacePurchases2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq86, and: and66, ne: ne3 } = await import("drizzle-orm");
-          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and66(
-            eq86(marketplaceListings2.fileHash, fileHash),
+          const { eq: eq87, and: and67, ne: ne3 } = await import("drizzle-orm");
+          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and67(
+            eq87(marketplaceListings2.fileHash, fileHash),
             ne3(marketplaceListings2.id, result.listingId)
           )).limit(1);
           if (duplicates.length > 0 && duplicates[0].sellerId !== listing.sellerId) {
@@ -81085,11 +81507,11 @@ function registerMarketplaceFileRoutes(app) {
               existingListing: duplicates[0].uid
             });
           }
-          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq86(marketplacePurchases2.buyerId, user.id));
+          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq87(marketplacePurchases2.buyerId, user.id));
           if (sellerPurchases.length > 0) {
             const purchasedListingIds = sellerPurchases.map((p) => p.listingId);
             for (const purchasedId of purchasedListingIds) {
-              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq86(marketplaceListings2.id, purchasedId)).limit(1);
+              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq87(marketplaceListings2.id, purchasedId)).limit(1);
               if (purchasedListing.length > 0 && purchasedListing[0].fileHash === fileHash) {
                 return res.status(403).json({
                   error: "Anti-resale protection: You cannot re-list an item you purchased. Only original work and upgrade packs are allowed."
@@ -81098,7 +81520,7 @@ function registerMarketplaceFileRoutes(app) {
             }
           }
         } catch (antiResaleErr) {
-          log83.warn("[Marketplace] Anti-resale check warning (non-fatal):", { error: getErrorMessage(antiResaleErr) });
+          log84.warn("[Marketplace] Anti-resale check warning (non-fatal):", { error: getErrorMessage(antiResaleErr) });
         }
       }
       const scannable = [".js", ".ts", ".py", ".json", ".md", ".txt"];
@@ -81106,7 +81528,7 @@ function registerMarketplaceFileRoutes(app) {
         const fileContent = result.fileBuffer.toString("utf-8");
         const malwareScan = await scanFileForMalware(fileContent, result.fileName, user.id);
         if (!malwareScan.safe) {
-          log83.error(`[Marketplace] Malware detected in upload "${result.fileName}" (risk: ${malwareScan.riskScore}/100)`);
+          log84.error(`[Marketplace] Malware detected in upload "${result.fileName}" (risk: ${malwareScan.riskScore}/100)`);
           await trackIncident(user.id, "malware_upload", isAdminRole(user.role));
           return res.status(403).json({
             error: "Security scan failed: This file contains suspicious code patterns and cannot be uploaded.",
@@ -81124,9 +81546,9 @@ function registerMarketplaceFileRoutes(app) {
       try {
         const backupKey = `backups/users/${user.id}/marketplace/${listing.uid}/${timestamp3}-${sanitizedName}`;
         await storagePut(backupKey, result.fileBuffer, mimeType);
-        log83.info(`[Marketplace] Backup stored: ${backupKey}`);
+        log84.info(`[Marketplace] Backup stored: ${backupKey}`);
       } catch (backupErr) {
-        log83.warn(`[Marketplace] Backup failed (non-fatal): ${getErrorMessage(backupErr)}`);
+        log84.warn(`[Marketplace] Backup failed (non-fatal): ${getErrorMessage(backupErr)}`);
       }
       await updateListing(result.listingId, {
         fileUrl: url,
@@ -81143,7 +81565,7 @@ function registerMarketplaceFileRoutes(app) {
         url
       });
     } catch (err) {
-      log83.error("[Marketplace Upload Error]", { error: String(err) });
+      log84.error("[Marketplace Upload Error]", { error: String(err) });
       return res.status(500).json({ error: getErrorMessage(err) || "Upload failed" });
     }
   });
@@ -81164,8 +81586,8 @@ function registerMarketplaceFileRoutes(app) {
         return res.status(503).json({ error: "Database unavailable" });
       }
       const { marketplacePurchases: marketplacePurchases2, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq86 } = await import("drizzle-orm");
-      const purchases = await database.select().from(marketplacePurchases2).where(eq86(marketplacePurchases2.downloadToken, token)).limit(1);
+      const { eq: eq87 } = await import("drizzle-orm");
+      const purchases = await database.select().from(marketplacePurchases2).where(eq87(marketplacePurchases2.downloadToken, token)).limit(1);
       if (purchases.length === 0) {
         return res.status(404).json({ error: "Invalid download token" });
       }
@@ -81191,10 +81613,10 @@ function registerMarketplaceFileRoutes(app) {
       const { sql: sql40 } = await import("drizzle-orm");
       await database.update(marketplacePurchases2).set({
         downloadCount: sql40`${marketplacePurchases2.downloadCount} + 1`
-      }).where(eq86(marketplacePurchases2.downloadToken, token));
+      }).where(eq87(marketplacePurchases2.downloadToken, token));
       await database.update(marketplaceListings2).set({
         downloadCount: sql40`${marketplaceListings2.downloadCount} + 1`
-      }).where(eq86(marketplaceListings2.id, purchase.listingId));
+      }).where(eq87(marketplaceListings2.id, purchase.listingId));
       return res.json({
         success: true,
         downloadUrl: listing.fileUrl,
@@ -81205,11 +81627,11 @@ function registerMarketplaceFileRoutes(app) {
         downloadsRemaining: purchase.maxDownloads - purchase.downloadCount - 1
       });
     } catch (err) {
-      log83.error("[Marketplace Download Error]", { error: String(err) });
+      log84.error("[Marketplace Download Error]", { error: String(err) });
       return res.status(500).json({ error: getErrorMessage(err) || "Download failed" });
     }
   });
-  log83.info("[Marketplace] File upload/download routes registered");
+  log84.info("[Marketplace] File upload/download routes registered");
 }
 
 // server/bundle-sync.ts
@@ -81217,7 +81639,7 @@ init_logger();
 import path7 from "path";
 import fs8 from "fs";
 import crypto25 from "crypto";
-var log84 = createLogger("BundleSync");
+var log85 = createLogger("BundleSync");
 var cachedManifest = null;
 var cachedTarball = null;
 function computeBundleHash(distPath) {
@@ -81259,7 +81681,7 @@ function getManifest() {
     buildTime: stat.mtime.toISOString()
   };
   cachedTarball = null;
-  log84.info("Bundle manifest updated", {
+  log85.info("Bundle manifest updated", {
     version: cachedManifest.version,
     hash: cachedManifest.hash
   });
@@ -81286,12 +81708,12 @@ async function generateTarball() {
     if (cachedManifest) {
       cachedManifest.size = cachedTarball.length;
     }
-    log84.info("Bundle tarball generated", {
+    log85.info("Bundle tarball generated", {
       size: `${(cachedTarball.length / 1024 / 1024).toFixed(1)}MB`
     });
     return cachedTarball;
   } catch (err) {
-    log84.error("Failed to generate bundle tarball", {
+    log85.error("Failed to generate bundle tarball", {
       error: String(err)
     });
     return null;
@@ -81319,7 +81741,7 @@ function notifyDesktopClients() {
       sseClients.delete(client);
     }
   }
-  log84.info(`Notified ${sseClients.size} desktop clients of new bundle`, {
+  log85.info(`Notified ${sseClients.size} desktop clients of new bundle`, {
     version: manifest.version,
     hash: manifest.hash
   });
@@ -81354,7 +81776,7 @@ function registerBundleSyncRoutes(app) {
         res.set("X-Bundle-Hash", manifest?.hash || "unknown");
         res.send(tarball);
       } catch (err) {
-        log84.error("Failed to serve bundle tarball", {
+        log85.error("Failed to serve bundle tarball", {
           error: String(err)
         });
         res.status(500).send("Failed to generate bundle");
@@ -81375,7 +81797,7 @@ function registerBundleSyncRoutes(app) {
 `
     );
     sseClients.add(res);
-    log84.info(`Desktop client connected to bundle stream (total: ${sseClients.size})`);
+    log85.info(`Desktop client connected to bundle stream (total: ${sseClients.size})`);
     const keepAlive = setInterval(() => {
       try {
         res.write(": ping\n\n");
@@ -81387,7 +81809,7 @@ function registerBundleSyncRoutes(app) {
     _req.on("close", () => {
       clearInterval(keepAlive);
       sseClients.delete(res);
-      log84.info(`Desktop client disconnected from bundle stream (total: ${sseClients.size})`);
+      log85.info(`Desktop client disconnected from bundle stream (total: ${sseClients.size})`);
     });
   });
   app.post("/api/desktop/notify-deploy", (req, res) => {
@@ -81401,7 +81823,7 @@ function registerBundleSyncRoutes(app) {
     notifyDesktopClients();
     res.json({ success: true, clientsNotified: sseClients.size });
   });
-  log84.info("Bundle sync routes registered (with SSE stream and deploy webhook)");
+  log85.info("Bundle sync routes registered (with SSE stream and deploy webhook)");
 }
 
 // server/_core/index.ts
@@ -81412,7 +81834,7 @@ import cookieParser from "cookie-parser";
 // server/_core/csrf.ts
 init_logger();
 import { randomBytes as randomBytes4 } from "crypto";
-var log85 = createLogger("CSRF");
+var log86 = createLogger("CSRF");
 var CSRF_COOKIE = "csrf_token";
 var CSRF_HEADER = "x-csrf-token";
 var TOKEN_LENGTH = 32;
@@ -81484,7 +81906,7 @@ function csrfValidationMiddleware(req, res, next) {
   const cookieToken = req.cookies?.[CSRF_COOKIE];
   const headerToken = req.headers[CSRF_HEADER];
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-    log85.warn("CSRF validation failed", {
+    log86.warn("CSRF validation failed", {
       path: req.path,
       hasCookie: !!cookieToken,
       hasHeader: !!headerToken,
@@ -81499,7 +81921,7 @@ function csrfValidationMiddleware(req, res, next) {
 init_correlation();
 init_logger();
 init_errors();
-var log87 = createLogger("Startup");
+var log88 = createLogger("Startup");
 function isPortAvailable(port) {
   return new Promise((resolve3) => {
     const server = net2.createServer();
@@ -81773,7 +82195,7 @@ async function startServer() {
     serveStatic(app);
   }
   app.use((err, _req, res, _next) => {
-    log87.error("Unhandled Express error", { error: err.message, stack: err.stack });
+    log88.error("Unhandled Express error", { error: err.message, stack: err.stack });
     const isProd3 = process.env.NODE_ENV === "production";
     res.status(500).json({
       error: isProd3 ? "Internal server error" : err.message,
@@ -81788,16 +82210,16 @@ async function startServer() {
       connectTimeout: 3e4
     });
     try {
-      log87.info("Running database migrations...");
+      log88.info("Running database migrations...");
       const migrationDb = drizzle2(pool);
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path8.dirname(__filename);
       const migrationsFolder = process.env.NODE_ENV === "production" ? path8.resolve(__dirname, "..", "drizzle") : path8.resolve(__dirname, "..", "..", "drizzle");
-      log87.debug("Migrations folder", { path: migrationsFolder });
+      log88.debug("Migrations folder", { path: migrationsFolder });
       await migrate(migrationDb, { migrationsFolder });
-      log87.info("Database migrations completed");
+      log88.info("Database migrations completed");
     } catch (migErr) {
-      log87.warn("Drizzle migration warning (continuing with raw SQL)", { error: getErrorMessage(migErr)?.substring(0, 200) });
+      log88.warn("Drizzle migration warning (continuing with raw SQL)", { error: getErrorMessage(migErr)?.substring(0, 200) });
     }
     try {
       const missingColumns = [
@@ -81845,10 +82267,10 @@ async function startServer() {
       for (const sql40 of missingColumns) {
         try {
           await pool.promise().query(sql40);
-          log87.debug("Added column", { column: sql40.split("`")[3] });
+          log88.debug("Added column", { column: sql40.split("`")[3] });
         } catch (e) {
           if (!getErrorMessage(e)?.includes("Duplicate column")) {
-            log87.warn("Column fix warning", { error: getErrorMessage(e) });
+            log88.warn("Column fix warning", { error: getErrorMessage(e) });
           }
         }
       }
@@ -81856,9 +82278,9 @@ async function startServer() {
         await pool.promise().query(
           "ALTER TABLE `crowdfundingCampaigns` MODIFY COLUMN `source` enum('internal','kickstarter','indiegogo','gofundme','other') DEFAULT 'internal' NOT NULL"
         );
-        log87.debug("Ensured source column is ENUM type");
+        log88.debug("Ensured source column is ENUM type");
       } catch (e) {
-        log87.warn("Source column fix", { error: getErrorMessage(e)?.substring(0, 100) });
+        log88.warn("Source column fix", { error: getErrorMessage(e)?.substring(0, 100) });
       }
       const createTables = [
         `CREATE TABLE IF NOT EXISTS \`marketplace_listings\` (\`id\` int AUTO_INCREMENT NOT NULL, \`uid\` varchar(64) NOT NULL, \`sellerId\` int NOT NULL, \`title\` varchar(256) NOT NULL, \`slug\` varchar(300) NOT NULL, \`description\` text NOT NULL, \`longDescription\` text, \`category\` enum('agents','modules','blueprints','artifacts','exploits','templates','datasets','other') NOT NULL DEFAULT 'modules', \`riskCategory\` enum('safe','low_risk','medium_risk','high_risk') NOT NULL DEFAULT 'safe', \`reviewStatus\` enum('pending_review','approved','rejected','flagged') NOT NULL DEFAULT 'pending_review', \`reviewNotes\` text, \`status\` enum('draft','active','paused','sold_out','removed') NOT NULL DEFAULT 'draft', \`priceCredits\` int NOT NULL, \`priceUsd\` int NOT NULL DEFAULT 0, \`currency\` varchar(8) NOT NULL DEFAULT 'USD', \`fileUrl\` text, \`fileSize\` int, \`fileType\` varchar(64), \`previewUrl\` text, \`thumbnailUrl\` text, \`demoUrl\` text, \`tags\` text, \`language\` varchar(64), \`license\` varchar(64) DEFAULT 'MIT', \`version\` varchar(32) DEFAULT '1.0.0', \`totalSales\` int NOT NULL DEFAULT 0, \`totalRevenue\` int NOT NULL DEFAULT 0, \`viewCount\` int NOT NULL DEFAULT 0, \`downloadCount\` int NOT NULL DEFAULT 0, \`avgRating\` int NOT NULL DEFAULT 0, \`ratingCount\` int NOT NULL DEFAULT 0, \`featured\` boolean NOT NULL DEFAULT false, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`marketplace_listings_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`marketplace_listings_uid_unique\` UNIQUE(\`uid\`), CONSTRAINT \`marketplace_listings_slug_unique\` UNIQUE(\`slug\`))`,
@@ -81889,7 +82311,7 @@ async function startServer() {
         try {
           await pool.promise().query(ddl);
         } catch (e) {
-          log87.warn("Table creation warning", { error: getErrorMessage(e)?.substring(0, 100) });
+          log88.warn("Table creation warning", { error: getErrorMessage(e)?.substring(0, 100) });
         }
       }
       try {
@@ -81922,52 +82344,52 @@ async function startServer() {
         } catch (_) {
         }
       }
-      log87.info("All tables ensured");
+      log88.info("All tables ensured");
     } catch (err) {
-      log87.error("Raw SQL migration failed", { error: getErrorMessage(err) });
+      log88.error("Raw SQL migration failed", { error: getErrorMessage(err) });
     }
     try {
       await pool.promise().end();
     } catch (_) {
     }
   } else {
-    log87.warn("No DATABASE_URL - skipping migrations");
+    log88.warn("No DATABASE_URL - skipping migrations");
   }
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
   if (port !== preferredPort) {
-    log87.info(`Port ${preferredPort} busy, using ${port} instead`);
+    log88.info(`Port ${preferredPort} busy, using ${port} instead`);
   }
   server.timeout = 6e5;
   server.keepAliveTimeout = 62e4;
   server.headersTimeout = 63e4;
   server.listen(port, () => {
-    log87.info(`Server running on http://localhost:${port}/`);
+    log88.info(`Server running on http://localhost:${port}/`);
     scheduleMonthlyRefill();
     setTimeout(async () => {
       try {
         const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq86, or: or7 } = await import("drizzle-orm");
+        const { eq: eq87, or: or7 } = await import("drizzle-orm");
         const { ENV: ENV2 } = await Promise.resolve().then(() => (init_env(), env_exports));
         const db = await getDb2();
         if (!db) return;
         try {
           const { sql: rawSql } = await import("drizzle-orm");
           await db.execute(rawSql`ALTER TABLE \`users\` MODIFY COLUMN \`role\` ENUM('user','admin','head_admin') NOT NULL DEFAULT 'user'`);
-          log87.info("Ensured head_admin role exists in users table");
+          log88.info("Ensured head_admin role exists in users table");
         } catch (alterErr) {
-          log87.warn("ALTER TABLE for head_admin role (non-fatal):", { error: String(alterErr) });
+          log88.warn("ALTER TABLE for head_admin role (non-fatal):", { error: String(alterErr) });
         }
         if (ENV2.headAdminEmail) {
           await db.update(users4).set({ role: "head_admin" }).where(
-            eq86(users4.email, ENV2.headAdminEmail)
+            eq87(users4.email, ENV2.headAdminEmail)
           ).catch(() => {
           });
-          log87.info("Head admin promotion", { email: ENV2.headAdminEmail });
+          log88.info("Head admin promotion", { email: ENV2.headAdminEmail });
         }
         await db.update(users4).set({ role: "admin" }).where(
-          eq86(users4.id, 1)
+          eq87(users4.id, 1)
         ).catch(() => {
         });
         if (ENV2.ownerEmails && ENV2.ownerEmails.length > 0) {
@@ -81979,26 +82401,26 @@ async function startServer() {
             ).catch(() => {
             });
           }
-          log87.info("Admin auto-promotion", { emails: ENV2.ownerEmails, headAdmin: ENV2.headAdminEmail });
+          log88.info("Admin auto-promotion", { emails: ENV2.ownerEmails, headAdmin: ENV2.headAdminEmail });
         }
         if (ENV2.ownerOpenId) {
           await db.update(users4).set({ role: "admin" }).where(
-            eq86(users4.openId, ENV2.ownerOpenId)
+            eq87(users4.openId, ENV2.ownerOpenId)
           ).catch(() => {
           });
         }
       } catch (err) {
-        log87.error("Admin auto-promotion failed", { error: String(err) });
+        log88.error("Admin auto-promotion failed", { error: String(err) });
       }
     }, 3e3);
     setTimeout(async () => {
       try {
         const { seedAffiliatePrograms: seedAffiliatePrograms2 } = await Promise.resolve().then(() => (init_affiliate_engine(), affiliate_engine_exports));
         const count10 = await seedAffiliatePrograms2();
-        if (count10 > 0) log87.info(`Auto-seeded ${count10} affiliate programs`);
-        else log87.debug("Affiliate programs already seeded");
+        if (count10 > 0) log88.info(`Auto-seeded ${count10} affiliate programs`);
+        else log88.debug("Affiliate programs already seeded");
       } catch (err) {
-        log87.error("Affiliate seed failed", { error: String(err) });
+        log88.error("Affiliate seed failed", { error: String(err) });
       }
     }, 5e3);
     setTimeout(async () => {
@@ -82008,7 +82430,7 @@ async function startServer() {
         const { sql: sql40 } = await import("drizzle-orm");
         const db = await getDb2();
         if (!db) {
-          log87.warn("Release seed skipped: DB not available");
+          log88.warn("Release seed skipped: DB not available");
           return;
         }
         const existing = await db.select({ count: sql40`count(*)` }).from(releases2);
@@ -82025,32 +82447,32 @@ async function startServer() {
             isPrerelease: 0,
             downloadCount: 0
           });
-          log87.info("Auto-seeded v8.1.0 release");
+          log88.info("Auto-seeded v8.1.0 release");
         } else {
-          log87.debug(`Releases already exist (${existing[0].count} found)`);
+          log88.debug(`Releases already exist (${existing[0].count} found)`);
         }
       } catch (err) {
-        log87.error("Release seed failed", { error: String(err) });
+        log88.error("Release seed failed", { error: String(err) });
       }
     }, 6e3);
     setTimeout(async () => {
       try {
         const { seedBlogPosts: seedBlogPosts2 } = await Promise.resolve().then(() => (init_blog_seed(), blog_seed_exports));
         const count10 = await seedBlogPosts2();
-        if (count10 > 0) log87.info(`Auto-seeded ${count10} blog posts`);
-        else log87.debug("Blog posts already seeded");
+        if (count10 > 0) log88.info(`Auto-seeded ${count10} blog posts`);
+        else log88.debug("Blog posts already seeded");
       } catch (err) {
-        log87.error("Blog seed failed", { error: String(err) });
+        log88.error("Blog seed failed", { error: String(err) });
       }
     }, 8e3);
     startScheduledDiscovery();
     startScheduledSeo();
     setTimeout(async () => {
       try {
-        log87.info("[SEO v4] Running first GEO optimization...");
+        log88.info("[SEO v4] Running first GEO optimization...");
         await runGeoOptimization();
       } catch (err) {
-        log87.error("[SEO v4] First GEO optimization failed:", { error: String(err) });
+        log88.error("[SEO v4] First GEO optimization failed:", { error: String(err) });
       }
     }, 8 * 60 * 60 * 1e3);
     setInterval(async () => {
@@ -82062,10 +82484,10 @@ async function startServer() {
     startAdvertisingScheduler();
     setTimeout(async () => {
       try {
-        log87.info("[Affiliate v2] Running first v2 optimization cycle...");
+        log88.info("[Affiliate v2] Running first v2 optimization cycle...");
         await runOptimizationCycleV2();
       } catch (err) {
-        log87.error("[Affiliate v2] First optimization failed:", { error: String(err) });
+        log88.error("[Affiliate v2] First optimization failed:", { error: String(err) });
       }
     }, 6 * 60 * 60 * 1e3);
     setInterval(async () => {
@@ -82079,19 +82501,19 @@ async function startServer() {
     setTimeout(async () => {
       try {
         await seedMarketplaceWithMerchants();
-        log87.info("Marketplace seeded successfully");
+        log88.info("Marketplace seeded successfully");
       } catch (err) {
-        log87.error("Marketplace seed failed", { error: String(err) });
+        log88.error("Marketplace seed failed", { error: String(err) });
       }
     }, 12e3);
     setTimeout(async () => {
       try {
         const result = await updateCampaignImages(updateCampaign, listCampaigns);
         if (result.updated > 0) {
-          log87.info("[CrowdfundingImages] Fixed broken images", { updated: result.updated, skipped: result.skipped });
+          log88.info("[CrowdfundingImages] Fixed broken images", { updated: result.updated, skipped: result.skipped });
         }
       } catch (err) {
-        log87.error("[CrowdfundingImages] Image update failed", { error: String(err) });
+        log88.error("[CrowdfundingImages] Image update failed", { error: String(err) });
       }
     }, 14e3);
     startScheduledSignups();
@@ -82102,7 +82524,7 @@ async function startServer() {
         await runStartupDiagnostic();
         startPeriodicSync();
       } catch (err) {
-        log87.error("[AutonomousSync] Startup diagnostic failed:", { error: String(err) });
+        log88.error("[AutonomousSync] Startup diagnostic failed:", { error: String(err) });
       }
     }, 15e3);
     const SELF_IMPROVE_INTERVAL = 24 * 60 * 60 * 1e3;
@@ -82110,10 +82532,10 @@ async function startServer() {
     setTimeout(async () => {
       const runSelfImproveCycle = async () => {
         try {
-          log87.info("[SelfImprove] Starting daily self-improvement health cycle...");
+          log88.info("[SelfImprove] Starting daily self-improvement health cycle...");
           const health = await runHealthCheck();
           if (health.healthy) {
-            log87.info("[SelfImprove] Health check passed. System is healthy.", {
+            log88.info("[SelfImprove] Health check passed. System is healthy.", {
               checks: health.checks.filter((c) => c.passed).length + "/" + health.checks.length
             });
             const keyFiles = [
@@ -82125,16 +82547,16 @@ async function startServer() {
             ];
             const snapResult = await createSnapshot(keyFiles, "Daily automated snapshot", "autonomous_scheduler");
             if (snapResult.success) {
-              log87.info("[SelfImprove] Daily snapshot created successfully.");
+              log88.info("[SelfImprove] Daily snapshot created successfully.");
             } else {
-              log87.warn("[SelfImprove] Snapshot skipped (likely no DB):", { reason: snapResult.error });
+              log88.warn("[SelfImprove] Snapshot skipped (likely no DB):", { reason: snapResult.error });
             }
           } else {
             const failed = health.checks.filter((c) => !c.passed).map((c) => c.name);
-            log87.warn("[SelfImprove] Health check found issues:", { failedChecks: failed });
+            log88.warn("[SelfImprove] Health check found issues:", { failedChecks: failed });
           }
         } catch (err) {
-          log87.error("[SelfImprove] Daily cycle failed:", { error: String(err) });
+          log88.error("[SelfImprove] Daily cycle failed:", { error: String(err) });
         }
       };
       await runSelfImproveCycle();
@@ -82143,7 +82565,7 @@ async function startServer() {
   });
   setTimeout(async () => {
     try {
-      log87.info("[Warmup] Pre-warming Venice connection...");
+      log88.info("[Warmup] Pre-warming Venice connection...");
       const warmupRes = await fetch("https://api.venice.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -82159,12 +82581,12 @@ async function startServer() {
         signal: AbortSignal.timeout(15e3)
       });
       if (warmupRes.ok) {
-        log87.info("[Warmup] Venice connection pre-warmed successfully");
+        log88.info("[Warmup] Venice connection pre-warmed successfully");
       } else {
-        log87.warn("[Warmup] Venice warmup returned " + warmupRes.status + " - non-fatal");
+        log88.warn("[Warmup] Venice warmup returned " + warmupRes.status + " - non-fatal");
       }
     } catch (err) {
-      log87.warn("[Warmup] Venice pre-warm failed (non-fatal):", { error: String(err) });
+      log88.warn("[Warmup] Venice pre-warm failed (non-fatal):", { error: String(err) });
     }
   }, 45e3);
 }
@@ -82172,46 +82594,46 @@ function scheduleMonthlyRefill() {
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1e3;
   setTimeout(async () => {
     try {
-      log87.info("Running startup credit refill check...");
+      log88.info("Running startup credit refill check...");
       const result = await processAllMonthlyRefills();
-      log87.info("Startup refill complete", { processed: result.processed, refilled: result.refilled, errors: result.errors });
+      log88.info("Startup refill complete", { processed: result.processed, refilled: result.refilled, errors: result.errors });
     } catch (err) {
-      log87.error("Startup refill failed", { error: getErrorMessage(err) });
+      log88.error("Startup refill failed", { error: getErrorMessage(err) });
     }
   }, 3e4);
   setInterval(async () => {
     try {
-      log87.info("Running scheduled credit refill...");
+      log88.info("Running scheduled credit refill...");
       const result = await processAllMonthlyRefills();
-      log87.info("Scheduled refill complete", { processed: result.processed, refilled: result.refilled, errors: result.errors });
+      log88.info("Scheduled refill complete", { processed: result.processed, refilled: result.refilled, errors: result.errors });
     } catch (err) {
-      log87.error("Scheduled refill failed", { error: getErrorMessage(err) });
+      log88.error("Scheduled refill failed", { error: getErrorMessage(err) });
     }
   }, TWENTY_FOUR_HOURS);
 }
-startServer().catch((err) => log87.error("Server startup failed", { error: String(err) }));
+startServer().catch((err) => log88.error("Server startup failed", { error: String(err) }));
 var isShuttingDown = false;
 function gracefulShutdown(signal) {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  log87.info(`Received ${signal}. Starting graceful shutdown...`);
+  log88.info(`Received ${signal}. Starting graceful shutdown...`);
   const SHUTDOWN_TIMEOUT = 15e3;
   const forceExit = setTimeout(() => {
-    log87.error("Graceful shutdown timed out. Forcing exit.");
+    log88.error("Graceful shutdown timed out. Forcing exit.");
     process.exit(1);
   }, SHUTDOWN_TIMEOUT);
   forceExit.unref();
   setTimeout(() => {
-    log87.info("Graceful shutdown complete.");
+    log88.info("Graceful shutdown complete.");
     process.exit(0);
   }, 3e3);
 }
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("unhandledRejection", (reason) => {
-  log87.error("Unhandled promise rejection", { error: String(reason) });
+  log88.error("Unhandled promise rejection", { error: String(reason) });
 });
 process.on("uncaughtException", (err) => {
-  log87.error("Uncaught exception", { error: err.message, stack: err.stack });
+  log88.error("Uncaught exception", { error: err.message, stack: err.stack });
   process.exit(1);
 });

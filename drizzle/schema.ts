@@ -778,6 +778,11 @@ export const creditBalances = mysqlTable("credit_balances", {
   lastRefillAt: timestamp("lastRefillAt"),
   lastLoginBonusAt: timestamp("lastLoginBonusAt"), // last daily login bonus claim
   loginBonusThisMonth: int("loginBonusThisMonth").notNull().default(0), // cumulative login bonus credits this month (cap: 150)
+  // Daily free credits — FREE TIER ONLY. Separate pool, resets every 24h, does not accumulate.
+  // Granted automatically on first action each day. Used before paid credits.
+  // Paid plan users do NOT receive daily free credits — they have their monthly allocation.
+  dailyFreeCredits: int("dailyFreeCredits").notNull().default(0), // current daily free balance (max 375, resets daily, free tier only)
+  dailyFreeLastGrantedAt: timestamp("dailyFreeLastGrantedAt"), // last time daily free credits were granted (free tier only)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -2342,3 +2347,47 @@ export const webAgentCredentials = mysqlTable("web_agent_credentials", {
 });
 export type WebAgentCredential = typeof webAgentCredentials.$inferSelect;
 export type InsertWebAgentCredential = typeof webAgentCredentials.$inferInsert;
+
+// ─── Credit Escalation State ──────────────────────────────────────────────────
+//
+// Tracks where a user is in the progressive credit escalation funnel:
+//   1. Out of credits → buy up to 3 boost packs (boostPacksBought this cycle)
+//   2. Still out → offered to double their plan (doublesThisCycle tracks how many times)
+//   3. Run out again → offered to double again
+//   4. Month resets → billed at current (possibly doubled) rate, state resets
+//
+// Downgrade rules:
+//   - User can downgrade at any time → charged new rate immediately via Stripe
+//   - Credits do NOT refill on downgrade — only refill when billingCycleEnd passes
+//   - pendingDowngradePlan stores the target plan for next cycle if user chose "next cycle"
+
+export const creditEscalation = mysqlTable("credit_escalation", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+
+  // Boost pack tracking — resets each billing cycle
+  boostPacksBought: int("boostPacksBought").notNull().default(0), // max 3 per cycle
+
+  // Membership doubling tracking — resets each billing cycle
+  doublesThisCycle: int("doublesThisCycle").notNull().default(0), // how many times doubled this cycle
+  currentDoubledPlanId: varchar("currentDoubledPlanId", { length: 32 }), // e.g. "pro_doubled_2x"
+  doubledPriceUsd: int("doubledPriceUsd").notNull().default(0), // current monthly charge in cents (e.g. 6000 = $60)
+
+  // Billing cycle anchor — used to detect when month rolls over
+  billingCycleStart: timestamp("billingCycleStart").notNull().defaultNow(),
+  billingCycleEnd: timestamp("billingCycleEnd"), // set from Stripe subscription period end
+
+  // Downgrade state — user chose to downgrade, pending next cycle
+  pendingDowngradePlan: mysqlEnum("pendingDowngradePlan", ["free", "pro", "enterprise", "cyber", "cyber_plus", "titan"]),
+  pendingDowngradeAt: timestamp("pendingDowngradeAt"), // when the downgrade was requested
+
+  // Flags
+  hasBeenOfferedDouble: boolean("hasBeenOfferedDouble").notNull().default(false), // shown the double offer this cycle
+  cycleResetAt: timestamp("cycleResetAt"), // last time this record was reset for a new cycle
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CreditEscalation = typeof creditEscalation.$inferSelect;
+export type InsertCreditEscalation = typeof creditEscalation.$inferInsert;

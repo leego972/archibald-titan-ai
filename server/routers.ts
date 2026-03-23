@@ -64,6 +64,7 @@ import { proxyRotationRouter } from "./proxy-rotation-router";
 import { ipRotationRouter } from "./ip-rotation-router";
 import { webAgentRouter } from "./web-agent-router";
 import { vpnRouter } from "./vpn-router";
+import { escalationRouter } from "./escalation-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -155,6 +156,8 @@ export const appRouter = router({
   ipRotation: ipRotationRouter,
   webAgent: webAgentRouter,
   vpn: vpnRouter,
+  // ── Credit Escalation Funnel ─────────────────────────────────────────
+  escalation: escalationRouter,
 });
 
 export type AppRouter = typeof appRouter;

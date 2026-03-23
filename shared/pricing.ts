@@ -453,6 +453,99 @@ export const CREDIT_PACKS: CreditPack[] = [
   },
 ];
 
+// ─── Credit Escalation Funnel ─────────────────────────────────────
+//
+// ESCALATION PHILOSOPHY:
+// When a user runs out of credits mid-cycle, they are offered a progressive
+// upsell ladder rather than a hard block. This maximises revenue while keeping
+// the user experience fair and transparent.
+//
+// Step 1: Buy up to 3 boost packs (top-up credits, no plan change)
+// Step 2: Offered to double their membership (charged immediately, credits added now)
+// Step 3: Run out again → offered to double again (up to 3 doublings per cycle)
+// Step 4: Month resets → billed at current (possibly doubled) rate going forward
+//
+// DOWNGRADE RULES:
+// - User can downgrade at any time → charged new lower rate immediately via Stripe
+// - Credits do NOT refill on downgrade — only refill when billing cycle rolls over
+// - This prevents gaming the system by downgrading to get a cheap refill
+
+export interface PlanDoubleStep {
+  basePlanId: string;       // the plan being doubled
+  basePriceUsd: number;     // original monthly price
+  doubledPriceUsd: number;  // 2x monthly price
+  doubledCredits: number;   // 2x monthly credit allocation
+  stripePriceId?: string;   // Stripe price ID for the doubled plan (set in production)
+  label: string;            // display label, e.g. "Pro 2x"
+  description: string;      // shown in the offer modal
+}
+
+// Maps each plan to its doubling offer (what they get charged if they accept)
+export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
+  pro: {
+    basePlanId: "pro",
+    basePriceUsd: 29,
+    doubledPriceUsd: 58,
+    doubledCredits: 100000,
+    label: "Pro 2x",
+    description: "Double your Pro plan — 100,000 credits for $58/mo until your cycle resets",
+  },
+  enterprise: {
+    basePlanId: "enterprise",
+    basePriceUsd: 99,
+    doubledPriceUsd: 198,
+    doubledCredits: 500000,
+    label: "Enterprise 2x",
+    description: "Double your Enterprise plan — 500,000 credits for $198/mo until your cycle resets",
+  },
+  cyber: {
+    basePlanId: "cyber",
+    basePriceUsd: 199,
+    doubledPriceUsd: 398,
+    doubledCredits: 1500000,
+    label: "Cyber 2x",
+    description: "Double your Cyber plan — 1,500,000 credits for $398/mo until your cycle resets",
+  },
+  cyber_plus: {
+    basePlanId: "cyber_plus",
+    basePriceUsd: 499,
+    doubledPriceUsd: 998,
+    doubledCredits: 6000000,
+    label: "Cyber+ 2x",
+    description: "Double your Cyber+ plan — 6,000,000 credits for $998/mo until your cycle resets",
+  },
+  titan: {
+    basePlanId: "titan",
+    basePriceUsd: 4999,
+    doubledPriceUsd: 9998,
+    doubledCredits: 20000000,
+    label: "Titan 2x",
+    description: "Double your Titan plan — 20,000,000 credits for $9,998/mo until your cycle resets",
+  },
+};
+
+// Maximum boost packs a user can buy per billing cycle before being offered an upgrade
+export const MAX_BOOST_PACKS_PER_CYCLE = 3;
+
+// Maximum times a user can double their plan in a single billing cycle
+export const MAX_DOUBLES_PER_CYCLE = 3;
+
+// ─── Daily Free Credits (Free Tier Only) ───────────────────────────────────────────────
+//
+// Free tier users receive 375 free credits every 24 hours.
+// These credits:
+//   - Are ONLY granted to users on the "free" plan
+//   - Reset every 24 hours (do NOT accumulate — unused credits are discarded)
+//   - Are consumed BEFORE paid credits in consumeCredits()
+//   - Allow ~5 standard tasks/day (5 × 75 credits = 375)
+//   - Are granted automatically on the first action of each day
+//   - Are shown separately in the credit balance UI so users understand the system
+//   - Paid plan users do NOT get daily free credits — they have their monthly allocation
+
+export const DAILY_FREE_CREDITS_AMOUNT = 375;   // credits granted per day (free tier only)
+export const DAILY_FREE_CREDITS_RESET_HOURS = 24; // hours before daily pool resets
+export const DAILY_FREE_CREDITS_PLAN = "free";   // only this plan receives daily free credits
+
 // ─── Clone Website Pricing (per-use, billed via Stripe) ────────────
 //
 // CLONE PRICING PHILOSOPHY:
