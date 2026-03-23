@@ -349,6 +349,9 @@ export const CREDIT_COSTS = {
   evilginx_action: 400,          // 400 credits per Evilginx phishlet / lure / session action
   blackeye_action: 300,          // 300 credits per Blackeye phishing page action
 
+  // ── VPN & Proxies ────────────────────────────────────────────────────
+  vpn_generate: 150,             // 150 credits per VPN proxy generation
+
   // ── Grants & Business ────────────────────────────────────────────────
   grant_match: 50,               // 50 credits per AI grant matching run
   grant_apply: 150,              // 150 credits per grant application submission

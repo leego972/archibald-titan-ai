@@ -617,6 +617,17 @@ function FetcherLayoutContent({
             <div className="flex items-center gap-2 px-1 pb-1">
               <VoiceModeToggle />
             </div>
+            {/* VPN quick toggle */}
+            <div className="flex items-center gap-2 px-1 pb-1">
+              <button
+                onClick={() => setLocation("/vpn")}
+                title="VPN Settings"
+                className="flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8"
+              >
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">VPN</span>
+              </button>
+            </div>
             {/* IP Rotation quick toggle */}
             <div className="flex items-center gap-2 px-1 pb-1">
               <button

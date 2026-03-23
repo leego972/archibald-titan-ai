@@ -174,7 +174,7 @@ export async function consumeCredits(
     "grant_match", "grant_apply", "business_plan_generate",
     "marketplace_list", "marketplace_feature",
     "site_monitor_add", "sandbox_run",
-    "affiliate_action", "api_call",
+    "affiliate_action", "api_call", "vpn_generate",
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txType = (validTxTypes.has(action) ? action : "chat_message") as any;
