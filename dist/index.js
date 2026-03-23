@@ -18832,6 +18832,7 @@ var init_evilginx_router = __esm({
     "use strict";
     init_trpc();
     init_subscription_gate();
+    init_credit_service();
     init_db();
     init_schema();
     init_fetcher_db();
@@ -19159,6 +19160,10 @@ echo VERSION:$VERSION`;
         enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
         const node = await getActiveNode(ctx.user.id);
         if (!node) throw new TRPCError11({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+        try {
+          await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: enable phishlet ${input.name}`);
+        } catch {
+        }
         const raw = await execOnNode(node, `phishlets enable ${input.name}`, 2e4, ctx.user.id);
         return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
       }),
@@ -19205,6 +19210,10 @@ echo VERSION:$VERSION`;
         enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
         const node = await getActiveNode(ctx.user.id);
         if (!node) throw new TRPCError11({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+        try {
+          await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: create lure for ${input.phishlet}`);
+        } catch {
+        }
         const createRaw = await execOnNode(node, `lures create ${input.phishlet}`, 2e4, ctx.user.id);
         const idMatch = createRaw.match(/\[(\d+)\]/);
         const lureId = idMatch ? parseInt(idMatch[1]) : null;
@@ -71048,6 +71057,7 @@ init_evilginx_router();
 // server/blackeye-router.ts
 init_trpc();
 init_subscription_gate();
+init_credit_service();
 init_db();
 init_schema();
 init_fetcher_db();
@@ -71310,6 +71320,10 @@ var blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode3(ctx.user.id);
     if (!node) throw new TRPCError33({ code: "BAD_REQUEST", message: "No active BlackEye node. Add and deploy a dedicated VPS node first." });
+    try {
+      await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye command: ${input.command.substring(0, 60)}`);
+    } catch {
+    }
     const output = await execBlackeyeCommandPublic(input.command, ctx.user.id, input.timeoutMs ?? 15e3);
     return { output, nodeLabel: node.label, publicIp: node.publicIp };
   }),
@@ -71481,6 +71495,10 @@ var blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode3(ctx.user.id);
     if (!node) throw new TRPCError33({ code: "BAD_REQUEST", message: "No active node." });
+    try {
+      await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye: launch ${input.template ?? "facebook"} phishing page`);
+    } catch {
+    }
     const template = input.template ?? "facebook";
     const port = input.port ?? 80;
     const templateDir = `/opt/blackeye/sites/${template}`;
@@ -71572,6 +71590,7 @@ var blackeyeRouter = router({
 // server/metasploit-router.ts
 init_trpc();
 init_subscription_gate();
+init_credit_service();
 init_db();
 init_schema();
 init_fetcher_db();
@@ -71849,6 +71868,10 @@ var metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode4(ctx.user.id);
     if (!node) throw new TRPCError34({ code: "BAD_REQUEST", message: "No active Metasploit node. Add and deploy a dedicated VPS node first." });
+    try {
+      await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit command: ${input.command.substring(0, 60)}`);
+    } catch {
+    }
     const output = await execMsfCommand(node, input.command, input.timeoutMs ?? 3e4, ctx.user.id);
     return { output, nodeLabel: node.label, publicIp: node.publicIp };
   }),
@@ -72056,6 +72079,10 @@ var metasploitRouter = router({
     const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join("\n");
     const payloadLine = input.payload ? `set PAYLOAD ${input.payload}
 ` : "";
+    try {
+      await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit module: ${input.module}`);
+    } catch {
+    }
     const cmd = `use ${input.module}
 ${setOpts}
 ${payloadLine}run`;
@@ -72069,6 +72096,10 @@ ${payloadLine}run`;
     if (!node) throw new TRPCError34({ code: "BAD_REQUEST", message: "No active node." });
     const encoderFlag = input.encoder ? `-e ${input.encoder}` : "";
     const outputFile = `/tmp/payload_${Date.now()}.${input.format}`;
+    try {
+      await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit payload: ${input.payload}`);
+    } catch {
+    }
     const cmd = `msfvenom -p '${input.payload}' LHOST='${input.lhost}' LPORT=${input.lport} -f '${input.format}' ${encoderFlag} -o '${outputFile}' 2>&1; echo OUTPUT_FILE:${outputFile}`;
     const out = await execSSHCommand(nodeToSSH4(node), cmd, 6e4, ctx.user.id);
     return { success: true, output: out, outputFile };

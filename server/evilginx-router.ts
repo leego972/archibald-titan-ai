@@ -28,6 +28,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -550,6 +551,7 @@ export const evilginxRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+      try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: enable phishlet ${input.name}`); } catch {}
       const raw = await execOnNode(node, `phishlets enable ${input.name}`, 20000, ctx.user.id);
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
@@ -609,6 +611,7 @@ export const evilginxRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+      try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: create lure for ${input.phishlet}`); } catch {}
       // Create lure
       const createRaw = await execOnNode(node, `lures create ${input.phishlet}`, 20000, ctx.user.id);
       // Extract lure ID from output

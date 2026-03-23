@@ -14,6 +14,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -343,6 +344,7 @@ export const metasploitRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node. Add and deploy a dedicated VPS node first." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit command: ${input.command.substring(0, 60)}`); } catch {}
       const output = await execMsfCommand(node, input.command, input.timeoutMs ?? 30000, ctx.user.id);
       return { output, nodeLabel: node.label, publicIp: node.publicIp };
     }),
@@ -581,6 +583,7 @@ export const metasploitRouter = router({
       // Build a multi-line msfconsole resource script — execMsfCommand handles the wrapping
       const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('\n');
       const payloadLine = input.payload ? `set PAYLOAD ${input.payload}\n` : '';
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit module: ${input.module}`); } catch {}
       const cmd = `use ${input.module}\n${setOpts}\n${payloadLine}run`;
       const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
       return { success: true, output: out };
@@ -596,6 +599,7 @@ export const metasploitRouter = router({
       const encoderFlag = input.encoder ? `-e ${input.encoder}` : '';
       const outputFile = `/tmp/payload_${Date.now()}.${input.format}`;
       // msfvenom is a standalone shell binary — use execSSHCommand directly, NOT execMsfCommand
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit payload: ${input.payload}`); } catch {}
       const cmd = `msfvenom -p '${input.payload}' LHOST='${input.lhost}' LPORT=${input.lport} -f '${input.format}' ${encoderFlag} -o '${outputFile}' 2>&1; echo OUTPUT_FILE:${outputFile}`;
       const out = await execSSHCommand(nodeToSSH(node), cmd, 60000, ctx.user.id);
       return { success: true, output: out, outputFile };

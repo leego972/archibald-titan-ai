@@ -13,6 +13,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -315,6 +316,7 @@ export const blackeyeRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node. Add and deploy a dedicated VPS node first." });
+      try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye command: ${input.command.substring(0, 60)}`); } catch {}
       const output = await execBlackeyeCommandPublic(input.command, ctx.user.id, input.timeoutMs ?? 15000);
       return { output, nodeLabel: node.label, publicIp: node.publicIp };
     }),
@@ -440,6 +442,7 @@ export const blackeyeRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye: launch ${input.template ?? 'facebook'} phishing page`); } catch {}
       const template = input.template ?? 'facebook';
       const port = input.port ?? 80;
       // BlackEye's blackeye.sh is interactive — bypass it entirely.
