@@ -299,10 +299,10 @@ function ArchibaldToggleItem() {
 
 // ─── Voice Mode Toggle ─────────────────────────────────────────────────────
 function VoiceModeToggle() {
-  const { enabled, listening, speaking, toggleEnabled } = useVoiceMode();
+  const { enabled, listening, speaking, setEnabled } = useVoiceMode();
   return (
     <button
-      onClick={toggleEnabled}
+      onClick={() => setEnabled(!enabled)}
       title={enabled ? "Voice Mode ON — tap to disable" : "Voice Mode OFF — tap to enable"}
       className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
         enabled
@@ -587,7 +587,7 @@ function FetcherLayoutContent({
           <SidebarFooter className="p-3 border-t border-white/5">
             {!isCollapsed && (
               <div className="flex items-center justify-between px-2 pb-2">
-                <LanguageSelector />
+                <LanguageSelector forceUp />
                 {toggleTheme && (
                   <button
                     onClick={toggleTheme}
@@ -601,7 +601,7 @@ function FetcherLayoutContent({
             )}
             {isCollapsed && (
               <div className="flex flex-col items-center gap-2 pb-2">
-                <LanguageSelector compact />
+                <LanguageSelector compact forceUp />
                 {toggleTheme && (
                   <button
                     onClick={toggleTheme}

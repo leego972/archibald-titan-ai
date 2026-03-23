@@ -1,17 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLanguage } from "./LanguageContext";
-import { FlagIcon } from "./FlagIcon";
 
 /**
  * Compact language selector dropdown.
  * Shows current language flag + code, expands to show all languages.
  * Uses SVG flag images (not emoji) for cross-platform compatibility including Windows.
  */
-export function LanguageSelector({ compact = false }: { compact?: boolean }) {
+export function LanguageSelector({ compact = false, forceUp = false }: { compact?: boolean; forceUp?: boolean }) {
   const { language, setLanguage, supportedLanguages, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const [dropDirection, setDropDirection] = useState<"down" | "up">("down");
+  const [dropDirection, setDropDirection] = useState<"down" | "up">(forceUp ? "up" : "down");
 
   // Close on outside click
   useEffect(() => {
@@ -26,6 +25,7 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
 
   // Determine whether to open up or down based on available space
   const calculateDirection = useCallback(() => {
+    if (forceUp) { setDropDirection("up"); return; }
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
@@ -33,12 +33,15 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     const spaceAbove = rect.top;
     const dropdownHeight = 320;
 
-    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+    if (spaceAbove >= dropdownHeight) {
+      setDropDirection("up");
+    } else if (spaceBelow >= dropdownHeight) {
       setDropDirection("down");
     } else {
-      setDropDirection("up");
+      // Not enough space either way — open toward whichever has more room
+      setDropDirection(spaceAbove >= spaceBelow ? "up" : "down");
     }
-  }, []);
+  }, [forceUp]);
 
   const handleToggle = () => {
     if (!open) {
@@ -61,7 +64,7 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
         title={t("common.language")}
         aria-label={t("common.language")}
       >
-        <FlagIcon langCode={language} size={16} />
+        <span style={{ fontSize: 16, lineHeight: 1 }} aria-hidden="true">{currentLang?.flag ?? "🌐"}</span>
         {!compact && (
           <span className="text-gray-700 dark:text-gray-300 font-medium">
             {language.toUpperCase()}
@@ -99,7 +102,7 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
                   : "text-gray-700 dark:text-gray-300"
               }`}
             >
-              <FlagIcon langCode={lang.code} size={18} />
+              <span style={{ fontSize: 18, lineHeight: 1 }} aria-hidden="true">{lang.flag ?? "🌐"}</span>
               <span className="flex-1 text-left">{lang.nativeName}</span>
               <span className="text-xs text-gray-400 uppercase">{lang.code}</span>
               {lang.code === language && (
