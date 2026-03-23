@@ -165,18 +165,40 @@ export const storageBillingRouter = router({
     .input(z.object({ returnUrl: z.string().url().optional() }))
     .mutation(async ({ ctx, input }) => {
       const stripe = getStripe();
-      const sub = await getStorageSubscription(ctx.user.id);
+      const sub = await getStorageSubscription(ctx.user.id, (ctx.user as any).role);
+
+      // Admin users have no Stripe customer — show a friendly message instead of crashing
       if (!sub?.stripeCustomerId) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No storage subscription found." });
+        const isAdmin = (ctx.user as any).role === "admin" || (ctx.user as any).role === "superadmin";
+        if (isAdmin) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Admin accounts have unlimited storage — no billing portal needed.",
+          });
+        }
+        // Regular user with no subscription yet
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No active storage subscription found. Subscribe to a storage plan first.",
+        });
       }
 
       const appUrl = process.env.APP_URL || "https://archibaldtitan.com";
-      const session = await stripe.billingPortal.sessions.create({
-        customer: sub.stripeCustomerId,
-        return_url: input.returnUrl || `${appUrl}/dashboard?tab=storage`,
-      });
-
-      return { portal_url: session.url };
+      try {
+        const session = await stripe.billingPortal.sessions.create({
+          customer: sub.stripeCustomerId,
+          return_url: input.returnUrl || `${appUrl}/storage`,
+        });
+        return { portal_url: session.url };
+      } catch (err: any) {
+        log.error(`[StorageBilling] Portal session error: ${err.message}`);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err.message?.includes("No such customer")
+            ? "Billing account not found. Please contact support."
+            : "Unable to open billing portal. Please try again.",
+        });
+      }
     }),
 });
 

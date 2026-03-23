@@ -169,6 +169,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_15_r2c7"), label: "VPN Chain", path: "/vpn-chain", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_16_r2c8"), label: "Proxy Maker", path: "/proxy-maker", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_38_r5c6"), label: "Proxy Rotation", path: "/proxy-rotation", isNew: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "IP Rotation", path: "/ip-rotation", isNew: true },
       // ── Card Tools ───────────────────────────────────────────────────────
       { icon: featureIcon("icon_12_r2c4"), label: "BIN Checker", path: "/bin-checker", isNew: true },
     ],
@@ -268,7 +269,7 @@ const allMenuItemPaths = [
   "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
   "/fetcher/api-analytics", "/fetcher/cli", "/fetcher/git-bash", "/fetcher/download-app",
   "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
-  "/tor", "/vpn-chain", "/proxy-maker", "/proxy-rotation", "/bin-checker", "/exploitpack",
+  "/tor", "/vpn-chain", "/proxy-maker", "/proxy-rotation", "/ip-rotation", "/bin-checker", "/exploitpack",
 ];
 
 const SIDEBAR_WIDTH_KEY = "fetcher-sidebar-width";

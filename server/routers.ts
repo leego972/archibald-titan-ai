@@ -61,6 +61,7 @@ import { vpnChainRouter } from "./vpn-chain-router";
 import { proxyMakerRouter } from "./proxy-maker-router";
 import { binCheckerRouter } from "./bin-checker-router";
 import { proxyRotationRouter } from "./proxy-rotation-router";
+import { ipRotationRouter } from "./ip-rotation-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -149,6 +150,7 @@ export const appRouter = router({
   proxyMaker: proxyMakerRouter,
   binChecker: binCheckerRouter,
   proxyRotation: proxyRotationRouter,
+  ipRotation: ipRotationRouter,
 });
 
 export type AppRouter = typeof appRouter;
