@@ -139,6 +139,7 @@ import TitanStoragePage from "./pages/TitanStoragePage";
 import TorPage from "./pages/TorPage";
 import VpnChainPage from "./pages/VpnChainPage";
 import ProxyMakerPage from "./pages/ProxyMakerPage";
+import ProxyRotationPage from "./pages/ProxyRotationPage";
 import BinCheckerPage from "./pages/BinCheckerPage";
 
 
@@ -241,6 +242,7 @@ function DashboardRouter() {
         <Route path="/tor" component={TorPage} />
         <Route path="/vpn-chain" component={VpnChainPage} />
         <Route path="/proxy-maker" component={ProxyMakerPage} />
+        <Route path="/proxy-rotation" component={ProxyRotationPage} />
         <Route path="/bin-checker" component={BinCheckerPage} />
 
         {/* Admin */}
@@ -327,6 +329,7 @@ function Router() {
       <Route path="/tor" component={DashboardRouter} />
       <Route path="/vpn-chain" component={DashboardRouter} />
       <Route path="/proxy-maker" component={DashboardRouter} />
+      <Route path="/proxy-rotation" component={DashboardRouter} />
       <Route path="/bin-checker" component={DashboardRouter} />
       <Route path="/admin/titan-server" component={DashboardRouter} />
       <Route path="/admin/activity-log" component={DashboardRouter} />

@@ -168,6 +168,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_38_r5c6"), label: "Tor Browser", path: "/tor", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_15_r2c7"), label: "VPN Chain", path: "/vpn-chain", isNew: true, titanOnly: true },
       { icon: featureIcon("icon_16_r2c8"), label: "Proxy Maker", path: "/proxy-maker", isNew: true, titanOnly: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "Proxy Rotation", path: "/proxy-rotation", isNew: true },
       // ── Card Tools ───────────────────────────────────────────────────────
       { icon: featureIcon("icon_12_r2c4"), label: "BIN Checker", path: "/bin-checker", isNew: true },
     ],
@@ -267,7 +268,7 @@ const allMenuItemPaths = [
   "/fetcher/developer-docs", "/fetcher/webhooks", "/fetcher/notifications",
   "/fetcher/api-analytics", "/fetcher/cli", "/fetcher/git-bash", "/fetcher/download-app",
   "/fetcher/releases", "/fetcher/admin", "/admin/activity-log", "/admin/titan-server", "/fetcher/self-improvement",
-  "/tor", "/vpn-chain", "/proxy-maker", "/bin-checker", "/exploitpack",
+  "/tor", "/vpn-chain", "/proxy-maker", "/proxy-rotation", "/bin-checker", "/exploitpack",
 ];
 
 const SIDEBAR_WIDTH_KEY = "fetcher-sidebar-width";
@@ -381,48 +382,26 @@ function FetcherLayoutContent({
     (item) => item.path === location || (item.path !== "/dashboard" && location.startsWith(item.path))
   );
   const isMobile = useIsMobile();
-  // VPN / Tor status for sidebar toggle
-  const vpnActiveQuery = trpc.vpnChain.getActiveState.useQuery(undefined, { retry: false });
-  const torActiveQuery = trpc.tor.getActiveState.useQuery(undefined, { retry: false });
-  const setVpnActive = trpc.vpnChain.setActive.useMutation({
+  // Proxy Rotation status for sidebar toggle
+  const proxyActiveQuery = trpc.proxyRotation.getActiveState.useQuery(undefined, { retry: false });
+  const setProxyActive = trpc.proxyRotation.setActive.useMutation({
     onSuccess: (data) => {
-      vpnActiveQuery.refetch();
-      if ('active' in data) {
-        toast.success(data.active ? "VPN Chain activated" : "VPN Chain deactivated");
-      }
+      proxyActiveQuery.refetch();
+      toast.success(data.active ? "Proxy rotation enabled" : "Proxy rotation disabled");
     },
     onError: (err) => {
       const msg = err.message ?? "";
-      if (msg.includes("No active") || msg.includes("no hop") || msg.includes("not found")) {
-        toast.error("No VPN hops configured — set up your VPN Chain first", {
-          action: { label: "Go to VPN", onClick: () => setLocation("/vpn-chain") },
+      if (msg.includes("No proxies") || msg.includes("proxy")) {
+        toast.error("No proxies configured", {
+          action: { label: "Add Proxies", onClick: () => setLocation("/proxy-rotation") },
         });
       } else {
         toast.error(err.message);
       }
     },
   });
-  const setTorActive = trpc.tor.setActive.useMutation({
-    onSuccess: (data) => {
-      torActiveQuery.refetch();
-      if ('active' in data) {
-        toast.success(data.active ? "Tor started on your VPS node" : "Tor stopped");
-      }
-    },
-    onError: (err) => {
-      const msg = err.message ?? "";
-      if (msg.includes("No active") || msg.includes("no node") || msg.includes("not found")) {
-        toast.error("No Tor node configured — set up your Tor VPS node first", {
-          action: { label: "Go to Tor", onClick: () => setLocation("/tor") },
-        });
-      } else {
-        toast.error(err.message);
-      }
-    },
-  });
-  const vpnActive = vpnActiveQuery.data?.active ?? false;
-  const vpnHasReadyHops = vpnActiveQuery.data?.hasReadyHops ?? false;
-  const torActive = torActiveQuery.data?.active ?? false;
+  const proxyActive = proxyActiveQuery.data?.active ?? false;
+  const proxyHasProxies = proxyActiveQuery.data?.hasProxies ?? false;
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -609,43 +588,29 @@ function FetcherLayoutContent({
                 )}
               </div>
             )}
-            {/* VPN Chain + Tor quick toggles */}
+            {/* Proxy Rotation quick toggle */}
             <div className="flex items-center gap-2 px-1 pb-1">
               <button
                 onClick={() => {
-                  if (setVpnActive.isPending) return;
-                  setVpnActive.mutate({ active: !vpnActive });
+                  if (setProxyActive.isPending) return;
+                  if (!proxyActive && !proxyHasProxies) {
+                    setLocation("/proxy-rotation");
+                    return;
+                  }
+                  setProxyActive.mutate({ active: !proxyActive });
                 }}
-                disabled={setVpnActive.isPending}
-                title={vpnActive ? "VPN Chain: ON — click to disable" : "VPN Chain: OFF — click to enable"}
+                disabled={setProxyActive.isPending}
+                title={proxyActive ? "Proxy Rotation: ON — click to disable" : proxyHasProxies ? "Proxy Rotation: OFF — click to enable" : "No proxies configured — click to set up"}
                 className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                  vpnActive
-                    ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
+                  proxyActive
+                    ? "bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30"
                     : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
                 } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
               >
-                {setVpnActive.isPending
+                {setProxyActive.isPending
                   ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                   : <Shield className="h-3.5 w-3.5 shrink-0" />}
-                <span className="group-data-[collapsible=icon]:hidden">VPN {vpnActive ? "ON" : "OFF"}</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (setTorActive.isPending) return;
-                  setTorActive.mutate({ active: !torActive });
-                }}
-                disabled={setTorActive.isPending}
-                title={torActive ? "Tor: ON — click to disable" : "Tor: OFF — click to enable"}
-                className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                  torActive
-                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30"
-                    : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
-                } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
-              >
-                {setTorActive.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                  : <Globe className="h-3.5 w-3.5 shrink-0" />}
-                <span className="group-data-[collapsible=icon]:hidden">Tor {torActive ? "ON" : "OFF"}</span>
+                <span className="group-data-[collapsible=icon]:hidden">Proxy {proxyActive ? "ON" : "OFF"}</span>
               </button>
             </div>
             {/* Standalone Logout Button — always visible in sidebar footer */}
