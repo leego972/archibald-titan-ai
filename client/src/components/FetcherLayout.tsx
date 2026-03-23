@@ -326,6 +326,123 @@ function VoiceModeToggle() {
   );
 }
 
+// ─── VPN Sidebar Widget ───────────────────────────────────────────────────
+const VPN_COUNTRIES = [
+  { id: "us", name: "United States", flag: "🇺🇸" },
+  { id: "gb", name: "United Kingdom", flag: "🇬🇧" },
+  { id: "ca", name: "Canada", flag: "🇨🇦" },
+  { id: "de", name: "Germany", flag: "🇩🇪" },
+  { id: "fr", name: "France", flag: "🇫🇷" },
+  { id: "nl", name: "Netherlands", flag: "🇳🇱" },
+  { id: "jp", name: "Japan", flag: "🇯🇵" },
+  { id: "au", name: "Australia", flag: "🇦🇺" },
+  { id: "br", name: "Brazil", flag: "🇧🇷" },
+  { id: "in", name: "India", flag: "🇮🇳" },
+  { id: "sg", name: "Singapore", flag: "🇸🇬" },
+  { id: "hk", name: "Hong Kong", flag: "🇭🇰" },
+  { id: "se", name: "Sweden", flag: "🇸🇪" },
+  { id: "ch", name: "Switzerland", flag: "🇨🇭" },
+  { id: "mx", name: "Mexico", flag: "🇲🇽" },
+  { id: "ru", name: "Russia", flag: "🇷🇺" },
+  { id: "ua", name: "Ukraine", flag: "🇺🇦" },
+  { id: "pl", name: "Poland", flag: "🇵🇱" },
+  { id: "it", name: "Italy", flag: "🇮🇹" },
+  { id: "es", name: "Spain", flag: "🇪🇸" },
+];
+
+function VpnSidebarWidget() {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+  const [, setLocation] = useLocation();
+  const [showCountries, setShowCountries] = useState(false);
+  const vpnStatus = trpc.vpn.getStatus.useQuery(undefined, { retry: false, refetchInterval: 10000 });
+  const vpnToggle = trpc.vpn.toggleStatus.useMutation({
+    onSuccess: () => vpnStatus.refetch(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const active = vpnStatus.data?.active ?? false;
+  const country = vpnStatus.data?.country ?? "us";
+  const currentCountry = VPN_COUNTRIES.find(c => c.id === country);
+
+  if (isCollapsed) {
+    return (
+      <div className="flex items-center gap-2 px-1 pb-1">
+        <button
+          onClick={() => setLocation("/vpn")}
+          title={`VPN ${active ? "ON" : "OFF"} — ${currentCountry?.name ?? country}`}
+          className={`flex items-center justify-center w-8 h-8 rounded-lg text-xs font-medium transition-all border ${
+            active
+              ? "bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30"
+              : "bg-zinc-800/50 text-zinc-500 border-zinc-700/50 hover:bg-zinc-700/50"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5 shrink-0" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-1 pb-1">
+      {/* Toggle row */}
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => vpnToggle.mutate({ active: !active, country })}
+          disabled={vpnToggle.isPending}
+          title={active ? "VPN ON — click to disconnect" : "VPN OFF — click to connect"}
+          className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 border ${
+            active
+              ? "bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30"
+              : "bg-zinc-800/50 text-zinc-500 border-zinc-700/50 hover:bg-zinc-700/50"
+          }`}
+        >
+          {vpnToggle.isPending
+            ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+            : <Shield className="h-3.5 w-3.5 shrink-0" />}
+          <span>VPN {active ? "ON" : "OFF"}</span>
+          {active && currentCountry && (
+            <span className="ml-auto text-[10px] opacity-70">{currentCountry.flag}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setShowCountries(v => !v)}
+          title="Select country"
+          className="flex items-center justify-center w-7 h-7 rounded-lg border border-zinc-700/50 bg-zinc-800/50 hover:bg-zinc-700/50 text-zinc-500 hover:text-zinc-300 transition-all text-xs"
+        >
+          <Globe className="h-3 w-3" />
+        </button>
+      </div>
+
+      {/* Scrollable country list */}
+      {showCountries && (
+        <div className="mt-1 rounded-lg border border-zinc-700/50 bg-zinc-900/80 overflow-hidden">
+          <div className="max-h-40 overflow-y-auto scrollbar-thin">
+            {VPN_COUNTRIES.map(c => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  vpnToggle.mutate({ active, country: c.id });
+                  setShowCountries(false);
+                }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-left transition-colors ${
+                  c.id === country
+                    ? "bg-green-500/15 text-green-300"
+                    : "text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200"
+                }`}
+              >
+                <span>{c.flag}</span>
+                <span className="truncate">{c.name}</span>
+                {c.id === country && <span className="ml-auto text-[9px] text-green-400">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FetcherLayout({
   children,
 }: {
@@ -617,17 +734,8 @@ function FetcherLayoutContent({
             <div className="flex items-center gap-2 px-1 pb-1">
               <VoiceModeToggle />
             </div>
-            {/* VPN quick toggle */}
-            <div className="flex items-center gap-2 px-1 pb-1">
-              <button
-                onClick={() => setLocation("/vpn")}
-                title="VPN Settings"
-                className="flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8"
-              >
-                <Shield className="h-3.5 w-3.5 shrink-0" />
-                <span className="group-data-[collapsible=icon]:hidden">VPN</span>
-              </button>
-            </div>
+            {/* VPN quick toggle with country selector */}
+            <VpnSidebarWidget />
             {/* IP Rotation quick toggle */}
             <div className="flex items-center gap-2 px-1 pb-1">
               <button
