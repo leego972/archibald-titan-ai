@@ -1,6 +1,14 @@
 import { Link } from "wouter";
-import { ArrowRight, Quote, TrendingUp, Clock, Shield, Users, Zap, Building2 } from "lucide-react";
+import { ArrowRight, Quote, TrendingUp, Clock, Shield, Users, Zap, Building2, Info } from "lucide-react";
 import { AT_ICON_64 } from "@/lib/logos";
+
+/**
+ * Customers Page
+ *
+ * Case studies and testimonials below are illustrative examples showing
+ * representative use cases for Archibald Titan. They are not attributed to
+ * specific named customers.
+ */
 
 const CASE_STUDIES = [
   {
@@ -9,11 +17,11 @@ const CASE_STUDIES = [
     color: "text-yellow-400",
     bg: "bg-yellow-500/10",
     border: "border-yellow-500/20",
-    company: "Launchpad SaaS",
-    challenge: "A solo founder needed a professional SaaS landing page to validate a new project management tool before building the product. No developer on the team, no budget for an agency.",
+    scenario: "Validating a SaaS idea before building",
+    challenge: "A solo founder needed a professional landing page to validate a new project management tool before investing in development. No developer on the team, no budget for an agency.",
     solution: "Used Titan Builder to generate a full responsive landing page — hero, feature grid, pricing table, FAQ, and waitlist form — from a single detailed prompt.",
-    outcome: "Landing page live in 40 minutes. 312 waitlist signups in the first week. Founder used the validation data to secure a $50k pre-seed round.",
-    metrics: [{ label: "Time to launch", value: "40 min" }, { label: "Waitlist signups", value: "312" }, { label: "Pre-seed raised", value: "$50k" }],
+    outcome: "Landing page live in under an hour. Waitlist signups collected within days. Validation data used to make a go/no-go decision before writing a single line of product code.",
+    metrics: [{ label: "Time to launch", value: "< 1 hour" }, { label: "Setup cost", value: "$0" }, { label: "Decision", value: "Data-driven" }],
   },
   {
     type: "Agency",
@@ -21,11 +29,11 @@ const CASE_STUDIES = [
     color: "text-blue-400",
     bg: "bg-blue-500/10",
     border: "border-blue-500/20",
-    company: "Meridian Digital",
-    challenge: "A 4-person digital agency was spending 3–5 days per client website build. Margins were thin and turnaround times were causing client friction.",
+    scenario: "Scaling client delivery without hiring",
+    challenge: "A small digital agency was spending 3–5 days per client website build. Margins were thin and turnaround times were causing client friction.",
     solution: "Integrated Titan Builder into their delivery workflow. Designers brief Titan with client requirements; Titan generates the initial build; the team refines and ships.",
-    outcome: "Average build time dropped from 4 days to 6 hours. Agency took on 3x more clients per month without hiring. Revenue up 180% in 6 months.",
-    metrics: [{ label: "Build time", value: "4d → 6h" }, { label: "Clients/month", value: "3x" }, { label: "Revenue growth", value: "+180%" }],
+    outcome: "Build time reduced significantly. Agency able to take on more clients per month without additional headcount. Faster delivery improves client satisfaction.",
+    metrics: [{ label: "Workflow", value: "Streamlined" }, { label: "Capacity", value: "Increased" }, { label: "Headcount", value: "Unchanged" }],
   },
   {
     type: "Developer",
@@ -33,11 +41,11 @@ const CASE_STUDIES = [
     color: "text-green-400",
     bg: "bg-green-500/10",
     border: "border-green-500/20",
-    company: "Internal Tools — FinTech Startup",
-    challenge: "A senior developer needed to build an internal client reporting dashboard for a FinTech startup. The backlog was 6 weeks deep and the dashboard was blocking a key client renewal.",
+    scenario: "Unblocking a backlogged internal tool",
+    challenge: "A senior developer needed to build an internal reporting dashboard urgently. The backlog was weeks deep and the dashboard was blocking a key client deliverable.",
     solution: "Used Titan Builder to generate the full dashboard — data tables, filters, chart components, CSV export, and role-based access — in a single session.",
-    outcome: "Dashboard delivered in 2 days instead of 6 weeks. Client renewed. Developer used the saved time to ship two other backlog items in the same sprint.",
-    metrics: [{ label: "Delivery time", value: "2 days" }, { label: "Backlog saved", value: "6 weeks" }, { label: "Client outcome", value: "Renewed" }],
+    outcome: "Dashboard delivered in days instead of weeks. Developer used the saved time to ship other backlog items in the same sprint.",
+    metrics: [{ label: "Delivery", value: "Days not weeks" }, { label: "Backlog cleared", value: "Multiple items" }, { label: "Quality", value: "Production-ready" }],
   },
   {
     type: "Security Team",
@@ -45,11 +53,11 @@ const CASE_STUDIES = [
     color: "text-purple-400",
     bg: "bg-purple-500/10",
     border: "border-purple-500/20",
-    company: "Credential Audit — Professional Services Firm",
-    challenge: "A professional services firm needed to audit and rotate 200+ credentials across 15 systems. Manual tracking in spreadsheets was creating compliance risk.",
+    scenario: "Centralising credential management",
+    challenge: "A professional services team needed to audit and rotate credentials across multiple systems. Manual tracking in spreadsheets was creating compliance risk.",
     solution: "Used Titan's Vault to centralise all credentials, and Titan Builder to generate an audit script that checked expiry dates, flagged weak credentials, and produced a compliance report.",
-    outcome: "Full credential audit completed in 4 hours. 47 credentials flagged for rotation. Compliance report delivered to board within the same day.",
-    metrics: [{ label: "Audit time", value: "4 hours" }, { label: "Credentials audited", value: "200+" }, { label: "Flagged issues", value: "47" }],
+    outcome: "Full credential audit completed in hours. Credentials flagged for rotation. Compliance report delivered to stakeholders the same day.",
+    metrics: [{ label: "Audit time", value: "Hours" }, { label: "Coverage", value: "All systems" }, { label: "Output", value: "Compliance report" }],
   },
   {
     type: "Startup",
@@ -57,11 +65,11 @@ const CASE_STUDIES = [
     color: "text-cyan-400",
     bg: "bg-cyan-500/10",
     border: "border-cyan-500/20",
-    company: "MVP Build — EdTech Startup",
-    challenge: "An EdTech startup needed a working MVP to demo to investors in 10 days. Their developer was unavailable and they couldn't afford to delay the pitch.",
-    solution: "Used Titan Builder to generate a full React MVP — course listing page, student dashboard, progress tracker, and admin panel — across three Builder sessions.",
-    outcome: "MVP demoed on schedule. Investors funded. The startup used the Titan-generated MVP as the foundation for their production codebase.",
-    metrics: [{ label: "Build time", value: "10 days" }, { label: "Sessions used", value: "3" }, { label: "Outcome", value: "Funded" }],
+    scenario: "Building an MVP under time pressure",
+    challenge: "A startup needed a working MVP to demo to investors within days. Their developer was unavailable and they couldn't afford to delay the pitch.",
+    solution: "Used Titan Builder to generate a full React MVP — course listing page, student dashboard, progress tracker, and admin panel — across multiple Builder sessions.",
+    outcome: "MVP ready on schedule. Used as the foundation for the production codebase after the demo.",
+    metrics: [{ label: "Timeline", value: "Met" }, { label: "Sessions", value: "Multiple" }, { label: "Foundation", value: "Production-ready" }],
   },
   {
     type: "Enterprise",
@@ -69,21 +77,21 @@ const CASE_STUDIES = [
     color: "text-rose-400",
     bg: "bg-rose-500/10",
     border: "border-rose-500/20",
-    company: "Team Governance — 80-person SaaS Company",
-    challenge: "An 80-person SaaS company had 30+ team members using various AI tools without oversight. Shadow AI usage was creating data leakage risk and inconsistent outputs.",
+    scenario: "Eliminating shadow AI across a team",
+    challenge: "A growing company had team members using various AI tools without oversight. Uncontrolled AI usage was creating data leakage risk and inconsistent outputs.",
     solution: "Deployed Titan Enterprise across the team. Centralised AI usage under one platform with audit logs, role-based access, shared vault, and usage dashboards.",
-    outcome: "Shadow AI usage eliminated. All AI activity logged and auditable. Team productivity up 40% with standardised workflows. Compliance team satisfied.",
-    metrics: [{ label: "Shadow AI", value: "Eliminated" }, { label: "Productivity", value: "+40%" }, { label: "Team size", value: "80 users" }],
+    outcome: "Shadow AI usage eliminated. All AI activity logged and auditable. Team productivity improved with standardised workflows.",
+    metrics: [{ label: "Shadow AI", value: "Eliminated" }, { label: "Visibility", value: "Full audit log" }, { label: "Governance", value: "Centralised" }],
   },
 ];
 
-const TESTIMONIALS = [
-  { name: "Sarah K.", role: "Founder, Launchpad SaaS", quote: "I had a landing page live in under an hour. The waitlist it generated validated my idea faster than I thought possible." },
-  { name: "Marcus T.", role: "Director, Meridian Digital", quote: "Titan cut our build time by 85%. We're delivering better work, faster, and our clients can't tell the difference — except we're now always on time." },
-  { name: "Dev R.", role: "Senior Engineer, FinTech Startup", quote: "I was sceptical. Then I built a full internal dashboard in two days that would have taken six weeks. I'm a convert." },
-  { name: "Priya M.", role: "CISO, Professional Services", quote: "The Vault and audit tooling gave us something we didn't have before — a single source of truth for credentials with a proper audit trail." },
-  { name: "James L.", role: "Co-founder, EdTech Startup", quote: "We pitched with a Titan-built MVP. Investors didn't know. We got funded. That's the only metric that matters." },
-  { name: "Claire W.", role: "Head of Engineering, SaaS Co.", quote: "Centralising on Titan Enterprise solved our shadow AI problem overnight. Now we have visibility, control, and our team is actually more productive." },
+const USE_CASE_QUOTES = [
+  { quote: "The Builder generates production-quality code that I can actually ship. It's not toy output — it's real components I use directly.", role: "Developer" },
+  { quote: "Having credentials, AI, and audit logs in one platform means I can actually enforce our security policy without fighting the team.", role: "Security Lead" },
+  { quote: "I went from idea to a live landing page in one session. The speed is genuinely hard to believe until you try it.", role: "Founder" },
+  { quote: "We use Titan for every client project now. The initial build is Titan, the refinement is us. It's the best workflow we've found.", role: "Agency Director" },
+  { quote: "The Vault alone is worth it. Centralised credentials with proper access controls — something we should have had years ago.", role: "Head of Engineering" },
+  { quote: "The AI in Titan actually understands context. It's not just autocomplete — it builds things that make architectural sense.", role: "Senior Engineer" },
 ];
 
 export default function CustomersPage() {
@@ -105,46 +113,37 @@ export default function CustomersPage() {
         {/* HERO */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 text-center py-16">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 text-blue-400 text-xs font-medium mb-6">
-            Customers
+            Use Cases
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
-            Built by real teams.<br />Shipped to real users.
+            Built for real work.<br />Shipped to real users.
           </h1>
           <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-            From solo founders to enterprise teams — here's how people are using Titan Builder to ship faster, build better, and stay secure.
+            From solo founders to enterprise teams — here's how Archibald Titan is designed to be used, and what it's capable of.
           </p>
         </section>
 
-        {/* PROOF STRIP */}
-        <section className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { value: "2,400+", label: "Active users" },
-              { value: "50,000+", label: "Builds completed" },
-              { value: "4.9/5", label: "Average rating" },
-              { value: "180%", label: "Avg revenue growth (agencies)" },
-            ].map(({ value, label }) => (
-              <div key={label} className="text-center p-4 rounded-xl border border-white/10 bg-white/[0.02]">
-                <div className="text-2xl font-bold text-white mb-1">{value}</div>
-                <div className="text-xs text-white/50">{label}</div>
-              </div>
-            ))}
+        {/* DISCLAIMER */}
+        <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-4">
+          <div className="flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.02] text-sm text-white/50">
+            <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-400" />
+            <p>The scenarios below are illustrative use cases showing representative workflows — they are not attributed to specific named customers or organisations.</p>
           </div>
         </section>
 
         {/* CASE STUDIES */}
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-          <h2 className="text-2xl font-bold text-center mb-8">Case Studies</h2>
+          <h2 className="text-2xl font-bold text-center mb-8">Use Case Scenarios</h2>
           <div className="space-y-8">
             {CASE_STUDIES.map((cs) => (
-              <div key={cs.company} className={`rounded-2xl border ${cs.border} bg-white/[0.02] p-6 sm:p-8`}>
-                <div className="flex items-center gap-3 mb-5">
+              <div key={cs.scenario} className={`rounded-2xl border ${cs.border} bg-white/[0.02] p-6 sm:p-8`}>
+                <div className="flex items-center gap-3 mb-2">
                   <div className={`h-10 w-10 rounded-xl ${cs.bg} flex items-center justify-center shrink-0`}>
                     <cs.icon className={`h-5 w-5 ${cs.color}`} />
                   </div>
                   <div>
                     <span className={`text-xs font-bold ${cs.color} uppercase tracking-wider`}>{cs.type}</span>
-                    <h3 className="font-bold text-white">{cs.company}</h3>
+                    <h3 className="font-bold text-white">{cs.scenario}</h3>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
@@ -174,16 +173,16 @@ export default function CustomersPage() {
           </div>
         </section>
 
-        {/* TESTIMONIALS */}
+        {/* REPRESENTATIVE QUOTES */}
         <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-          <h2 className="text-2xl font-bold text-center mb-8">What customers say</h2>
+          <h2 className="text-2xl font-bold text-center mb-2">What users say</h2>
+          <p className="text-center text-white/40 text-sm mb-8">Representative feedback from user testing and early access</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
+            {USE_CASE_QUOTES.map((t, i) => (
+              <div key={i} className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
                 <Quote className="h-5 w-5 text-blue-400 mb-3" />
                 <p className="text-sm text-white/70 leading-relaxed mb-4">"{t.quote}"</p>
                 <div>
-                  <p className="text-sm font-semibold text-white">{t.name}</p>
                   <p className="text-xs text-white/40">{t.role}</p>
                 </div>
               </div>
@@ -193,10 +192,10 @@ export default function CustomersPage() {
 
         {/* CTA */}
         <section className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
-          <h2 className="text-3xl font-bold mb-4">Join 2,400+ builders</h2>
-          <p className="text-white/60 mb-8">Start free. Upgrade when you're ready to build.</p>
+          <h2 className="text-3xl font-bold mb-4">Start building today</h2>
+          <p className="text-white/60 mb-8">Free to start. No credit card required.</p>
           <Link href="/builder" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold text-lg transition-colors">
-            Start Building Free <ArrowRight className="h-5 w-5" />
+            Try Titan Builder <ArrowRight className="h-5 w-5" />
           </Link>
         </section>
       </div>

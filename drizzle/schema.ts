@@ -2303,3 +2303,42 @@ export const userMemory = mysqlTable("user_memory", {
 });
 export type UserMemory = typeof userMemory.$inferSelect;
 export type InsertUserMemory = typeof userMemory.$inferInsert;
+
+// ─── Web Agent Tasks ─────────────────────────────────────────────────────────
+export const webAgentTasks = mysqlTable("web_agent_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  instruction: text("instruction").notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  targetSite: varchar("targetSite", { length: 512 }),
+  result: json("result").$type<{
+    summary: string;
+    data?: any;
+    screenshotUrl?: string;
+    steps?: Array<{ action: string; detail: string; timestamp: string }>;
+  }>(),
+  confirmationRequired: text("confirmationRequired"),
+  errorMessage: text("errorMessage"),
+  stepCount: int("stepCount").notNull().default(0),
+  durationMs: int("durationMs"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WebAgentTask = typeof webAgentTasks.$inferSelect;
+export type InsertWebAgentTask = typeof webAgentTasks.$inferInsert;
+
+// ─── Web Agent Site Credentials ──────────────────────────────────────────────
+export const webAgentCredentials = mysqlTable("web_agent_credentials", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  siteName: varchar("siteName", { length: 255 }).notNull(),
+  siteUrl: varchar("siteUrl", { length: 512 }).notNull(),
+  username: text("username").notNull(),
+  password: text("password").notNull(),
+  totpSecret: text("totpSecret"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WebAgentCredential = typeof webAgentCredentials.$inferSelect;
+export type InsertWebAgentCredential = typeof webAgentCredentials.$inferInsert;

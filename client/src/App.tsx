@@ -8,6 +8,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import FetcherLayout from "./components/FetcherLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ArchibaldProvider } from "./contexts/ArchibaldContext";
+import { VoiceModeProvider } from "./components/VoiceMode";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
@@ -142,6 +143,7 @@ import ProxyMakerPage from "./pages/ProxyMakerPage";
 import ProxyRotationPage from "./pages/ProxyRotationPage";
 import IPRotationPage from "./pages/IPRotationPage";
 import BinCheckerPage from "./pages/BinCheckerPage";
+import WebAgentPage from "./pages/WebAgentPage";
 
 
 function DashboardRouter() {
@@ -246,6 +248,7 @@ function DashboardRouter() {
         <Route path="/proxy-rotation" component={ProxyRotationPage} />
         <Route path="/ip-rotation" component={IPRotationPage} />
         <Route path="/bin-checker" component={BinCheckerPage} />
+        <Route path="/web-agent" component={WebAgentPage} />
 
         {/* Admin */}
         <Route path="/fetcher/releases" component={ReleaseManagementPage} />
@@ -334,6 +337,7 @@ function Router() {
       <Route path="/proxy-rotation" component={DashboardRouter} />
       <Route path="/ip-rotation" component={DashboardRouter} />
       <Route path="/bin-checker" component={DashboardRouter} />
+      <Route path="/web-agent" component={DashboardRouter} />
       <Route path="/admin/titan-server" component={DashboardRouter} />
       <Route path="/admin/activity-log" component={DashboardRouter} />
       <Route path="/fetcher/self-improvement" component={DashboardRouter} />
@@ -352,10 +356,12 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable={true}>
         <ArchibaldProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <VoiceModeProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </VoiceModeProvider>
         </ArchibaldProvider>
       </ThemeProvider>
     </ErrorBoundary>

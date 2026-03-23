@@ -220,10 +220,20 @@ export default function CliToolPage() {
         </div>
         <Badge
           variant="outline"
-          className="text-emerald-400 border-emerald-400/30"
+          className="text-amber-400 border-amber-400/30"
         >
-          v1.0.0
+          In Development
         </Badge>
+      </div>
+
+      {/* In Development Notice */}
+      <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-amber-200/70">
+        <ExternalLink className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
+        <p>
+          <strong className="text-amber-400">titan-cli is currently in development</strong> — the npm package and install scripts are not yet published.
+          The documentation below shows the planned API and commands. The underlying REST API is fully functional and available now via{" "}
+          <a href="/fetcher/api-access" className="underline hover:text-amber-300">API Access</a>.
+        </p>
       </div>
 
       <AffiliateRecommendations context="developer" variant="banner" />

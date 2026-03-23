@@ -59,11 +59,22 @@ const MAX_MEMORY_FACTS = 50;
  */
 const MAX_FACTS_PER_EXTRACTION = 10;
 
+// In-memory TTL cache for user memory (60s TTL)
+// Long-term memory rarely changes mid-conversation — safe to cache for 60s
+const _memoryCache = new Map<number, { value: string; expiresAt: number }>();
+const MEMORY_CACHE_TTL_MS = 60_000;
+
+export function invalidateMemoryCache(userId: number): void {
+  _memoryCache.delete(userId);
+}
+
 // ── Long-Term Memory: Load ─────────────────────────────────────────────────
 // Fast DB read — runs in parallel with conversation loading.
 // Returns empty string if no facts exist (no latency penalty).
 
 export async function loadUserMemory(userId: number): Promise<string> {
+  const cached = _memoryCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   try {
     const db = await getDb();
     if (!db) return "";
@@ -91,7 +102,9 @@ export async function loadUserMemory(userId: number): Promise<string> {
       for (const item of items) lines.push(`  • ${item}`);
     }
     lines.push("--- END LONG-TERM MEMORY ---");
-    return lines.join("\n");
+    const memResult = lines.join("\n");
+    _memoryCache.set(userId, { value: memResult, expiresAt: Date.now() + MEMORY_CACHE_TTL_MS });
+    return memResult;
   } catch (err) {
     log.warn("Failed to load user memory (non-fatal)", { error: getErrorMessage(err) });
     return "";

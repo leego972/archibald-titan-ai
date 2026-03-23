@@ -62,6 +62,7 @@ import { proxyMakerRouter } from "./proxy-maker-router";
 import { binCheckerRouter } from "./bin-checker-router";
 import { proxyRotationRouter } from "./proxy-rotation-router";
 import { ipRotationRouter } from "./ip-rotation-router";
+import { webAgentRouter } from "./web-agent-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -151,6 +152,7 @@ export const appRouter = router({
   binChecker: binCheckerRouter,
   proxyRotation: proxyRotationRouter,
   ipRotation: ipRotationRouter,
+  webAgent: webAgentRouter,
 });
 
 export type AppRouter = typeof appRouter;

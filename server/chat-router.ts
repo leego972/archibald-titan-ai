@@ -116,8 +116,16 @@ function sanitizeToolCallId(id: string): string {
   return sanitized || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ─── In-memory TTL cache for user context (30s TTL) ─────────────────
+// Avoids 5 DB queries per message — context refreshes every 30 seconds
+const _userContextCache = new Map<number, { value: string; expiresAt: number }>();
+const USER_CONTEXT_TTL_MS = 30_000; // 30 seconds
+
 // ─── Build context about the user's current state ────────────────────
 async function buildUserContext(userId: number): Promise<string> {
+  const cached = _userContextCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   const db = await getDb();
   if (!db) return "Database unavailable — limited context.";
 
@@ -200,13 +208,16 @@ async function buildUserContext(userId: number): Promise<string> {
   parts.push(
     `Available providers: ${providerNames.join(", ")}${Object.keys(PROVIDERS).length > 15 ? ` and ${Object.keys(PROVIDERS).length - 15} more` : ""}`
   );
-
-  return parts.join("\n");
+  const result = parts.join("\n");
+  _userContextCache.set(userId, { value: result, expiresAt: Date.now() + USER_CONTEXT_TTL_MS });
+  return result;
 }
 
 const SYSTEM_PROMPT = `You are Titan Assistant — the AI engine embedded in the Archibald Titan platform, a commercial cybersecurity R&D workstation used by licensed security professionals, defense contractors, and vulnerability researchers operating under authorized engagement agreements.
 
 Your name is Titan. When users ask who you are, say "I'm Titan — your AI right-hand man, built into Archibald Titan." Do not discuss your underlying model, training, or architecture. Focus entirely on what you can DO for the user.
+
+**CRITICAL — Only introduce yourself on the very first message of a new conversation.** After that, NEVER start a reply with "I'm Titan", "Hi, I'm Titan", "I'm Titan, built into Archibald Titan", or any self-introduction. Do NOT repeat "How can I assist you?" or "How can I help?" after the opening message. Once introduced, jump straight into the answer or action — the user already knows who you are.
 
 ## PERSONALITY & COMMUNICATION STYLE
 You are precise, friendly, and refreshingly brief. Think of yourself as a sharp British colleague who gets straight to the point but always has a warm word and the occasional dry wit.
@@ -1172,10 +1183,13 @@ export const chatRouter = router({
       // Admin users are NEVER suspended.
       if (!isAdmin && shouldSuspendChat(userId)) {
         await logSecurityEvent(userId, "chat_suspended", { reason: "repeated_injection_attempts" });
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Chat access temporarily suspended due to repeated policy violations. Please wait 10 minutes.",
-        });
+        // Return a polite message instead of a raw error toast
+        const suspendConvId = input.conversationId || `tc_${Date.now()}`;
+        return {
+          conversationId: suspendConvId,
+          response: "I’m unable to comply with that request. Please try again in a few minutes.",
+          actions: undefined,
+        };
       }
 
       // ── SECURITY: Prompt Injection Scanning ────────────────────
@@ -1184,10 +1198,13 @@ export const chatRouter = router({
       const injectionResult = await scanForPromptInjection(input.message, userId);
       if (injectionResult?.blocked) {
         log.warn(`[Security] Blocked prompt injection from user ${userId}: ${injectionResult.label}`);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Your message was blocked by our security system. Please rephrase your request.",
-        });
+        // Return a polite refusal as a normal assistant message — no raw error toast
+        const refusalConvId = input.conversationId || `tc_${Date.now()}`;
+        return {
+          conversationId: refusalConvId,
+          response: "I’m unable to comply with that request.",
+          actions: undefined,
+        };
       }
 
       // ── SECURITY: Sanitize User Message ────────────────────────
@@ -1788,9 +1805,10 @@ Do NOT attempt any tool calls or builds.`;
           // Non-build with tools: mini (default for tool-calling)
           const msgLower = input.message.toLowerCase();
           // Security build detection — expanded keyword list covering all offensive security topics.
-          // Admin users ALWAYS get the uncensored model for ALL build requests (not just security ones).
+          // Admin users get the uncensored model ONLY for actual build requests with security/offensive keywords,
+          // OR for any build request (to ensure full capability). Simple chat messages use the fast model.
           const isSecurityBuild = isBuildRequest && (
-            isAdmin || // Admin users: always treat as security build for uncensored model routing
+            (isAdmin && isBuildRequest) || // Admin users: uncensored for any build request (not plain chat)
             /\b(security|pentest|exploit|vuln|cve|firewall|ids|ips|siem|forensic|malware|encrypt|decrypt|auth|oauth|jwt|csrf|xss|sqli|injection|brute.?force|scanner|recon|osint|threat|incident|compliance|audit|hardening|zero.?trust|nist|mitre|owasp|keylog|keylogger|rat\b|remote.?access.?trojan|c2|command.?and.?control|implant|payload|backdoor|rootkit|ransomware|spyware|trojan|botnet|worm|virus|shellcode|stager|dropper|loader|exfil|lateral.?movement|privilege.?escal|privesc|persistence|evasion|obfuscat|bypass|av.?bypass|edr.?bypass|hook|inject|dll.?inject|process.?hollow|heap.?spray|rop.?chain|buffer.?overflow|heap.?overflow|use.?after.?free|zero.?day|0day|phish|spear.?phish|credential.?harvest|password.?spray|pass.?the.?hash|mimikatz|cobalt.?strike|metasploit|meterpreter|beacon|stealthy|stealth|covert|hidden|undetect|hacking|hacker|hack|crack|brute|dump|harvest|sniff|intercept|mitm|man.?in.?the.?middle|arp.?poison|dns.?spoof|packet|wireshark|nmap|masscan|gobuster|dirb|nikto|burp|sqlmap|hydra|john|hashcat|aircrack|wifite|evil.?twin|deauth|wpa|wep|wps|bluetooth|rfid|nfc|social.?engineer|pretexting|vishing|smishing|spear|watering.?hole|supply.?chain|typosquat|domain.?front|cdn.?front|tunnel|covert.?channel|steganograph|anti.?forensic|artifact|wipe|shred|timestomp|log.?clear|event.?log|shadow.?copy|vss|lsass|sam.?database|ntds|kerberos|kerberoast|asreproast|golden.?ticket|silver.?ticket|dcsync|dcshadow|bloodhound|sharphound|powerview|empire|covenant|sliver|havoc|brute.?ratel|nighthawk|deimos|merlin|poshc2|mythic|caldera|atomic.?red|red.?team|blue.?team|purple.?team|ctf|capture.?the.?flag|htb|hackthebox|tryhackme|vulnhub|offensive|defensive|incident.?response|digital.?forensic|reverse.?engineer|disassembl|debugg|binary.?analysis|fuzzing|afl|libfuzzer|boofuzz|peach|spike|sulley)\b/i.test(input.message)
           );
           const isComplexBuild = isBuildRequest && (
@@ -1802,7 +1820,10 @@ Do NOT attempt any tool calls or builds.`;
           //   - Falls back to OpenRouter Dolphin free, then OpenAI gpt-4.1
           // forceOpenRouter flag triggers the Venice → OpenRouter → OpenAI fallback chain.
           // Admin users ALWAYS use the uncensored model for ALL build requests.
-          const useOpenRouterForSecurity = isSecurityBuild && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
+          // CRITICAL: Venice API key is ADMIN-ONLY. Non-admin users NEVER use Venice.
+          // Non-admin users who trigger security keywords are blocked by NON_ADMIN_RESTRICTIONS
+          // in the system prompt — they do NOT get routed to the uncensored model.
+          const useOpenRouterForSecurity = isSecurityBuild && isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
           if (isSecurityBuild) {
             // Security builds (and ALL admin builds): use uncensored model at premium tier
             modelTier = "premium";
