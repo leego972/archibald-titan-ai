@@ -383,26 +383,17 @@ function FetcherLayoutContent({
     (item) => item.path === location || (item.path !== "/dashboard" && location.startsWith(item.path))
   );
   const isMobile = useIsMobile();
-  // Proxy Rotation status for sidebar toggle
-  const proxyActiveQuery = trpc.proxyRotation.getActiveState.useQuery(undefined, { retry: false });
-  const setProxyActive = trpc.proxyRotation.setActive.useMutation({
-    onSuccess: (data) => {
-      proxyActiveQuery.refetch();
-      toast.success(data.active ? "Proxy rotation enabled" : "Proxy rotation disabled");
-    },
-    onError: (err) => {
-      const msg = err.message ?? "";
-      if (msg.includes("No proxies") || msg.includes("proxy")) {
-        toast.error("No proxies configured", {
-          action: { label: "Add Proxies", onClick: () => setLocation("/proxy-rotation") },
-        });
-      } else {
-        toast.error(err.message);
-      }
-    },
+  // IP Rotation status for sidebar toggle
+  const ipRotationQuery = trpc.ipRotation.getActiveState.useQuery(undefined, { retry: false, refetchInterval: 5000 });
+  const enableAllLayers = trpc.ipRotation.enableAll.useMutation({
+    onSuccess: () => { ipRotationQuery.refetch(); toast.success("IP Rotation enabled — all 3 layers active"); },
+    onError: (err) => toast.error(err.message),
   });
-  const proxyActive = proxyActiveQuery.data?.active ?? false;
-  const proxyHasProxies = proxyActiveQuery.data?.hasProxies ?? false;
+  const disableAllLayers = trpc.ipRotation.disableAll.useMutation({
+    onSuccess: () => { ipRotationQuery.refetch(); toast.success("IP Rotation disabled"); },
+    onError: (err) => toast.error(err.message),
+  });
+  const proxyActive = ipRotationQuery.data?.active ?? false;
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -589,29 +580,25 @@ function FetcherLayoutContent({
                 )}
               </div>
             )}
-            {/* Proxy Rotation quick toggle */}
+            {/* IP Rotation quick toggle */}
             <div className="flex items-center gap-2 px-1 pb-1">
               <button
                 onClick={() => {
-                  if (setProxyActive.isPending) return;
-                  if (!proxyActive && !proxyHasProxies) {
-                    setLocation("/proxy-rotation");
-                    return;
-                  }
-                  setProxyActive.mutate({ active: !proxyActive });
+                  if (enableAllLayers.isPending || disableAllLayers.isPending) return;
+                  if (proxyActive) { disableAllLayers.mutate(); } else { enableAllLayers.mutate(); }
                 }}
-                disabled={setProxyActive.isPending}
-                title={proxyActive ? "Proxy Rotation: ON — click to disable" : proxyHasProxies ? "Proxy Rotation: OFF — click to enable" : "No proxies configured — click to set up"}
+                disabled={enableAllLayers.isPending || disableAllLayers.isPending}
+                title={proxyActive ? "IP Rotation ON (3 layers) — tap to disable" : "IP Rotation OFF — tap to enable all 3 layers"}
                 className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   proxyActive
                     ? "bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30"
                     : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
                 } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
               >
-                {setProxyActive.isPending
+                {(enableAllLayers.isPending || disableAllLayers.isPending)
                   ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                   : <Shield className="h-3.5 w-3.5 shrink-0" />}
-                <span className="group-data-[collapsible=icon]:hidden">Proxy {proxyActive ? "ON" : "OFF"}</span>
+                <span className="group-data-[collapsible=icon]:hidden">IP Rot {proxyActive ? "ON" : "OFF"}</span>
               </button>
             </div>
             {/* Standalone Logout Button — always visible in sidebar footer */}
