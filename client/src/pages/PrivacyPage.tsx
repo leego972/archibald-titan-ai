@@ -26,9 +26,14 @@ export default function PrivacyPage() {
       {/* Content */}
       <div className="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
-          <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">Legal</span>
+          <span className="text-sm font-semibold text-red-400 tracking-widest uppercase">Legal</span>
           <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">Privacy Policy</h1>
           <p className="mt-4 text-white/40">Last updated: February 15, 2026</p>
+          <div className="mt-6 p-5 rounded-xl border border-white/8 bg-white/[0.02]">
+            <p className="text-sm text-white/60 leading-relaxed">
+              <strong className="text-white">Archibald Titan</strong> is a security and operator platform built around <strong className="text-white">Titan Builder</strong> — a command center for running security tools, building software, managing credentials, launching marketplace modules, and automating workflows. This policy covers how the entire platform ecosystem handles your data, including Titan Builder, Titan Storage, the Grand Bazaar marketplace, credential management, and all cloud-backed services.
+            </p>
+          </div>
         </div>
 
         <div className="prose prose-invert max-w-none space-y-8">
@@ -36,10 +41,10 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-bold text-white mb-4 pb-2 border-b border-white/10">1. Overview</h2>
             <p className="text-sm text-white/60 leading-relaxed mb-3">
-              Archibald Titan ("the Software," "the Platform," "we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how the Software handles information when you use our locally-installed application, cloud-hosted services, AI assistant, code execution sandboxes, cybersecurity research tools, and associated web services.
+              Archibald Titan ("the Platform," "we," "us," or "our") is a security and operator platform built around Titan Builder — the command center of the Archibald Titan ecosystem. The Platform includes Titan Builder (AI command center), the Grand Bazaar marketplace, Titan Storage, credential management, security tooling, team workflows, and automation. This Privacy Policy explains how the Platform handles information across all of these services.
             </p>
             <p className="text-sm text-white/60 leading-relaxed">
-              The fundamental design principle of Archibald Titan is local-first operation for credential management. However, the Platform also provides cloud-based services including AI-powered assistance, code execution sandboxes, website replication, security scanning, and subscription-based features. This Privacy Policy describes what information may be collected, processed, and stored across all Platform capabilities.
+              Credential management is designed with a local-first principle — your API keys, passwords, and vault contents stay on your machine. Cloud-based services (AI assistance, sandboxes, storage, security scanning, marketplace, team features) operate with the data handling practices described below. This policy covers both.
             </p>
           </section>
 

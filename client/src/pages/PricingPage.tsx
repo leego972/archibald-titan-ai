@@ -578,18 +578,21 @@ export default function PricingPage() {
       {/* Hero */}
       <section className="pt-32 pb-8 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold mb-6 tracking-wide uppercase">
             <Sparkles className="w-3.5 h-3.5" />
-            Simple, transparent pricing
+            One stack. Six tiers.
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4">
-            Choose Your{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-              Power Level
+            Pick your{" "}
+            <span className="bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
+              operator level
             </span>
           </h1>
-          <p className="text-lg text-white/40 max-w-2xl mx-auto mb-4">
-            Start free and scale as you grow. All plans include AES-256 encryption and AI-powered tools. Upgrade to <span className="text-cyan-400 font-medium">Cyber</span> for the full security suite.
+          <p className="text-lg text-white/50 max-w-2xl mx-auto mb-3">
+            Every tier unlocks more of the Titan Builder ecosystem — more credits, more tools, more of the stack. Start free. Go as deep as you need.
+          </p>
+          <p className="text-sm text-white/30 max-w-xl mx-auto mb-4">
+            All plans include <strong className="text-white/50">Titan Builder</strong> (AI command center), <strong className="text-white/50">Grand Bazaar</strong> marketplace access, <strong className="text-white/50">Titan Storage</strong>, credential management, and the credit system.
           </p>
           {isAuthenticated && currentPlan !== "free" && (
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
@@ -603,6 +606,28 @@ export default function PricingPage() {
       {/* Toggle */}
       <section className="px-6">
         <BillingToggle interval={interval} setInterval={setInterval} />
+      </section>
+
+      {/* Stack explainer strip */}
+      <section className="px-6 pb-10">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {[
+              { label: "Titan Builder", sub: "AI command center" },
+              { label: "Grand Bazaar", sub: "Software marketplace" },
+              { label: "Titan Storage", sub: "Cloudflare R2" },
+              { label: "Credits", sub: "Compute metering" },
+              { label: "Integrations", sub: "15+ providers" },
+              { label: "Security Suite", sub: "Cyber & above" },
+              { label: "Offensive Tools", sub: "Titan tier only" },
+            ].map((item) => (
+              <div key={item.label} className="flex flex-col items-center text-center p-3 rounded-xl border border-white/5 bg-white/[0.02]">
+                <span className="text-xs font-bold text-white/70">{item.label}</span>
+                <span className="text-[10px] text-white/30 mt-0.5">{item.sub}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Main Tier Cards (Free, Pro, Enterprise) */}
@@ -638,8 +663,8 @@ export default function PricingPage() {
         <section className="px-6 pb-16">
           <div className="w-full max-w-6xl">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Enterprise, Cyber+, & Titan Tiers</h2>
-              <p className="text-white/40 text-sm">Team management, offensive security tools, and dedicated infrastructure for organizations at scale</p>
+              <h2 className="text-2xl font-bold text-white mb-2">Enterprise, Cyber+, & Titan</h2>
+              <p className="text-white/40 text-sm">Unlock the full security suite, offensive tooling, and team infrastructure. These tiers are for operators who need the whole stack.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {advancedTiers.map((tier) => (
