@@ -5291,7 +5291,7 @@ async function r2Put(relKey, data, contentType, originalFileName) {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "cfut_gln5fncgAVAU4KHgmNnD0vslpYpXaWGDVpHP3BjJ62bbeb9a"
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || ""
     }
   });
   const key = relKey.replace(/^\/+/, "");
@@ -5350,7 +5350,7 @@ async function storageDelete(relKey) {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "cfut_gln5fncgAVAU4KHgmNnD0vslpYpXaWGDVpHP3BjJ62bbeb9a"
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || ""
     }
   });
   const key = relKey.replace(/^\/+/, "");
@@ -46367,7 +46367,7 @@ var blog_seed_exports = {};
 __export(blog_seed_exports, {
   seedBlogPosts: () => seedBlogPosts
 });
-import { eq as eq84, sql as sql39 } from "drizzle-orm";
+import { eq as eq85, sql as sql39 } from "drizzle-orm";
 async function seedBlogPosts() {
   const db = await getDb();
   if (!db) {
@@ -46378,7 +46378,7 @@ async function seedBlogPosts() {
   let inserted = 0;
   for (const post of posts) {
     try {
-      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq84(blogPosts.slug, post.slug)).limit(1);
+      const existing = await db.select({ id: blogPosts.id }).from(blogPosts).where(eq85(blogPosts.slug, post.slug)).limit(1);
       if (existing.length > 0) continue;
       const wordCount = post.content.split(/\s+/).length;
       const readingTime = Math.ceil(wordCount / 200);
@@ -46416,17 +46416,17 @@ async function seedBlogPosts() {
     for (const cat of categories) {
       try {
         const name = cat.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-        const existing = await db.select().from(blogCategories).where(eq84(blogCategories.slug, cat)).limit(1);
+        const existing = await db.select().from(blogCategories).where(eq85(blogCategories.slug, cat)).limit(1);
         if (existing.length === 0) {
-          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq84(blogPosts.category, cat));
+          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq85(blogPosts.category, cat));
           await db.insert(blogCategories).values({
             name,
             slug: cat,
             postCount: count10
           });
         } else {
-          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq84(blogPosts.category, cat));
-          await db.update(blogCategories).set({ postCount: count10 }).where(eq84(blogCategories.slug, cat));
+          const [{ count: count10 }] = await db.select({ count: sql39`count(*)` }).from(blogPosts).where(eq85(blogPosts.category, cat));
+          await db.update(blogCategories).set({ postCount: count10 }).where(eq85(blogCategories.slug, cat));
         }
       } catch (err) {
       }
@@ -61486,16 +61486,16 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85 } = await import("drizzle-orm");
+      const { eq: eq86 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) throw new TRPCError28({ code: "INTERNAL_SERVER_ERROR" });
-      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq85(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+      const [payment] = await dbConn.select().from(cryptoPayments2).where(eq86(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
       if (!payment) throw new TRPCError28({ code: "NOT_FOUND" });
       if (payment.status === "pending" && isBinancePayConfigured()) {
         try {
           const binanceStatus = await queryOrderStatus(input.merchantTradeNo);
           if (binanceStatus?.data?.status === "PAID") {
-            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq85(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
+            await dbConn.update(cryptoPayments2).set({ status: "completed", paidAt: /* @__PURE__ */ new Date(), webhookData: JSON.stringify(binanceStatus.data) }).where(eq86(cryptoPayments2.merchantTradeNo, input.merchantTradeNo));
             return { ...payment, status: "completed" };
           }
         } catch (err) {
@@ -61515,7 +61515,7 @@ var crowdfundingRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { cryptoPayments: cryptoPayments2, platformRevenue: platformRevenue2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, sql: sql40 } = await import("drizzle-orm");
+      const { eq: eq86, sql: sql40 } = await import("drizzle-orm");
       const dbConn = await getDb2();
       if (!dbConn) return { totalRevenue: 0, totalFees: 0, totalPayments: 0, completedPayments: 0 };
       const payments = await dbConn.select().from(cryptoPayments2);
@@ -61793,12 +61793,12 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
-    await db.update(sandboxes3).set({ name: input.name }).where(and65(eq85(sandboxes3.id, input.sandboxId), eq85(sandboxes3.userId, ctx.user.id)));
+    await db.update(sandboxes3).set({ name: input.name }).where(and66(eq86(sandboxes3.id, input.sandboxId), eq86(sandboxes3.userId, ctx.user.id)));
     return { success: true };
   }),
   /**
@@ -61848,14 +61848,14 @@ var sandboxRouter = router({
   ).mutation(async ({ input, ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxes: sandboxes3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85 } = await import("drizzle-orm");
+    const { eq: eq86 } = await import("drizzle-orm");
     const sandbox = await getSandbox(input.sandboxId, ctx.user.id);
     if (!sandbox) throw new Error("Sandbox not found");
     const envVars = { ...sandbox.envVars || {} };
     delete envVars[input.key];
     const db = await getDb2();
     if (!db) throw new Error("Database not available");
-    await db.update(sandboxes3).set({ envVars }).where(eq85(sandboxes3.id, input.sandboxId));
+    await db.update(sandboxes3).set({ envVars }).where(eq86(sandboxes3.id, input.sandboxId));
     return { success: true };
   }),
   /**
@@ -61980,13 +61980,13 @@ var sandboxRouter = router({
   projectFiles: protectedProcedure.input(z34.object({ conversationId: z34.number().int().optional() }).optional()).query(async ({ ctx }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65, desc: desc52 } = await import("drizzle-orm");
+    const { eq: eq86, and: and66, desc: desc52 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { files: [], projects: [] };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { files: [], projects: [] };
     const sbId = sandboxes3[0].id;
-    const allFiles = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.sandboxId, sbId), eq85(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+    const allFiles = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sbId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
     const projectMap = /* @__PURE__ */ new Map();
     for (const file of allFiles) {
       const parts = file.filePath.split("/");
@@ -62019,12 +62019,12 @@ var sandboxRouter = router({
   projectFileContent: protectedProcedure.input(z34.object({ fileId: z34.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { content: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { content: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.id, input.fileId), eq85(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { content: null, error: "File not found" };
     if (file.content) {
       return { content: file.content, path: file.filePath };
@@ -62047,12 +62047,12 @@ var sandboxRouter = router({
   projectFileDownloadUrl: protectedProcedure.input(z34.object({ fileId: z34.number().int() })).query(async ({ ctx, input }) => {
     const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
     const db = await getDb2();
     if (!db) return { url: null, error: "Database unavailable" };
     const sandboxes3 = await listSandboxes(ctx.user.id);
     if (sandboxes3.length === 0) return { url: null, error: "No sandbox found" };
-    const [file] = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.id, input.fileId), eq85(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+    const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
     if (!file) return { url: null, error: "File not found" };
     if (file.s3Key) {
       try {
@@ -62069,12 +62069,12 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, and: and65 } = await import("drizzle-orm");
+      const { eq: eq86, and: and66 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, error: "No sandbox found" };
-      const [file] = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.id, input.fileId), eq85(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
+      const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, input.fileId), eq86(sandboxFiles2.sandboxId, sandboxes3[0].id))).limit(1);
       if (!file) return { success: false, error: "File not found" };
       if (file.s3Key) {
         try {
@@ -62083,7 +62083,7 @@ var sandboxRouter = router({
         } catch {
         }
       }
-      await db.delete(sandboxFiles2).where(eq85(sandboxFiles2.id, input.fileId));
+      await db.delete(sandboxFiles2).where(eq86(sandboxFiles2.id, input.fileId));
       return { success: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -62095,29 +62095,29 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, and: and65, like: like8, notLike, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq86, and: and66, like: like8, notLike, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found \u2014 please create a project first" };
       let allFiles = [];
       if (input.projectName === "Ungrouped" || input.projectName === "general") {
-        allFiles = await db.select().from(sandboxFiles2).where(and65(
-          eq85(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        allFiles = await db.select().from(sandboxFiles2).where(and66(
+          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
           notLike(sandboxFiles2.filePath, "%/%")
         ));
       } else {
-        const files = await db.select().from(sandboxFiles2).where(and65(
-          eq85(sandboxFiles2.sandboxId, sandboxes3[0].id),
+        const files = await db.select().from(sandboxFiles2).where(and66(
+          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
           like8(sandboxFiles2.filePath, `${input.projectName}/%`)
         ));
-        const exactFiles = await db.select().from(sandboxFiles2).where(and65(
-          eq85(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq85(sandboxFiles2.filePath, input.projectName)
+        const exactFiles = await db.select().from(sandboxFiles2).where(and66(
+          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq86(sandboxFiles2.filePath, input.projectName)
         ));
-        const byProjectName = await db.select().from(sandboxFiles2).where(and65(
-          eq85(sandboxFiles2.sandboxId, sandboxes3[0].id),
-          eq85(sandboxFiles2.projectName, input.projectName)
+        const byProjectName = await db.select().from(sandboxFiles2).where(and66(
+          eq86(sandboxFiles2.sandboxId, sandboxes3[0].id),
+          eq86(sandboxFiles2.projectName, input.projectName)
         ));
         const idSet = /* @__PURE__ */ new Set();
         allFiles = [...files, ...exactFiles, ...byProjectName].filter((f) => {
@@ -62150,14 +62150,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, and: and65, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq86, and: and66, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
-      const files = await db.select().from(sandboxFiles2).where(and65(
+      const files = await db.select().from(sandboxFiles2).where(and66(
         inArray3(sandboxFiles2.id, input.fileIds),
-        eq85(sandboxFiles2.sandboxId, sandboxes3[0].id)
+        eq86(sandboxFiles2.sandboxId, sandboxes3[0].id)
       ));
       if (files.length === 0) return { success: false, deleted: 0, error: "No matching files found" };
       for (const file of files) {
@@ -62183,14 +62183,14 @@ var sandboxRouter = router({
     try {
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, inArray: inArray3 } = await import("drizzle-orm");
+      const { eq: eq86, inArray: inArray3 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) return { success: false, deleted: 0, error: "Database unavailable" };
       const sandboxes3 = await listSandboxes(ctx.user.id);
       if (sandboxes3.length === 0) return { success: false, deleted: 0, error: "No sandbox found" };
       let totalDeleted = 0;
       for (const sb of sandboxes3) {
-        const allFiles = await db.select().from(sandboxFiles2).where(eq85(sandboxFiles2.sandboxId, sb.id));
+        const allFiles = await db.select().from(sandboxFiles2).where(eq86(sandboxFiles2.sandboxId, sb.id));
         if (allFiles.length === 0) continue;
         for (const file of allFiles) {
           if (file.s3Key) {
@@ -68799,12 +68799,12 @@ var marketplaceRouter = router({
         const dbInstance = await getDb();
         if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
         const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq85, sql: sqlOp } = await import("drizzle-orm");
+        const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
         await dbInstance.update(creditBalances3).set({
           credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
           lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-        }).where(eq85(creditBalances3.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+        }).where(eq86(creditBalances3.userId, ctx.user.id));
+        const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
         await dbInstance.insert(creditTransactions3).values({
           userId: ctx.user.id,
           amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -68922,12 +68922,12 @@ var marketplaceRouter = router({
       const dbInstance = await getDb();
       if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
       const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, sql: sqlOp } = await import("drizzle-orm");
+      const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`
-      }).where(eq85(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq86(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -SELLER_ANNUAL_FEE_CREDITS,
@@ -69117,9 +69117,9 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, sql: sql40 } = await import("drizzle-orm");
+    const { eq: eq86, sql: sql40 } = await import("drizzle-orm");
     return await dbInstance.transaction(async (tx) => {
-      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
+      const buyerBal = await tx.select({ credits: creditBalances3.credits, isUnlimited: creditBalances3.isUnlimited }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).for("update").limit(1);
       if (buyerBal.length === 0) throw new TRPCError31({ code: "BAD_REQUEST", message: "No credit balance found" });
       if (buyerBal[0].credits < listing.priceCredits && !buyerBal[0].isUnlimited) {
         throw new TRPCError31({ code: "BAD_REQUEST", message: `Insufficient credits. Need ${listing.priceCredits}, have ${buyerBal[0].credits}` });
@@ -69128,9 +69128,9 @@ var marketplaceRouter = router({
         await tx.update(creditBalances3).set({
           credits: sql40`${creditBalances3.credits} - ${listing.priceCredits}`,
           lifetimeCreditsUsed: sql40`${creditBalances3.lifetimeCreditsUsed} + ${listing.priceCredits}`
-        }).where(eq85(creditBalances3.userId, ctx.user.id));
+        }).where(eq86(creditBalances3.userId, ctx.user.id));
       }
-      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+      const updatedBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
       const buyerBalanceAfter = updatedBal[0]?.credits ?? 0;
       await tx.insert(creditTransactions3).values({
         userId: ctx.user.id,
@@ -69141,16 +69141,16 @@ var marketplaceRouter = router({
       });
       const sellerShare = Math.floor(listing.priceCredits * (1 - PLATFORM_COMMISSION_RATE));
       if (sellerShare > 0) {
-        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
+        const sellerBal = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, listing.sellerId)).for("update").limit(1);
         if (sellerBal.length === 0) {
           await tx.insert(creditBalances3).values({ userId: listing.sellerId, credits: sellerShare, lifetimeCreditsAdded: sellerShare });
         } else {
           await tx.update(creditBalances3).set({
             credits: sql40`${creditBalances3.credits} + ${sellerShare}`,
             lifetimeCreditsAdded: sql40`${creditBalances3.lifetimeCreditsAdded} + ${sellerShare}`
-          }).where(eq85(creditBalances3.userId, listing.sellerId));
+          }).where(eq86(creditBalances3.userId, listing.sellerId));
         }
-        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, listing.sellerId)).limit(1);
+        const sellerUpdated = await tx.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, listing.sellerId)).limit(1);
         await tx.insert(creditTransactions3).values({
           userId: listing.sellerId,
           amount: sellerShare,
@@ -69418,13 +69418,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${FEATURE_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${FEATURE_COST}`
-      }).where(eq85(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq86(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -FEATURE_COST,
@@ -69433,7 +69433,7 @@ var marketplaceRouter = router({
         balanceAfter: updatedBal[0]?.credits ?? 0
       });
     }
-    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq85(marketplaceListings2.id, input.listingId));
+    await dbInstance.update(marketplaceListings2).set({ featured: true }).where(eq86(marketplaceListings2.id, input.listingId));
     return { success: true, cost: FEATURE_COST, message: "Listing featured for 30 days" };
   }),
   /** Boost a listing — costs 200 credits, increases visibility for 7 days */
@@ -69450,13 +69450,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${BOOST_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${BOOST_COST}`
-      }).where(eq85(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq86(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -BOOST_COST,
@@ -69467,7 +69467,7 @@ var marketplaceRouter = router({
     }
     await dbInstance.update(marketplaceListings2).set({
       viewCount: sqlOp`${marketplaceListings2.viewCount} + 100`
-    }).where(eq85(marketplaceListings2.id, input.listingId));
+    }).where(eq86(marketplaceListings2.id, input.listingId));
     return { success: true, cost: BOOST_COST, message: "Listing boosted for 7 days" };
   }),
   /** Verify seller — costs 1000 credits, gets verified badge permanently */
@@ -69483,13 +69483,13 @@ var marketplaceRouter = router({
     const dbInstance = await getDb();
     if (!dbInstance) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR" });
     const { creditBalances: creditBalances3, creditTransactions: creditTransactions3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, sql: sqlOp } = await import("drizzle-orm");
+    const { eq: eq86, sql: sqlOp } = await import("drizzle-orm");
     if (!balance.isUnlimited) {
       await dbInstance.update(creditBalances3).set({
         credits: sqlOp`${creditBalances3.credits} - ${VERIFY_COST}`,
         lifetimeCreditsUsed: sqlOp`${creditBalances3.lifetimeCreditsUsed} + ${VERIFY_COST}`
-      }).where(eq85(creditBalances3.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq85(creditBalances3.userId, ctx.user.id)).limit(1);
+      }).where(eq86(creditBalances3.userId, ctx.user.id));
+      const updatedBal = await dbInstance.select({ credits: creditBalances3.credits }).from(creditBalances3).where(eq86(creditBalances3.userId, ctx.user.id)).limit(1);
       await dbInstance.insert(creditTransactions3).values({
         userId: ctx.user.id,
         amount: -VERIFY_COST,
@@ -69519,8 +69519,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) return [];
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85 } = await import("drizzle-orm");
-    return database.select().from(sellerPayoutMethods3).where(eq85(sellerPayoutMethods3.userId, ctx.user.id));
+    const { eq: eq86 } = await import("drizzle-orm");
+    return database.select().from(sellerPayoutMethods3).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
   }),
   /** Add a new payout method */
   addPayoutMethod: protectedProcedure.input(z43.object({
@@ -69541,8 +69541,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerProfiles: sellerProfiles3, sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
-    const profiles = await database.select().from(sellerProfiles3).where(eq85(sellerProfiles3.userId, ctx.user.id)).limit(1);
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const profiles = await database.select().from(sellerProfiles3).where(eq86(sellerProfiles3.userId, ctx.user.id)).limit(1);
     if (profiles.length === 0) throw new TRPCError31({ code: "FORBIDDEN", message: "You must be a registered seller to add payout methods" });
     const seller = profiles[0];
     if (input.methodType === "bank_transfer") {
@@ -69555,9 +69555,9 @@ var marketplaceRouter = router({
       }
     }
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq85(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
     }
-    const existing = await database.select().from(sellerPayoutMethods3).where(eq85(sellerPayoutMethods3.userId, ctx.user.id));
+    const existing = await database.select().from(sellerPayoutMethods3).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
     const shouldBeDefault = existing.length === 0 || input.isDefault;
     let stripeConnectAccountId;
     if (input.methodType === "stripe_connect") {
@@ -69644,11 +69644,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and65(eq85(sellerPayoutMethods3.id, input.id), eq85(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0) throw new TRPCError31({ code: "NOT_FOUND", message: "Payout method not found" });
     if (input.isDefault) {
-      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq85(sellerPayoutMethods3.userId, ctx.user.id));
+      await database.update(sellerPayoutMethods3).set({ isDefault: false }).where(eq86(sellerPayoutMethods3.userId, ctx.user.id));
     }
     const updateData = {};
     if (input.label !== void 0) updateData.label = input.label;
@@ -69660,7 +69660,7 @@ var marketplaceRouter = router({
     if (input.bankSwiftBic !== void 0) updateData.bankSwiftBic = input.bankSwiftBic;
     if (input.paypalEmail !== void 0) updateData.paypalEmail = input.paypalEmail;
     if (input.isDefault !== void 0) updateData.isDefault = input.isDefault;
-    await database.update(sellerPayoutMethods3).set(updateData).where(and65(eq85(sellerPayoutMethods3.id, input.id), eq85(sellerPayoutMethods3.userId, ctx.user.id)));
+    await database.update(sellerPayoutMethods3).set(updateData).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Delete a payout method */
@@ -69668,8 +69668,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
-    await database.delete(sellerPayoutMethods3).where(and65(eq85(sellerPayoutMethods3.id, input.id), eq85(sellerPayoutMethods3.userId, ctx.user.id)));
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    await database.delete(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.id), eq86(sellerPayoutMethods3.userId, ctx.user.id)));
     return { success: true };
   }),
   /** Get Stripe Connect onboarding link (for incomplete onboarding) */
@@ -69677,8 +69677,8 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database || !ctx.user?.id) throw new TRPCError31({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
     const { sellerPayoutMethods: sellerPayoutMethods3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, and: and65 } = await import("drizzle-orm");
-    const methods = await database.select().from(sellerPayoutMethods3).where(and65(eq85(sellerPayoutMethods3.id, input.payoutMethodId), eq85(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
+    const { eq: eq86, and: and66 } = await import("drizzle-orm");
+    const methods = await database.select().from(sellerPayoutMethods3).where(and66(eq86(sellerPayoutMethods3.id, input.payoutMethodId), eq86(sellerPayoutMethods3.userId, ctx.user.id))).limit(1);
     if (methods.length === 0 || !methods[0].stripeConnectAccountId) {
       throw new TRPCError31({ code: "NOT_FOUND", message: "Stripe Connect payout method not found" });
     }
@@ -69702,11 +69702,11 @@ var marketplaceRouter = router({
     const database = await getDb();
     if (!database) return { users: [], files: [] };
     const { marketplaceListings: marketplaceListings2, sellerProfiles: sellerProfiles3, users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq85, isNotNull: isNotNull4 } = await import("drizzle-orm");
+    const { eq: eq86, isNotNull: isNotNull4 } = await import("drizzle-orm");
     if (input.userId) {
-      const profiles = await database.select().from(sellerProfiles3).where(eq85(sellerProfiles3.userId, input.userId)).limit(1);
+      const profiles = await database.select().from(sellerProfiles3).where(eq86(sellerProfiles3.userId, input.userId)).limit(1);
       if (profiles.length === 0) return { users: [], files: [] };
-      const listings = await database.select().from(marketplaceListings2).where(eq85(marketplaceListings2.sellerId, profiles[0].id));
+      const listings = await database.select().from(marketplaceListings2).where(eq86(marketplaceListings2.sellerId, profiles[0].id));
       return {
         users: [],
         files: listings.filter((l) => l.fileUrl).map((l) => ({
@@ -69726,7 +69726,7 @@ var marketplaceRouter = router({
     const allProfiles = await database.select().from(sellerProfiles3);
     const userFiles = [];
     for (const profile of allProfiles) {
-      const listings = await database.select().from(marketplaceListings2).where(eq85(marketplaceListings2.sellerId, profile.id));
+      const listings = await database.select().from(marketplaceListings2).where(eq86(marketplaceListings2.sellerId, profile.id));
       const filesCount = listings.filter((l) => l.fileUrl).length;
       if (filesCount > 0) {
         userFiles.push({
@@ -78197,6 +78197,134 @@ var webAgentRouter = router({
   })
 });
 
+// server/vpn-router.ts
+init_trpc();
+init_db();
+init_schema();
+init_credit_service();
+init_subscription_gate();
+import { z as z62 } from "zod";
+import { TRPCError as TRPCError45 } from "@trpc/server";
+import { eq as eq80, and as and63 } from "drizzle-orm";
+var SMARTPROXY_API_URL = "https://api.smartproxy.com/v1";
+var SMARTPROXY_API_KEY = process.env.SMARTPROXY_API_KEY || "01364bc9ba149865b562098c1d60c027f997ca033f2ea9ac1c88298061875dc51a87c6c0581908572b321020a53a40f18b185b05566df372e1953478218fbf3bcf9cee190cf261c8bb15e95470c07870c65ac4db";
+async function getOrCreateSubUser(userId) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const row = await db.select().from(userSecrets).where(and63(eq80(userSecrets.userId, userId), eq80(userSecrets.secretType, "__smartproxy_subuser"))).limit(1);
+  if (row.length) {
+    return JSON.parse(row[0].encryptedValue);
+  }
+  const subUserName = `titan_u${userId}_${Math.random().toString(36).substring(2, 8)}`;
+  const subUserPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  try {
+    const response = await fetch(`${SMARTPROXY_API_URL}/sub-users`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${Buffer.from(SMARTPROXY_API_KEY + ":").toString("base64")}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username: subUserName,
+        password: subUserPassword,
+        traffic_limit: 5
+        // 5GB default limit per user
+      })
+    });
+    if (!response.ok) {
+      console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${response.statusText}`);
+    }
+  } catch (err) {
+    console.warn("[VPN] Smartproxy API unreachable, storing local credentials:", err);
+  }
+  const subUser = { username: subUserName, password: subUserPassword };
+  await db.insert(userSecrets).values({
+    userId,
+    secretType: "__smartproxy_subuser",
+    label: "Smartproxy Sub-User",
+    encryptedValue: JSON.stringify(subUser)
+  });
+  return subUser;
+}
+var vpnRouter = router({
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { active: false, country: "us", serverConfigured: true };
+    const row = await db.select().from(userSecrets).where(and63(eq80(userSecrets.userId, ctx.user.id), eq80(userSecrets.secretType, "__vpn_status"))).limit(1);
+    const status = row.length ? JSON.parse(row[0].encryptedValue) : { active: false, country: "us" };
+    return {
+      active: status.active,
+      country: status.country,
+      serverConfigured: true
+    };
+  }),
+  toggleStatus: protectedProcedure.input(z62.object({
+    active: z62.boolean(),
+    country: z62.string().optional()
+  })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const plan = await getUserPlan(ctx.user.id);
+    if (plan.planId === "free") {
+      throw new TRPCError45({
+        code: "FORBIDDEN",
+        message: "VPN access requires a Pro subscription or higher."
+      });
+    }
+    if (input.active) {
+      const creditCheck = await consumeCredits(ctx.user.id, "vpn_generate", "VPN proxy generation via Smartproxy");
+      if (!creditCheck) {
+        throw new TRPCError45({
+          code: "PAYMENT_REQUIRED",
+          message: "Insufficient credits to generate VPN proxy. Each connection costs 150 credits."
+        });
+      }
+    }
+    try {
+      await getOrCreateSubUser(ctx.user.id);
+      const row = await db.select().from(userSecrets).where(and63(eq80(userSecrets.userId, ctx.user.id), eq80(userSecrets.secretType, "__vpn_status"))).limit(1);
+      const currentCountry = row.length ? JSON.parse(row[0].encryptedValue).country : "us";
+      const newStatus = {
+        active: input.active,
+        country: input.country || currentCountry
+      };
+      if (row.length) {
+        await db.update(userSecrets).set({ encryptedValue: JSON.stringify(newStatus) }).where(and63(eq80(userSecrets.userId, ctx.user.id), eq80(userSecrets.secretType, "__vpn_status")));
+      } else {
+        await db.insert(userSecrets).values({
+          userId: ctx.user.id,
+          secretType: "__vpn_status",
+          label: "VPN Status",
+          encryptedValue: JSON.stringify(newStatus)
+        });
+      }
+      return { success: true, active: newStatus.active, country: newStatus.country };
+    } catch (error) {
+      if (error instanceof TRPCError45) throw error;
+      throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: `Failed to configure VPN: ${error.message}` });
+    }
+  }),
+  getConfig: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const row = await db.select().from(userSecrets).where(and63(eq80(userSecrets.userId, ctx.user.id), eq80(userSecrets.secretType, "__vpn_status"))).limit(1);
+    const status = row.length ? JSON.parse(row[0].encryptedValue) : { active: false, country: "us" };
+    if (!status.active) {
+      throw new TRPCError45({ code: "BAD_REQUEST", message: "VPN is not active" });
+    }
+    const subUser = await getOrCreateSubUser(ctx.user.id);
+    const proxyUsername = `${subUser.username}-country-${status.country.toUpperCase()}`;
+    return {
+      host: "gate.smartproxy.com",
+      port: 7e3,
+      username: proxyUsername,
+      password: subUser.password,
+      protocol: "HTTP/SOCKS5",
+      country: status.country
+    };
+  })
+});
+
 // server/routers.ts
 var appRouter = router({
   files: filesRouter,
@@ -78285,7 +78413,8 @@ var appRouter = router({
   binChecker: binCheckerRouter,
   proxyRotation: proxyRotationRouter,
   ipRotation: ipRotationRouter,
-  webAgent: webAgentRouter
+  webAgent: webAgentRouter,
+  vpn: vpnRouter
 });
 
 // server/_core/serve-static.ts
@@ -78333,7 +78462,7 @@ init_db();
 init_schema();
 import bcrypt3 from "bcryptjs";
 import crypto20 from "crypto";
-import { eq as eq80, and as and63, isNotNull as isNotNull3 } from "drizzle-orm";
+import { eq as eq81, and as and64, isNotNull as isNotNull3 } from "drizzle-orm";
 init_const();
 init_env();
 init_notification();
@@ -78573,7 +78702,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const normalizedEmail = email.trim().toLowerCase();
-      const existing = await db.select({ id: users.id }).from(users).where(eq80(users.email, normalizedEmail)).limit(1);
+      const existing = await db.select({ id: users.id }).from(users).where(eq81(users.email, normalizedEmail)).limit(1);
       if (existing.length > 0) {
         return res.status(409).json({ error: "An account with this email already exists. Please sign in instead." });
       }
@@ -78613,7 +78742,7 @@ function registerEmailAuthRoutes(app) {
       });
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      const newUser = await db.select().from(users).where(eq80(users.openId, openId)).limit(1);
+      const newUser = await db.select().from(users).where(eq81(users.openId, openId)).limit(1);
       if (newUser[0]) {
         await db.insert(identityProviders).values({
           userId: newUser[0].id,
@@ -78664,8 +78793,8 @@ function registerEmailAuthRoutes(app) {
       }
       const normalizedEmail = email.trim().toLowerCase();
       const result = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(
-        and63(
-          eq80(users.email, normalizedEmail),
+        and64(
+          eq81(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -78717,7 +78846,7 @@ function registerEmailAuthRoutes(app) {
         userId: passwordResetTokens.userId,
         expiresAt: passwordResetTokens.expiresAt,
         usedAt: passwordResetTokens.usedAt
-      }).from(passwordResetTokens).where(eq80(passwordResetTokens.token, token)).limit(1);
+      }).from(passwordResetTokens).where(eq81(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link", valid: false });
       }
@@ -78728,7 +78857,7 @@ function registerEmailAuthRoutes(app) {
       if (/* @__PURE__ */ new Date() > resetToken.expiresAt) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one.", valid: false });
       }
-      const userResult = await db.select({ email: users.email }).from(users).where(eq80(users.id, resetToken.userId)).limit(1);
+      const userResult = await db.select({ email: users.email }).from(users).where(eq81(users.id, resetToken.userId)).limit(1);
       return res.json({
         valid: true,
         email: userResult[0]?.email || "your account"
@@ -78757,7 +78886,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(passwordResetTokens).where(eq80(passwordResetTokens.token, token)).limit(1);
+      const result = await db.select().from(passwordResetTokens).where(eq81(passwordResetTokens.token, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired reset link" });
       }
@@ -78769,8 +78898,8 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "This reset link has expired. Please request a new one." });
       }
       const passwordHash = await bcrypt3.hash(password, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq80(users.id, resetToken.userId));
-      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq80(passwordResetTokens.id, resetToken.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, resetToken.userId));
+      await db.update(passwordResetTokens).set({ usedAt: /* @__PURE__ */ new Date() }).where(eq81(passwordResetTokens.id, resetToken.id));
       log76.info(`[Password Reset] Password successfully reset for userId: ${resetToken.userId}`);
       return res.json({
         success: true,
@@ -78805,8 +78934,8 @@ function registerEmailAuthRoutes(app) {
         return res.status(500).json({ error: "Database not available" });
       }
       const result = await db.select().from(users).where(
-        and63(
-          eq80(users.email, normalizedEmail),
+        and64(
+          eq81(users.email, normalizedEmail),
           isNotNull3(users.passwordHash)
         )
       ).limit(1);
@@ -78846,7 +78975,7 @@ function registerEmailAuthRoutes(app) {
         loginUpdate.role = normalizedEmail === ENV.headAdminEmail ? "head_admin" : "admin";
         log76.info(`[EmailAuth] Auto-promoted user to ${loginUpdate.role} on login: ${normalizedEmail}`);
       }
-      await db.update(users).set(loginUpdate).where(eq80(users.id, user.id));
+      await db.update(users).set(loginUpdate).where(eq81(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || normalizedEmail.split("@")[0],
         expiresInMs: ONE_YEAR_MS
@@ -78854,10 +78983,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and63(
-          eq80(identityProviders.userId, user.id),
-          eq80(identityProviders.provider, "email"),
-          eq80(identityProviders.providerAccountId, normalizedEmail)
+        and64(
+          eq81(identityProviders.userId, user.id),
+          eq81(identityProviders.provider, "email"),
+          eq81(identityProviders.providerAccountId, normalizedEmail)
         )
       ).catch(() => {
       });
@@ -78903,7 +79032,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq80(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq81(users.id, sessionUser.id)).limit(1);
       if (result.length === 0 || !result[0].passwordHash) {
         return res.status(400).json({ error: "Password change is not available for OAuth accounts. Please use your OAuth provider to manage your password." });
       }
@@ -78913,7 +79042,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Current password is incorrect" });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq80(users.id, user.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, user.id));
       return res.json({ success: true, message: "Password changed successfully" });
     } catch (error) {
       log76.error("[Email Auth] Change password failed:", { error: String(error) });
@@ -78945,7 +79074,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq80(users.id, sessionUser.id)).limit(1);
+      const result = await db.select().from(users).where(eq81(users.id, sessionUser.id)).limit(1);
       if (result.length === 0) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -78953,7 +79082,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(400).json({ error: "You already have a password set. Use the change password form instead." });
       }
       const passwordHash = await bcrypt3.hash(newPassword, SALT_ROUNDS);
-      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq80(users.id, sessionUser.id));
+      await db.update(users).set({ passwordHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq81(users.id, sessionUser.id));
       return res.json({ success: true, message: "Password set successfully. You can now use it to log in to the desktop app." });
     } catch (error) {
       log76.error("[Email Auth] Set password failed:", { error: String(error) });
@@ -78991,14 +79120,14 @@ function registerEmailAuthRoutes(app) {
           return res.status(400).json({ error: "Invalid email format" });
         }
         const normalizedEmail = newEmail.trim().toLowerCase();
-        const existing = await db.select({ id: users.id }).from(users).where(eq80(users.email, normalizedEmail)).limit(1);
+        const existing = await db.select({ id: users.id }).from(users).where(eq81(users.email, normalizedEmail)).limit(1);
         if (existing.length > 0 && existing[0].id !== sessionUser.id) {
           return res.status(409).json({ error: "This email is already in use by another account" });
         }
         updates.email = normalizedEmail;
       }
-      await db.update(users).set(updates).where(eq80(users.id, sessionUser.id));
-      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq80(users.id, sessionUser.id)).limit(1);
+      await db.update(users).set(updates).where(eq81(users.id, sessionUser.id));
+      const updated = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq81(users.id, sessionUser.id)).limit(1);
       return res.json({ success: true, user: updated[0] || null });
     } catch (error) {
       log76.error("[Email Auth] Update profile failed:", { error: String(error) });
@@ -79015,7 +79144,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available", verified: false });
       }
-      const result = await db.select().from(users).where(eq80(users.emailVerificationToken, token)).limit(1);
+      const result = await db.select().from(users).where(eq81(users.emailVerificationToken, token)).limit(1);
       if (result.length === 0) {
         return res.status(400).json({ error: "Invalid or expired verification link", verified: false });
       }
@@ -79031,7 +79160,7 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: null,
         emailVerificationExpires: null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq80(users.id, user.id));
+      }).where(eq81(users.id, user.id));
       log76.info(`[Email Auth] Email verified for userId: ${user.id}, email: ${user.email}`);
       await notifyOwner({
         title: `New Verified User: ${user.name || user.email}`,
@@ -79058,7 +79187,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq80(users.email, normalizedEmail)).limit(1);
+      const result = await db.select().from(users).where(eq81(users.email, normalizedEmail)).limit(1);
       if (result.length === 0 || result[0].emailVerified) {
         return res.json({ success: true, message: "If an account exists with that email, a verification link has been sent." });
       }
@@ -79069,7 +79198,7 @@ function registerEmailAuthRoutes(app) {
         emailVerificationToken: verificationToken,
         emailVerificationExpires: verificationExpires,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq80(users.id, user.id));
+      }).where(eq81(users.id, user.id));
       const baseUrl = req.headers.origin || getPublicOrigin(req);
       const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
       await sendVerificationEmail(
@@ -79106,7 +79235,7 @@ function registerEmailAuthRoutes(app) {
       if (!db) {
         return res.status(500).json({ error: "Database not available" });
       }
-      const result = await db.select().from(users).where(eq80(users.id, pending.userId)).limit(1);
+      const result = await db.select().from(users).where(eq81(users.id, pending.userId)).limit(1);
       if (result.length === 0) {
         pendingTwoFactorLogins.delete(twoFactorToken);
         return res.status(401).json({ error: "User not found" });
@@ -79130,7 +79259,7 @@ function registerEmailAuthRoutes(app) {
             usedBackupCode = true;
             const updatedCodes = [...user.twoFactorBackupCodes];
             updatedCodes.splice(i, 1);
-            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq80(users.id, user.id));
+            await db.update(users).set({ twoFactorBackupCodes: updatedCodes }).where(eq81(users.id, user.id));
             break;
           }
         }
@@ -79139,7 +79268,7 @@ function registerEmailAuthRoutes(app) {
         return res.status(401).json({ error: "Invalid verification code" });
       }
       pendingTwoFactorLogins.delete(twoFactorToken);
-      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq80(users.id, user.id));
+      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq81(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(pending.openId, {
         name: pending.name,
         expiresInMs: ONE_YEAR_MS
@@ -79147,10 +79276,10 @@ function registerEmailAuthRoutes(app) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
       await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(
-        and63(
-          eq80(identityProviders.userId, user.id),
-          eq80(identityProviders.provider, "email"),
-          eq80(identityProviders.providerAccountId, pending.email)
+        and64(
+          eq81(identityProviders.userId, user.id),
+          eq81(identityProviders.provider, "email"),
+          eq81(identityProviders.providerAccountId, pending.email)
         )
       ).catch(() => {
       });
@@ -79190,7 +79319,7 @@ function registerEmailAuthRoutes(app) {
       }
       const db = await getDb();
       if (!db) return res.status(500).json({ error: "Database not available" });
-      const result = await db.select().from(users).where(and63(eq80(users.email, normalizedEmail), isNotNull3(users.passwordHash))).limit(1);
+      const result = await db.select().from(users).where(and64(eq81(users.email, normalizedEmail), isNotNull3(users.passwordHash))).limit(1);
       if (result.length === 0) {
         recordFailedAttempt(clientIp, normalizedEmail);
         return res.status(401).json({ error: "Invalid email or password" });
@@ -79217,17 +79346,17 @@ function registerEmailAuthRoutes(app) {
       if (!isAdminRole(user.role) && (ENV.ownerEmails && ENV.ownerEmails.includes(normalizedEmail) || user.openId === ENV.ownerOpenId || user.id === 1)) {
         loginUpdate.role = normalizedEmail === ENV.headAdminEmail ? "head_admin" : "admin";
       }
-      await db.update(users).set(loginUpdate).where(eq80(users.id, user.id));
+      await db.update(users).set(loginUpdate).where(eq81(users.id, user.id));
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || normalizedEmail.split("@")[0],
         expiresInMs: ONE_YEAR_MS
       });
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and63(
-        eq80(identityProviders.userId, user.id),
-        eq80(identityProviders.provider, "email"),
-        eq80(identityProviders.providerAccountId, normalizedEmail)
+      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and64(
+        eq81(identityProviders.userId, user.id),
+        eq81(identityProviders.provider, "email"),
+        eq81(identityProviders.providerAccountId, normalizedEmail)
       )).catch(() => {
       });
       return res.json({
@@ -79245,7 +79374,7 @@ function registerEmailAuthRoutes(app) {
 init_db();
 init_schema();
 import crypto21 from "crypto";
-import { eq as eq81, and as and64 } from "drizzle-orm";
+import { eq as eq82, and as and65 } from "drizzle-orm";
 init_const();
 init_env();
 init_logger();
@@ -79391,23 +79520,23 @@ async function getGoogleUser(accessToken) {
 async function findOrCreateOAuthUser(opts) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and64(eq81(identityProviders.provider, opts.provider), eq81(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
+  const existingLink = await db.select({ userId: identityProviders.userId }).from(identityProviders).where(and65(eq82(identityProviders.provider, opts.provider), eq82(identityProviders.providerAccountId, opts.providerAccountId))).limit(1);
   if (existingLink.length > 0) {
-    const user = await db.select().from(users).where(eq81(users.id, existingLink[0].userId)).limit(1);
+    const user = await db.select().from(users).where(eq82(users.id, existingLink[0].userId)).limit(1);
     if (user.length > 0) {
-      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and64(eq81(identityProviders.provider, opts.provider), eq81(identityProviders.providerAccountId, opts.providerAccountId)));
+      await db.update(identityProviders).set({ lastUsedAt: /* @__PURE__ */ new Date() }).where(and65(eq82(identityProviders.provider, opts.provider), eq82(identityProviders.providerAccountId, opts.providerAccountId)));
       const updateFields = { lastSignedIn: /* @__PURE__ */ new Date() };
       if (!isAdminRole(user[0].role) && shouldBeAdmin(user[0].openId, user[0].email, user[0].id)) {
         updateFields.role = user[0].email && user[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
         log77.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${user[0].email || user[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq81(users.id, user[0].id));
+      await db.update(users).set(updateFields).where(eq82(users.id, user[0].id));
       const effectiveRole = updateFields.role || user[0].role;
       return { userId: user[0].id, openId: user[0].openId, name: user[0].name || "", isNew: false };
     }
   }
   if (opts.email) {
-    const existingUser = await db.select().from(users).where(eq81(users.email, opts.email.toLowerCase())).limit(1);
+    const existingUser = await db.select().from(users).where(eq82(users.email, opts.email.toLowerCase())).limit(1);
     if (existingUser.length > 0) {
       await db.insert(identityProviders).values({
         userId: existingUser[0].id,
@@ -79424,7 +79553,7 @@ async function findOrCreateOAuthUser(opts) {
         updateFields.role = existingUser[0].email && existingUser[0].email.toLowerCase() === ENV.headAdminEmail ? "head_admin" : "admin";
         log77.info(`[Auth] Auto-promoted existing user to ${updateFields.role} on login: ${existingUser[0].email || existingUser[0].openId}`);
       }
-      await db.update(users).set(updateFields).where(eq81(users.id, existingUser[0].id));
+      await db.update(users).set(updateFields).where(eq82(users.id, existingUser[0].id));
       return { userId: existingUser[0].id, openId: existingUser[0].openId, name: existingUser[0].name || "", isNew: false };
     }
   }
@@ -79453,7 +79582,7 @@ async function findOrCreateOAuthUser(opts) {
     emailVerified: true,
     lastSignedIn: /* @__PURE__ */ new Date()
   });
-  const newUser = await db.select().from(users).where(eq81(users.openId, openId)).limit(1);
+  const newUser = await db.select().from(users).where(eq82(users.openId, openId)).limit(1);
   if (newUser.length === 0) throw new Error("Failed to create user");
   await db.insert(identityProviders).values({
     userId: newUser[0].id,
@@ -79647,7 +79776,7 @@ init_storage();
 init_db();
 init_db();
 init_schema();
-import { eq as eq82 } from "drizzle-orm";
+import { eq as eq83 } from "drizzle-orm";
 import crypto22 from "crypto";
 var log78 = createLogger("ModuleGenerator");
 var MODULES_PER_CYCLE2 = 3;
@@ -79733,7 +79862,7 @@ async function getSellerUserId2(botOpenId) {
   try {
     const dbInst = await getDb();
     if (!dbInst) return null;
-    const rows = await dbInst.select({ id: users.id }).from(users).where(eq82(users.openId, botOpenId)).limit(1);
+    const rows = await dbInst.select({ id: users.id }).from(users).where(eq83(users.openId, botOpenId)).limit(1);
     return rows[0]?.id ?? null;
   } catch {
     return null;
@@ -80052,7 +80181,7 @@ init_db();
 init_schema();
 init_logger();
 init_errors();
-import { eq as eq83 } from "drizzle-orm";
+import { eq as eq84 } from "drizzle-orm";
 var log79 = createLogger("BinancePayWebhook");
 function registerBinancePayWebhook(app) {
   app.post(
@@ -80118,18 +80247,18 @@ function registerBinancePayWebhook(app) {
             cryptoAmount: String(data.orderAmount || data.paymentInfo?.orderAmount || "0"),
             paidAt: /* @__PURE__ */ new Date(),
             webhookData: JSON.stringify(data)
-          }).where(eq83(cryptoPayments.merchantTradeNo, merchantTradeNo));
-          const [payment] = await db.select().from(cryptoPayments).where(eq83(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
+          }).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo));
+          const [payment] = await db.select().from(cryptoPayments).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo)).limit(1);
           if (payment && payment.campaignId) {
             const { crowdfundingCampaigns: crowdfundingCampaigns2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq83(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
+            const [campaign] = await db.select().from(crowdfundingCampaigns2).where(eq84(crowdfundingCampaigns2.id, payment.campaignId)).limit(1);
             if (campaign) {
               const newAmount = (campaign.currentAmount || 0) + Math.round(parseFloat(payment.creatorAmount || "0") * 100) / 100;
               const newBackers = (campaign.backerCount || 0) + 1;
               await db.update(crowdfundingCampaigns2).set({
                 currentAmount: Math.round(newAmount),
                 backerCount: newBackers
-              }).where(eq83(crowdfundingCampaigns2.id, payment.campaignId));
+              }).where(eq84(crowdfundingCampaigns2.id, payment.campaignId));
               log79.info(`[BinancePay Webhook] Campaign #${payment.campaignId} updated: +$${payment.creatorAmount}, backers=${newBackers}`);
             }
             try {
@@ -80152,7 +80281,7 @@ function registerBinancePayWebhook(app) {
           if (merchantTradeNo) {
             const db = await getDb();
             if (db) {
-              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq83(cryptoPayments.merchantTradeNo, merchantTradeNo));
+              await db.update(cryptoPayments).set({ status: "expired", webhookData: JSON.stringify(data) }).where(eq84(cryptoPayments.merchantTradeNo, merchantTradeNo));
             }
           }
           log79.info(`[BinancePay Webhook] Payment closed/expired`);
@@ -80314,15 +80443,15 @@ function registerStorageUploadRoutes(app) {
         if (!isAdminRole(user.role)) return res.status(403).json({ message: "Admin access required" });
         const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { storageFiles: storageFiles2 } = await Promise.resolve().then(() => (init_storage_schema(), storage_schema_exports));
-        const { eq: eq85, and: and65, desc: desc52 } = await import("drizzle-orm");
+        const { eq: eq86, and: and66, desc: desc52 } = await import("drizzle-orm");
         const db = await getDb2();
         if (!db) return res.status(503).json({ message: "Database unavailable" });
         const userId = req.query.userId ? parseInt(req.query.userId) : void 0;
         const limit = Math.min(parseInt(req.query.limit) || 200, 500);
         const offset = parseInt(req.query.offset) || 0;
-        const conditions = [eq85(storageFiles2.isDeleted, false)];
-        if (userId && !isNaN(userId)) conditions.push(eq85(storageFiles2.userId, userId));
-        const files = await db.select().from(storageFiles2).where(and65(...conditions)).orderBy(desc52(storageFiles2.createdAt)).limit(limit).offset(offset);
+        const conditions = [eq86(storageFiles2.isDeleted, false)];
+        if (userId && !isNaN(userId)) conditions.push(eq86(storageFiles2.userId, userId));
+        const files = await db.select().from(storageFiles2).where(and66(...conditions)).orderBy(desc52(storageFiles2.createdAt)).limit(limit).offset(offset);
         return res.json({ files, count: files.length });
       } catch (err) {
         log80.error(`[StorageAdmin] Error listing files: ${err.message}`);
@@ -80510,10 +80639,10 @@ async function getUserSandboxId(userId) {
 async function getFileRecord(fileId, sandboxId) {
   const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq85, and: and65 } = await import("drizzle-orm");
+  const { eq: eq86, and: and66 } = await import("drizzle-orm");
   const db = await getDb2();
   if (!db) return null;
-  const [file] = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.id, fileId), eq85(sandboxFiles2.sandboxId, sandboxId))).limit(1);
+  const [file] = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.id, fileId), eq86(sandboxFiles2.sandboxId, sandboxId))).limit(1);
   return file || null;
 }
 async function getFileContent(file) {
@@ -80635,7 +80764,7 @@ function registerProjectDownloadRoutes(app) {
       }
       const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { sandboxFiles: sandboxFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85, and: and65, inArray: inArray3, desc: desc52 } = await import("drizzle-orm");
+      const { eq: eq86, and: and66, inArray: inArray3, desc: desc52 } = await import("drizzle-orm");
       const db = await getDb2();
       if (!db) {
         res.status(500).json({ error: "Database unavailable" });
@@ -80652,16 +80781,16 @@ function registerProjectDownloadRoutes(app) {
           res.status(400).json({ error: "No valid file IDs provided" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.sandboxId, sandboxId), eq85(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
+        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0), inArray3(sandboxFiles2.id, ids)));
       } else if (conversationParam) {
         const convId = parseInt(conversationParam, 10);
         if (isNaN(convId)) {
           res.status(400).json({ error: "Invalid conversationId" });
           return;
         }
-        files = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.sandboxId, sandboxId), eq85(sandboxFiles2.isDirectory, 0), eq85(sandboxFiles2.conversationId, convId))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0), eq86(sandboxFiles2.conversationId, convId))).orderBy(desc52(sandboxFiles2.createdAt));
       } else if (projectParam) {
-        files = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.sandboxId, sandboxId), eq85(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
         files = files.filter((f) => {
           if (f.projectName) return f.projectName === projectParam;
           const parts = f.filePath.split("/");
@@ -80669,7 +80798,7 @@ function registerProjectDownloadRoutes(app) {
           return derivedName === projectParam;
         });
       } else if (allParam === "true") {
-        files = await db.select().from(sandboxFiles2).where(and65(eq85(sandboxFiles2.sandboxId, sandboxId), eq85(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
+        files = await db.select().from(sandboxFiles2).where(and66(eq86(sandboxFiles2.sandboxId, sandboxId), eq86(sandboxFiles2.isDirectory, 0))).orderBy(desc52(sandboxFiles2.createdAt));
       } else {
         res.status(400).json({ error: "Provide ?ids=1,2,3 or ?conversationId=N or ?project=name or ?all=true" });
         return;
@@ -80808,9 +80937,9 @@ function registerMarketplaceFileRoutes(app) {
       if (database) {
         try {
           const { marketplaceListings: marketplaceListings2, marketplacePurchases: marketplacePurchases2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq85, and: and65, ne: ne3 } = await import("drizzle-orm");
-          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and65(
-            eq85(marketplaceListings2.fileHash, fileHash),
+          const { eq: eq86, and: and66, ne: ne3 } = await import("drizzle-orm");
+          const duplicates = await database.select({ id: marketplaceListings2.id, uid: marketplaceListings2.uid, title: marketplaceListings2.title, sellerId: marketplaceListings2.sellerId }).from(marketplaceListings2).where(and66(
+            eq86(marketplaceListings2.fileHash, fileHash),
             ne3(marketplaceListings2.id, result.listingId)
           )).limit(1);
           if (duplicates.length > 0 && duplicates[0].sellerId !== listing.sellerId) {
@@ -80819,11 +80948,11 @@ function registerMarketplaceFileRoutes(app) {
               existingListing: duplicates[0].uid
             });
           }
-          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq85(marketplacePurchases2.buyerId, user.id));
+          const sellerPurchases = await database.select({ listingId: marketplacePurchases2.listingId }).from(marketplacePurchases2).where(eq86(marketplacePurchases2.buyerId, user.id));
           if (sellerPurchases.length > 0) {
             const purchasedListingIds = sellerPurchases.map((p) => p.listingId);
             for (const purchasedId of purchasedListingIds) {
-              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq85(marketplaceListings2.id, purchasedId)).limit(1);
+              const purchasedListing = await database.select({ fileHash: marketplaceListings2.fileHash }).from(marketplaceListings2).where(eq86(marketplaceListings2.id, purchasedId)).limit(1);
               if (purchasedListing.length > 0 && purchasedListing[0].fileHash === fileHash) {
                 return res.status(403).json({
                   error: "Anti-resale protection: You cannot re-list an item you purchased. Only original work and upgrade packs are allowed."
@@ -80898,8 +81027,8 @@ function registerMarketplaceFileRoutes(app) {
         return res.status(503).json({ error: "Database unavailable" });
       }
       const { marketplacePurchases: marketplacePurchases2, marketplaceListings: marketplaceListings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq85 } = await import("drizzle-orm");
-      const purchases = await database.select().from(marketplacePurchases2).where(eq85(marketplacePurchases2.downloadToken, token)).limit(1);
+      const { eq: eq86 } = await import("drizzle-orm");
+      const purchases = await database.select().from(marketplacePurchases2).where(eq86(marketplacePurchases2.downloadToken, token)).limit(1);
       if (purchases.length === 0) {
         return res.status(404).json({ error: "Invalid download token" });
       }
@@ -80925,10 +81054,10 @@ function registerMarketplaceFileRoutes(app) {
       const { sql: sql40 } = await import("drizzle-orm");
       await database.update(marketplacePurchases2).set({
         downloadCount: sql40`${marketplacePurchases2.downloadCount} + 1`
-      }).where(eq85(marketplacePurchases2.downloadToken, token));
+      }).where(eq86(marketplacePurchases2.downloadToken, token));
       await database.update(marketplaceListings2).set({
         downloadCount: sql40`${marketplaceListings2.downloadCount} + 1`
-      }).where(eq85(marketplaceListings2.id, purchase.listingId));
+      }).where(eq86(marketplaceListings2.id, purchase.listingId));
       return res.json({
         success: true,
         downloadUrl: listing.fileUrl,
@@ -81682,7 +81811,7 @@ async function startServer() {
       try {
         const { getDb: getDb2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { users: users4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq85, or: or7 } = await import("drizzle-orm");
+        const { eq: eq86, or: or7 } = await import("drizzle-orm");
         const { ENV: ENV2 } = await Promise.resolve().then(() => (init_env(), env_exports));
         const db = await getDb2();
         if (!db) return;
@@ -81695,13 +81824,13 @@ async function startServer() {
         }
         if (ENV2.headAdminEmail) {
           await db.update(users4).set({ role: "head_admin" }).where(
-            eq85(users4.email, ENV2.headAdminEmail)
+            eq86(users4.email, ENV2.headAdminEmail)
           ).catch(() => {
           });
           log87.info("Head admin promotion", { email: ENV2.headAdminEmail });
         }
         await db.update(users4).set({ role: "admin" }).where(
-          eq85(users4.id, 1)
+          eq86(users4.id, 1)
         ).catch(() => {
         });
         if (ENV2.ownerEmails && ENV2.ownerEmails.length > 0) {
@@ -81717,7 +81846,7 @@ async function startServer() {
         }
         if (ENV2.ownerOpenId) {
           await db.update(users4).set({ role: "admin" }).where(
-            eq85(users4.openId, ENV2.ownerOpenId)
+            eq86(users4.openId, ENV2.ownerOpenId)
           ).catch(() => {
           });
         }

@@ -66,7 +66,7 @@ async function r2Put(
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "cfut_gln5fncgAVAU4KHgmNnD0vslpYpXaWGDVpHP3BjJ62bbeb9a",
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
     },
   });
   
@@ -143,7 +143,7 @@ export async function storageDelete(relKey: string): Promise<void> {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "cfut_gln5fncgAVAU4KHgmNnD0vslpYpXaWGDVpHP3BjJ62bbeb9a",
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
     },
   });
   
