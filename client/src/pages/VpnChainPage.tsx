@@ -3,7 +3,8 @@
  * Multi-hop VPN routing — traffic bounces through multiple servers
  * so no single server knows both who you are AND where you're going.
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,8 @@ import {
 
 export default function VpnChainPage() {
   const [addOpen, setAddOpen] = useState(false);
+  const [, setLocation] = useLocation();
+  const addHopRef = useRef<HTMLButtonElement>(null);
   const [newHop, setNewHop] = useState({ label: "", host: "", port: "22", username: "root", password: "", country: "" });
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
 
@@ -93,12 +96,30 @@ export default function VpnChainPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => {
+              if (setActive.isPending) return;
+              if (hops.length === 0) {
+                toast.info("Add at least one hop first", {
+                  description: "Click \"Add Hop\" below to configure a VPN server.",
+                  action: { label: "Add Hop", onClick: () => setAddOpen(true) },
+                });
+                return;
+              }
+              setActive.mutate({ active: !isActive });
+            }}
+            title={hops.length === 0 ? "No hops configured — add a hop first" : isActive ? "Click to deactivate VPN" : "Click to activate VPN"}
+          >
             <span className="text-sm text-zinc-400">Active</span>
             <Switch
               checked={isActive}
-              onCheckedChange={(v) => setActive.mutate({ active: v })}
-              disabled={hops.length === 0}
+              onCheckedChange={(v) => {
+                if (hops.length === 0) return;
+                setActive.mutate({ active: v });
+              }}
+              disabled={setActive.isPending}
+              className={hops.length === 0 ? "opacity-40" : ""}
             />
           </div>
           <Badge variant={isActive ? "default" : "secondary"} className={isActive ? "bg-blue-500/20 text-blue-300 border-blue-500/30" : ""}>
