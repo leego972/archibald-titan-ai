@@ -360,7 +360,7 @@ export default function WebAgentPage() {
   // Poll for active task updates
   useEffect(() => {
     const hasActiveTasks = tasksQuery.data?.some(
-      (t) => t.status === "pending" || t.status === "running"
+      (t: any) => t.status === "pending" || t.status === "running"
     );
     if (hasActiveTasks) {
       if (!pollIntervalRef.current) {
@@ -478,7 +478,7 @@ export default function WebAgentPage() {
               <p className="text-sm">No tasks yet. Give Titan an instruction above.</p>
             </div>
           ) : (
-            tasks.map((task) => (
+            tasks.map((task: any) => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -514,7 +514,7 @@ export default function WebAgentPage() {
             </div>
           ) : (
             <div className="grid gap-3">
-              {credentials.map((cred) => (
+              {credentials.map((cred: any) => (
                 <Card key={cred.id} className="bg-zinc-900/50 border-white/10">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">

@@ -176,13 +176,17 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
 
       // Store conversationId for continuity
       if (result?.conversationId && !conversationId) {
-        setConversationId(result.conversationId);
+        const cid = result.conversationId;
+        setConversationId(typeof cid === "string" ? parseInt(cid, 10) : cid as number);
       }
 
-      const replyText =
-        typeof result?.content === "string"
-          ? result.content
-          : result?.message ?? "Sorry, I didn't catch that.";
+      const resultAny = result as any;
+      const replyText: string =
+        typeof resultAny?.content === "string"
+          ? resultAny.content
+          : typeof resultAny?.response === "string"
+            ? resultAny.response
+            : resultAny?.message ?? "Sorry, I didn't catch that.";
 
       const titanMsg: VoiceMessage = {
         id: crypto.randomUUID(),

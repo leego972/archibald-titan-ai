@@ -1883,7 +1883,8 @@ export default function ChatPage() {
 
       // If conversation was created server-side (fallback), update the ID
       if (!convIdForStream && result.conversationId) {
-        setActiveConversationId(result.conversationId);
+        const cid = result.conversationId;
+        setActiveConversationId(typeof cid === "string" ? parseInt(cid, 10) : cid as number);
         utils.chat.listConversations.invalidate();
       }
 

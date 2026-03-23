@@ -78,7 +78,8 @@ export async function getCredentialForSite(
   userId: number,
   siteName: string
 ): Promise<{ username: string; password: string; totpSecret?: string } | null> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const creds = await db
     .select()
     .from(webAgentCredentials)
@@ -108,7 +109,8 @@ export async function saveCredential(
   totpSecret?: string,
   notes?: string
 ): Promise<number> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   // Check if credential already exists for this site
   const existing = await db
     .select({ id: webAgentCredentials.id })
@@ -148,7 +150,8 @@ export async function saveCredential(
 }
 
 export async function listCredentials(userId: number) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const creds = await db
     .select({
       id: webAgentCredentials.id,
@@ -170,7 +173,8 @@ export async function listCredentials(userId: number) {
 }
 
 export async function deleteCredential(userId: number, credentialId: number) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   await db
     .delete(webAgentCredentials)
     .where(
@@ -250,7 +254,13 @@ Return ONLY valid JSON, no markdown, no explanation.`;
   });
 
   try {
-    const cleaned = response.content
+    const rawContent = response.choices[0]?.message?.content;
+    const textContent = typeof rawContent === "string"
+      ? rawContent
+      : Array.isArray(rawContent)
+        ? rawContent.map((c: { type: string; text?: string }) => c.type === "text" ? (c.text ?? "") : "").join("")
+        : "";
+    const cleaned = textContent
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
       .trim();
@@ -310,7 +320,12 @@ Write a clear, concise summary of what was found or accomplished. Be specific �
     maxTokens: 500,
   });
 
-  return response.content;
+  const rawContent = response.choices[0]?.message?.content;
+  return typeof rawContent === "string"
+    ? rawContent
+    : Array.isArray(rawContent)
+      ? rawContent.map((c: { type: string; text?: string }) => c.type === "text" ? (c.text ?? "") : "").join("")
+      : "";
 }
 
 // ─── Browser Action Executor ──────────────────────────────────────────────────
@@ -529,7 +544,8 @@ export async function runWebAgentTask(
   taskId: number,
   userId: number
 ): Promise<AgentResult> {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const startTime = Date.now();
   const steps: AgentStep[] = [];
   const extractedData: Record<string, any> = {};
@@ -599,7 +615,6 @@ export async function runWebAgentTask(
     const browserConfig: BrowserConfig = {
       headless: true,
       proxy: undefined,
-      deviceProfile: undefined,
     };
     const { browser: b, context, page } = await launchStealthBrowser(browserConfig);
     browser = b;
@@ -609,10 +624,10 @@ export async function runWebAgentTask(
       // Check for CAPTCHA before each step
       try {
         const captchaResult = await detectAndSolveCaptcha(page, {
-          service: "none",
+          service: null,
           apiKey: "",
         });
-        if (captchaResult.detected && !captchaResult.solved) {
+        if (!captchaResult.solved && captchaResult.error) {
           steps.push({
             action: "captcha",
             detail: "CAPTCHA detected but could not be solved automatically",

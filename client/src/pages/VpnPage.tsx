@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
 const COUNTRIES = [
@@ -22,7 +22,7 @@ const COUNTRIES = [
 ];
 
 export default function VpnPage() {
-  const { toast } = useToast();
+  
   const queryClient = useQueryClient();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
@@ -35,17 +35,10 @@ export default function VpnPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [["vpn", "getStatus"]] });
       queryClient.invalidateQueries({ queryKey: [["vpn", "getConfig"]] });
-      toast({
-        title: "VPN Status Updated",
-        description: "Your proxy settings have been updated successfully.",
-      });
+      toast.success("VPN Status Updated", { description: "Your proxy settings have been updated successfully." });
     },
     onError: (error) => {
-      toast({
-        title: "Failed to update VPN",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Failed to update VPN", { description: error.message });
     }
   });
 
@@ -75,10 +68,7 @@ export default function VpnPage() {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
-    toast({
-      title: "Copied to clipboard",
-      description: `${field} has been copied.`,
-    });
+    toast.success("Copied to clipboard", { description: `${field} has been copied.` });
   };
 
   if (statusLoading) {

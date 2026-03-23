@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { webAgentTasks, webAgentCredentials } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -37,7 +38,8 @@ export const webAgentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const userId = ctx.user.id;
 
       // Create task record
@@ -62,7 +64,8 @@ export const webAgentRouter = router({
   getTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .query(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const tasks = await db
         .select()
         .from(webAgentTasks)
@@ -86,7 +89,8 @@ export const webAgentRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       return db
         .select()
         .from(webAgentTasks)
@@ -99,7 +103,8 @@ export const webAgentRouter = router({
   confirmTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const tasks = await db
         .select()
         .from(webAgentTasks)
@@ -136,7 +141,8 @@ export const webAgentRouter = router({
   cancelTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
         .update(webAgentTasks)
         .set({ status: "cancelled" })
@@ -153,7 +159,8 @@ export const webAgentRouter = router({
   deleteTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const db = getDb();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
         .delete(webAgentTasks)
         .where(

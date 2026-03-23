@@ -55,7 +55,7 @@ const PROXY_SOURCES: Array<{ url: string; protocol: "http" | "socks5" | "socks4"
   { url: "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt", protocol: "http", name: "clarketm-HTTP" },
   { url: "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt", protocol: "http", name: "sunny9577-HTTP" },
   { url: "https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt", protocol: "http", name: "mmpx12-HTTP" },
-  { url: "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt", protocol: "https", name: "roosterkid-HTTPS" },
+  { url: "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt", protocol: "http", name: "roosterkid-HTTPS" },
   { url: "https://raw.githubusercontent.com/almroot/proxylist/master/list.txt", protocol: "http", name: "almroot-HTTP" },
   { url: "https://raw.githubusercontent.com/elliottophellia/yakumo/master/results/http/global/http_checked.txt", protocol: "http", name: "yakumo-HTTP" },
   { url: "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt", protocol: "http", name: "vakhov-HTTP" },
