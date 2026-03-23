@@ -23,6 +23,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -371,6 +372,7 @@ export const torRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+    try { await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation"); } catch {}
     const output = await execSSHCommand(nodeToSSH(node), NEW_CIRCUIT, 10000, ctx.user.id);
     const ok = output.includes("CIRCUIT_RENEWED");
     if (ok) {
@@ -514,6 +516,7 @@ export const torRouter = router({
       enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
+      try { await consumeCredits(ctx.user.id, "vpn_generate", `Tor: run command through circuit`); } catch {}
       const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
       const script = `torify bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "TOR_CMD_FAILED"`;
       const output = await execSSHCommand(nodeToSSH(node), script, input.timeoutMs ?? 30000, ctx.user.id);

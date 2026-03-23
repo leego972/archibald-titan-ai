@@ -23,6 +23,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -504,11 +505,12 @@ export const vpnChainRouter = router({
     if (readyHops.length === 0) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
     }
+    try { await consumeCredits(ctx.user.id, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain`); } catch {}
     const result = await buildChainTunnels(ctx.user.id, readyHops);
     if (result.success) {
       await saveHops(ctx.user.id, hops);
       await setChainActiveFlag(ctx.user.id, true);
-      log.info(`User ${ctx.user.id} built VPN chain with ${readyHops.length} hops`);
+      log.info(`User ${ctx.user.id} built VPN chain with ${readyHops.length} hops`)
     }
     return {
       success: result.success,
@@ -535,6 +537,7 @@ export const vpnChainRouter = router({
     if (!firstHop.wgPublicKey) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "First hop has no WireGuard public key. Re-deploy the hop." });
     }
+    try { await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config"); } catch {}
     const { execSync } = await import("child_process");
     let clientPrivKey: string;
     let clientPubKey: string;
@@ -688,6 +691,7 @@ export const vpnChainRouter = router({
         if (readyHops.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
         }
+        try { await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: activate chain"); } catch {}
         // Build the chain if not already linked
         const allLinked = readyHops.every(h => h.chainLinked);
         if (!allLinked) {

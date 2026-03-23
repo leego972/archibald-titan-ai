@@ -30286,6 +30286,7 @@ var init_tor_router = __esm({
     "use strict";
     init_trpc();
     init_subscription_gate();
+    init_credit_service();
     init_db();
     init_schema();
     init_fetcher_db();
@@ -30532,6 +30533,10 @@ var init_tor_router = __esm({
         enforceFeature(plan.planId, "offensive_tooling", "Tor");
         const node = await getActiveNode2(ctx.user.id);
         if (!node) throw new TRPCError12({ code: "BAD_REQUEST", message: "No active Tor node." });
+        try {
+          await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation");
+        } catch {
+        }
         const output = await execSSHCommand(nodeToSSH2(node), NEW_CIRCUIT, 1e4, ctx.user.id);
         const ok = output.includes("CIRCUIT_RENEWED");
         if (ok) {
@@ -30676,6 +30681,10 @@ var init_tor_router = __esm({
         enforceFeature(plan.planId, "offensive_tooling", "Tor");
         const node = await getActiveNode2(ctx.user.id);
         if (!node) throw new TRPCError12({ code: "BAD_REQUEST", message: "No active Tor node." });
+        try {
+          await consumeCredits(ctx.user.id, "vpn_generate", `Tor: run command through circuit`);
+        } catch {
+        }
         const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
         const script = `torify bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "TOR_CMD_FAILED"`;
         const output = await execSSHCommand(nodeToSSH2(node), script, input.timeoutMs ?? 3e4, ctx.user.id);
@@ -74755,6 +74764,7 @@ init_tor_router();
 // server/vpn-chain-router.ts
 init_trpc();
 init_subscription_gate();
+init_credit_service();
 init_db();
 init_schema();
 init_fetcher_db();
@@ -75140,6 +75150,10 @@ var vpnChainRouter = router({
     if (readyHops.length === 0) {
       throw new TRPCError42({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
     }
+    try {
+      await consumeCredits(ctx.user.id, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain`);
+    } catch {
+    }
     const result = await buildChainTunnels(ctx.user.id, readyHops);
     if (result.success) {
       await saveHops(ctx.user.id, hops);
@@ -75169,6 +75183,10 @@ var vpnChainRouter = router({
     const firstHop = sorted[0];
     if (!firstHop.wgPublicKey) {
       throw new TRPCError42({ code: "BAD_REQUEST", message: "First hop has no WireGuard public key. Re-deploy the hop." });
+    }
+    try {
+      await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config");
+    } catch {
     }
     const { execSync: execSync3 } = await import("child_process");
     let clientPrivKey;
@@ -75310,6 +75328,10 @@ var vpnChainRouter = router({
       if (readyHops.length === 0) {
         throw new TRPCError42({ code: "BAD_REQUEST", message: "No deployed hops. Deploy at least one hop first." });
       }
+      try {
+        await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: activate chain");
+      } catch {
+      }
       const allLinked = readyHops.every((h) => h.chainLinked);
       if (!allLinked) {
         const result = await buildChainTunnels(ctx.user.id, readyHops);
@@ -75447,6 +75469,7 @@ init_db();
 init_schema();
 init_fetcher_db();
 init_subscription_gate();
+init_credit_service();
 init_titan_server();
 init_logger();
 import { z as z57 } from "zod";
@@ -75608,6 +75631,10 @@ var proxyMakerRouter = router({
     node.status = "deploying";
     await saveNodes6(ctx.user.id, nodes);
     try {
+      await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node ${node.label}`);
+    } catch {
+    }
+    try {
       const output = await execSSHCommand(nodeToSSH6(node), INSTALL_3PROXY, 18e4, ctx.user.id);
       if (!output.includes("PROXY_OK")) {
         node.status = "error";
@@ -75759,6 +75786,10 @@ var proxyMakerRouter = router({
     const node = nodes.find((n) => n.id === input.nodeId);
     if (!node) throw new TRPCError43({ code: "NOT_FOUND", message: "Node not found." });
     if (!node.publicIp) return { success: false, message: "Deploy node first." };
+    try {
+      await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: test proxy ${node.label}`);
+    } catch {
+    }
     const script = `curl -s --max-time 10 --socks5 127.0.0.1:1080 "${input.testUrl}" 2>&1 || echo PROXY_TEST_FAILED`;
     try {
       const output = await execSSHCommand(nodeToSSH6(node), script, 2e4, ctx.user.id);
