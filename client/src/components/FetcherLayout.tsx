@@ -529,6 +529,15 @@ function FetcherLayoutContent({
   const [isResizing, setIsResizing] = useState(false);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const [showOutOfCredits, setShowOutOfCredits] = useState(false);
+
+  // Listen for global credit-exhaustion events fired from main.tsx
+  // This catches FORBIDDEN errors from ANY tRPC router without per-router wiring.
+  useEffect(() => {
+    const handler = () => setShowOutOfCredits(true);
+    window.addEventListener("titan:out-of-credits", handler);
+    return () => window.removeEventListener("titan:out-of-credits", handler);
+  }, []);
+
   // Grant daily free credits to free tier users on mount (silently)
   const grantDailyFree = trpc.escalation.grantDailyFreeCredits.useMutation();
   useEffect(() => {

@@ -4,7 +4,7 @@ import { eq, and, isNotNull, ne, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { getDb } from "./db";
-import { subscriptions, users, creditBalances } from "../drizzle/schema";
+import { subscriptions, users, creditBalances, creditEscalation } from "../drizzle/schema";
 import { PRICING_TIERS, CREDIT_PACKS, type PlanId } from "../shared/pricing";
 import { addCredits, processMonthlyRefill, getCreditBalance } from "./credit-service";
 import { referralCodes } from "../drizzle/schema";
@@ -1456,6 +1456,29 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
   }
 
+  // ── Sync billingCycleEnd into escalation table ───────────────────────
+  // Keeps the escalation funnel aware of when the current billing period ends
+  // so it can correctly block further escalation after the cycle ends.
+  if (subRecord[0]) {
+    try {
+      const existingEscalation = await db
+        .select({ id: creditEscalation.id })
+        .from(creditEscalation)
+        .where(eq(creditEscalation.userId, subRecord[0].userId))
+        .limit(1);
+
+      if (existingEscalation.length > 0) {
+        await db
+          .update(creditEscalation)
+          .set({ billingCycleEnd: currentPeriodEnd })
+          .where(eq(creditEscalation.userId, subRecord[0].userId));
+        log.info(`[Stripe Webhook] billingCycleEnd synced for user=${subRecord[0].userId}: ${currentPeriodEnd.toISOString()}`);
+      }
+    } catch (syncErr) {
+      log.warn(`[Stripe Webhook] Could not sync billingCycleEnd for user=${subRecord[0].userId}: ${getErrorMessage(syncErr)}`);
+    }
+  }
+
   log.info(`[Stripe Webhook] Subscription updated: ${subscription.id}, status=${status}, plan=${planId}`);
 }
 
@@ -1563,6 +1586,47 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         typeof (invoice as any).payment_intent === "string" ? (invoice as any).payment_intent : (invoice as any).payment_intent?.id
       );
       log.info(`[Stripe Webhook] Auto-renewal refill: user=${userId}, plan=${planId}, credits=+${allocation}`);
+    }
+
+    // ── Reset escalation funnel state for the new billing cycle ──────────
+    // When a subscription renews, the user starts fresh:
+    //   - boost packs reset to 0 (they can buy 3 more this cycle)
+    //   - doubles reset to 0 (they can double again this cycle)
+    //   - billing cycle anchors updated to new period
+    // If they were on a doubled plan, they are now billed at that rate — it becomes their base.
+    const newPeriodEnd = (invoice as any).lines?.data?.[0]?.period?.end
+      ? new Date((invoice as any).lines.data[0].period.end * 1000)
+      : null;
+    const newCycleStart = new Date();
+
+    try {
+      const existingEscalation = await db
+        .select({ id: creditEscalation.id })
+        .from(creditEscalation)
+        .where(eq(creditEscalation.userId, userId))
+        .limit(1);
+
+      if (existingEscalation.length > 0) {
+        await db
+          .update(creditEscalation)
+          .set({
+            boostPacksBought: 0,
+            doublesThisCycle: 0,
+            currentDoubledPlanId: null,
+            doubledPriceUsd: 0,
+            hasBeenOfferedDouble: false,
+            pendingDowngradePlan: null,
+            pendingDowngradeAt: null,
+            billingCycleStart: newCycleStart,
+            ...(newPeriodEnd ? { billingCycleEnd: newPeriodEnd } : {}),
+            cycleResetAt: newCycleStart,
+          })
+          .where(eq(creditEscalation.userId, userId));
+        log.info(`[Stripe Webhook] Escalation state reset for user=${userId} on renewal. New cycle: ${newCycleStart.toISOString()}`);
+      }
+      // If no escalation record exists, nothing to reset — it will be created on first out-of-credits event
+    } catch (escalationErr) {
+      log.warn(`[Stripe Webhook] Could not reset escalation state for user=${userId}: ${getErrorMessage(escalationErr)}`);
     }
   } else if (billingReason === "subscription_update") {
     // Plan was changed (upgrade/downgrade) — the proration invoice was paid

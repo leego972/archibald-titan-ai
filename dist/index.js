@@ -4327,9 +4327,9 @@ var init_pricing = __esm({
     ];
     CREDIT_COSTS = {
       // ── Core AI ──────────────────────────────────────────────────────────
-      chat_message: 25,
+      chat_message: 10,
       // Standard — LLM inference + context window processing
-      builder_action: 75,
+      builder_action: 50,
       // Medium — full tool call cycle (read/write/exec/plan)
       voice_action: 25,
       // Standard — Whisper transcription (short audio clip)
@@ -4338,7 +4338,7 @@ var init_pricing = __esm({
       video_generation: 1e3,
       // Max — video diffusion model, very high GPU cost
       // ── Credential & Fetch ───────────────────────────────────────────────
-      fetch_action: 15,
+      fetch_action: 5,
       // Light — stealth browser + CAPTCHA solve + parse
       github_action: 75,
       // Medium — GitHub API call + repo mutation
@@ -4347,7 +4347,7 @@ var init_pricing = __esm({
       // ── Clone & Replicate ────────────────────────────────────────────────
       clone_action: 1e3,
       // Max — full site clone pipeline (Cyber+ / Titan only)
-      replicate_action: 2e3,
+      replicate_action: 1e3,
       // Extreme — full site replication job
       // ── SEO & Content ────────────────────────────────────────────────────
       seo_run: 150,
@@ -51296,6 +51296,17 @@ async function handleSubscriptionUpdated(subscription) {
       log17.info(`[Stripe Webhook] Upgrade credit bonus: user=${subRecord[0].userId}, +${creditDiff} credits`);
     }
   }
+  if (subRecord[0]) {
+    try {
+      const existingEscalation = await db.select({ id: creditEscalation.id }).from(creditEscalation).where(eq12(creditEscalation.userId, subRecord[0].userId)).limit(1);
+      if (existingEscalation.length > 0) {
+        await db.update(creditEscalation).set({ billingCycleEnd: currentPeriodEnd }).where(eq12(creditEscalation.userId, subRecord[0].userId));
+        log17.info(`[Stripe Webhook] billingCycleEnd synced for user=${subRecord[0].userId}: ${currentPeriodEnd.toISOString()}`);
+      }
+    } catch (syncErr) {
+      log17.warn(`[Stripe Webhook] Could not sync billingCycleEnd for user=${subRecord[0].userId}: ${getErrorMessage(syncErr)}`);
+    }
+  }
   log17.info(`[Stripe Webhook] Subscription updated: ${subscription.id}, status=${status}, plan=${planId}`);
 }
 async function handleSubscriptionDeleted(subscription) {
@@ -51352,6 +51363,28 @@ async function handleInvoicePaid(invoice) {
         typeof invoice.payment_intent === "string" ? invoice.payment_intent : invoice.payment_intent?.id
       );
       log17.info(`[Stripe Webhook] Auto-renewal refill: user=${userId}, plan=${planId}, credits=+${allocation}`);
+    }
+    const newPeriodEnd = invoice.lines?.data?.[0]?.period?.end ? new Date(invoice.lines.data[0].period.end * 1e3) : null;
+    const newCycleStart = /* @__PURE__ */ new Date();
+    try {
+      const existingEscalation = await db.select({ id: creditEscalation.id }).from(creditEscalation).where(eq12(creditEscalation.userId, userId)).limit(1);
+      if (existingEscalation.length > 0) {
+        await db.update(creditEscalation).set({
+          boostPacksBought: 0,
+          doublesThisCycle: 0,
+          currentDoubledPlanId: null,
+          doubledPriceUsd: 0,
+          hasBeenOfferedDouble: false,
+          pendingDowngradePlan: null,
+          pendingDowngradeAt: null,
+          billingCycleStart: newCycleStart,
+          ...newPeriodEnd ? { billingCycleEnd: newPeriodEnd } : {},
+          cycleResetAt: newCycleStart
+        }).where(eq12(creditEscalation.userId, userId));
+        log17.info(`[Stripe Webhook] Escalation state reset for user=${userId} on renewal. New cycle: ${newCycleStart.toISOString()}`);
+      }
+    } catch (escalationErr) {
+      log17.warn(`[Stripe Webhook] Could not reset escalation state for user=${userId}: ${getErrorMessage(escalationErr)}`);
     }
   } else if (billingReason === "subscription_update") {
     log17.info(`[Stripe Webhook] Plan change invoice paid: user=${userId}, plan=${planId}`);
@@ -76928,7 +76961,7 @@ var PROXY_SOURCES = [
   { url: "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt", protocol: "http", name: "clarketm-HTTP" },
   { url: "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt", protocol: "http", name: "sunny9577-HTTP" },
   { url: "https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt", protocol: "http", name: "mmpx12-HTTP" },
-  { url: "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt", protocol: "https", name: "roosterkid-HTTPS" },
+  { url: "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt", protocol: "http", name: "roosterkid-HTTPS" },
   { url: "https://raw.githubusercontent.com/almroot/proxylist/master/list.txt", protocol: "http", name: "almroot-HTTP" },
   { url: "https://raw.githubusercontent.com/elliottophellia/yakumo/master/results/http/global/http_checked.txt", protocol: "http", name: "yakumo-HTTP" },
   { url: "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt", protocol: "http", name: "vakhov-HTTP" },
@@ -77855,6 +77888,7 @@ init_trpc();
 init_db();
 init_schema();
 import { z as z61 } from "zod";
+import { TRPCError as TRPCError45 } from "@trpc/server";
 import { eq as eq79, and as and62, desc as desc51 } from "drizzle-orm";
 
 // server/web-agent-engine.ts
@@ -77867,7 +77901,8 @@ init_logger();
 init_errors();
 var log72 = createLogger("WebAgent");
 async function getCredentialForSite(userId, siteName) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const creds = await db.select().from(webAgentCredentials).where(
     and61(
       eq78(webAgentCredentials.userId, userId),
@@ -77883,7 +77918,8 @@ async function getCredentialForSite(userId, siteName) {
   };
 }
 async function saveCredential2(userId, siteName, siteUrl, username, password, totpSecret, notes) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const existing = await db.select({ id: webAgentCredentials.id }).from(webAgentCredentials).where(
     and61(
       eq78(webAgentCredentials.userId, userId),
@@ -77912,7 +77948,8 @@ async function saveCredential2(userId, siteName, siteUrl, username, password, to
   return result.insertId ?? 0;
 }
 async function listCredentials2(userId) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const creds = await db.select({
     id: webAgentCredentials.id,
     siteName: webAgentCredentials.siteName,
@@ -77928,7 +77965,8 @@ async function listCredentials2(userId) {
   }));
 }
 async function deleteCredential2(userId, credentialId) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   await db.delete(webAgentCredentials).where(
     and61(
       eq78(webAgentCredentials.id, credentialId),
@@ -77995,7 +78033,9 @@ Return ONLY valid JSON, no markdown, no explanation.`;
     maxTokens: 2e3
   });
   try {
-    const cleaned = response.content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const rawContent = response.choices[0]?.message?.content;
+    const textContent = typeof rawContent === "string" ? rawContent : Array.isArray(rawContent) ? rawContent.map((c) => c.type === "text" ? c.text ?? "" : "").join("") : "";
+    const cleaned = textContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned);
   } catch {
     return {
@@ -78037,7 +78077,8 @@ Write a clear, concise summary of what was found or accomplished. Be specific \u
     temperature: 0.3,
     maxTokens: 500
   });
-  return response.content;
+  const rawContent = response.choices[0]?.message?.content;
+  return typeof rawContent === "string" ? rawContent : Array.isArray(rawContent) ? rawContent.map((c) => c.type === "text" ? c.text ?? "" : "").join("") : "";
 }
 async function executeStep(page, step, credentials, steps, extractedData) {
   const timestamp3 = (/* @__PURE__ */ new Date()).toISOString();
@@ -78222,7 +78263,8 @@ async function executeStep(page, step, credentials, steps, extractedData) {
   return {};
 }
 async function runWebAgentTask(taskId, userId) {
-  const db = getDb();
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
   const startTime = Date.now();
   const steps = [];
   const extractedData = {};
@@ -78257,18 +78299,17 @@ async function runWebAgentTask(taskId, userId) {
     }
     const browserConfig = {
       headless: true,
-      proxy: void 0,
-      deviceProfile: void 0
+      proxy: void 0
     };
     const { browser: b, context, page } = await launchStealthBrowser(browserConfig);
     browser = b;
     for (const step of plan.steps) {
       try {
         const captchaResult = await detectAndSolveCaptcha(page, {
-          service: "none",
+          service: null,
           apiKey: ""
         });
-        if (captchaResult.detected && !captchaResult.solved) {
+        if (!captchaResult.solved && captchaResult.error) {
           steps.push({
             action: "captcha",
             detail: "CAPTCHA detected but could not be solved automatically",
@@ -78348,7 +78389,8 @@ var webAgentRouter = router({
       instruction: z61.string().min(5).max(2e3)
     })
   ).mutation(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const userId = ctx.user.id;
     const result = await db.insert(webAgentTasks).values({
       userId,
@@ -78365,7 +78407,8 @@ var webAgentRouter = router({
   }),
   // ─── Get task status and result ─────────────────────────────────────────────
   getTask: protectedProcedure.input(z61.object({ taskId: z61.number() })).query(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const tasks = await db.select().from(webAgentTasks).where(
       and62(
         eq79(webAgentTasks.id, input.taskId),
@@ -78381,12 +78424,14 @@ var webAgentRouter = router({
       limit: z61.number().min(1).max(100).default(20)
     })
   ).query(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     return db.select().from(webAgentTasks).where(eq79(webAgentTasks.userId, ctx.user.id)).orderBy(desc51(webAgentTasks.createdAt)).limit(input.limit);
   }),
   // ─── Confirm an awaiting task (allow it to proceed) ─────────────────────────
   confirmTask: protectedProcedure.input(z61.object({ taskId: z61.number() })).mutation(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const tasks = await db.select().from(webAgentTasks).where(
       and62(
         eq79(webAgentTasks.id, input.taskId),
@@ -78407,7 +78452,8 @@ var webAgentRouter = router({
   }),
   // ─── Cancel a task ──────────────────────────────────────────────────────────
   cancelTask: protectedProcedure.input(z61.object({ taskId: z61.number() })).mutation(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     await db.update(webAgentTasks).set({ status: "cancelled" }).where(
       and62(
         eq79(webAgentTasks.id, input.taskId),
@@ -78418,7 +78464,8 @@ var webAgentRouter = router({
   }),
   // ─── Delete a task from history ─────────────────────────────────────────────
   deleteTask: protectedProcedure.input(z61.object({ taskId: z61.number() })).mutation(async ({ input, ctx }) => {
-    const db = getDb();
+    const db = await getDb();
+    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     await db.delete(webAgentTasks).where(
       and62(
         eq79(webAgentTasks.id, input.taskId),
@@ -78465,7 +78512,7 @@ init_schema();
 init_credit_service();
 init_subscription_gate();
 import { z as z62 } from "zod";
-import { TRPCError as TRPCError45 } from "@trpc/server";
+import { TRPCError as TRPCError46 } from "@trpc/server";
 import { eq as eq80, and as and63 } from "drizzle-orm";
 var SMARTPROXY_API_URL = "https://api.smartproxy.com/v1";
 var SMARTPROXY_API_KEY = process.env.SMARTPROXY_API_KEY || "01364bc9ba149865b562098c1d60c027f997ca033f2ea9ac1c88298061875dc51a87c6c0581908572b321020a53a40f18b185b05566df372e1953478218fbf3bcf9cee190cf261c8bb15e95470c07870c65ac4db";
@@ -78524,10 +78571,10 @@ var vpnRouter = router({
     country: z62.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const plan = await getUserPlan(ctx.user.id);
     if (plan.planId === "free") {
-      throw new TRPCError45({
+      throw new TRPCError46({
         code: "FORBIDDEN",
         message: "VPN access requires a Pro subscription or higher."
       });
@@ -78535,7 +78582,7 @@ var vpnRouter = router({
     if (input.active) {
       const creditCheck = await consumeCredits(ctx.user.id, "vpn_generate", "VPN proxy generation via Smartproxy");
       if (!creditCheck) {
-        throw new TRPCError45({
+        throw new TRPCError46({
           code: "PAYMENT_REQUIRED",
           message: "Insufficient credits to generate VPN proxy. Each connection costs 150 credits."
         });
@@ -78561,17 +78608,17 @@ var vpnRouter = router({
       }
       return { success: true, active: newStatus.active, country: newStatus.country };
     } catch (error) {
-      if (error instanceof TRPCError45) throw error;
-      throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: `Failed to configure VPN: ${error.message}` });
+      if (error instanceof TRPCError46) throw error;
+      throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR", message: `Failed to configure VPN: ${error.message}` });
     }
   }),
   getConfig: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError45({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const row = await db.select().from(userSecrets).where(and63(eq80(userSecrets.userId, ctx.user.id), eq80(userSecrets.secretType, "__vpn_status"))).limit(1);
     const status = row.length ? JSON.parse(row[0].encryptedValue) : { active: false, country: "us" };
     if (!status.active) {
-      throw new TRPCError45({ code: "BAD_REQUEST", message: "VPN is not active" });
+      throw new TRPCError46({ code: "BAD_REQUEST", message: "VPN is not active" });
     }
     const subUser = await getOrCreateSubUser(ctx.user.id);
     const proxyUsername = `${subUser.username}-country-${status.country.toUpperCase()}`;
@@ -78595,12 +78642,12 @@ init_credit_service();
 init_logger();
 init_pricing();
 import { z as z63 } from "zod";
-import { TRPCError as TRPCError46 } from "@trpc/server";
+import { TRPCError as TRPCError47 } from "@trpc/server";
 import { eq as eq81 } from "drizzle-orm";
 var log74 = createLogger("Escalation");
 async function getOrCreateEscalation(userId) {
   const db = await getDb();
-  if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
   const existing = await db.select().from(creditEscalation).where(eq81(creditEscalation.userId, userId)).limit(1);
   if (existing.length > 0) return existing[0];
   await db.insert(creditEscalation).values({ userId });
@@ -78634,7 +78681,7 @@ var escalationRouter = router({
     const balance = await getCreditBalance(userId);
     const escalation = await getOrCreateEscalation(userId);
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     if (isCycleExpired(escalation.billingCycleEnd)) {
       await resetEscalationCycle(userId);
       const fresh = await getOrCreateEscalation(userId);
@@ -78654,10 +78701,10 @@ var escalationRouter = router({
       return { granted: false, reason: "Daily free credits are only available on the Free plan." };
     }
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     const bal = await db.select({ dailyFreeCredits: creditBalances.dailyFreeCredits, dailyFreeLastGrantedAt: creditBalances.dailyFreeLastGrantedAt }).from(creditBalances).where(eq81(creditBalances.userId, userId)).limit(1);
     if (bal.length === 0) {
-      throw new TRPCError46({ code: "NOT_FOUND", message: "Credit balance not found." });
+      throw new TRPCError47({ code: "NOT_FOUND", message: "Credit balance not found." });
     }
     const lastGranted = bal[0].dailyFreeLastGrantedAt;
     const now = /* @__PURE__ */ new Date();
@@ -78693,26 +78740,26 @@ var escalationRouter = router({
     const userId = ctx.user.id;
     const plan = await getUserPlan(userId);
     if (plan.planId === "free") {
-      throw new TRPCError46({
+      throw new TRPCError47({
         code: "FORBIDDEN",
         message: "Boost packs are available on paid plans only. Upgrade to Pro or higher to unlock boost packs."
       });
     }
     const pack = CREDIT_PACKS.find((p) => p.id === input.packId);
-    if (!pack) throw new TRPCError46({ code: "NOT_FOUND", message: "Boost pack not found." });
+    if (!pack) throw new TRPCError47({ code: "NOT_FOUND", message: "Boost pack not found." });
     const escalation = await getOrCreateEscalation(userId);
     if (isCycleExpired(escalation.billingCycleEnd)) {
       await resetEscalationCycle(userId);
     }
     const freshEscalation = await getOrCreateEscalation(userId);
     if (freshEscalation.boostPacksBought >= MAX_BOOST_PACKS_PER_CYCLE) {
-      throw new TRPCError46({
+      throw new TRPCError47({
         code: "FORBIDDEN",
         message: `You've already purchased ${MAX_BOOST_PACKS_PER_CYCLE} boost packs this billing cycle. Consider upgrading your plan for more monthly credits.`
       });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     await addCredits(userId, pack.credits, "pack_purchase", `Boost pack: ${pack.name} (+${pack.credits.toLocaleString()} credits)`, input.stripePaymentIntentId);
     await db.update(creditEscalation).set({ boostPacksBought: freshEscalation.boostPacksBought + 1 }).where(eq81(creditEscalation.userId, userId));
     const newCount = freshEscalation.boostPacksBought + 1;
@@ -78739,14 +78786,14 @@ var escalationRouter = router({
     const userId = ctx.user.id;
     const plan = await getUserPlan(userId);
     if (plan.planId === "free") {
-      throw new TRPCError46({
+      throw new TRPCError47({
         code: "FORBIDDEN",
         message: "Plan doubling is available on paid plans only."
       });
     }
     const doubleOffer = PLAN_DOUBLE_MAP[plan.planId];
     if (!doubleOffer) {
-      throw new TRPCError46({ code: "BAD_REQUEST", message: "No doubling offer available for your plan." });
+      throw new TRPCError47({ code: "BAD_REQUEST", message: "No doubling offer available for your plan." });
     }
     const escalation = await getOrCreateEscalation(userId);
     if (isCycleExpired(escalation.billingCycleEnd)) {
@@ -78754,13 +78801,13 @@ var escalationRouter = router({
     }
     const freshEscalation = await getOrCreateEscalation(userId);
     if (freshEscalation.doublesThisCycle >= MAX_DOUBLES_PER_CYCLE) {
-      throw new TRPCError46({
+      throw new TRPCError47({
         code: "FORBIDDEN",
         message: `You've already doubled your plan ${MAX_DOUBLES_PER_CYCLE} times this cycle. Your credits will refresh when your billing cycle resets.`
       });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     const creditsToAdd = doubleOffer.doubledCredits;
     await addCredits(
       userId,
@@ -78801,13 +78848,13 @@ var escalationRouter = router({
     const currentIdx = planOrder.indexOf(plan.planId);
     const targetIdx = planOrder.indexOf(input.targetPlan);
     if (targetIdx >= currentIdx) {
-      throw new TRPCError46({
+      throw new TRPCError47({
         code: "BAD_REQUEST",
         message: "Use the upgrade flow to move to a higher plan."
       });
     }
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     await db.update(creditEscalation).set({
       pendingDowngradePlan: input.targetPlan,
       pendingDowngradeAt: /* @__PURE__ */ new Date()
@@ -78828,7 +78875,7 @@ var escalationRouter = router({
   syncBillingCycle: protectedProcedure.input(z63.object({ billingCycleEnd: z63.string() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.user.id;
     const db = await getDb();
-    if (!db) throw new TRPCError46({ code: "INTERNAL_SERVER_ERROR" });
+    if (!db) throw new TRPCError47({ code: "INTERNAL_SERVER_ERROR" });
     const cycleEnd = new Date(input.billingCycleEnd);
     await db.update(creditEscalation).set({ billingCycleEnd: cycleEnd }).where(eq81(creditEscalation.userId, userId));
     if (/* @__PURE__ */ new Date() > cycleEnd) {

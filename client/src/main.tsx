@@ -37,10 +37,34 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   window.location.href = getLoginUrl(window.location.pathname);
 };
 
+/**
+ * Global handler for FORBIDDEN errors caused by insufficient credits.
+ * Fires a custom DOM event that FetcherLayout listens to in order to
+ * show the OutOfCreditsModal without needing per-router wiring.
+ */
+const showOutOfCreditsIfInsufficient = (error: unknown) => {
+  if (!(error instanceof TRPCClientError)) return;
+  if (typeof window === "undefined") return;
+
+  // The credit check throws FORBIDDEN with a specific message pattern
+  const isCreditError =
+    error.data?.code === "FORBIDDEN" &&
+    (
+      error.message.toLowerCase().includes("insufficient credits") ||
+      error.message.toLowerCase().includes("purchase more credits") ||
+      error.message.toLowerCase().includes("upgrade your plan")
+    );
+
+  if (!isCreditError) return;
+
+  window.dispatchEvent(new CustomEvent("titan:out-of-credits"));
+};
+
 queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
+    showOutOfCreditsIfInsufficient(error);
     console.error("[API Query Error]", error);
   }
 });
@@ -49,6 +73,7 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
+    showOutOfCreditsIfInsufficient(error);
     console.error("[API Mutation Error]", error);
   }
 });

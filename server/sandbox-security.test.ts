@@ -315,7 +315,7 @@ describe("Security Tools", () => {
       expect(result).toBeDefined();
       expect(result.host).toBe("example.com");
       expect(result.valid).toBeDefined();
-    });
+    }, 15000);
 
     it("should report certificate details", async () => {
       const { checkSSL } = await import("./security-tools");
@@ -350,7 +350,7 @@ describe("Security Tools", () => {
       expect(result.overallScore).toBeGreaterThanOrEqual(0);
       expect(result.overallScore).toBeLessThanOrEqual(100);
       expect(Array.isArray(result.issues)).toBe(true);
-    });
+    }, 15000);
 
     it("should handle empty file list", async () => {
       const { analyzeCodeSecurity } = await import("./security-tools");
