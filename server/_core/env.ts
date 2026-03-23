@@ -11,6 +11,8 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  // Platform Stripe Connect account — all bot/platform sellers route payouts here
+  platformStripeConnectAccountId: process.env.PLATFORM_STRIPE_CONNECT_ACCOUNT_ID ?? "",
   githubClientId: process.env.GITHUB_CLIENT_ID ?? "",
   githubClientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",

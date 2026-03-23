@@ -12,7 +12,7 @@ import * as db from "./db";
 import { consumeCredits, addCredits, getCreditBalance } from "./credit-service";
 import { randomUUID } from "crypto";
 import { seedMarketplaceWithMerchants } from "./marketplace-seed";
-import { generateAndUploadPayloads } from "./marketplace-payload-generator";
+import { generateAndUploadPayload, generateAllMissingPayloads } from "./marketplace-payload-generator";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { safeDDLStatement } from "./_core/sql-sanitize.js";
@@ -1367,7 +1367,7 @@ export const marketplaceRouter = router({
       const result = await seedMarketplaceWithMerchants();
       
       // Step 3: Generate and upload real file payloads for all listings
-      const payloadResult = await generateAndUploadPayloads();
+      const payloadResult = await generateAllMissingPayloads();
       
       return {
         ...result,

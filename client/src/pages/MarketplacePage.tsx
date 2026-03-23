@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -181,6 +182,8 @@ function MarketplaceNav({ activeTab, onTabChange }: { activeTab: string; onTabCh
 // ═══════════════════════════════════════════════════════════════════
 
 function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: number) => void; onListItem: () => void }) {
+  const sub = useSubscription();
+  const canBuy = sub.canUse("marketplace_buy");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
@@ -204,6 +207,21 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Free Tier Browse-Only Banner */}
+      {!sub.loading && !canBuy && (
+        <div className="bg-amber-950/40 border-b border-amber-600/30 px-4 py-2.5">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-amber-400">
+              <Crown className="w-4 h-4 shrink-0" />
+              <span><strong>Free plan:</strong> Browse-only. Upgrade to Pro to buy and sell items.</span>
+            </div>
+            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white shrink-0 h-7 text-xs"
+              onClick={() => window.location.href = "/pricing"}>
+              Upgrade
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Hero Header */}
       <div className="relative overflow-hidden border-b border-amber-900/30 bg-gradient-to-b from-amber-950/30 via-background to-background">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/5 via-transparent to-transparent" />
@@ -489,6 +507,8 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
 function DetailView({ listingId, onBack }: { listingId: number; onBack: () => void }) {
   const { data, isLoading } = trpc.marketplace.getById.useQuery({ id: listingId });
   const { data: hasPurchased } = trpc.marketplace.hasPurchased.useQuery({ listingId });
+  const sub = useSubscription();
+  const canBuy = sub.canUse("marketplace_buy");
   const utils = trpc.useUtils();
 
   const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
@@ -716,13 +736,26 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                     <Star className="w-4 h-4 mr-2" /> Write a Review
                   </Button>
                 </div>
-              ) : (
+              ) : canBuy ? (
                 <Button
                   className="w-full bg-amber-600 hover:bg-amber-700 text-white"
                   onClick={() => setShowPurchaseDialog(true)}
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" /> Purchase Now
                 </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="w-full flex items-center gap-2 p-3 rounded-lg border border-amber-600/30 bg-amber-950/10 text-sm text-amber-400">
+                    <Crown className="w-4 h-4 shrink-0" />
+                    <span>Upgrade to Pro to buy items in the Bazaar</span>
+                  </div>
+                  <Button
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                    onClick={() => window.location.href = "/pricing"}
+                  >
+                    <Crown className="w-4 h-4 mr-2" /> Upgrade to Pro
+                  </Button>
+                </div>
               )}
 
               {listing.demoUrl && (
@@ -943,7 +976,9 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
 // ═══════════════════════════════════════════════════════════════════
 
 function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => void }) {
-  const { data: purchases = [], isLoading } = trpc.marketplace.myPurchases.useQuery();
+  const sub = useSubscription();
+  const canBuy = sub.canUse("marketplace_buy");
+  const { data: purchases = [], isLoading } = trpc.marketplace.myPurchases.useQuery(undefined, { enabled: canBuy });
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const handleDownload = async (e: React.MouseEvent, downloadToken: string) => {
@@ -962,6 +997,20 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
       setDownloading(null);
     }
   };
+
+  // Free tier gate
+  if (!sub.loading && !canBuy) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-12 text-center">
+        <Package2 className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold mb-3">Purchases Require Pro</h2>
+        <p className="text-muted-foreground mb-6">Upgrade to Pro to buy items from the Bazaar and access your purchase inventory.</p>
+        <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => window.location.href = "/pricing"}>
+          <Crown className="w-4 h-4 mr-2" /> Upgrade to Pro
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
@@ -1296,6 +1345,8 @@ function PayoutMethodsManager() {
 // ═══════════════════════════════════════════════════════════════════
 
 function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }) {
+  const sub = useSubscription();
+  const canSell = sub.canUse("marketplace_sell");
   const { data: sellerStatus, isLoading: sellerLoading, refetch: refetchSeller } = trpc.marketplace.sellerStatus.useQuery();
   const { data: myListings = [], isLoading, refetch } = trpc.marketplace.myListings.useQuery(undefined, {
     enabled: !!(sellerStatus as any)?.isActive,
@@ -1389,6 +1440,47 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
 
   const isActiveSeller = !!(sellerStatus as any)?.isActive;
   const sellerExpiry = (sellerStatus as any)?.expiresAt;
+
+  // ── FREE TIER: Browse-only gate ──
+  if (!canSell && !sub.loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-12">
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-6">
+            <Crown className="w-20 h-20 text-amber-400 drop-shadow-lg" />
+          </div>
+          <h1 className="text-3xl font-bold mb-3">Upgrade to Sell on the Bazaar</h1>
+          <p className="text-muted-foreground text-lg max-w-md mx-auto">
+            Free accounts can browse the Bazaar. Upgrade to Pro or higher to sell your tools, agents, and code.
+          </p>
+        </div>
+        <div className="space-y-4">
+          <div className="p-4 rounded-lg border border-amber-600/30 bg-amber-950/10">
+            <div className="flex items-center gap-3 mb-3">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <span className="font-semibold text-amber-400">Pro Plan — $29/month</span>
+            </div>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> List unlimited items on the Bazaar</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Keep 92% of every sale (8% platform fee)</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Seller dashboard with analytics</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Buy tools, agents, and code from other sellers</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> 50,000 credits/month + Titan Builder</li>
+            </ul>
+          </div>
+          <Button
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white text-lg py-6"
+            onClick={() => window.location.href = "/pricing"}
+          >
+            <Crown className="w-5 h-5 mr-2" /> Upgrade to Pro
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Already subscribed? <a href="/settings" className="text-amber-400 hover:underline">Check your account settings</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (sellerLoading) {
     return (

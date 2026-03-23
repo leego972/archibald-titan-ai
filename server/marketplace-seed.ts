@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { ENV } from "./_core/env.js";
 const log = createLogger("MarketplaceSeed");
 
 function generateUid() {
@@ -1290,6 +1291,9 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
       const botSubscriptionExpiry = new Date();
       botSubscriptionExpiry.setFullYear(botSubscriptionExpiry.getFullYear() + 100);
 
+      // Platform Stripe Connect account ID — all bot sellers route through the platform account
+      const platformStripeId = ENV.platformStripeConnectAccountId || null;
+
       if (existingProfile[0]) {
         await db.update(sellerProfiles).set({
           displayName: bot.name,
@@ -1301,6 +1305,9 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
           sellerSubscriptionActive: true,
           sellerSubscriptionExpiresAt: botSubscriptionExpiry,
           sellerSubscriptionPaidAt: new Date(),
+          isPlatformBot: true,
+          stripeConnectAccountId: platformStripeId,
+          stripeConnectOnboarded: !!platformStripeId,
         }).where(eq(sellerProfiles.userId, userId));
       } else {
         await db.insert(sellerProfiles).values({
@@ -1314,6 +1321,9 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
           sellerSubscriptionActive: true,
           sellerSubscriptionExpiresAt: botSubscriptionExpiry,
           sellerSubscriptionPaidAt: new Date(),
+          isPlatformBot: true,
+          stripeConnectAccountId: platformStripeId,
+          stripeConnectOnboarded: !!platformStripeId,
         });
       }
     } catch (e: unknown) {

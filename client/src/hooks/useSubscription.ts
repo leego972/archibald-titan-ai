@@ -69,6 +69,9 @@ const FEATURE_ACCESS: Record<string, PlanId[]> = {
   credential_health: ["cyber", "cyber_plus", "titan"],
   totp_vault: ["cyber", "cyber_plus", "titan"],
   security_tools: ["cyber", "cyber_plus", "titan"],
+  // Marketplace — Free plan can browse only; Pro+ can buy/sell
+  marketplace_buy:  ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+  marketplace_sell: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
   // Titan-exclusive features
   zero_click_research: ["cyber_plus", "titan"],
   c2_framework: ["cyber_plus", "titan"],
@@ -97,7 +100,8 @@ export function useSubscription(): SubscriptionState {
     const loading = usageQuery.isLoading || subQuery.isLoading;
     const usage = usageQuery.data;
     // Admin users always resolve to titan (highest tier, unlimited)
-    const planId: PlanId = isAdmin ? "titan" : (usage?.plan?.planId || "pro");
+    // Default to "free" when no subscription data is available (not "pro" which is a paid tier)
+    const planId: PlanId = isAdmin ? "titan" : (usage?.plan?.planId || "free");
     const tier = usage?.plan?.tier;
 
     const canUse = (feature: string): boolean => {
@@ -111,8 +115,8 @@ export function useSubscription(): SubscriptionState {
       planId,
       planName: isAdmin ? "Admin (Unlimited)" : (tier?.name || "Free"),
       loading,
-      isPaid: isAdmin || planId !== "pro",
-      isFree: !isAdmin && planId === "pro",
+      isPaid: isAdmin || planId !== "free",
+      isFree: !isAdmin && planId === "free",
       isPro: planId === "pro",
       isEnterprise: isAdmin || ["enterprise", "cyber", "cyber_plus", "titan"].includes(planId),
       isCyber: isAdmin || ["cyber", "cyber_plus", "titan"].includes(planId),

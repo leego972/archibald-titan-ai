@@ -1818,6 +1818,10 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   sellerSubscriptionPaidAt: timestamp("sellerSubscriptionPaidAt"),
   sellerSubscriptionStripeId: varchar("sellerSubscriptionStripeId", { length: 128 }),
   totalPlatformFeesPaid: int("totalPlatformFeesPaid").notNull().default(0),
+  // Stripe Connect - set to platform account ID for bot sellers, seller's own account for real sellers
+  stripeConnectAccountId: varchar("stripeConnectAccountId", { length: 128 }),
+  stripeConnectOnboarded: boolean("stripeConnectOnboarded").notNull().default(false),
+  isPlatformBot: boolean("isPlatformBot").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
