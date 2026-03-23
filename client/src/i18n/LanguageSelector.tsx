@@ -33,11 +33,6 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     const spaceAbove = rect.top;
     const dropdownHeight = 320;
 
-    if (window.innerWidth < 768) {
-      setDropDirection("down");
-      return;
-    }
-
     if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
       setDropDirection("down");
     } else {

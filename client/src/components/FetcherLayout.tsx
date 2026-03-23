@@ -421,6 +421,7 @@ function FetcherLayoutContent({
     },
   });
   const vpnActive = vpnActiveQuery.data?.active ?? false;
+  const vpnHasReadyHops = vpnActiveQuery.data?.hasReadyHops ?? false;
   const torActive = torActiveQuery.data?.active ?? false;
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -613,10 +614,14 @@ function FetcherLayoutContent({
               <button
                 onClick={() => {
                   if (setVpnActive.isPending) return;
+                  if (!vpnActive && !vpnHasReadyHops) {
+                    setLocation("/vpn-chain");
+                    return;
+                  }
                   setVpnActive.mutate({ active: !vpnActive });
                 }}
                 disabled={setVpnActive.isPending}
-                title={vpnActive ? "VPN Chain: ON — click to disable" : "VPN Chain: OFF — click to enable"}
+                title={vpnActive ? "VPN Chain: ON — click to disable" : vpnHasReadyHops ? "VPN Chain: OFF — click to enable" : "VPN Chain: not configured — click to set up"}
                 className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   vpnActive
                     ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
