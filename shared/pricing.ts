@@ -445,6 +445,9 @@ export const CREDIT_COSTS = {
 
   // ── Proxy ─────────────────────────────────────────────────────────────────────────
   proxy_add: 10,                 // Light — add + validate new proxy to pool
+  // ── Linken Sphere ─────────────────────────────────────────────────────────────────
+  linken_session_start: 50,      // Standard — start a Linken Sphere stealth browser session
+  linken_quick_create: 25,       // Light — create a quick Linken Sphere session profile
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;
