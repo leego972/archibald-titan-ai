@@ -517,6 +517,8 @@ export default function ContentCreatorPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | undefined>();
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState("Initialising...");
+  const [generationPercent, setGenerationPercent] = useState(0);
 
   // Campaign builder state
   const [showNewCampaign, setShowNewCampaign] = useState(false);
@@ -569,11 +571,28 @@ export default function ContentCreatorPage() {
     onSuccess: (data) => {
       setGeneratedContent(data);
       setIsGenerating(false);
+      setGenerationPercent(100);
+      setGenerationStep("Complete!");
       toast.success(`Content generated! Quality: ${data.qualityScore}/100 · SEO: ${data.seoScore}/100`);
       pieces.refetch();
+      // Connect to SSE stream for live progress if jobId returned
+      if ((data as any).jobId) {
+        const es = new EventSource(`/api/content/stream/${(data as any).jobId}`);
+        es.addEventListener("progress", (e) => {
+          try {
+            const ev = JSON.parse(e.data);
+            setGenerationStep(ev.message || "Processing...");
+            setGenerationPercent(Math.round(((ev.step || 1) / (ev.totalSteps || 5)) * 100));
+          } catch {}
+        });
+        es.addEventListener("complete", () => { es.close(); });
+        es.addEventListener("error", () => { es.close(); });
+      }
     },
     onError: (err) => {
       setIsGenerating(false);
+      setGenerationStep("Failed");
+      setGenerationPercent(0);
       toast.error(`Generation failed: ${err.message}`);
     },
   });
@@ -704,6 +723,8 @@ export default function ContentCreatorPage() {
     if (!selectedPlatform) { toast.error("Select a platform"); return; }
     setIsGenerating(true);
     setGeneratedContent(null);
+    setGenerationPercent(5);
+    setGenerationStep("Initialising...");
     generateContent.mutate({
       platform: selectedPlatform,
       contentType: selectedContentType,
@@ -1039,14 +1060,25 @@ export default function ContentCreatorPage() {
               </CardHeader>
               <CardContent>
                 {isGenerating && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                  <div className="flex flex-col items-center justify-center py-16 gap-6">
                     <div className="relative">
                       <div className="w-16 h-16 rounded-full border-2 border-pink-500/30 animate-ping absolute inset-0" />
                       <div className="w-16 h-16 rounded-full border-2 border-purple-500/50 animate-spin flex items-center justify-center">
                         <Sparkles className="w-6 h-6 text-pink-400" />
                       </div>
                     </div>
-                    <p className="text-gray-400 text-sm">AI is crafting your content...</p>
+                    <div className="w-full max-w-xs flex flex-col gap-2">
+                      <div className="flex justify-between text-xs text-gray-400">
+                        <span>{generationStep}</span>
+                        <span>{generationPercent}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#161b22] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                          style={{ width: `${generationPercent}%` }}
+                        />
+                      </div>
+                    </div>
                     <p className="text-gray-600 text-xs">Pulling SEO data · Applying brand voice · Optimising for {PLATFORM_ICONS[selectedPlatform]?.label}</p>
                   </div>
                 )}

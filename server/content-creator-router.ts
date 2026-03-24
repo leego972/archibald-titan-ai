@@ -33,6 +33,12 @@ import { isTikTokContentConfigured } from "./tiktok-content-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { consumeCredits, checkCredits } from "./credit-service";
+import {
+  registerContentJob,
+  emitContentProgress,
+  completeContentJob,
+  failContentJob,
+} from "./content-stream";
 
 const log = createLogger("ContentCreatorRouter");
 
@@ -244,8 +250,24 @@ export const contentCreatorRouter = router({
         throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
 
+      // Register SSE job for real-time progress streaming
+      const { randomUUID } = await import("crypto");
+      const jobId = randomUUID();
+      registerContentJob(jobId, ctx.user.id, 5);
+
       const { saveToDraft, ...genParams } = input;
-      const content = await generateCreatorContent(genParams);
+
+      // Emit progress steps as generation proceeds
+      emitContentProgress(jobId, "Analysing topic and keywords...", 1);
+      let content: Awaited<ReturnType<typeof generateCreatorContent>>;
+      try {
+        emitContentProgress(jobId, "Generating content with AI...", 2);
+        content = await generateCreatorContent(genParams);
+        emitContentProgress(jobId, "Scoring quality and SEO...", 3);
+      } catch (err) {
+        failContentJob(jobId, getErrorMessage(err));
+        throw err;
+      }
 
       // Consume credits after successful generation
       try {
@@ -280,11 +302,15 @@ export const contentCreatorRouter = router({
             generationMs: content.generationMs,
           } as any);
 
-          return { ...content, pieceId: (result as any).insertId };
+          emitContentProgress(jobId, "Saving to drafts...", 4);
+          const pieceId = (result as any).insertId;
+          completeContentJob(jobId, content.body || content.title || "");
+          return { ...content, pieceId, jobId };
         }
       }
 
-      return { ...content, pieceId: null };
+      completeContentJob(jobId, content.body || content.title || "");
+      return { ...content, pieceId: null, jobId };
     }),
 
   bulkGenerate: adminProcedure
