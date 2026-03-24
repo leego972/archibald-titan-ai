@@ -26,6 +26,7 @@ import {
 } from "./security-hardening";
 import { auditQueryParam } from "./security-fortress";
 import { isAdminRole } from '@shared/const';
+import { dispatchNotification } from "./notification-channels-router";
 const log = createLogger("MarketplaceRouter");
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -667,6 +668,24 @@ export const marketplaceRouter = router({
           downloadToken,
         });
 
+         // ── Notify buyer and seller of the completed purchase ───────────────────────────────
+        dispatchNotification(ctx.user.id, "job.completed", {
+          event: "Purchase Completed",
+          item: listing.title,
+          creditsPaid: listing.priceCredits,
+          purchaseId: purchaseUid,
+          timestamp: new Date().toISOString(),
+        }).catch((e) => log.warn(`[Marketplace] Buyer notification failed: ${getErrorMessage(e)}`));
+
+        dispatchNotification(listing.sellerId, "payment.succeeded", {
+          event: "New Sale",
+          item: listing.title,
+          creditsEarned: sellerShare,
+          purchaseId: purchaseUid,
+          buyer: ctx.user.name || ctx.user.email || `User #${ctx.user.id}`,
+          timestamp: new Date().toISOString(),
+        }).catch((e) => log.warn(`[Marketplace] Seller notification failed: ${getErrorMessage(e)}`));
+
         return {
           purchaseId: purchase.id,
           uid: purchaseUid,
@@ -677,7 +696,6 @@ export const marketplaceRouter = router({
         };
       });
     }),
-
   /** Get my purchases (inventory) */
   myPurchases: protectedProcedure.query(async ({ ctx }) => {
     if (!ctx.user?.id) throw new TRPCError({ code: "UNAUTHORIZED" });

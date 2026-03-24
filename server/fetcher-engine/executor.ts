@@ -51,6 +51,7 @@ import {
   decrementActiveJobs,
 } from "./safety-engine";
 import { createLogger } from "../_core/logger.js";
+import { dispatchNotification } from "../notification-channels-router";
 const log = createLogger("Executor");
 
 // ─── Configuration ──────────────────────────────────────────────────
@@ -487,9 +488,25 @@ export async function executeJob(jobId: number, userId: number): Promise<void> {
     await updateJobStatus(jobId, finalStatus);
     log.info(`[Fetcher] ═══ Job ${jobId} FINISHED ═══ ` +
       `Status: ${finalStatus} | ${completedCount}/${totalTasks} succeeded | ${elapsed(jobStart)}`);
+
+    // ── Notify user of job completion ───────────────────────────────────────────────────────────────
+    dispatchNotification(userId, finalStatus === "failed" ? "job.failed" : "job.completed", {
+      jobId,
+      status: finalStatus,
+      completed: completedCount,
+      failed: failedCount,
+      total: totalTasks,
+      timestamp: new Date().toISOString(),
+    }).catch((e) => log.warn(`[Fetcher] Could not dispatch job notification: ${String(e)}`));
   } catch (err) {
     log.error(`[Fetcher] Job ${jobId} FATAL error:`, { error: String(err) });
     await updateJobStatus(jobId, "failed");
+    dispatchNotification(userId, "job.failed", {
+      jobId,
+      status: "failed",
+      error: String(err),
+      timestamp: new Date().toISOString(),
+    }).catch(() => {});
   } finally {
     runningJobs.delete(jobId);
     decrementActiveJobs(userId);

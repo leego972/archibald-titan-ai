@@ -28,6 +28,7 @@ import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-se
 import { consumeCredits, checkCredits } from "./credit-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { dispatchNotification } from "./notification-channels-router";
 const log = createLogger("AstraRouter");
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
@@ -254,6 +255,15 @@ export const astraRouter = router({
         } catch (e) {
           log.warn("[Astra] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
         }
+        // Notify user that scan has been queued
+        dispatchNotification(ctx.user.id, "job.completed", {
+          event: "Astra Scan Started",
+          scanId: result.data.status,
+          target: input.url,
+          appname: input.appname,
+          message: `Scan queued for ${input.url}. Check Results tab for findings.`,
+          timestamp: new Date().toISOString(),
+        }).catch((e) => log.warn(`[Astra] Notification failed: ${getErrorMessage(e)}`));
         return { success: true, scanId: result.data.status, message: `Scan started for ${input.url}` };
       }
       throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to start scan — ensure Astra is running and the target URL is reachable" });
