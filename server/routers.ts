@@ -42,6 +42,7 @@ import { advertisingRouter } from "./advertising-router";
 import { userSecretsRouter } from "./user-secrets-router";
 import { customInstructionsRouter } from "./custom-instructions-router";
 import { marketplaceRouter } from "./marketplace-router";
+import { marketplaceIntelligenceRouter } from "./marketplace-intelligence-router";
 import { siteMonitorRouter } from "./site-monitor-router";
 import { securityDashboardRouter } from "./security-dashboard-router";
 import { evilginxRouter } from "./evilginx-router";
@@ -136,6 +137,7 @@ export const appRouter = router({
   advertising: advertisingRouter,
   userSecrets: userSecretsRouter,
   marketplace: marketplaceRouter,
+  marketplaceIntelligence: marketplaceIntelligenceRouter,
   siteMonitor: siteMonitorRouter,
   securityDashboard: securityDashboardRouter,
   customInstructions: customInstructionsRouter,

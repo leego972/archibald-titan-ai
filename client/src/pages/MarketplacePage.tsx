@@ -187,6 +187,17 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const { data: trending = [] } = trpc.marketplaceIntelligence.getTrending.useQuery({ limit: 6 });
+  const { data: recommendations = [] } = trpc.marketplaceIntelligence.getRecommendations.useQuery({ limit: 6 });
+
+  const wishlistMutation = trpc.marketplaceIntelligence.addToWishlist.useMutation({
+    onSuccess: () => toast.success("Added to wishlist!"),
+    onError: (err) => toast.error(err.message),
+  });
 
   const { data: listings = [], isLoading, refetch } = trpc.marketplace.browse.useQuery({
     category: activeCategory !== "all" ? activeCategory : undefined,
@@ -307,15 +318,100 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
 
       {/* Search & Filters */}
       <div className="max-w-6xl mx-auto px-6 py-6">
-        <div className="relative mb-6">
+        {/* Trending Section */}
+        {!searchQuery && (trending as any[]).length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              <h2 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">Trending Now</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {(trending as any[]).map((item: any) => (
+                <button key={item.id} onClick={() => onSelectListing(item.id)}
+                  className="text-left p-3 rounded-lg border border-amber-600/30 bg-amber-950/10 hover:border-amber-500/50 hover:bg-amber-950/20 transition-all group">
+                  <div className="text-xs font-medium truncate group-hover:text-amber-400 transition-colors">{item.title}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{item.priceCredits} cr</div>
+                  <div className="flex items-center gap-1 mt-1">
+                    <TrendingUp className="w-2.5 h-2.5 text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400">{item.trendScore?.toFixed(0) || "Hot"}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Personalized Recommendations */}
+        {!searchQuery && (recommendations as any[]).length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <h2 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Recommended For You</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {(recommendations as any[]).map((item: any) => (
+                <button key={item.id} onClick={() => onSelectListing(item.id)}
+                  className="text-left p-3 rounded-lg border border-purple-600/30 bg-purple-950/10 hover:border-purple-500/50 hover:bg-purple-950/20 transition-all group">
+                  <div className="text-xs font-medium truncate group-hover:text-purple-400 transition-colors">{item.title}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{item.priceCredits} cr</div>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Star className="w-2.5 h-2.5 text-amber-400" />
+                    <span className="text-[10px] text-muted-foreground">{item.score?.toFixed(0) || "Match"}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search the bazaar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-card/50 border-border/50"
+            className="pl-10 pr-24 bg-card/50 border-border/50"
           />
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-amber-400 transition-colors flex items-center gap-1">
+            <Filter className="w-3 h-3" />
+            Advanced
+          </button>
         </div>
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <div className="p-4 rounded-lg border border-border/30 bg-card/30 mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Min Price (credits)</label>
+              <Input type="number" placeholder="0" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Max Price (credits)</label>
+              <Input type="number" placeholder="Any" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Min Rating</label>
+              <select className="w-full h-8 text-sm bg-card border border-border/50 rounded-md px-2 text-foreground">
+                <option value="">Any</option>
+                <option value="4">4+ stars</option>
+                <option value="3">3+ stars</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">License</label>
+              <select className="w-full h-8 text-sm bg-card border border-border/50 rounded-md px-2 text-foreground">
+                <option value="">Any</option>
+                <option value="MIT">MIT</option>
+                <option value="GPL">GPL</option>
+                <option value="Commercial">Commercial</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-6" />
 
         {/* Category Tabs */}
         <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
@@ -979,7 +1075,23 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
   const sub = useSubscription();
   const canBuy = sub.canUse("marketplace_buy");
   const { data: purchases = [], isLoading } = trpc.marketplace.myPurchases.useQuery(undefined, { enabled: canBuy });
+  const { data: wishlist = [] } = trpc.marketplaceIntelligence.getWishlist.useQuery(undefined, { enabled: canBuy });
+  const { data: myDisputes = [] } = trpc.marketplaceIntelligence.getMyDisputes.useQuery(undefined, { enabled: canBuy });
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [inventoryTab, setInventoryTab] = useState("purchases");
+  const [disputeListingId, setDisputeListingId] = useState<number | null>(null);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeDesc, setDisputeDesc] = useState("");
+
+  const removeWishlistMutation = trpc.marketplaceIntelligence.removeFromWishlist.useMutation({
+    onSuccess: () => toast.success("Removed from wishlist"),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const openDisputeMutation = trpc.marketplaceIntelligence.openDispute.useMutation({
+    onSuccess: () => { toast.success("Dispute opened. We'll review within 48 hours."); setDisputeListingId(null); setDisputeReason(""); setDisputeDesc(""); },
+    onError: (err) => toast.error(err.message),
+  });
 
   const handleDownload = async (e: React.MouseEvent, downloadToken: string) => {
     e.stopPropagation();
@@ -1016,64 +1128,166 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
     <div className="max-w-5xl mx-auto px-6 py-6">
       <div className="flex items-center gap-3 mb-6">
         <Package2 className="w-6 h-6 text-amber-400" />
-        <h1 className="text-2xl font-bold">My Purchases</h1>
-        <Badge variant="outline">{(purchases as any[]).length} items</Badge>
+        <h1 className="text-2xl font-bold">My Inventory</h1>
+        <Badge variant="outline">{(purchases as any[]).length} purchases</Badge>
+        {(wishlist as any[]).length > 0 && <Badge variant="outline" className="text-purple-400 border-purple-600/50">{(wishlist as any[]).length} wishlist</Badge>}
+        {(myDisputes as any[]).length > 0 && <Badge variant="outline" className="text-red-400 border-red-600/50">{(myDisputes as any[]).length} disputes</Badge>}
       </div>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
-        </div>
-      )}
+      <Tabs value={inventoryTab} onValueChange={setInventoryTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="purchases">Purchases ({(purchases as any[]).length})</TabsTrigger>
+          <TabsTrigger value="wishlist">Wishlist ({(wishlist as any[]).length})</TabsTrigger>
+          <TabsTrigger value="disputes">Disputes ({(myDisputes as any[]).length})</TabsTrigger>
+        </TabsList>
 
-      {!isLoading && (purchases as any[]).length === 0 && (
-        <div className="text-center py-16">
-          <Package2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground mb-2">Your inventory is empty.</p>
-          <p className="text-sm text-muted-foreground">Browse the Grand Bazaar to find items.</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {(purchases as any[]).map((purchase) => {
-          const listing = purchase.listing;
-          if (!listing) return null;
-          const CatIcon = CATEGORY_ICONS[listing.category] || Package2;
-          return (
-            <Card key={purchase.id} className="border-border/30 bg-card/50 hover:border-amber-600/40 transition-all cursor-pointer" onClick={() => onSelectListing(listing.id)}>
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center flex-shrink-0">
-                    <CatIcon className="w-8 h-8 text-muted-foreground/20" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate">{listing.title}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{listing.description}</p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Coins className="w-3 h-3 text-amber-400" /> {purchase.priceCredits}</span>
-                      <span>{new Date(purchase.createdAt).toLocaleDateString()}</span>
-                      <Badge variant="outline" className="text-[10px]">{purchase.status}</Badge>
-                      {!purchase.hasReviewed && (
-                        <Badge className="bg-amber-600/20 text-amber-400 text-[10px]">Review pending</Badge>
-                      )}
+        <TabsContent value="purchases">
+          {isLoading && <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-amber-400" /></div>}
+          {!isLoading && (purchases as any[]).length === 0 && (
+            <div className="text-center py-16">
+              <Package2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground mb-2">Your inventory is empty.</p>
+              <p className="text-sm text-muted-foreground">Browse the Grand Bazaar to find items.</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(purchases as any[]).map((purchase) => {
+              const listing = purchase.listing;
+              if (!listing) return null;
+              const CatIcon = CATEGORY_ICONS[listing.category] || Package2;
+              return (
+                <Card key={purchase.id} className="border-border/30 bg-card/50 hover:border-amber-600/40 transition-all cursor-pointer" onClick={() => onSelectListing(listing.id)}>
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center flex-shrink-0">
+                        <CatIcon className="w-8 h-8 text-muted-foreground/20" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{listing.title}</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{listing.description}</p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Coins className="w-3 h-3 text-amber-400" /> {purchase.priceCredits}</span>
+                          <span>{new Date(purchase.createdAt).toLocaleDateString()}</span>
+                          <Badge variant="outline" className="text-[10px]">{purchase.status}</Badge>
+                          {!purchase.hasReviewed && <Badge className="bg-amber-600/20 text-amber-400 text-[10px]">Review pending</Badge>}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-600/50 text-xs h-7"
+                            disabled={downloading === purchase.downloadToken}
+                            onClick={(e) => handleDownload(e, purchase.downloadToken)}>
+                            {downloading === purchase.downloadToken ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
+                            Download ({purchase.maxDownloads - purchase.downloadCount} left)
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-400 border-red-600/50 text-xs h-7"
+                            onClick={(e) => { e.stopPropagation(); setDisputeListingId(listing.id); }}>
+                            <AlertTriangle className="w-3 h-3 mr-1" /> Dispute
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-2">
-                      <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-600/50 text-xs h-7"
-                        disabled={downloading === purchase.downloadToken}
-                        onClick={(e) => handleDownload(e, purchase.downloadToken)}>
-                        {downloading === purchase.downloadToken
-                          ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          : <Download className="w-3 h-3 mr-1" />}
-                        Download ({purchase.maxDownloads - purchase.downloadCount} left)
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="wishlist">
+          {(wishlist as any[]).length === 0 ? (
+            <div className="text-center py-16">
+              <Star className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">Your wishlist is empty. Click the heart icon on any listing to save it.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(wishlist as any[]).map((item: any) => (
+                <Card key={item.id} className="border-border/30 bg-card/50 hover:border-purple-600/40 transition-all cursor-pointer" onClick={() => onSelectListing(item.listingId)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{item.listing?.title || `Listing #${item.listingId}`}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">{item.listing?.priceCredits} credits</p>
+                        <p className="text-xs text-muted-foreground">Saved {new Date(item.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-red-400 border-red-600/50 text-xs ml-3"
+                        onClick={(e) => { e.stopPropagation(); removeWishlistMutation.mutate({ listingId: item.listingId }); }}>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="disputes">
+          {(myDisputes as any[]).length === 0 ? (
+            <div className="text-center py-16">
+              <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">No disputes. If you have an issue with a purchase, use the Dispute button on the item.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {(myDisputes as any[]).map((dispute: any) => (
+                <Card key={dispute.id} className="border-border/30 bg-card/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className={dispute.status === 'open' ? 'bg-amber-600/20 text-amber-400' : dispute.status === 'resolved' ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'}>
+                            {dispute.status}
+                          </Badge>
+                          <span className="text-sm font-medium">{dispute.reason}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{dispute.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Opened {new Date(dispute.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Dispute Dialog */}
+      <Dialog open={disputeListingId !== null} onOpenChange={(open) => { if (!open) setDisputeListingId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open a Dispute</DialogTitle>
+            <DialogDescription>Describe the issue with your purchase. We review all disputes within 48 hours.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Reason</label>
+              <select value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)}
+                className="w-full text-sm bg-card border border-border/50 rounded-md px-3 py-2 text-foreground">
+                <option value="">Select a reason...</option>
+                <option value="not_as_described">Not as described</option>
+                <option value="not_working">Not working</option>
+                <option value="wrong_item">Wrong item delivered</option>
+                <option value="no_download">Cannot download</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description</label>
+              <Textarea value={disputeDesc} onChange={(e) => setDisputeDesc(e.target.value)} rows={4} placeholder="Describe the issue in detail..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button className="bg-red-600 hover:bg-red-700"
+              onClick={() => { if (disputeListingId && disputeReason) openDisputeMutation.mutate({ listingId: disputeListingId, reason: disputeReason, description: disputeDesc }); }}
+              disabled={!disputeReason || openDisputeMutation.isPending}>
+              {openDisputeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <AlertTriangle className="w-3.5 h-3.5 mr-1" />}
+              Submit Dispute
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1426,6 +1640,39 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
     onError: (err) => toast.error(err.message),
   });
 
+  const boostMutation = trpc.marketplace.boostListing.useMutation({
+    onSuccess: () => { toast.success("Listing boosted for 7 days! (200 credits deducted)"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const featureMutation = trpc.marketplace.featureListing.useMutation({
+    onSuccess: () => { toast.success("Listing featured for 30 days! (500 credits deducted)"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const verifySellerMutation = trpc.marketplace.verifySeller.useMutation({
+    onSuccess: () => { toast.success("Seller verified! Permanent verified badge added. (1000 credits)"); refetchSeller(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const renewSellerMutation = trpc.marketplace.renewSeller.useMutation({
+    onSuccess: () => { toast.success("Seller subscription renewed for another year!"); refetchSeller(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const generateDescMutation = trpc.marketplaceIntelligence.generateDescription.useMutation({
+    onSuccess: (data) => {
+      if (data.description) setNewListing(prev => ({ ...prev, longDescription: data.description }));
+      toast.success("AI description generated!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { data: priceSuggestion } = trpc.marketplaceIntelligence.suggestPrice.useQuery(
+    { category: newListing.category, tags: newListing.tags ? newListing.tags.split(",").map((t: string) => t.trim()) : [] },
+    { enabled: showCreateDialog }
+  );
+
   const STATUS_COLORS: Record<string, string> = {
     active: "bg-emerald-600", draft: "bg-slate-600", paused: "bg-amber-600",
     pending_review: "bg-blue-600", approved: "bg-emerald-600", rejected: "bg-red-600", flagged: "bg-red-600",
@@ -1669,6 +1916,18 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         : <Upload className="w-3.5 h-3.5" />}
                     </Button>
+                    <Button size="sm" variant="outline" className="text-purple-400 border-purple-600/50 text-xs"
+                      title="Boost listing for 7 days (200 credits)"
+                      onClick={() => { if (confirm("Boost this listing for 7 days? Costs 200 credits.")) boostMutation.mutate({ id: listing.id }); }}
+                      disabled={boostMutation.isPending}>
+                      <Zap className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-amber-400 border-amber-600/50 text-xs"
+                      title="Feature listing for 30 days (500 credits)"
+                      onClick={() => { if (confirm("Feature this listing for 30 days? Costs 500 credits.")) featureMutation.mutate({ id: listing.id }); }}
+                      disabled={featureMutation.isPending}>
+                      <Crown className="w-3.5 h-3.5" />
+                    </Button>
                     <Button size="sm" variant="outline" className="text-red-400 border-red-600/50 text-xs"
                       onClick={() => { if (confirm("Delete this listing?")) deleteMutation.mutate({ id: listing.id }); }}>
                       <XCircle className="w-3.5 h-3.5" />
@@ -1705,7 +1964,20 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
               <Textarea value={newListing.description} onChange={(e) => setNewListing({ ...newListing, description: e.target.value })} placeholder="Brief description of what this item does..." rows={3} />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Full Description (Markdown)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium">Full Description (Markdown)</label>
+                <Button size="sm" variant="outline" className="text-xs text-purple-400 border-purple-600/50 h-6 px-2"
+                  onClick={() => generateDescMutation.mutate({
+                    title: newListing.title,
+                    category: newListing.category,
+                    tags: newListing.tags ? newListing.tags.split(",").map((t: string) => t.trim()) : [],
+                    keyFeatures: newListing.description,
+                  })}
+                  disabled={generateDescMutation.isPending || !newListing.title}>
+                  {generateDescMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  AI Generate
+                </Button>
+              </div>
               <Textarea value={newListing.longDescription} onChange={(e) => setNewListing({ ...newListing, longDescription: e.target.value })} placeholder="Detailed description with features, installation steps, etc..." rows={6} />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1726,6 +1998,13 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
               <div>
                 <label className="text-sm font-medium mb-1 block">Price (Credits) *</label>
                 <Input type="number" min={0} value={newListing.priceCredits} onChange={(e) => setNewListing({ ...newListing, priceCredits: parseInt(e.target.value) || 0 })} />
+                {priceSuggestion && (priceSuggestion as any).suggested && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <Sparkles className="w-3 h-3 inline mr-1 text-purple-400" />
+                    AI suggests: <button className="text-amber-400 hover:underline" onClick={() => setNewListing(prev => ({ ...prev, priceCredits: (priceSuggestion as any).suggested }))}>{(priceSuggestion as any).suggested} credits</button>
+                    {(priceSuggestion as any).range && <span className="text-muted-foreground/60"> (range: {(priceSuggestion as any).range.min}–{(priceSuggestion as any).range.max})</span>}
+                  </p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -1781,9 +2060,15 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
 // ═══════════════════════════════════════════════════════════════════
 
 function SellerDashboardView() {
-  const { data: profile } = trpc.marketplace.mySellerProfile.useQuery();
+  const { data: profile, refetch: refetchProfile } = trpc.marketplace.mySellerProfile.useQuery();
   const { data: sales = [], isLoading: salesLoading } = trpc.marketplace.mySales.useQuery();
   const { data: myListings = [] } = trpc.marketplace.myListings.useQuery();
+  const { data: analytics } = trpc.marketplaceIntelligence.getMyAnalytics.useQuery();
+  const { data: leaderboard = [] } = trpc.marketplaceIntelligence.getLeaderboard.useQuery({ limit: 10 });
+  const [dashTab, setDashTab] = useState("overview");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBio, setEditBio] = useState("");
 
   const totalRevenue = (sales as any[]).reduce((sum, s) => sum + Math.floor(s.priceCredits * 0.92), 0);
   const thisMonthSales = (sales as any[]).filter(s => {
@@ -1792,11 +2077,40 @@ function SellerDashboardView() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
+  const verifySellerMutation = trpc.marketplace.verifySeller.useMutation({
+    onSuccess: () => { toast.success("Seller verified! Permanent badge added. (1000 credits)"); refetchProfile(); },
+    onError: (err) => toast.error(err.message),
+  });
+  const renewSellerMutation = trpc.marketplace.renewSeller.useMutation({
+    onSuccess: () => { toast.success("Seller subscription renewed for another year!"); refetchProfile(); },
+    onError: (err) => toast.error(err.message),
+  });
+  const updateProfileMutation = trpc.marketplace.updateSellerProfile.useMutation({
+    onSuccess: () => { toast.success("Profile updated!"); setEditingProfile(false); refetchProfile(); },
+    onError: (err) => toast.error(err.message),
+  });
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <LayoutDashboard className="w-6 h-6 text-amber-400" />
-        <h1 className="text-2xl font-bold">Seller Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <LayoutDashboard className="w-6 h-6 text-amber-400" />
+          <h1 className="text-2xl font-bold">Seller Dashboard</h1>
+        </div>
+        <div className="flex gap-2">
+          {profile?.profile && !profile.profile.verified && (
+            <Button size="sm" variant="outline" className="text-blue-400 border-blue-600/50 text-xs"
+              onClick={() => { if (confirm("Get verified seller badge? Costs 1000 credits.")) verifySellerMutation.mutate(); }}
+              disabled={verifySellerMutation.isPending}>
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Get Verified
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="text-amber-400 border-amber-600/50 text-xs"
+            onClick={() => { if (confirm("Renew seller subscription for 1 year?")) renewSellerMutation.mutate(); }}
+            disabled={renewSellerMutation.isPending}>
+            <Crown className="w-3.5 h-3.5 mr-1" /> Renew
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -1833,58 +2147,184 @@ function SellerDashboardView() {
         </Card>
       </div>
 
-      {/* Seller Profile */}
-      {profile?.profile && (
-        <Card className="border-border/30 bg-card/50 mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xl font-bold">
-                {profile.profile.displayName?.[0] || "?"}
-              </div>
-              <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  {profile.profile.displayName}
-                  {profile.profile.verified && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
-                </h2>
-                <p className="text-sm text-muted-foreground">{profile.profile.bio || "No bio set"}</p>
-                <p className="text-xs text-muted-foreground mt-1">Member since {new Date(profile.profile.createdAt).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Dashboard Tabs */}
+      <Tabs value={dashTab} onValueChange={setDashTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="payouts">Payouts</TabsTrigger>
+        </TabsList>
 
-      {/* ★ PAYOUT METHODS SECTION ★ */}
-      <div className="mb-6">
-        <PayoutMethodsManager />
-      </div>
-
-      {/* Recent Sales */}
-      <Card className="border-border/30 bg-card/50">
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Sales</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {salesLoading && <Loader2 className="w-6 h-6 animate-spin text-amber-400 mx-auto" />}
-          {!salesLoading && (sales as any[]).length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No sales yet. Create listings to start selling!</p>
-          )}
-          <div className="space-y-2">
-            {(sales as any[]).slice(0, 20).map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
-                <div>
-                  <div className="text-sm font-medium">{sale.listing?.title || `Listing #${sale.listingId}`}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleDateString()} — {sale.uid}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-emerald-400">+{Math.floor(sale.priceCredits * 0.92).toLocaleString()}</div>
-                  <div className="text-[10px] text-muted-foreground">credits earned</div>
-                </div>
+        <TabsContent value="overview">
+          <Card className="border-border/30 bg-card/50">
+            <CardHeader><CardTitle className="text-lg">Recent Sales</CardTitle></CardHeader>
+            <CardContent>
+              {salesLoading && <Loader2 className="w-6 h-6 animate-spin text-amber-400 mx-auto" />}
+              {!salesLoading && (sales as any[]).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No sales yet. Create listings to start selling!</p>
+              )}
+              <div className="space-y-2">
+                {(sales as any[]).slice(0, 20).map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+                    <div>
+                      <div className="text-sm font-medium">{sale.listing?.title || `Listing #${sale.listingId}`}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleDateString()} — {sale.uid}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-emerald-400">+{Math.floor(sale.priceCredits * 0.92).toLocaleString()}</div>
+                      <div className="text-[10px] text-muted-foreground">credits earned</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <div className="space-y-4">
+            {analytics ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="border-border/30 bg-card/50"><CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-purple-400">{(analytics as any).conversionRate?.toFixed(1) || 0}%</div>
+                    <div className="text-xs text-muted-foreground">Conversion Rate</div>
+                  </CardContent></Card>
+                  <Card className="border-border/30 bg-card/50"><CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-400">{(analytics as any).totalViews?.toLocaleString() || 0}</div>
+                    <div className="text-xs text-muted-foreground">Total Views</div>
+                  </CardContent></Card>
+                  <Card className="border-border/30 bg-card/50"><CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-amber-400">{(analytics as any).thisMonthRevenue?.toLocaleString() || 0}</div>
+                    <div className="text-xs text-muted-foreground">This Month (credits)</div>
+                  </CardContent></Card>
+                  <Card className="border-border/30 bg-card/50"><CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-emerald-400">{(analytics as any).avgOrderValue?.toLocaleString() || 0}</div>
+                    <div className="text-xs text-muted-foreground">Avg Order Value</div>
+                  </CardContent></Card>
+                </div>
+                {(analytics as any).topListings?.length > 0 && (
+                  <Card className="border-border/30 bg-card/50">
+                    <CardHeader><CardTitle className="text-sm">Top Performing Listings</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {(analytics as any).topListings.map((l: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-5">#{i+1}</span>
+                              <span className="text-sm font-medium truncate max-w-[200px]">{l.title}</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs">
+                              <span className="text-muted-foreground">{l.views} views</span>
+                              <span className="text-emerald-400 font-bold">{l.sales} sales</span>
+                              <span className="text-amber-400">{l.revenue?.toLocaleString()} cr</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="leaderboard">
+          <Card className="border-border/30 bg-card/50">
+            <CardHeader><CardTitle className="text-lg">Top Sellers on the Bazaar</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {(leaderboard as any[]).map((seller, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm font-bold w-6 text-center ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-700' : 'text-muted-foreground'}`}>#{i+1}</span>
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
+                        {seller.displayName?.[0] || "?"}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium flex items-center gap-1">
+                          {seller.displayName}
+                          {seller.verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{seller.totalListings} listings</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-emerald-400">{seller.totalSales?.toLocaleString()} sales</div>
+                      <div className="text-xs text-amber-400">{seller.totalRevenue?.toLocaleString()} credits</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="profile">
+          <Card className="border-border/30 bg-card/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Seller Profile</CardTitle>
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+                  setEditName((profile?.profile as any)?.displayName || "");
+                  setEditBio((profile?.profile as any)?.bio || "");
+                  setEditingProfile(true);
+                }}>
+                  <Edit className="w-3.5 h-3.5 mr-1" /> Edit
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {editingProfile ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Display Name</label>
+                    <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Bio</label>
+                    <Textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700"
+                      onClick={() => updateProfileMutation.mutate({ displayName: editName, bio: editBio })}
+                      disabled={updateProfileMutation.isPending}>
+                      {updateProfileMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                      Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingProfile(false)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-2xl font-bold">
+                    {(profile?.profile as any)?.displayName?.[0] || "?"}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      {(profile?.profile as any)?.displayName}
+                      {(profile?.profile as any)?.verified && <CheckCircle2 className="w-4 h-4 text-blue-400" title="Verified Seller" />}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{(profile?.profile as any)?.bio || "No bio set"}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Member since {profile?.profile?.createdAt ? new Date((profile.profile as any).createdAt).toLocaleDateString() : "N/A"}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payouts">
+          <PayoutMethodsManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
