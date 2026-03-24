@@ -22,7 +22,7 @@ export interface DeviceProfile {
   screenSize: { width: number; height: number };
 }
 
-const DEVICE_PROFILES: DeviceProfile[] = [
+export const DEVICE_PROFILES: DeviceProfile[] = [
   {
     name: "Windows Chrome Desktop",
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",

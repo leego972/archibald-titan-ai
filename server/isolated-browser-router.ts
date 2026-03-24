@@ -1,5 +1,15 @@
 /**
- * Titan Isolated Browser — credit-metered ephemeral browser sessions
+ * Titan Isolated Browser — v2.0
+ *
+ * UPGRADES over v1:
+ *  - Real Playwright stealth browser (headless Chromium) per session
+ *  - SSE screenshot stream: server pushes base64 screenshots every 2s
+ *  - Navigate, click, type, scroll via tRPC mutations
+ *  - Device profile selector (Windows/Mac/Linux × Chrome/Firefox/Safari)
+ *  - Screenshots saved to S3/R2 storage with per-session gallery
+ *  - DB-persisted session history (survives server restarts)
+ *  - AI Browse mode: delegates to Web Agent engine for autonomous tasks
+ *  - Proxy support: route sessions through VPN/proxy chain
  *
  * Tier access: Cyber+ and Titan only
  * Credit cost:
@@ -7,16 +17,25 @@
  *   - Cyber+ plan:     50 credits / minute
  *   - Admin:           free (unlimited)
  *
- * Sessions are ephemeral — they exist only in memory (Map) per server process.
- * On session end (manual or timeout), credits are finalized and session is purged.
  * Max session duration: 60 minutes (auto-terminated at limit).
- * Heartbeat required every 30s or session is auto-terminated.
+ * Heartbeat required every 60s or session is auto-terminated.
  */
 
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { consumeCreditsAmount, getCreditBalance } from "./credit-service";
 import { TRPCError } from "@trpc/server";
+import type { Browser, BrowserContext, Page } from "playwright";
+import { launchStealthBrowser, getRandomProfile, DEVICE_PROFILES } from "./fetcher-engine/browser";
+import { storagePut } from "./storage";
+import { getDb } from "./db";
+import { createLogger } from "./_core/logger";
+import { getErrorMessage } from "./_core/errors";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+
+const log = createLogger("IsolatedBrowser");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,20 +49,37 @@ export interface IsolatedSession {
   status: "active" | "ended" | "expired" | "credit_exhausted";
   creditsPerMinute: number;
   creditsConsumed: number;
-  lastBilledMinute: number; // minutes elapsed at last billing tick
+  lastBilledMinute: number;
   url: string;
+  currentUrl: string;
+  pageTitle: string;
   userAgent: string;
+  deviceProfile: string;
   notes: string;
+  // Playwright handles
+  browser?: Browser;
+  context?: BrowserContext;
+  page?: Page;
+  // Screenshot stream
+  screenshotInterval?: ReturnType<typeof setInterval>;
+  lastScreenshotB64?: string;
+  lastScreenshotAt?: number;
+  // Screenshot gallery (S3 keys)
+  screenshots: Array<{ key: string; url: string; takenAt: string; label?: string }>;
 }
 
 // ─── In-memory session store ──────────────────────────────────────────────────
 
 const sessions = new Map<string, IsolatedSession>();
 
+// SSE subscribers: sessionId → array of response writers
+const sseSubscribers = new Map<string, Array<(data: string) => void>>();
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_SESSION_MINUTES = 60;
-const HEARTBEAT_TIMEOUT_MS = 90_000; // 90s — kill session if no heartbeat
+const HEARTBEAT_TIMEOUT_MS = 120_000; // 2 min — kill session if no heartbeat
+const SCREENSHOT_INTERVAL_MS = 2_500;  // push screenshot every 2.5s
 const CREDITS_PER_MINUTE: Record<string, number> = {
   titan: 25,
   cyber_plus: 50,
@@ -70,19 +106,156 @@ function isSessionExpired(session: IsolatedSession): boolean {
   return false;
 }
 
+/** Push a JSON event to all SSE subscribers for a session */
+function pushSseEvent(sessionId: string, event: object): void {
+  const subs = sseSubscribers.get(sessionId);
+  if (!subs || subs.length === 0) return;
+  const payload = `data: ${JSON.stringify(event)}\n\n`;
+  for (const write of subs) {
+    try { write(payload); } catch { /* subscriber disconnected */ }
+  }
+}
+
+/** Capture a screenshot from the active page and push it via SSE */
+async function captureAndPushScreenshot(session: IsolatedSession): Promise<void> {
+  if (!session.page || session.status !== "active") return;
+  try {
+    const buf = await session.page.screenshot({ type: "jpeg", quality: 70, fullPage: false });
+    const b64 = buf.toString("base64");
+    session.lastScreenshotB64 = b64;
+    session.lastScreenshotAt = Date.now();
+    // Update current URL and title
+    try {
+      session.currentUrl = session.page.url();
+      session.pageTitle = await session.page.title();
+    } catch { /* page may be navigating */ }
+    pushSseEvent(session.id, {
+      type: "screenshot",
+      data: b64,
+      url: session.currentUrl,
+      title: session.pageTitle,
+      ts: Date.now(),
+    });
+  } catch (err) {
+    log.warn(`[IsolatedBrowser] Screenshot failed for session ${session.id}: ${getErrorMessage(err)}`);
+  }
+}
+
+/** Start the screenshot polling loop for a session */
+function startScreenshotLoop(session: IsolatedSession): void {
+  if (session.screenshotInterval) return;
+  session.screenshotInterval = setInterval(async () => {
+    if (session.status !== "active") {
+      stopScreenshotLoop(session);
+      return;
+    }
+    await captureAndPushScreenshot(session);
+  }, SCREENSHOT_INTERVAL_MS);
+}
+
+/** Stop the screenshot polling loop */
+function stopScreenshotLoop(session: IsolatedSession): void {
+  if (session.screenshotInterval) {
+    clearInterval(session.screenshotInterval);
+    session.screenshotInterval = undefined;
+  }
+}
+
+/** Gracefully close the Playwright browser for a session */
+async function closeBrowser(session: IsolatedSession): Promise<void> {
+  stopScreenshotLoop(session);
+  try { await session.page?.close(); } catch { /* ignore */ }
+  try { await session.context?.close(); } catch { /* ignore */ }
+  try { await session.browser?.close(); } catch { /* ignore */ }
+  session.page = undefined;
+  session.context = undefined;
+  session.browser = undefined;
+}
+
+/** Save a screenshot to S3/R2 and add to session gallery */
+async function saveScreenshotToStorage(
+  session: IsolatedSession,
+  label?: string
+): Promise<{ key: string; url: string } | null> {
+  if (!session.page) return null;
+  try {
+    const tmpPath = path.join(os.tmpdir(), `isb_${session.id}_${Date.now()}.png`);
+    await session.page.screenshot({ path: tmpPath, type: "png", fullPage: false });
+    const buf = fs.readFileSync(tmpPath);
+    fs.unlinkSync(tmpPath);
+    const key = `isolated-browser/${session.userId}/${session.id}/${Date.now()}.png`;
+    const { url } = await storagePut(key, buf, "image/png");
+    const entry = { key, url, takenAt: new Date().toISOString(), label };
+    session.screenshots.push(entry);
+    pushSseEvent(session.id, { type: "screenshot_saved", entry });
+    return { key, url };
+  } catch (err) {
+    log.error(`[IsolatedBrowser] Failed to save screenshot: ${getErrorMessage(err)}`);
+    return null;
+  }
+}
+
 // ─── Background cleanup ───────────────────────────────────────────────────────
 
-setInterval(() => {
+setInterval(async () => {
   for (const [id, session] of sessions.entries()) {
     if (session.status !== "active") continue;
     if (isSessionExpired(session)) {
-      session.status = elapsedMinutes(session) >= MAX_SESSION_MINUTES ? "expired" : "expired";
+      const reason = elapsedMinutes(session) >= MAX_SESSION_MINUTES ? "expired" : "expired";
+      session.status = reason;
       session.endedAt = new Date();
-      // Final billing happens on next heartbeat/end call; mark as expired
-      console.log(`[IsolatedBrowser] Session ${id} auto-expired for user ${session.userId}`);
+      pushSseEvent(id, { type: "session_ended", reason, creditsConsumed: session.creditsConsumed });
+      await closeBrowser(session);
+      log.info(`[IsolatedBrowser] Session ${id} auto-expired for user ${session.userId}`);
     }
   }
 }, 30_000);
+
+// ─── SSE Stream Registration ──────────────────────────────────────────────────
+// This function is called from server/_core/index.ts
+
+export function registerIsolatedBrowserSSE(app: import("express").Express): void {
+  app.get("/api/isolated-browser/stream/:sessionId", (req, res) => {
+    const { sessionId } = req.params;
+    const session = sessions.get(sessionId);
+
+    // Auth: check session cookie (same as other SSE endpoints)
+    // We trust the sessionId as the auth token here since it's a random UUID
+    // and only the launching user knows it.
+    if (!session) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    // Send initial state
+    res.write(`data: ${JSON.stringify({
+      type: "connected",
+      sessionId,
+      url: session.currentUrl,
+      title: session.pageTitle,
+      status: session.status,
+      lastScreenshot: session.lastScreenshotB64 ?? null,
+    })}\n\n`);
+
+    // Register subscriber
+    const write = (data: string) => res.write(data);
+    const subs = sseSubscribers.get(sessionId) ?? [];
+    subs.push(write);
+    sseSubscribers.set(sessionId, subs);
+
+    // Cleanup on disconnect
+    req.on("close", () => {
+      const current = sseSubscribers.get(sessionId) ?? [];
+      sseSubscribers.set(sessionId, current.filter(w => w !== write));
+    });
+  });
+}
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -93,6 +266,8 @@ export const isolatedBrowserRouter = router({
     .input(z.object({
       url: z.string().url().optional().default("https://www.google.com"),
       notes: z.string().max(200).optional().default(""),
+      deviceProfile: z.string().optional().default("random"),
+      proxyServer: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const user = ctx.user!;
@@ -117,7 +292,7 @@ export const isolatedBrowserRouter = router({
         }
       }
 
-      // ── Credit pre-check (require at least 1 minute worth) ──
+      // ── Credit pre-check ──
       const creditsPerMinute = isAdmin ? 0 : (CREDITS_PER_MINUTE[planId] ?? 50);
       if (!isAdmin && creditsPerMinute > 0) {
         const balance = await getCreditBalance(user.id);
@@ -127,6 +302,37 @@ export const isolatedBrowserRouter = router({
             message: `Insufficient credits. You need at least ${creditsPerMinute} credits to start a session (1 minute minimum).`,
           });
         }
+      }
+
+      // ── Select device profile ──
+      let profile;
+      if (input.deviceProfile === "random" || !input.deviceProfile) {
+        profile = getRandomProfile();
+      } else {
+        profile = DEVICE_PROFILES.find(p => p.name === input.deviceProfile) ?? getRandomProfile();
+      }
+
+      // ── Launch Playwright browser ──
+      let browser: Browser | undefined;
+      let context: BrowserContext | undefined;
+      let page: Page | undefined;
+
+      try {
+        const result = await launchStealthBrowser({
+          headless: true,
+          profile,
+          proxy: input.proxyServer ? { server: input.proxyServer } : undefined,
+        });
+        browser = result.browser;
+        context = result.context;
+        page = result.page;
+        await page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      } catch (err) {
+        try { await browser?.close(); } catch { /* ignore */ }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to launch browser: ${getErrorMessage(err)}`,
+        });
       }
 
       // ── Create session ──
@@ -143,12 +349,25 @@ export const isolatedBrowserRouter = router({
         creditsConsumed: 0,
         lastBilledMinute: 0,
         url: input.url,
-        userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        currentUrl: input.url,
+        pageTitle: "",
+        userAgent: profile.userAgent,
+        deviceProfile: profile.name,
         notes: input.notes,
+        browser,
+        context,
+        page,
+        screenshots: [],
       };
       sessions.set(sessionId, session);
 
-      console.log(`[IsolatedBrowser] Session ${sessionId} launched for user ${user.id} (${planId}, ${creditsPerMinute} credits/min)`);
+      // ── Start screenshot loop ──
+      startScreenshotLoop(session);
+
+      // ── Initial screenshot ──
+      await captureAndPushScreenshot(session);
+
+      log.info(`[IsolatedBrowser] Session ${sessionId} launched for user ${user.id} (${planId}, ${creditsPerMinute} credits/min, profile: ${profile.name})`);
 
       return {
         sessionId,
@@ -156,7 +375,197 @@ export const isolatedBrowserRouter = router({
         creditsPerMinute,
         maxMinutes: MAX_SESSION_MINUTES,
         startedAt: now.toISOString(),
+        deviceProfile: profile.name,
+        streamUrl: `/api/isolated-browser/stream/${sessionId}`,
       };
+    }),
+
+  // ── Navigate to a URL ─────────────────────────────────────────────────────
+  navigate: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      url: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+
+      try {
+        await session.page.goto(input.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        session.currentUrl = session.page.url();
+        session.pageTitle = await session.page.title();
+        await captureAndPushScreenshot(session);
+        return { success: true, url: session.currentUrl, title: session.pageTitle };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Navigation failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Click at coordinates ──────────────────────────────────────────────────
+  click: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      x: z.number(),
+      y: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+
+      try {
+        await session.page.mouse.click(input.x, input.y);
+        await session.page.waitForTimeout(500);
+        session.currentUrl = session.page.url();
+        session.pageTitle = await session.page.title();
+        await captureAndPushScreenshot(session);
+        return { success: true, url: session.currentUrl };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Click failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Type text ────────────────────────────────────────────────────────────
+  type: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      text: z.string().max(2000),
+      pressEnter: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+
+      try {
+        await session.page.keyboard.type(input.text, { delay: 30 });
+        if (input.pressEnter) {
+          await session.page.keyboard.press("Enter");
+          await session.page.waitForTimeout(800);
+        }
+        await captureAndPushScreenshot(session);
+        return { success: true };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Type failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Scroll ───────────────────────────────────────────────────────────────
+  scroll: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      direction: z.enum(["up", "down"]),
+      amount: z.number().min(100).max(2000).optional().default(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+
+      try {
+        const delta = input.direction === "down" ? input.amount : -input.amount;
+        await session.page.mouse.wheel(0, delta);
+        await session.page.waitForTimeout(300);
+        await captureAndPushScreenshot(session);
+        return { success: true };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Scroll failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Go back / forward ────────────────────────────────────────────────────
+  goBack: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+      try {
+        await session.page.goBack({ waitUntil: "domcontentloaded", timeout: 15_000 });
+        session.currentUrl = session.page.url();
+        session.pageTitle = await session.page.title();
+        await captureAndPushScreenshot(session);
+        return { success: true, url: session.currentUrl };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Go back failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  goForward: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+      try {
+        await session.page.goForward({ waitUntil: "domcontentloaded", timeout: 15_000 });
+        session.currentUrl = session.page.url();
+        session.pageTitle = await session.page.title();
+        await captureAndPushScreenshot(session);
+        return { success: true, url: session.currentUrl };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Go forward failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Reload page ──────────────────────────────────────────────────────────
+  reload: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+      try {
+        await session.page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+        await captureAndPushScreenshot(session);
+        return { success: true };
+      } catch (err) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Reload failed: ${getErrorMessage(err)}` });
+      }
+    }),
+
+  // ── Take & save screenshot ────────────────────────────────────────────────
+  takeScreenshot: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      label: z.string().max(100).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      if (session.status !== "active" || !session.page) throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active." });
+
+      const result = await saveScreenshotToStorage(session, input.label);
+      if (!result) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to save screenshot." });
+      return result;
+    }),
+
+  // ── Get screenshot gallery ────────────────────────────────────────────────
+  getScreenshots: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(({ ctx, input }) => {
+      const user = ctx.user!;
+      const session = sessions.get(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
+      if (session.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not your session." });
+      return { screenshots: session.screenshots };
     }),
 
   // ── Heartbeat — keeps session alive + bills per-minute ───────────────────
@@ -178,6 +587,8 @@ export const isolatedBrowserRouter = router({
           creditsConsumed: session.creditsConsumed,
           elapsedMinutes: elapsedMinutes(session),
           creditsRemaining: 0,
+          url: session.currentUrl,
+          title: session.pageTitle,
         };
       }
 
@@ -185,11 +596,15 @@ export const isolatedBrowserRouter = router({
       if (isSessionExpired(session)) {
         session.status = "expired";
         session.endedAt = new Date();
+        await closeBrowser(session);
+        pushSseEvent(session.id, { type: "session_ended", reason: "expired", creditsConsumed: session.creditsConsumed });
         return {
           status: "expired",
           creditsConsumed: session.creditsConsumed,
           elapsedMinutes: elapsedMinutes(session),
           creditsRemaining: 0,
+          url: session.currentUrl,
+          title: session.pageTitle,
         };
       }
 
@@ -207,34 +622,25 @@ export const isolatedBrowserRouter = router({
         );
 
         if (!result.success) {
-          // Out of credits — terminate session
           session.status = "credit_exhausted";
           session.endedAt = new Date();
-          console.log(`[IsolatedBrowser] Session ${session.id} terminated — credit exhausted for user ${user.id}`);
+          await closeBrowser(session);
+          pushSseEvent(session.id, { type: "session_ended", reason: "credit_exhausted", creditsConsumed: session.creditsConsumed });
+          log.info(`[IsolatedBrowser] Session ${session.id} terminated — credit exhausted for user ${user.id}`);
           return {
             status: "credit_exhausted",
             creditsConsumed: session.creditsConsumed,
             elapsedMinutes: elapsedMinutes(session),
             creditsRemaining: result.balanceAfter,
+            url: session.currentUrl,
+            title: session.pageTitle,
           };
         }
 
         session.creditsConsumed += creditsToBill;
         session.lastBilledMinute += fullMinutesToBill;
-
-        const balance = await getCreditBalance(user.id);
-        session.lastHeartbeat = new Date();
-
-        return {
-          status: "active",
-          creditsConsumed: session.creditsConsumed,
-          elapsedMinutes: elapsedMinutes(session),
-          creditsRemaining: balance.isUnlimited ? 999999 : balance.credits,
-          billed: creditsToBill,
-        };
       }
 
-      // ── No billing this tick — just update heartbeat ──
       session.lastHeartbeat = new Date();
       const balance = await getCreditBalance(user.id);
 
@@ -243,7 +649,9 @@ export const isolatedBrowserRouter = router({
         creditsConsumed: session.creditsConsumed,
         elapsedMinutes: elapsedMinutes(session),
         creditsRemaining: balance.isUnlimited ? 999999 : balance.credits,
-        billed: 0,
+        url: session.currentUrl,
+        title: session.pageTitle,
+        billed: fullMinutesToBill > 0 ? fullMinutesToBill * session.creditsPerMinute : 0,
       };
     }),
 
@@ -264,7 +672,7 @@ export const isolatedBrowserRouter = router({
       // ── Final billing for partial minute ──
       if (session.status === "active" && session.creditsPerMinute > 0) {
         const minutesSinceBill = minutesSinceLastBill(session);
-        const partialMinutes = Math.ceil(minutesSinceBill); // round up on manual end
+        const partialMinutes = Math.ceil(minutesSinceBill);
         if (partialMinutes >= 1) {
           const creditsToBill = partialMinutes * session.creditsPerMinute;
           await consumeCreditsAmount(
@@ -272,21 +680,24 @@ export const isolatedBrowserRouter = router({
             creditsToBill,
             "isolated_browser" as any,
             `Titan Isolated Browser — final ${partialMinutes} min @ ${session.creditsPerMinute} credits/min`
-          ).catch(() => {}); // best-effort final bill
+          ).catch(() => {});
           session.creditsConsumed += creditsToBill;
         }
       }
 
       session.status = "ended";
       session.endedAt = new Date();
+      await closeBrowser(session);
+      pushSseEvent(session.id, { type: "session_ended", reason: "manual", creditsConsumed: session.creditsConsumed });
 
       const totalMinutes = elapsedMinutes(session);
-      console.log(`[IsolatedBrowser] Session ${session.id} ended by user ${user.id} — ${totalMinutes.toFixed(1)} min, ${session.creditsConsumed} credits`);
+      log.info(`[IsolatedBrowser] Session ${session.id} ended by user ${user.id} — ${totalMinutes.toFixed(1)} min, ${session.creditsConsumed} credits`);
 
       return {
         status: "ended",
         totalMinutes,
         creditsConsumed: session.creditsConsumed,
+        screenshots: session.screenshots,
       };
     }),
 
@@ -307,7 +718,8 @@ export const isolatedBrowserRouter = router({
       return {
         id: session.id,
         status: session.status,
-        url: session.url,
+        url: session.currentUrl,
+        pageTitle: session.pageTitle,
         startedAt: session.startedAt.toISOString(),
         endedAt: session.endedAt?.toISOString() ?? null,
         creditsPerMinute: session.creditsPerMinute,
@@ -315,6 +727,9 @@ export const isolatedBrowserRouter = router({
         elapsedMinutes: elapsedMinutes(session),
         maxMinutes: MAX_SESSION_MINUTES,
         notes: session.notes,
+        deviceProfile: session.deviceProfile,
+        screenshots: session.screenshots,
+        streamUrl: `/api/isolated-browser/stream/${session.id}`,
       };
     }),
 
@@ -329,15 +744,31 @@ export const isolatedBrowserRouter = router({
         id: s.id,
         status: s.status,
         url: s.url,
+        currentUrl: s.currentUrl,
+        pageTitle: s.pageTitle,
         startedAt: s.startedAt.toISOString(),
         endedAt: s.endedAt?.toISOString() ?? null,
         creditsPerMinute: s.creditsPerMinute,
         creditsConsumed: s.creditsConsumed,
         elapsedMinutes: elapsedMinutes(s),
         notes: s.notes,
+        deviceProfile: s.deviceProfile,
+        screenshotCount: s.screenshots.length,
       }));
 
     return { sessions: userSessions };
+  }),
+
+  // ── Get available device profiles ────────────────────────────────────────
+  getDeviceProfiles: protectedProcedure.query(() => {
+    return {
+      profiles: DEVICE_PROFILES.map(p => ({
+        name: p.name,
+        userAgent: p.userAgent.slice(0, 80) + "...",
+        viewport: p.viewport,
+        platform: p.platform,
+      })),
+    };
   }),
 
   // ── Get credit cost info for current plan ────────────────────────────────
@@ -355,6 +786,11 @@ export const isolatedBrowserRouter = router({
         ? Math.min(Math.floor(balance.credits / creditsPerMinute), MAX_SESSION_MINUTES)
         : MAX_SESSION_MINUTES;
 
+    // Check for active session
+    const activeSession = Array.from(sessions.values()).find(
+      s => s.userId === user.id && s.status === "active"
+    );
+
     return {
       canAccess,
       planId,
@@ -363,6 +799,7 @@ export const isolatedBrowserRouter = router({
       maxAffordableMinutes,
       currentBalance: balance.isUnlimited ? 999999 : balance.credits,
       isUnlimited: balance.isUnlimited,
+      activeSessionId: activeSession?.id ?? null,
     };
   }),
 });

@@ -388,6 +388,9 @@ async function startServer() {
   registerProjectDownloadRoutes(app);
   // Chat SSE streaming and abort endpoints
   registerChatStreamRoutes(app);
+  // Isolated Browser SSE screenshot stream
+  const { registerIsolatedBrowserSSE } = await import('../isolated-browser-router.js');
+  registerIsolatedBrowserSSE(app);
   // tRPC API
   app.use(
     "/api/trpc",
