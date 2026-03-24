@@ -277,7 +277,8 @@ Days since last update: ${daysSinceUpdate}
 Action needed: ${action}
 
 Brief should specify exactly what to update (statistics, examples, new sections) to recover rankings.`;
-        refreshBrief = await invokeLLM({ prompt, maxTokens: 150 });
+        const briefResult = await invokeLLM({ messages: [{ role: "user" as const, content: prompt }], maxTokens: 150, systemTag: "seo" });
+        refreshBrief = (briefResult.choices[0]?.message?.content as string) ?? "";
       } catch {
         refreshBrief = `Update statistics and examples for ${page.keywords[0]}. Add 2025-specific data points and a new FAQ section targeting long-tail variants.`;
       }
@@ -421,7 +422,8 @@ export async function validateAndGenerateSchema(url: string): Promise<SchemaVali
     const prompt = `Generate valid JSON-LD schema markup for a ${pageType} page at ${url} for Archibald Titan AI (archibaldtitan.com), a local AI cybersecurity platform.
 Required schema types to generate: ${missingSchema.join(", ")}
 Return ONLY valid JSON-LD as a single @graph array. No explanation.`;
-    const raw = await invokeLLM({ prompt, maxTokens: 600 });
+    const schemaResult = await invokeLLM({ messages: [{ role: "user" as const, content: prompt }], maxTokens: 600, systemTag: "seo" });
+    const raw = (schemaResult.choices[0]?.message?.content as string) ?? "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (jsonMatch) generatedSchema = JSON.parse(jsonMatch[0]);
   } catch {

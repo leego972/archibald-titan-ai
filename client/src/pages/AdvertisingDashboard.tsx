@@ -26,7 +26,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Progress } from "../components/ui/progress";
-import { useToast } from "../hooks/use-toast";
+import { toast } from "sonner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,6 @@ function SeverityBadge({ severity }: { severity: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdvertisingDashboard() {
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedContent, setSelectedContent] = useState<any>(null);
   const [viralPlatform, setViralPlatform] = useState("x_twitter");
@@ -96,36 +95,36 @@ export default function AdvertisingDashboard() {
 
   // ─── Mutations ────────────────────────────────────────────────────────────
   const runCycle = trpc.advertising.runCycle.useMutation({
-    onSuccess: () => { toast({ title: "Advertising cycle started", description: "Running full autonomous cycle now" }); dashboard.refetch(); },
-    onError: (e) => toast({ title: "Cycle failed", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast.success("Advertising cycle started — running full autonomous cycle now"); dashboard.refetch(); },
+    onError: (e) => toast.error(`Cycle failed: ${e.message}`),
   });
   const startScheduler = trpc.advertising.startScheduler.useMutation({
-    onSuccess: () => { toast({ title: "Scheduler started" }); },
+    onSuccess: () => { toast.success("Scheduler started"); },
   });
   const stopScheduler = trpc.advertising.stopScheduler.useMutation({
-    onSuccess: () => { toast({ title: "Scheduler stopped" }); },
+    onSuccess: () => { toast.success("Scheduler stopped"); },
   });
   const updateStatus = trpc.advertising.updateContentStatus.useMutation({
-    onSuccess: () => { contentQueue.refetch(); toast({ title: "Status updated" }); },
+    onSuccess: () => { contentQueue.refetch(); toast.success("Status updated"); },
   });
   const triggerContentCycle = trpc.advertising.triggerContentCycle.useMutation({
-    onSuccess: (r) => { toast({ title: "Content cycle complete", description: `Generated: ${(r as any).generated ?? 0}, Published: ${(r as any).published ?? 0}` }); },
+    onSuccess: (r) => { toast.success(`Content cycle complete — Generated: ${(r as any).generated ?? 0}, Published: ${(r as any).published ?? 0}`); },
   });
   const autoApprove = trpc.advertising.autoApproveContent.useMutation({
-    onSuccess: (r) => { toast({ title: "Auto-approve complete", description: `Approved: ${(r as any).approved ?? 0}` }); contentQueue.refetch(); },
+    onSuccess: (r) => { toast.success(`Auto-approve complete — Approved: ${(r as any).approved ?? 0}`); contentQueue.refetch(); },
   });
   const generateViral = trpc.advertising.generateViralContent.useMutation({
-    onSuccess: (r) => { setPreviewContent(r); toast({ title: "Viral content generated" }); },
-    onError: (e) => toast({ title: "Generation failed", description: e.message, variant: "destructive" }),
+    onSuccess: (r) => { setPreviewContent(r); toast.success("Viral content generated"); },
+    onError: (e) => toast.error(`Generation failed: ${e.message}`),
   });
   const createMVT = trpc.advertising.createMVTTest.useMutation({
-    onSuccess: () => { mvtTests.refetch(); toast({ title: "MVT test created" }); },
+    onSuccess: () => { mvtTests.refetch(); toast.success("MVT test created"); },
   });
   const resumeChannel = trpc.advertising.resumeChannel.useMutation({
-    onSuccess: (_, vars) => { channelHealth.refetch(); toast({ title: `Channel ${vars.channel} resumed` }); },
+    onSuccess: (_, vars) => { channelHealth.refetch(); toast.success(`Channel ${vars.channel} resumed`); },
   });
   const createABTest = trpc.advertising.createABTest.useMutation({
-    onSuccess: () => { abTests.refetch(); toast({ title: "A/B test created" }); },
+    onSuccess: () => { abTests.refetch(); toast.success("A/B test created"); },
   });
 
   const data = dashboard.data;
@@ -187,9 +186,9 @@ export default function AdvertisingDashboard() {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { label: "Blog Posts", value: data?.performance?.blogPostsPublished ?? 0, sub: "last 30 days" },
-              { label: "Social Posts", value: data?.performance?.socialPostsPublished ?? 0, sub: "last 30 days" },
-              { label: "Community Posts", value: data?.performance?.communityEngagements ?? 0, sub: "last 30 days" },
+              { label: "Blog Posts", value: (data?.performance as any)?.organic?.blogPostsPublished ?? 0, sub: "last 30 days" },
+              { label: "Social Posts", value: (data?.performance as any)?.organic?.contentByPlatform?.social_organic ?? 0, sub: "last 30 days" },
+              { label: "Community Posts", value: (data?.performance as any)?.organic?.affiliateClicks ?? 0, sub: "last 30 days" },
               { label: "Active Channels", value: (channelStatuses.data?.summary?.coreConnected ?? 0) + (channelStatuses.data?.summary?.freeApiConnected ?? 0), sub: `of ${(channelStatuses.data?.summary?.coreTotal ?? 0) + (channelStatuses.data?.summary?.freeApiTotal ?? 0)} total` },
             ].map(kpi => (
               <Card key={kpi.label} className="bg-gray-900 border-gray-800">

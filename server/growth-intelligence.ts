@@ -213,7 +213,7 @@ export async function analyzeCompetitorGaps(): Promise<{
     ).join("\n");
 
     const response = await invokeLLM({
-      systemTag: "growth_intelligence",
+      systemTag: "misc",
       model: "strong",
       messages: [
         {
@@ -283,7 +283,7 @@ export async function generateCompetitorCounterContent(
   const weaknesses = profile?.weaknesses || ["limited AI features", "cloud dependency"];
 
   const response = await invokeLLM({
-    systemTag: "growth_intelligence",
+    systemTag: "misc",
     model: "strong",
     messages: [
       {
@@ -664,7 +664,7 @@ export async function generateViralContent(params: {
   const pattern = params.pattern || getBestViralPattern(params.platform);
 
   const response = await invokeLLM({
-    systemTag: "growth_intelligence",
+    systemTag: "misc",
     model: "strong",
     messages: [
       {
@@ -1050,7 +1050,7 @@ export async function calculateGrowthVelocity(): Promise<GrowthVelocity[]> {
       else trend = "stable";
 
       velocities.push({
-        channel: row.channel,
+        channel: row.channel ?? "unknown",
         thisWeek,
         lastWeek,
         deltaPercent: Math.round(deltaPercent * 10) / 10,
@@ -1165,7 +1165,7 @@ export async function generateWeeklyGrowthReport(): Promise<WeeklyGrowthReport> 
 
   try {
     const response = await invokeLLM({
-      systemTag: "growth_intelligence",
+      systemTag: "misc",
       model: "strong",
       messages: [
         {

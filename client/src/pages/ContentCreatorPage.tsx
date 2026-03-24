@@ -300,7 +300,7 @@ export default function ContentCreatorPage() {
   );
 
   const campaignAnalytics = trpc.contentCreator.getCampaignAnalytics.useQuery(
-    { id: analyticsTargetCampaign! },
+    { campaignId: analyticsTargetCampaign! },
     { enabled: !!analyticsTargetCampaign }
   );
 

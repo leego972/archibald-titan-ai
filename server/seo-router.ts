@@ -211,7 +211,7 @@ export const seoRouter = router({
           comparison: all.filter(p => p.type === "comparison").length,
           integration: all.filter(p => p.type === "integration").length,
           "use-case": all.filter(p => p.type === "use-case").length,
-          location: all.filter(p => p.type === "location").length,
+          location: all.filter(p => (p.type as string) === "location").length,
         },
       };
     }),
@@ -312,7 +312,7 @@ export const seoRouter = router({
         comparisonPages: allPages.filter(p => p.type === "comparison").length,
         integrationPages: allPages.filter(p => p.type === "integration").length,
         useCasePages: allPages.filter(p => p.type === "use-case").length,
-        locationPages: allPages.filter(p => p.type === "location").length,
+        locationPages: allPages.filter(p => (p.type as string) === "location").length,
       },
       features: [
         "Dynamic meta tag injection (SSR-like)",
