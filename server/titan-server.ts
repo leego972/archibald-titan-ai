@@ -102,3 +102,88 @@ export async function execSSHCommand(
       });
   });
 }
+
+/**
+ * Execute an SSH command with real-time streaming output.
+ * Calls onData for each chunk of stdout/stderr as it arrives.
+ * Calls onDone when the command completes (with exit code).
+ * Calls onError if the connection or command fails.
+ * Returns a cancel() function to abort the stream.
+ */
+export function execSSHStream(
+  ssh: SSHConfig,
+  command: string,
+  onData: (line: string, isStderr: boolean) => void,
+  onDone: (exitCode: number) => void,
+  onError: (err: Error) => void,
+  timeoutMs = 120000,
+  userId?: number
+): () => void {
+  const conn = new SSHClient();
+  let finished = false;
+
+  const timer = setTimeout(() => {
+    if (!finished) {
+      finished = true;
+      conn.end();
+      onError(new Error(`SSH command timed out after ${timeoutMs / 1000}s`));
+    }
+  }, timeoutMs);
+
+  let finalCommand = command;
+  if (ssh.isTitanServer && userId) {
+    const userDir = getTitanUserDir(userId);
+    finalCommand = `mkdir -p ${userDir} && cd ${userDir} && (${command})`;
+  }
+
+  conn
+    .on("ready", () => {
+      conn.exec(finalCommand, (err: Error | undefined, stream: import("ssh2").ClientChannel) => {
+        if (err) {
+          clearTimeout(timer);
+          conn.end();
+          if (!finished) { finished = true; onError(err); }
+          return;
+        }
+        stream
+          .on("close", (code: number) => {
+            clearTimeout(timer);
+            conn.end();
+            if (!finished) { finished = true; onDone(code ?? 0); }
+          })
+          .on("data", (data: Buffer) => {
+            const lines = data.toString().split(/\r?\n/);
+            for (const line of lines) {
+              if (line) onData(line, false);
+            }
+          })
+          .stderr.on("data", (data: Buffer) => {
+            const lines = data.toString().split(/\r?\n/);
+            for (const line of lines) {
+              if (line) onData(line, true);
+            }
+          });
+      });
+    })
+    .on("error", (err: Error) => {
+      clearTimeout(timer);
+      if (!finished) { finished = true; onError(err); }
+    })
+    .connect({
+      host: ssh.host,
+      port: ssh.port,
+      username: ssh.username,
+      password: ssh.password || undefined,
+      privateKey: ssh.privateKey || undefined,
+      readyTimeout: 8000,
+    });
+
+  // Return a cancel function
+  return () => {
+    if (!finished) {
+      finished = true;
+      clearTimeout(timer);
+      conn.end();
+    }
+  };
+}

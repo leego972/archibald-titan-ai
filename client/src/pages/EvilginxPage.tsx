@@ -18,6 +18,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSubscription } from "@/hooks/useSubscription";
 import VpsNodeManager from "@/components/VpsNodeManager";
+import { StreamingTerminal } from "@/components/StreamingTerminal";
+import { useSecurityStream } from "@/hooks/useSecurityStream";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -1565,37 +1567,16 @@ function ProxyBlacklistTab({ exec }: { exec: (cmd: string) => Promise<string> })
 
 // ─── Terminal Tab ────────────────────────────────────────────────
 
-function TerminalTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
+function TerminalTab({ exec: _exec }: { exec: (cmd: string) => Promise<string> }) {
   const [command, setCommand] = useState("");
-  const [history, setHistory] = useState<Array<{ cmd: string; output: string; time: string }>>([]);
-  const [running, setRunning] = useState(false);
-  const terminalRef = useRef<HTMLDivElement>(null);
+  const { lines, isStreaming, exitCode, error, run, cancel, clear } = useSecurityStream("evilginx");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const runCommand = async () => {
-    if (!command.trim() || running) return;
+  const runCommand = () => {
+    if (!command.trim() || isStreaming) return;
     const cmd = command.trim();
     setCommand("");
-    setRunning(true);
-
-    try {
-      const output = await exec(cmd);
-      setHistory((prev) => [
-        ...prev,
-        { cmd, output, time: new Date().toLocaleTimeString() },
-      ]);
-    } catch (err: any) {
-      setHistory((prev) => [
-        ...prev,
-        { cmd, output: `Error: ${err.message}`, time: new Date().toLocaleTimeString() },
-      ]);
-    }
-    setRunning(false);
-
-    // Scroll to bottom
-    setTimeout(() => {
-      terminalRef.current?.scrollTo(0, terminalRef.current.scrollHeight);
-    }, 100);
+    run(cmd);
   };
 
   return (
@@ -1605,39 +1586,19 @@ function TerminalTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
           <Terminal className="w-5 h-5 text-emerald-400" />
           Evilginx Terminal
         </h3>
-        <p className="text-sm text-zinc-500">Execute raw Evilginx commands directly on your server</p>
+        <p className="text-sm text-zinc-500">Real-time SSH command streaming — output appears line-by-line as it executes</p>
       </div>
 
-      {/* Terminal Output */}
-      <div
-        ref={terminalRef}
-        className="bg-black rounded-lg border border-zinc-800 h-[500px] overflow-y-auto p-4 font-mono text-sm"
-        onClick={() => inputRef.current?.focus()}
-      >
-        <div className="text-zinc-500 mb-4">
-          <p>Connected to Evilginx server. Type commands below.</p>
-          <p>Type "help" for a list of available commands.</p>
-          <p className="text-zinc-700">─────────────────────────────────────────</p>
-        </div>
-
-        {history.map((entry, i) => (
-          <div key={i} className="mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-red-400">:</span>
-              <span className="text-white">{entry.cmd}</span>
-              <span className="text-zinc-700 text-xs ml-auto">{entry.time}</span>
-            </div>
-            <pre className="text-zinc-400 whitespace-pre-wrap mt-1 ml-4">{entry.output}</pre>
-          </div>
-        ))}
-
-        {running && (
-          <div className="flex items-center gap-2 text-zinc-500">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>Executing...</span>
-          </div>
-        )}
-      </div>
+      {/* Streaming Terminal */}
+      <StreamingTerminal
+        lines={lines}
+        isStreaming={isStreaming}
+        exitCode={exitCode}
+        error={error}
+        onClear={clear}
+        onCancel={cancel}
+        className="min-h-[400px]"
+      />
 
       {/* Input */}
       <div className="flex gap-2">
@@ -1650,11 +1611,11 @@ function TerminalTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
             onKeyDown={(e) => e.key === "Enter" && runCommand()}
             placeholder="Type an Evilginx command..."
             className="flex-1 bg-transparent text-white font-mono text-sm py-3 outline-none placeholder:text-zinc-600"
-            disabled={running}
+            disabled={isStreaming}
           />
         </div>
-        <Button onClick={runCommand} className="bg-red-600 hover:bg-red-700" disabled={running || !command.trim()}>
-          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+        <Button onClick={runCommand} className="bg-red-600 hover:bg-red-700" disabled={isStreaming || !command.trim()}>
+          {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
         </Button>
       </div>
 
@@ -1666,10 +1627,8 @@ function TerminalTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
             size="sm"
             variant="outline"
             className="border-zinc-800 text-zinc-400 hover:text-white font-mono text-xs"
-            onClick={() => {
-              setCommand(cmd);
-              setTimeout(() => runCommand(), 50);
-            }}
+            onClick={() => { run(cmd); }}
+            disabled={isStreaming}
           >
             {cmd}
           </Button>

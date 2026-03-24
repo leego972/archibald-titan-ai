@@ -48,6 +48,8 @@ import {
   Search,
 } from "lucide-react";
 import VpsNodeManager from "@/components/VpsNodeManager";
+import { StreamingTerminal } from "@/components/StreamingTerminal";
+import { useSecurityStream } from "@/hooks/useSecurityStream";
 
 // ─── Template Categories ──────────────────────────────────────────
 const CATEGORIES = [
@@ -66,6 +68,77 @@ const CATEGORIES = [
 ];
 
 // ─── Main Page ────────────────────────────────────────────────────
+// ─── Streaming Terminal Component ───────────────────────────────
+function BlackEyeStreamingTerminal() {
+  const [command, setCommand] = useState("");
+  const { lines, isStreaming, exitCode, error, run, cancel, clear } = useSecurityStream("blackeye");
+
+  const runCommand = () => {
+    if (!command.trim() || isStreaming) return;
+    const cmd = command.trim();
+    setCommand("");
+    run(cmd);
+  };
+
+  return (
+    <Card className="bg-zinc-900/50 border-zinc-800">
+      <CardHeader>
+        <CardTitle className="text-white text-base flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-orange-400" />
+          SSH Terminal
+          <span className="text-xs font-normal text-zinc-500 ml-1">— real-time streaming output</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <StreamingTerminal
+          lines={lines}
+          isStreaming={isStreaming}
+          exitCode={exitCode}
+          error={error}
+          onClear={clear}
+          onCancel={cancel}
+        />
+        <div className="flex gap-2">
+          <Input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && runCommand()}
+            placeholder="Enter command..."
+            className="bg-zinc-800 border-zinc-700 text-white font-mono text-sm"
+            disabled={isStreaming}
+          />
+          <Button
+            className="bg-orange-600 hover:bg-orange-700"
+            onClick={runCommand}
+            disabled={isStreaming || !command.trim()}
+          >
+            {isStreaming ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          </Button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            "ls /opt/blackeye",
+            "cat /opt/blackeye/sites/*/usernames.txt",
+            "ps aux | grep blackeye",
+            "netstat -tlnp | grep :80",
+          ].map(cmd => (
+            <Button
+              key={cmd}
+              size="sm"
+              variant="outline"
+              className="border-zinc-700 text-zinc-400 text-xs font-mono"
+              onClick={() => run(cmd)}
+              disabled={isStreaming}
+            >
+              {cmd}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function BlackEyePage() {
   const [showSetup, setShowSetup] = useState(false);
   const [activeTab, setActiveTab] = useState("templates");
@@ -590,53 +663,7 @@ export default function BlackEyePage() {
 
           {/* Terminal Tab */}
           <TabsContent value="terminal" className="space-y-4">
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader>
-                <CardTitle className="text-white text-base flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-orange-400" />
-                  SSH Terminal
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-zinc-950 rounded-lg p-4 font-mono text-xs text-green-400 min-h-48 max-h-96 overflow-y-auto whitespace-pre-wrap">
-                  {terminalOutput || "# BlackEye SSH Terminal\n# Enter commands below to execute on the remote server\n"}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    value={terminalCommand}
-                    onChange={(e) => setTerminalCommand(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleRunCommand()}
-                    placeholder="Enter command..."
-                    className="bg-zinc-800 border-zinc-700 text-white font-mono text-sm"
-                  />
-                  <Button
-                    className="bg-orange-600 hover:bg-orange-700"
-                    onClick={handleRunCommand}
-                    disabled={commandMutation.isPending || !terminalCommand.trim()}
-                  >
-                    {commandMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  </Button>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    "ls /opt/blackeye",
-                    "cat /opt/blackeye/sites/*/usernames.txt",
-                    "ps aux | grep blackeye",
-                    "netstat -tlnp | grep :80",
-                  ].map(cmd => (
-                    <Button
-                      key={cmd}
-                      size="sm"
-                      variant="outline"
-                      className="border-zinc-700 text-zinc-400 text-xs font-mono"
-                      onClick={() => setTerminalCommand(cmd)}
-                    >
-                      {cmd}
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <BlackEyeStreamingTerminal />
           </TabsContent>
 
           {/* Server Tab */}

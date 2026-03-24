@@ -391,6 +391,9 @@ async function startServer() {
   // Chat SSE streaming and abort endpoints
   registerChatStreamRoutes(app);
   registerContentStreamRoutes(app);
+  // Security Tool SSE streaming (Evilginx, BlackEye, Metasploit, ExploitPack)
+  const { registerSecurityStreamRoutes } = await import('../security-stream.js');
+  registerSecurityStreamRoutes(app);
   // Isolated Browser SSE screenshot stream
   const { registerIsolatedBrowserSSE } = await import('../isolated-browser-router.js');
   registerIsolatedBrowserSSE(app);
