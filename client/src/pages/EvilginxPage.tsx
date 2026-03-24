@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSubscription } from "@/hooks/useSubscription";
+import VpsNodeManager from "@/components/VpsNodeManager";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -1687,17 +1688,22 @@ export default function EvilginxPage() {
   const [showSetup, setShowSetup] = useState(false);
   const [activeTab, setActiveTab] = useState("config");
 
-  const getConnectionQuery = trpc.evilginx.getConnection.useQuery(undefined, {
+    const getConnectionQuery = trpc.evilginx.getConnection.useQuery(undefined, {
     enabled: canUse("offensive_tooling"),
     retry: false,
   });
-
   const execMutation = trpc.evilginx.exec.useMutation();
-
+  // Node management hooks for VpsNodeManager
+  const listNodesQuery = trpc.evilginx.listNodes.useQuery(undefined, { enabled: canUse("offensive_tooling") });
+  const addNodeMutation = trpc.evilginx.addNode.useMutation();
+  const deployNodeMutation = trpc.evilginx.deployNode.useMutation();
+  const checkNodeMutation = trpc.evilginx.checkNode.useMutation();
+  const setActiveNodeMutation = trpc.evilginx.setActiveNode.useMutation();
+  const removeNodeMutation = trpc.evilginx.removeNode.useMutation();
   useEffect(() => {
     if (getConnectionQuery.data) {
       setConnectionConfig(getConnectionQuery.data);
-      setConnected(true);
+      setConnected(!!getConnectionQuery.data.connected);
     }
   }, [getConnectionQuery.data]);
 
@@ -1765,33 +1771,26 @@ export default function EvilginxPage() {
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardContent className="p-12 text-center">
             <WifiOff className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">Evilginx3 Not Connected</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">No Evilginx3 Node Connected</h2>
             <p className="text-zinc-500 max-w-md mx-auto mb-6">
-              Evilginx3 runs directly on the Titan server — no external VPS needed.
-              Click below to connect and start managing phishlets, lures, and sessions.
+              Evilginx3 requires a dedicated VPS with its own public IP for MITM phishing.
+              Add a node and Titan will install Evilginx3 on it automatically via SSH.
             </p>
             <div className="space-y-3 text-left max-w-sm mx-auto mb-6">
-              <div className="flex items-start gap-3 text-sm">
-                <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
-                  <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">1</span>
+              {["Get a fresh VPS from any provider (Vultr, Hetzner, DigitalOcean…)",
+                "Click Add VPS Node and enter the SSH credentials",
+                "Click Deploy — Titan installs Evilginx3 automatically",
+                "Manage phishlets, lures and sessions from this dashboard"].map((step, i) => (
+                <div key={i} className="flex items-start gap-3 text-sm">
+                  <div className="bg-red-500/10 rounded-full p-1 mt-0.5 flex-shrink-0">
+                    <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">{i + 1}</span>
+                  </div>
+                  <p className="text-zinc-400">{step}</p>
                 </div>
-                <p className="text-zinc-400">Ensure Evilginx3 is installed on this server (<code className="text-zinc-300">/usr/local/bin/evilginx</code> or set <code className="text-zinc-300">EVILGINX_BIN</code>)</p>
-              </div>
-              <div className="flex items-start gap-3 text-sm">
-                <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
-                  <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">2</span>
-                </div>
-                <p className="text-zinc-400">Click Connect — Titan will verify the binary and activate the dashboard</p>
-              </div>
-              <div className="flex items-start gap-3 text-sm">
-                <div className="bg-red-500/10 rounded-full p-1 mt-0.5">
-                  <span className="text-red-400 text-xs font-bold w-4 h-4 flex items-center justify-center">3</span>
-                </div>
-                <p className="text-zinc-400">Manage everything from this dashboard — no terminal or SSH needed</p>
-              </div>
+              ))}
             </div>
             <Button onClick={() => setShowSetup(true)} className="bg-red-600 hover:bg-red-700">
-              <Zap className="w-4 h-4 mr-2" /> Connect Evilginx3
+              <Server className="w-4 h-4 mr-2" /> Add VPS Node
             </Button>
           </CardContent>
         </Card>
@@ -1842,20 +1841,25 @@ export default function EvilginxPage() {
         </Tabs>
       )}
 
-      {/* Connection Setup Dialog */}
-      <ConnectionSetup
+      {/* VPS Node Manager Dialog */}
+      <VpsNodeManager
         open={showSetup}
-        onClose={() => setShowSetup(false)}
-        onSave={(config) => {
-          if (config) {
-            setConnectionConfig(config);
-            setConnected(true);
-          } else {
-            setConnectionConfig(null);
-            setConnected(false);
-          }
+        onClose={() => {
+          setShowSetup(false);
+          getConnectionQuery.refetch();
+          listNodesQuery.refetch();
         }}
-        existing={connectionConfig}
+        toolName="Evilginx3"
+        accentColor="red"
+        deployLabel="Deploy Evilginx3"
+        hooks={{
+          listNodes: listNodesQuery,
+          addNode: addNodeMutation,
+          deployNode: deployNodeMutation,
+          checkNode: checkNodeMutation,
+          setActiveNode: setActiveNodeMutation,
+          removeNode: removeNodeMutation,
+        }}
       />
     </div>
   );

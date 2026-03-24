@@ -195,6 +195,11 @@ export const binCheckerRouter = router({
       let apiData = await lookupBinApi(bin.slice(0, 6));
       if (!apiData) apiData = await lookupBinFallback(bin.slice(0, 6));
 
+      // Deduct credits after successful lookup
+      try { await consumeCredits(ctx.user.id, "bin_lookup", `BIN lookup: ${bin.slice(0, 6)}`); } catch (e) {
+        log.warn("[BinChecker] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+
       return {
         success: true,
         bin: bin.slice(0, 6),

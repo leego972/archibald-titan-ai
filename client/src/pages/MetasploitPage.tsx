@@ -57,6 +57,7 @@ import {
   Lock,
   Layers,
 } from "lucide-react";
+import VpsNodeManager from "@/components/VpsNodeManager";
 
 // ─── Connection Setup Dialog ──────────────────────────────────────
 function ConnectionSetup({
@@ -257,6 +258,14 @@ export default function MetasploitPage() {
 
   const connectionQuery = trpc.metasploit.getConnection.useQuery(undefined);
   const connection = connectionQuery.data;
+  const connected = !!connection?.connected;
+  // Node management hooks for VpsNodeManager
+  const listNodesQuery = trpc.metasploit.listNodes.useQuery(undefined);
+  const addNodeMutation = trpc.metasploit.addNode.useMutation();
+  const deployNodeMutation = trpc.metasploit.deployNode.useMutation();
+  const checkNodeMutation = trpc.metasploit.checkNode.useMutation();
+  const setActiveNodeMutation = trpc.metasploit.setActiveNode.useMutation();
+  const removeNodeMutation = trpc.metasploit.removeNode.useMutation();
 
   const searchMutation = trpc.metasploit.searchModules.useMutation();
   const moduleInfoMutation = trpc.metasploit.getModuleInfo.useMutation();
@@ -366,11 +375,11 @@ export default function MetasploitPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {connection ? (
+          {connected ? (
             <div className="flex items-center gap-2">
               <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
                 <Wifi className="w-3 h-3 mr-1" />
-                {connection.host}:{connection.port}
+                {connection?.nodeLabel ?? connection?.host ?? "Node Active"}
               </Badge>
               <Button size="sm" variant="outline" className="border-zinc-700" onClick={() => setShowSetup(true)}>
                 <Settings className="w-4 h-4" />
@@ -378,7 +387,7 @@ export default function MetasploitPage() {
             </div>
           ) : (
             <Button onClick={() => setShowSetup(true)} className="bg-blue-600 hover:bg-blue-700">
-              <Server className="w-4 h-4 mr-2" /> Connect Server
+              <Server className="w-4 h-4 mr-2" /> Add VPS Node
             </Button>
           )}
         </div>
@@ -397,7 +406,7 @@ export default function MetasploitPage() {
       </Card>
 
       {/* Not Connected State */}
-      {!connection && (
+      {!connected && (
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardContent className="p-12 text-center">
             <WifiOff className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
@@ -429,7 +438,7 @@ export default function MetasploitPage() {
       )}
 
       {/* Main Dashboard */}
-      {connection && (
+      {connected && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-zinc-900 border border-zinc-800 p-1 flex-wrap h-auto gap-1">
             <TabsTrigger value="modules" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">
@@ -962,11 +971,25 @@ export default function MetasploitPage() {
         </Tabs>
       )}
 
-      {/* Connection Setup Dialog */}
-      <ConnectionSetup
+      {/* VPS Node Manager Dialog */}
+      <VpsNodeManager
         open={showSetup}
-        onClose={() => setShowSetup(false)}
-        onSave={() => connectionQuery.refetch()}
+        onClose={() => {
+          setShowSetup(false);
+          connectionQuery.refetch();
+          listNodesQuery.refetch();
+        }}
+        toolName="Metasploit"
+        accentColor="blue"
+        deployLabel="Deploy Metasploit"
+        hooks={{
+          listNodes: listNodesQuery,
+          addNode: addNodeMutation,
+          deployNode: deployNodeMutation,
+          checkNode: checkNodeMutation,
+          setActiveNode: setActiveNodeMutation,
+          removeNode: removeNodeMutation,
+        }}
       />
     </div>
   );
