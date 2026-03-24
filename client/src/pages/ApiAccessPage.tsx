@@ -43,6 +43,7 @@ import {
   Eye,
   EyeOff,
   Code,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ export default function ApiAccessPage() {
   const [keyName, setKeyName] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
   const [expiresIn, setExpiresIn] = useState<string>("90");
+  const [rateLimitInput, setRateLimitInput] = useState<string>("60");
 
   const keysQuery = trpc.apiAccess.listKeys.useQuery(undefined, {
     enabled: sub.canUse("api_access"),
@@ -204,6 +206,19 @@ export default function ApiAccessPage() {
                 </div>
               </div>
               <div>
+                <Label>Rate Limit (requests per minute)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  placeholder="60"
+                  value={rateLimitInput}
+                  onChange={(e) => setRateLimitInput(e.target.value)}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Default: 60 req/min. Max: 10,000 req/min.</p>
+              </div>
+              <div>
                 <Label>Expiration</Label>
                 <Select value={expiresIn} onValueChange={setExpiresIn}>
                   <SelectTrigger className="mt-1">
@@ -231,6 +246,7 @@ export default function ApiAccessPage() {
                     name: keyName,
                     scopes: selectedScopes as any,
                     expiresInDays: parseInt(expiresIn),
+                    rateLimit: parseInt(rateLimitInput) || 60,
                   })
                 }
                 disabled={
@@ -363,6 +379,10 @@ curl -H "Authorization: Bearer at_YOUR_KEY" \\
                           {new Date(key.lastUsedAt).toLocaleDateString()}
                         </span>
                       )}
+                      <span className="flex items-center gap-1 text-amber-500">
+                        <Zap className="h-3 w-3" />
+                        {(key as any).rateLimit ?? 60} req/min
+                      </span>
                       {key.expiresAt && (
                         <span className="flex items-center gap-1">
                           {new Date(key.expiresAt) < new Date() ? (

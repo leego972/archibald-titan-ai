@@ -286,6 +286,7 @@ export const apiKeys = mysqlTable("api_keys", {
   usageCount: int("usageCount").default(0).notNull(),
   expiresAt: timestamp("expiresAt"),
   revokedAt: timestamp("revokedAt"),
+  rateLimit: int("rateLimit").default(60).notNull(), // max requests per minute (default: 60 rpm)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

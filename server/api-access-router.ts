@@ -93,6 +93,7 @@ export const apiAccessRouter = router({
         usageCount: apiKeys.usageCount,
         expiresAt: apiKeys.expiresAt,
         revokedAt: apiKeys.revokedAt,
+        rateLimit: apiKeys.rateLimit,
         createdAt: apiKeys.createdAt,
       })
       .from(apiKeys)
@@ -109,6 +110,7 @@ export const apiAccessRouter = router({
         name: z.string().min(1).max(128),
         scopes: z.array(z.enum(AVAILABLE_SCOPES)).min(1),
         expiresInDays: z.number().min(1).max(365).optional(),
+        rateLimit: z.number().min(1).max(10000).default(60).optional(), // requests per minute
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -143,6 +145,7 @@ export const apiAccessRouter = router({
         keyHash: hash,
         scopes: input.scopes,
         expiresAt,
+        rateLimit: input.rateLimit ?? 60,
       });
 
       await logAudit({
@@ -182,6 +185,51 @@ export const apiAccessRouter = router({
       return { success: true };
     }),
 
+  // Get live rate limit stats for a specific key
+  getRateLimitStats: protectedProcedure
+    .input(z.object({ keyId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      const results = await db
+        .select({ id: apiKeys.id, rateLimit: apiKeys.rateLimit })
+        .from(apiKeys)
+        .where(and(eq(apiKeys.id, input.keyId), eq(apiKeys.userId, ctx.user.id)))
+        .limit(1);
+
+      if (results.length === 0) return null;
+      const key = results[0];
+
+      const { getRateLimitStats } = await import("./api-rate-limiter");
+      return getRateLimitStats(String(key.id), key.rateLimit);
+    }),
+
+  // Update the rate limit on an existing key
+  updateRateLimit: protectedProcedure
+    .input(z.object({ keyId: z.number(), rateLimit: z.number().min(1).max(10000) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db
+        .update(apiKeys)
+        .set({ rateLimit: input.rateLimit })
+        .where(and(eq(apiKeys.id, input.keyId), eq(apiKeys.userId, ctx.user.id)));
+
+      await logAudit({
+        userId: ctx.user.id,
+        userName: ctx.user.name || undefined,
+        userEmail: ctx.user.email || undefined,
+        action: "apiKey.updateRateLimit",
+        resource: "apiKey",
+        resourceId: input.keyId.toString(),
+        details: { rateLimit: input.rateLimit },
+      });
+
+      return { success: true };
+    }),
+
   // Available scopes
   scopes: protectedProcedure.query(() => {
     return AVAILABLE_SCOPES.map((s) => ({
@@ -204,9 +252,10 @@ export const apiAccessRouter = router({
 // ─── Express REST Endpoints (for external API consumers) ─────────────
 
 import { Express, Request, Response } from "express";
+import { checkRateLimit } from "./api-rate-limiter";
 
 export function registerApiRoutes(app: Express) {
-  // Middleware to validate API key
+  // Middleware to validate API key and enforce per-key rate limits
   const authenticateApiKey = async (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
@@ -219,8 +268,28 @@ export function registerApiRoutes(app: Express) {
       return res.status(401).json({ error: "Invalid or expired API key" });
     }
 
+    // ── Rate limiting: sliding window per API key ──────────────────
+    const limitRpm = apiKey.rateLimit ?? 60;
+    const rl = checkRateLimit(String(apiKey.id), limitRpm);
+
+    // Always attach rate limit headers so clients can track usage
+    res.setHeader("X-RateLimit-Limit", rl.limit);
+    res.setHeader("X-RateLimit-Remaining", rl.remaining);
+    res.setHeader("X-RateLimit-Reset", Math.ceil(rl.resetAt / 1000));
+
+    if (!rl.allowed) {
+      res.setHeader("Retry-After", Math.ceil(rl.retryAfterMs / 1000));
+      return res.status(429).json({
+        error: "Rate limit exceeded",
+        message: `This API key allows ${limitRpm} requests per minute. Retry after ${Math.ceil(rl.retryAfterMs / 1000)} seconds.`,
+        retryAfterSeconds: Math.ceil(rl.retryAfterMs / 1000),
+        resetAt: new Date(rl.resetAt).toISOString(),
+      });
+    }
+
     (req as any).apiKeyUserId = apiKey.userId;
     (req as any).apiKeyScopes = apiKey.scopes;
+    (req as any).apiKeyId = apiKey.id;
     next();
   };
 
