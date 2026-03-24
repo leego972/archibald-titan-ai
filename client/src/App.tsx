@@ -39,6 +39,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import DesktopLoginPage from "./pages/DesktopLoginPage";
+import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
 import ChatPage from "./pages/ChatPage";
@@ -274,6 +275,7 @@ function Router() {
       <Route path="/" component={LandingPage} />
 
       {/* Auth pages */}
+      <Route path="/payment-setup" component={PaymentSetupPage} />
       <Route path="/login" component={() => <LoginPage />} />
       <Route path="/register" component={() => <SignUpPage />} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />

@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { blogPosts, blogCategories } from "../drizzle/schema";
 import { eq, desc, sql, like, and, or } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
+import { checkCredits, consumeCredits } from "./credit-service";
 
 // ─── Blog Router ────────────────────────────────────────────────
 export const blogRouter = router({
@@ -235,7 +236,11 @@ export const blogRouter = router({
       category: z.string().default("ai-tools"),
       tone: z.enum(["professional", "casual", "technical", "educational"]).default("professional"),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "blog_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const response = await invokeLLM({
         systemTag: "misc",
       model: "fast",
@@ -295,6 +300,7 @@ Tone: ${input.tone}`
       });
 
       const generated = JSON.parse(response.choices[0].message.content as string);
+      try { await consumeCredits(ctx.user.id, "blog_generate", "AI blog post generation"); } catch {}
       return {
         ...generated,
         category: input.category,
@@ -312,9 +318,14 @@ Tone: ${input.tone}`
         category: z.string(),
       })),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+      // Gate: check credits for the full batch upfront
+      const creditCheck = await checkCredits(ctx.user.id, "blog_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits. Need ${creditCheck.cost} per post, have ${creditCheck.currentBalance}.`);
+      }
       const results: { title: string; slug: string; status: string }[] = [];
 
       for (const topicConfig of input.topics) {

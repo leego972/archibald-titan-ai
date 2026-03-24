@@ -19,7 +19,7 @@ import {
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { isAdminRole } from '@shared/const';
-import { consumeCredits } from "./credit-service";
+import { consumeCredits, checkCredits } from "./credit-service";
 const log = createLogger("GrantFinderRouter");
 
 // ==========================================
@@ -105,6 +105,10 @@ export const businessPlanRouter = router({
     targetMarket: z.string().optional(),
     competitiveAdvantage: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "business_plan_generate");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     try { await consumeCredits(ctx.user.id, "business_plan_generate", "Business plan generation"); } catch {}
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
@@ -294,6 +298,11 @@ export const grantApplicationRouter = router({
     grantOpportunityId: z.number(),
     businessPlanId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "grant_match");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
+    try { await consumeCredits(ctx.user.id, "grant_match", "Grant application generation"); } catch {}
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;

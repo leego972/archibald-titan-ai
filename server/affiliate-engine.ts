@@ -26,6 +26,7 @@ import {
 } from "../drizzle/schema";
 import { randomBytes } from "crypto";
 import { createLogger } from "./_core/logger.js";
+import { addCredits } from "./credit-service";
 const log = createLogger("AffiliateEngine");
 
 // ─── Known High-Paying Affiliate Programs ───────────────────────────
@@ -1316,23 +1317,36 @@ export async function requestReferralPayout(
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const result = await db.insert(affiliatePayouts).values({
+   const result = await db.insert(affiliatePayouts).values({
     partnerId: codeRecord.id,
     amountCents: finalAmount,
     currency: method === "credits" ? "CRD" : "USD",
-    status: "pending",
+    status: method === "credits" ? "completed" : "pending",
     paymentMethod: method,
     periodStart,
     periodEnd,
     conversionCount: codeRecord.totalReferrals,
   });
-
   const payoutId = Number(result[0].insertId);
+
+  // If paying out as credits, immediately top up the user's credit balance
+  if (method === "credits") {
+    try {
+      await addCredits(
+        userId,
+        finalAmount,
+        "referral_bonus",
+        `Referral payout — ${finalAmount} credits (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
+      );
+    } catch (err) {
+      log.error("Failed to add referral credits to user balance", { error: String(err), userId, payoutId });
+    }
+  }
 
   return {
     success: true,
     message: method === "credits"
-      ? `Payout of ${finalAmount} credits requested (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied!)`
+      ? `${finalAmount} credits added to your balance! (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
       : `Payout of $${(finalAmount / 100).toFixed(2)} via wire transfer requested. Processing in 3-5 business days.`,
     payoutId,
     amountCents: finalAmount,
