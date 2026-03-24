@@ -50,6 +50,7 @@ import { metasploitRouter } from "./metasploit-router";
 import { exploitpackRouter } from "./exploitpack-router";
 import { filesRouter } from "./api/files";
 import { contentCreatorRouter } from "./content-creator-router";
+import { contentIntelligenceRouter } from "./content-intelligence-router";
 import { cybermcpRouter } from "./cybermcp-router";
 import { astraRouter } from "./astra-router";
 import { argusRouter } from "./argus-router";
@@ -142,6 +143,7 @@ export const appRouter = router({
   metasploit: metasploitRouter,
   exploitpack: exploitpackRouter,
   contentCreator: contentCreatorRouter,
+  contentIntelligence: contentIntelligenceRouter,
   cyberMcp: cybermcpRouter,
   astra: astraRouter,
   argus: argusRouter,

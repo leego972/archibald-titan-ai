@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,9 +136,367 @@ function StatCard({ label, value, icon: Icon, color }: {
   );
 }
 
+// ─── Intelligence Sub-Components ────────────────────────────────────────────
+
+function PipelineRunner() {
+  const [prompt, setPrompt] = React.useState("");
+  const [platform, setPlatform] = React.useState("linkedin");
+  const [minScore, setMinScore] = React.useState(75);
+  const [result, setResult] = React.useState<any>(null);
+  const runPipeline = trpc.contentIntelligence.runPipeline.useMutation({
+    onSuccess: (data) => { setResult(data); toast.success(`Pipeline complete — score: ${data.finalScore}/100`); },
+    onError: (e) => toast.error(e.message),
+  });
+  const stages = ["Draft","Critique","Rewrite","Score","Quality Gate"];
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 items-center">
+        {stages.map((s,i) => (
+          <React.Fragment key={s}>
+            <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
+              result ? "bg-green-900/30 border-green-700 text-green-300" : "bg-[#0d1117] border-[#21262d] text-gray-400"
+            }`}><span className="w-4 h-4 rounded-full bg-current opacity-60 flex items-center justify-center text-[10px] text-black font-bold">{i+1}</span>{s}</div>
+            {i < stages.length-1 && <ChevronRight className="w-3 h-3 text-gray-600" />}
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2 space-y-1">
+          <Label className="text-gray-400 text-xs">Prompt</Label>
+          <Textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="e.g. Why local AI beats cloud password managers" className="bg-[#0d1117] border-[#21262d] text-white resize-none" rows={2} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-gray-400 text-xs">Platform</Label>
+          <Select value={platform} onValueChange={setPlatform}>
+            <SelectTrigger className="bg-[#0d1117] border-[#21262d] text-white"><SelectValue /></SelectTrigger>
+            <SelectContent className="bg-[#161b22] border-[#21262d]">
+              {["linkedin","x_twitter","blog","reddit","tiktok","email","hackernews","instagram"].map(p => (
+                <SelectItem key={p} value={p} className="text-white hover:bg-[#21262d]">{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Label className="text-gray-400 text-xs mt-1 block">Min Score</Label>
+          <Input type="number" value={minScore} onChange={e => setMinScore(+e.target.value)} min={0} max={100} className="bg-[#0d1117] border-[#21262d] text-white" />
+        </div>
+      </div>
+      <Button onClick={() => runPipeline.mutate({ prompt, platform, minScore })} disabled={!prompt || runPipeline.isPending}
+        className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 gap-2">
+        {runPipeline.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+        {runPipeline.isPending ? "Running Pipeline..." : "Run 5-Stage Pipeline"}
+      </Button>
+      {result && (
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-3">
+            <Badge className={result.passed ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"}>
+              {result.passed ? "✓ Passed" : "✗ Failed"} — Score: {result.finalScore}/100
+            </Badge>
+            <span className="text-gray-400 text-xs">{result.iterations} iterations</span>
+          </div>
+          <div className="bg-[#0d1117] border border-[#21262d] rounded p-3">
+            <p className="text-white text-sm font-medium mb-1">{result.finalContent?.title}</p>
+            <p className="text-gray-300 text-xs">{result.finalContent?.body?.slice(0,300)}...</p>
+          </div>
+          {result.brandVoiceScore && (
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(result.brandVoiceScore.dimensions || {}).map(([k,v]: any) => (
+                <div key={k} className="bg-[#0d1117] border border-[#21262d] rounded p-2">
+                  <p className="text-gray-400 text-xs capitalize">{k}</p>
+                  <Progress value={v} className="h-1 mt-1" />
+                  <p className="text-white text-xs mt-1">{v}/100</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContentAtomGenerator() {
+  const [topic, setTopic] = React.useState("");
+  const [keywords, setKeywords] = React.useState("");
+  const [result, setResult] = React.useState<any>(null);
+  const generate = trpc.contentIntelligence.generateAtom.useMutation({
+    onSuccess: (data) => { setResult(data); toast.success(`Content atom generated — ${data.variants?.length || 9} variants ready`); },
+    onError: (e) => toast.error(e.message),
+  });
+  const platformColors: Record<string,string> = {
+    linkedin: "text-blue-400", x_twitter: "text-zinc-300", blog: "text-green-400",
+    reddit: "text-orange-400", tiktok: "text-pink-400", email: "text-yellow-400",
+    instagram: "text-purple-400", discord: "text-indigo-400", hackernews: "text-orange-500",
+  };
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-gray-400 text-xs">Core Topic</Label>
+          <Input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. Zero-trust security model" className="bg-[#0d1117] border-[#21262d] text-white" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-gray-400 text-xs">Target Keywords (comma-separated)</Label>
+          <Input value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="e.g. zero trust, network security, ZTNA" className="bg-[#0d1117] border-[#21262d] text-white" />
+        </div>
+      </div>
+      <Button onClick={() => generate.mutate({ topic, targetKeywords: keywords.split(",").map(k=>k.trim()).filter(Boolean) })} disabled={!topic || generate.isPending}
+        className="bg-purple-600 hover:bg-purple-700 text-white border-0 gap-2">
+        {generate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+        {generate.isPending ? "Generating 9 Variants..." : "Generate Content Atom"}
+      </Button>
+      {result && (
+        <div className="space-y-3">
+          <p className="text-gray-400 text-xs">Core message: <span className="text-white">{result.coreMessage}</span></p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(result.variants || []).map((v: any) => (
+              <div key={v.platform} className="bg-[#0d1117] border border-[#21262d] rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-medium ${platformColors[v.platform] || "text-gray-300"}`}>{v.platform}</span>
+                  <Badge className="bg-[#21262d] text-gray-300 text-xs">{v.format}</Badge>
+                </div>
+                <p className="text-white text-xs font-medium">{v.hook}</p>
+                <p className="text-gray-400 text-xs">{v.body?.slice(0,120)}...</p>
+                <Button size="sm" variant="outline" className="w-full border-[#21262d] text-gray-300 hover:bg-[#21262d] text-xs gap-1"
+                  onClick={() => { navigator.clipboard.writeText(v.body); toast.success("Copied!"); }}>
+                  <Copy className="w-3 h-3" /> Copy
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendsPanel() {
+  const trends = trpc.contentIntelligence.getTrends.useQuery({ limit: 8 });
+  const breaking = trpc.contentIntelligence.getBreakingTrends.useQuery();
+  const ideas = trpc.contentIntelligence.getTrendIdeas.useQuery({ limit: 12 });
+  return (
+    <div className="space-y-4">
+      {(breaking.data?.length ?? 0) > 0 && (
+        <Card className="bg-red-950/20 border-red-800/40">
+          <CardHeader className="pb-2"><CardTitle className="text-red-300 text-sm flex items-center gap-2"><Zap className="w-4 h-4" /> Breaking Trends — Act Now</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {breaking.data?.map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between bg-[#0d1117] border border-red-800/30 rounded p-2">
+                <div>
+                  <p className="text-white text-sm font-medium">{t.topic}</p>
+                  <p className="text-gray-400 text-xs">{t.source} · Urgency: {t.urgency}</p>
+                </div>
+                <Badge className="bg-red-900 text-red-300">🔥 {t.velocityScore}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="bg-[#161b22] border-[#21262d]">
+          <CardHeader className="pb-2"><CardTitle className="text-white text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-400" /> Active Trend Signals</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {trends.isLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : trends.data?.map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between p-2 bg-[#0d1117] rounded border border-[#21262d]">
+                <div>
+                  <p className="text-white text-xs font-medium">{t.topic}</p>
+                  <p className="text-gray-500 text-xs">{t.source} · {t.category}</p>
+                </div>
+                <div className="text-right">
+                  <Badge className="bg-green-900/40 text-green-300 text-xs">{t.velocityScore}</Badge>
+                  <p className="text-gray-500 text-xs mt-0.5">{t.timeToAct}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="bg-[#161b22] border-[#21262d]">
+          <CardHeader className="pb-2"><CardTitle className="text-white text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-yellow-400" /> Trend-Based Content Ideas</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {ideas.isLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : ideas.data?.map((idea: any, i: number) => (
+              <div key={i} className="p-2 bg-[#0d1117] rounded border border-[#21262d]">
+                <p className="text-white text-xs font-medium">{idea.title}</p>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {idea.platforms?.map((p: string) => <Badge key={p} className="bg-[#21262d] text-gray-400 text-xs">{p}</Badge>)}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function EvergreenPanel() {
+  const candidates = trpc.contentIntelligence.getEvergreenCandidates.useQuery({});
+  const top = trpc.contentIntelligence.getTopEvergreenOpportunity.useQuery();
+  return (
+    <div className="space-y-4">
+      {top.data && (
+        <Card className="bg-blue-950/20 border-blue-800/40">
+          <CardHeader className="pb-2"><CardTitle className="text-blue-300 text-sm flex items-center gap-2"><Star className="w-4 h-4" /> Top Refresh Opportunity</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-white font-medium">{top.data.title}</p>
+            <p className="text-gray-400 text-xs mt-1">{top.data.refreshReason}</p>
+            <div className="flex gap-2 mt-2">
+              <Badge className="bg-blue-900 text-blue-300">Score: {top.data.refreshScore}</Badge>
+              <Badge className="bg-[#21262d] text-gray-300">{top.data.priority} priority</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <Card className="bg-[#161b22] border-[#21262d]">
+        <CardHeader className="pb-2"><CardTitle className="text-white text-sm flex items-center gap-2"><RefreshCw className="w-4 h-4 text-cyan-400" /> Evergreen Content Refresh Queue</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {candidates.isLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : (candidates.data || []).map((c: any) => (
+            <div key={c.contentId} className="flex items-center justify-between p-2 bg-[#0d1117] rounded border border-[#21262d]">
+              <div>
+                <p className="text-white text-xs font-medium">{c.title}</p>
+                <p className="text-gray-500 text-xs">{c.originalPlatform} · Published {new Date(c.originalPublishedAt).toLocaleDateString()}</p>
+                <p className="text-gray-400 text-xs">{c.refreshReason}</p>
+              </div>
+              <div className="text-right">
+                <Badge className={`text-xs ${ c.priority === "critical" ? "bg-red-900 text-red-300" : c.priority === "high" ? "bg-orange-900 text-orange-300" : "bg-[#21262d] text-gray-300" }`}>{c.priority}</Badge>
+                <p className="text-gray-500 text-xs mt-0.5">Score: {c.refreshScore}</p>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PersonasPanel() {
+  const personas = trpc.contentIntelligence.getPersonas.useQuery();
+  const [selectedPersona, setSelectedPersona] = React.useState<string | null>(null);
+  const angles = trpc.contentIntelligence.getPersonaAngles.useQuery(
+    { personaId: selectedPersona! },
+    { enabled: !!selectedPersona }
+  );
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {(personas.data || []).map((p: any) => (
+          <Card key={p.id} onClick={() => setSelectedPersona(p.id)}
+            className={`cursor-pointer transition-colors ${ selectedPersona === p.id ? "bg-blue-950/30 border-blue-700" : "bg-[#161b22] border-[#21262d] hover:border-[#30363d]" }`}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold">{p.name[0]}</div>
+                <div>
+                  <p className="text-white text-sm font-medium">{p.name}</p>
+                  <p className="text-gray-400 text-xs">{p.role}</p>
+                </div>
+              </div>
+              <p className="text-gray-400 text-xs">{p.painPoints?.slice(0,2).join(" · ")}</p>
+              <div className="flex gap-1 mt-2 flex-wrap">
+                {p.preferredPlatforms?.map((pl: string) => <Badge key={pl} className="bg-[#21262d] text-gray-400 text-xs">{pl}</Badge>)}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {selectedPersona && angles.data && (
+        <Card className="bg-[#161b22] border-[#21262d]">
+          <CardHeader className="pb-2"><CardTitle className="text-white text-sm">Content Angles for {selectedPersona}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {(angles.data || []).map((a: any, i: number) => (
+              <div key={i} className="p-2 bg-[#0d1117] rounded border border-[#21262d]">
+                <div className="flex items-center justify-between">
+                  <p className="text-white text-xs font-medium">{a.angle}</p>
+                  <Badge className="bg-[#21262d] text-gray-400 text-xs">{a.format}</Badge>
+                </div>
+                <p className="text-gray-400 text-xs mt-1">{a.hook}</p>
+                <p className="text-gray-500 text-xs">{a.platform} · {a.cta}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function RepurposePanel() {
+  const [source, setSource] = React.useState("");
+  const [sourcePlatform, setSourcePlatform] = React.useState("blog");
+  const [targets, setTargets] = React.useState<string[]>(["linkedin","x_twitter","tiktok"]);
+  const [result, setResult] = React.useState<any>(null);
+  const repurpose = trpc.contentIntelligence.repurposeContent.useMutation({
+    onSuccess: (data) => { setResult(data); toast.success(`Repurposed into ${data.variants?.length} platform variants`); },
+    onError: (e) => toast.error(e.message),
+  });
+  const allPlatforms = ["linkedin","x_twitter","blog","reddit","tiktok","email","instagram","discord","hackernews","youtube_shorts"];
+  const toggleTarget = (p: string) => setTargets(prev => prev.includes(p) ? prev.filter(x=>x!==p) : [...prev,p]);
+  return (
+    <div className="space-y-4">
+      <Card className="bg-[#161b22] border-[#21262d]">
+        <CardHeader><CardTitle className="text-white text-sm flex items-center gap-2"><Copy className="w-4 h-4 text-cyan-400" /> Cross-Platform Content Repurposer</CardTitle>
+          <CardDescription className="text-gray-400">Paste any piece of content and instantly repurpose it for every platform in your stack</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2 space-y-1">
+              <Label className="text-gray-400 text-xs">Source Content</Label>
+              <Textarea value={source} onChange={e => setSource(e.target.value)} placeholder="Paste your blog post, LinkedIn article, or any content here..." className="bg-[#0d1117] border-[#21262d] text-white resize-none" rows={5} />
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-gray-400 text-xs">Source Platform</Label>
+                <Select value={sourcePlatform} onValueChange={setSourcePlatform}>
+                  <SelectTrigger className="bg-[#0d1117] border-[#21262d] text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-[#161b22] border-[#21262d]">
+                    {allPlatforms.map(p => <SelectItem key={p} value={p} className="text-white hover:bg-[#21262d]">{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-gray-400 text-xs">Target Platforms</Label>
+                <div className="flex flex-wrap gap-1">
+                  {allPlatforms.filter(p=>p!==sourcePlatform).map(p => (
+                    <button key={p} onClick={() => toggleTarget(p)}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${ targets.includes(p) ? "bg-cyan-900/40 border-cyan-700 text-cyan-300" : "bg-[#0d1117] border-[#21262d] text-gray-400 hover:border-[#30363d]" }`}>{p}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <Button onClick={() => repurpose.mutate({ sourceContent: source, sourcePlatform, targetPlatforms: targets })} disabled={!source || targets.length === 0 || repurpose.isPending}
+            className="bg-cyan-600 hover:bg-cyan-700 text-white border-0 gap-2">
+            {repurpose.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+            {repurpose.isPending ? `Repurposing for ${targets.length} platforms...` : `Repurpose for ${targets.length} Platforms`}
+          </Button>
+          {result && (
+            <div className="space-y-3">
+              <p className="text-gray-400 text-xs">Repurposing strategy: <span className="text-white">{result.repurposingStrategy}</span></p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(result.variants || []).map((v: any) => (
+                  <div key={v.platform} className="bg-[#0d1117] border border-[#21262d] rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-cyan-400 text-xs font-medium">{v.platform}</span>
+                      <div className="flex gap-1">
+                        <Badge className="bg-[#21262d] text-gray-400 text-xs">{v.format}</Badge>
+                        <Badge className={`text-xs ${ v.adaptationScore >= 80 ? "bg-green-900 text-green-300" : "bg-yellow-900 text-yellow-300" }`}>{v.adaptationScore}</Badge>
+                      </div>
+                    </div>
+                    <p className="text-white text-xs">{v.content?.slice(0,200)}...</p>
+                    <Button size="sm" variant="outline" className="w-full border-[#21262d] text-gray-300 hover:bg-[#21262d] text-xs gap-1"
+                      onClick={() => { navigator.clipboard.writeText(v.content); toast.success("Copied!"); }}>
+                      <Copy className="w-3 h-3" /> Copy
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function ContentCreatorPage() {
-  const [activeTab, setActiveTab] = useState<"studio" | "queue" | "campaigns" | "calendar" | "tiktok" | "analytics">("studio");
+  const [activeTab, setActiveTab] = useState<"studio" | "queue" | "campaigns" | "calendar" | "tiktok" | "analytics" | "pipeline" | "atom" | "trends" | "evergreen" | "personas" | "repurpose">("studio");
 
   // Content Calendar state
   const [calendarStart, setCalendarStart] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); });
@@ -491,6 +849,12 @@ export default function ContentCreatorPage() {
             <TabsTrigger value="tiktok" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Music2 className="w-3.5 h-3.5" /> TikTok Hub</TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Calendar className="w-3.5 h-3.5" /> Calendar</TabsTrigger>
             <TabsTrigger value="analytics" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><BarChart3 className="w-3.5 h-3.5" /> Analytics</TabsTrigger>
+            <TabsTrigger value="pipeline" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Zap className="w-3.5 h-3.5" /> Pipeline</TabsTrigger>
+            <TabsTrigger value="atom" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Sparkles className="w-3.5 h-3.5" /> Content Atom</TabsTrigger>
+            <TabsTrigger value="trends" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><TrendingUp className="w-3.5 h-3.5" /> Trends</TabsTrigger>
+            <TabsTrigger value="evergreen" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><RefreshCw className="w-3.5 h-3.5" /> Evergreen</TabsTrigger>
+            <TabsTrigger value="personas" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Users className="w-3.5 h-3.5" /> Personas</TabsTrigger>
+            <TabsTrigger value="repurpose" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Copy className="w-3.5 h-3.5" /> Repurpose</TabsTrigger>
           </TabsList>
         </div>
 
@@ -1552,6 +1916,73 @@ export default function ContentCreatorPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+        {/* ═══ PIPELINE TAB ═══ */}
+        <TabsContent value="pipeline" className="mt-4 space-y-4">
+          <Card className="bg-[#161b22] border-[#21262d]">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2"><Zap className="w-5 h-5 text-yellow-400" /> 5-Stage Content Refinement Pipeline</CardTitle>
+              <CardDescription className="text-gray-400">Every piece goes through Draft → Critique → Rewrite → Score → Quality Gate before reaching the queue</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Content Prompt</Label>
+                  <Textarea id="pipeline-prompt" placeholder="e.g. Why local AI is safer than cloud-based password managers" className="bg-[#0d1117] border-[#21262d] text-white resize-none" rows={3} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Platform</Label>
+                  <Select defaultValue="linkedin">
+                    <SelectTrigger className="bg-[#0d1117] border-[#21262d] text-white"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-[#161b22] border-[#21262d]">
+                      {["linkedin","x_twitter","blog","reddit","tiktok","email","hackernews","instagram","discord"].map(p => (
+                        <SelectItem key={p} value={p} className="text-white hover:bg-[#21262d]">{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Label className="text-gray-300 mt-2 block">Min Quality Score</Label>
+                  <Input type="number" defaultValue={75} min={0} max={100} id="pipeline-min-score" className="bg-[#0d1117] border-[#21262d] text-white" />
+                </div>
+              </div>
+              <PipelineRunner />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══ CONTENT ATOM TAB ═══ */}
+        <TabsContent value="atom" className="mt-4 space-y-4">
+          <Card className="bg-[#161b22] border-[#21262d]">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2"><Sparkles className="w-5 h-5 text-purple-400" /> Content Atom Generator</CardTitle>
+              <CardDescription className="text-gray-400">One topic → 9 platform-specific variants automatically. Write once, publish everywhere.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ContentAtomGenerator />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══ TRENDS TAB ═══ */}
+        <TabsContent value="trends" className="mt-4 space-y-4">
+          <TrendsPanel />
+        </TabsContent>
+
+        {/* ═══ EVERGREEN TAB ═══ */}
+        <TabsContent value="evergreen" className="mt-4 space-y-4">
+          <EvergreenPanel />
+        </TabsContent>
+
+        {/* ═══ PERSONAS TAB ═══ */}
+        <TabsContent value="personas" className="mt-4 space-y-4">
+          <PersonasPanel />
+        </TabsContent>
+
+        {/* ═══ REPURPOSE TAB ═══ */}
+        <TabsContent value="repurpose" className="mt-4 space-y-4">
+          <RepurposePanel />
+        </TabsContent>
+
+      </Tabs>
 
       {/* ═══ PIECE EDITOR DIALOG ═══ */}
       <Dialog open={showPieceEditor} onOpenChange={setShowPieceEditor}>
