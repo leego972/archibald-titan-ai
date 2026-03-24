@@ -973,10 +973,16 @@ function CommandHistory({
 // ─── Security Scanner Component ─────────────────────────────────────
 
 function SecurityScanner({ sandboxId }: { sandboxId: number }) {
-  const [secTab, setSecTab] = useState<"headers" | "code" | "fixes">("headers");
+  const [secTab, setSecTab] = useState<"headers" | "ports" | "ssl" | "code" | "fixes">("headers");
   const [scanTarget, setScanTarget] = useState("");
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
+  const [portTarget, setPortTarget] = useState("");
+  const [portResult, setPortResult] = useState<any>(null);
+  const [portScanning, setPortScanning] = useState(false);
+  const [sslDomain, setSslDomain] = useState("");
+  const [sslResult, setSslResult] = useState<any>(null);
+  const [sslChecking, setSslChecking] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [codeFilename, setCodeFilename] = useState("code.ts");
   const [codeReviewResult, setCodeReviewResult] = useState<any>(null);
@@ -987,6 +993,39 @@ function SecurityScanner({ sandboxId }: { sandboxId: number }) {
 
   const execMutation = trpc.sandbox.exec.useMutation();
   const codeReviewMutation = trpc.sandbox.codeReview.useMutation();
+  const portScanMutation = trpc.sandbox.portScan.useMutation();
+  const sslCheckMutation = trpc.sandbox.sslCheck.useMutation();
+
+  // Port scan handler
+  const runPortScan = async () => {
+    if (!portTarget.trim()) return;
+    setPortScanning(true);
+    setPortResult(null);
+    try {
+      const result = await portScanMutation.mutateAsync({ host: portTarget.trim() });
+      setPortResult(result);
+    } catch (err: any) {
+      toast.error(`Port scan failed: ${err.message}`);
+    } finally {
+      setPortScanning(false);
+    }
+  };
+
+  // SSL check handler
+  const runSslCheck = async () => {
+    if (!sslDomain.trim()) return;
+    setSslChecking(true);
+    setSslResult(null);
+    try {
+      const domain = sslDomain.trim().replace(/^https?:\/\//, "").split("/")[0];
+      const result = await sslCheckMutation.mutateAsync({ domain });
+      setSslResult(result);
+    } catch (err: any) {
+      toast.error(`SSL check failed: ${err.message}`);
+    } finally {
+      setSslChecking(false);
+    }
+  };
   // Direct fetch wrappers to bypass tRPC type inference limit (25+ endpoints)
   const fixVulnMutate = async (input: any) => {
     const res = await fetch('/api/trpc/sandbox.fixVulnerability', {
@@ -1141,18 +1180,20 @@ function SecurityScanner({ sandboxId }: { sandboxId: number }) {
   return (
     <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
       {/* Tab bar */}
-      <div className="flex items-center gap-0 bg-[#161b22] border-b border-zinc-800">
-        {(["headers", "code", "fixes"] as const).map((tab) => (
+      <div className="flex items-center gap-0 bg-[#161b22] border-b border-zinc-800 overflow-x-auto">
+        {(["headers", "ports", "ssl", "code", "fixes"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setSecTab(tab)}
-            className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
               secTab === tab
                 ? "border-red-500 text-zinc-200 bg-[#0d1117]"
                 : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {tab === "headers" && "Header Scan"}
+            {tab === "headers" && "Headers"}
+            {tab === "ports" && "Port Scan"}
+            {tab === "ssl" && "SSL Check"}
             {tab === "code" && "Code Review"}
             {tab === "fixes" && (
               <span className="flex items-center gap-1">
@@ -1219,6 +1260,165 @@ function SecurityScanner({ sandboxId }: { sandboxId: number }) {
               <div className="text-center text-zinc-600 text-xs py-8">
                 <Shield className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
                 <p>Enter a URL to scan for security headers</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Port Scan Tab */}
+      {secTab === "ports" && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-3 border-b border-zinc-800/50">
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2 bg-[#161b22] rounded px-2 flex-1">
+                <Wifi className="w-3 h-3 text-zinc-500" />
+                <input
+                  value={portTarget}
+                  onChange={(e) => setPortTarget(e.target.value)}
+                  placeholder="192.168.1.1 or example.com"
+                  className="flex-1 bg-transparent text-zinc-300 text-xs outline-none py-1.5"
+                  onKeyDown={(e) => e.key === "Enter" && runPortScan()}
+                />
+              </div>
+              <Button size="sm" onClick={runPortScan} disabled={portScanning || !portTarget.trim()} className="h-8 text-xs bg-orange-600 hover:bg-orange-700 text-white">
+                {portScanning ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Activity className="w-3 h-3 mr-1" />}
+                Scan
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {portResult ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded bg-[#161b22]">
+                  <div>
+                    <p className="text-zinc-300 text-sm font-medium">{portResult.host}</p>
+                    <p className="text-zinc-500 text-xs">{portResult.openPorts?.length || 0} open ports found</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded ${portResult.openPorts?.length > 0 ? "bg-orange-900/50 text-orange-300" : "bg-green-900/50 text-green-300"}`}>
+                    {portResult.openPorts?.length > 0 ? "Exposed" : "Closed"}
+                  </span>
+                </div>
+                {portResult.openPorts?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-xs font-medium mb-2">Open Ports</p>
+                    {portResult.openPorts.map((p: any) => (
+                      <div key={p.port} className="flex items-center gap-3 py-1.5 px-2 rounded bg-[#161b22]">
+                        <span className="text-orange-400 font-mono text-xs w-12">{p.port}</span>
+                        <span className="text-zinc-300 text-xs">{p.service || "unknown"}</span>
+                        {p.version && <span className="text-zinc-500 text-xs">{p.version}</span>}
+                        <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded border ${
+                          p.risk === "high" ? "bg-red-900/50 text-red-300 border-red-700/50" :
+                          p.risk === "medium" ? "bg-yellow-900/50 text-yellow-300 border-yellow-700/50" :
+                          "bg-zinc-800 text-zinc-400 border-zinc-700"
+                        }`}>{p.risk || "low"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {portResult.summary && (
+                  <div className="p-2 rounded bg-[#161b22] text-zinc-400 text-xs">{portResult.summary}</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-zinc-600 text-xs py-8">
+                <Activity className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                <p>Enter a host to scan for open ports</p>
+                <p className="text-zinc-700 mt-1">Checks common ports: 21, 22, 23, 25, 80, 443, 3306, 5432, 6379, 8080, 8443, 27017</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SSL Check Tab */}
+      {secTab === "ssl" && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-3 border-b border-zinc-800/50">
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2 bg-[#161b22] rounded px-2 flex-1">
+                <Lock className="w-3 h-3 text-zinc-500" />
+                <input
+                  value={sslDomain}
+                  onChange={(e) => setSslDomain(e.target.value)}
+                  placeholder="example.com"
+                  className="flex-1 bg-transparent text-zinc-300 text-xs outline-none py-1.5"
+                  onKeyDown={(e) => e.key === "Enter" && runSslCheck()}
+                />
+              </div>
+              <Button size="sm" onClick={runSslCheck} disabled={sslChecking || !sslDomain.trim()} className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white">
+                {sslChecking ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
+                Check
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {sslResult ? (
+              <div className="space-y-3">
+                <div className={`flex items-center justify-between p-3 rounded ${sslResult.valid ? "bg-green-900/20 border border-green-800/50" : "bg-red-900/20 border border-red-800/50"}`}>
+                  <div>
+                    <p className="text-zinc-300 text-sm font-medium">{sslResult.domain || sslDomain}</p>
+                    <p className="text-zinc-500 text-xs">{sslResult.valid ? "Certificate valid" : "Certificate issue detected"}</p>
+                  </div>
+                  {sslResult.valid ? <CheckCircle2 className="w-5 h-5 text-green-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+                </div>
+                <div className="bg-[#161b22] rounded p-3 space-y-2 text-xs">
+                  {sslResult.issuer && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Issuer</span>
+                      <span className="text-zinc-300">{sslResult.issuer}</span>
+                    </div>
+                  )}
+                  {sslResult.subject && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Subject</span>
+                      <span className="text-zinc-300">{sslResult.subject}</span>
+                    </div>
+                  )}
+                  {sslResult.validFrom && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Valid From</span>
+                      <span className="text-zinc-300">{new Date(sslResult.validFrom).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {sslResult.validTo && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Expires</span>
+                      <span className={`${new Date(sslResult.validTo) < new Date(Date.now() + 30 * 86400000) ? "text-orange-400" : "text-zinc-300"}`}>
+                        {new Date(sslResult.validTo).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {sslResult.daysUntilExpiry !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Days Until Expiry</span>
+                      <span className={`${sslResult.daysUntilExpiry < 30 ? "text-orange-400 font-bold" : "text-green-400"}`}>
+                        {sslResult.daysUntilExpiry} days
+                      </span>
+                    </div>
+                  )}
+                  {sslResult.protocol && (
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Protocol</span>
+                      <span className="text-zinc-300">{sslResult.protocol}</span>
+                    </div>
+                  )}
+                </div>
+                {sslResult.warnings?.length > 0 && (
+                  <div className="space-y-1">
+                    {sslResult.warnings.map((w: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 p-2 rounded bg-yellow-900/20 border border-yellow-800/50">
+                        <AlertTriangle className="w-3 h-3 text-yellow-400 mt-0.5 shrink-0" />
+                        <span className="text-yellow-300 text-xs">{w}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-zinc-600 text-xs py-8">
+                <Lock className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                <p>Enter a domain to check SSL certificate</p>
               </div>
             )}
           </div>

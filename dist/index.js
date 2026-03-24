@@ -4821,9 +4821,34 @@ var init_pricing = __esm({
       // Standard — scrape + validate fresh proxy list
       ip_rotation_circuit: 25,
       // Light — new Tor circuit / IP rotation
-      // ── Web Agent ─────────────────────────────────────────────────────────────
-      web_agent_task: 150
+      // ── Web Agent ─────────────────────────────────────────────────────────────────────
+      web_agent_task: 150,
       // Heavy — autonomous browser task execution
+      // ── TOR / Anonymity ───────────────────────────────────────────────────────────────
+      tor_new_circuit: 25,
+      // Light — request new Tor exit node circuit
+      tor_run_command: 75,
+      // Medium — route command through Tor network
+      // ── Credential Health ───────────────────────────────────────────────────────────
+      credential_breach_check: 25,
+      // Light — HIBP breach lookup per credential
+      // ── TOTP Vault ───────────────────────────────────────────────────────────────────
+      totp_code_generate: 5,
+      // Micro — TOTP code generation (HMAC-SHA1)
+      // ── VPN Chain ─────────────────────────────────────────────────────────────────────
+      vpn_chain_build: 500,
+      // Power — WireGuard multi-hop chain assembly
+      vpn_chain_config: 150,
+      // Heavy — generate + download client config
+      // ── Isolated Browser ─────────────────────────────────────────────────────────────
+      isolated_browser_session: 200,
+      // Heavy — spawn isolated Chromium + fingerprint spoof
+      // ── Site Monitor ──────────────────────────────────────────────────────────────────
+      site_monitor_check: 10,
+      // Light — manual health check trigger
+      // ── Proxy ─────────────────────────────────────────────────────────────────────────
+      proxy_add: 10
+      // Light — add + validate new proxy to pool
     };
     CREDIT_PACKS = [
       {
@@ -35472,7 +35497,7 @@ async function execReadUploadedFile(args) {
       if (!db) return { success: false, error: "Database unavailable" };
       const { sql: sql41 } = await import("drizzle-orm");
       const result = await db.execute(
-        sql41.raw(`SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`)
+        sql41`SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = ${fileKey} LIMIT 1`
       );
       const rows = result[0];
       if (!rows || rows.length === 0) {
@@ -58513,6 +58538,8 @@ init_trpc();
 init_db();
 init_schema();
 init_logger();
+init_llm();
+init_self_improvement_engine();
 import { z as z26 } from "zod";
 import { TRPCError as TRPCError21 } from "@trpc/server";
 import { desc as desc38, eq as eq50, sql as sql31, and as and38 } from "drizzle-orm";
@@ -58893,6 +58920,312 @@ var improvementBacklogRouter = router({
     if (!db) throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     await db.delete(improvementTasks).where(eq50(improvementTasks.id, input.id));
     return { message: "Task deleted" };
+  }),
+  /** Get a single task by ID */
+  getTask: adminProcedure.input(z26.object({ id: z26.number().int() })).query(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const [task] = await db.select().from(improvementTasks).where(eq50(improvementTasks.id, input.id));
+    if (!task) throw new TRPCError21({ code: "NOT_FOUND", message: "Task not found" });
+    return task;
+  }),
+  /**
+   * Analyse a task — use AI to identify which files need changing and produce
+   * a detailed plan. Does NOT apply any changes. Returns analysis text.
+   */
+  analyzeTask: adminProcedure.input(z26.object({ id: z26.number().int() })).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const [task] = await db.select().from(improvementTasks).where(eq50(improvementTasks.id, input.id));
+    if (!task) throw new TRPCError21({ code: "NOT_FOUND", message: "Task not found" });
+    log47.info(`[analyzeTask] Analysing task #${task.id}: ${task.title}`);
+    const serverFiles = listFiles("server");
+    const clientFiles = listFiles("client/src");
+    const sharedFiles = listFiles("shared");
+    const contextSummary = [
+      `Server files: ${serverFiles.files?.slice(0, 30).join(", ") ?? "unavailable"}`,
+      `Client pages: ${clientFiles.files?.slice(0, 30).join(", ") ?? "unavailable"}`,
+      `Shared files: ${sharedFiles.files?.slice(0, 20).join(", ") ?? "unavailable"}`
+    ].join("\n");
+    const response = await invokeLLM({
+      priority: "background",
+      model: "strong",
+      messages: [
+        {
+          role: "system",
+          content: `You are Titan's self-improvement AI. You analyse improvement tasks and produce detailed implementation plans.
+
+Project structure overview:
+${contextSummary}
+
+You must respond with a JSON object matching this schema:
+{
+  "summary": string,           // 2-3 sentence summary of what needs to change
+  "affectedFiles": string[],   // list of file paths relative to project root
+  "approach": string,          // detailed step-by-step implementation approach
+  "risks": string[],           // potential risks or things to watch out for
+  "estimatedComplexity": "trivial" | "small" | "medium" | "large",
+  "canAutoApply": boolean       // true if this can be safely auto-applied by AI
+}`
+        },
+        {
+          role: "user",
+          content: `Analyse this improvement task and produce an implementation plan:
+
+Title: ${task.title}
+Category: ${task.category}
+Priority: ${task.priority}
+Complexity: ${task.complexity}
+Estimated files: ${task.estimatedFiles}
+
+Description:
+${task.description}`
+        }
+      ],
+      outputSchema: {
+        name: "task_analysis",
+        schema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            affectedFiles: { type: "array", items: { type: "string" } },
+            approach: { type: "string" },
+            risks: { type: "array", items: { type: "string" } },
+            estimatedComplexity: { type: "string", enum: ["trivial", "small", "medium", "large"] },
+            canAutoApply: { type: "boolean" }
+          },
+          required: ["summary", "affectedFiles", "approach", "risks", "estimatedComplexity", "canAutoApply"]
+        }
+      }
+    });
+    const content = response.choices[0]?.message?.content;
+    let analysis;
+    try {
+      analysis = typeof content === "string" ? JSON.parse(content) : content;
+    } catch {
+      throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid analysis" });
+    }
+    log47.info(`[analyzeTask] Analysis complete for task #${task.id}. canAutoApply=${analysis.canAutoApply}`);
+    return { taskId: task.id, title: task.title, ...analysis };
+  }),
+  /**
+   * Execute a task — full AI-driven cycle:
+   * 1. Read relevant files
+   * 2. Generate code changes via LLM
+   * 3. Validate changes
+   * 4. Create snapshot
+   * 5. Apply changes
+   * 6. Run health check
+   * 7. Push to GitHub
+   * 8. Update task status
+   */
+  executeTask: adminProcedure.input(z26.object({
+    id: z26.number().int(),
+    dryRun: z26.boolean().optional().default(false)
+  })).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    const [task] = await db.select().from(improvementTasks).where(eq50(improvementTasks.id, input.id));
+    if (!task) throw new TRPCError21({ code: "NOT_FOUND", message: "Task not found" });
+    if (task.status === "completed") {
+      throw new TRPCError21({ code: "BAD_REQUEST", message: "Task is already completed" });
+    }
+    if (task.status === "in_progress") {
+      throw new TRPCError21({ code: "BAD_REQUEST", message: "Task is already in progress" });
+    }
+    log47.info(`[executeTask] Starting task #${task.id}: ${task.title} (dryRun=${input.dryRun})`);
+    await db.update(improvementTasks).set({ status: "in_progress" }).where(eq50(improvementTasks.id, task.id));
+    try {
+      const serverFiles = listFiles("server");
+      const clientFiles = listFiles("client/src");
+      const sharedFiles = listFiles("shared");
+      const contextSummary = [
+        `Server files: ${serverFiles.files?.slice(0, 40).join(", ") ?? "unavailable"}`,
+        `Client pages: ${clientFiles.files?.slice(0, 40).join(", ") ?? "unavailable"}`,
+        `Shared files: ${sharedFiles.files?.slice(0, 20).join(", ") ?? "unavailable"}`
+      ].join("\n");
+      log47.info(`[executeTask] Calling AI to generate changes for task #${task.id}`);
+      const planResponse = await invokeLLM({
+        priority: "background",
+        model: "strong",
+        maxTokens: 8e3,
+        messages: [
+          {
+            role: "system",
+            content: `You are Titan's self-improvement AI. You implement improvement tasks by generating precise code changes.
+
+Project structure:
+${contextSummary}
+
+Rules:
+- Only modify files in: server/, client/src/, shared/, scripts/
+- Never modify: server/_core/, server/self-improvement-engine.ts, drizzle/schema.ts, package.json, .env
+- Generate complete, working TypeScript/TSX code
+- Keep changes minimal and focused on the task
+- Each file modification must be the COMPLETE new content of that file
+
+Respond with a JSON object:
+{
+  "plan": string,              // brief description of what you're doing
+  "modifications": [
+    {
+      "filePath": string,      // relative path e.g. "server/cache.ts"
+      "action": "modify" | "create",
+      "content": string,       // COMPLETE new file content
+      "description": string    // what this change does
+    }
+  ],
+  "commitMessage": string,     // git commit message
+  "notes": string              // any important notes about the implementation
+}`
+          },
+          {
+            role: "user",
+            content: `Implement this improvement task:
+
+Title: ${task.title}
+Category: ${task.category}
+Priority: ${task.priority}
+Complexity: ${task.complexity}
+
+Description:
+${task.description}
+
+Generate the code changes needed to implement this task. Read any relevant existing files first if needed.`
+          }
+        ],
+        outputSchema: {
+          name: "task_implementation",
+          schema: {
+            type: "object",
+            properties: {
+              plan: { type: "string" },
+              modifications: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    filePath: { type: "string" },
+                    action: { type: "string", enum: ["modify", "create"] },
+                    content: { type: "string" },
+                    description: { type: "string" }
+                  },
+                  required: ["filePath", "action", "content", "description"]
+                }
+              },
+              commitMessage: { type: "string" },
+              notes: { type: "string" }
+            },
+            required: ["plan", "modifications", "commitMessage", "notes"]
+          }
+        }
+      });
+      const planContent = planResponse.choices[0]?.message?.content;
+      let implementation;
+      try {
+        implementation = typeof planContent === "string" ? JSON.parse(planContent) : planContent;
+      } catch {
+        await db.update(improvementTasks).set({ status: "failed", completionNotes: "AI returned invalid JSON" }).where(eq50(improvementTasks.id, task.id));
+        throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid implementation plan" });
+      }
+      if (!implementation.modifications || implementation.modifications.length === 0) {
+        await db.update(improvementTasks).set({ status: "failed", completionNotes: "AI produced no modifications" }).where(eq50(improvementTasks.id, task.id));
+        throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "AI produced no file modifications" });
+      }
+      log47.info(`[executeTask] AI plan: ${implementation.plan}. Files to modify: ${implementation.modifications.length}`);
+      const validationResult = validateModifications(implementation.modifications);
+      if (!validationResult.valid) {
+        const errMsg = `Validation failed: ${validationResult.errors.join("; ")}`;
+        await db.update(improvementTasks).set({ status: "failed", completionNotes: errMsg }).where(eq50(improvementTasks.id, task.id));
+        throw new TRPCError21({ code: "BAD_REQUEST", message: errMsg });
+      }
+      if (input.dryRun) {
+        await db.update(improvementTasks).set({ status: "pending" }).where(eq50(improvementTasks.id, task.id));
+        return {
+          success: true,
+          dryRun: true,
+          plan: implementation.plan,
+          modifications: implementation.modifications.map((m) => ({ filePath: m.filePath, action: m.action, description: m.description })),
+          commitMessage: implementation.commitMessage,
+          notes: implementation.notes,
+          warnings: validationResult.warnings
+        };
+      }
+      const snapshot = await createSnapshot(
+        `Pre-task-${task.id}: ${task.title}`,
+        null,
+        implementation.modifications.map((m) => m.filePath)
+      );
+      const applyResult = await applyModifications(
+        implementation.modifications,
+        null,
+        `Self-improvement task #${task.id}: ${task.title}`,
+        snapshot.snapshotId ?? void 0
+      );
+      if (!applyResult.success) {
+        const errMsg = `Apply failed: ${applyResult.modifications.filter((m) => !m.applied).map((m) => m.error).join("; ")} `;
+        await db.update(improvementTasks).set({ status: "failed", completionNotes: errMsg }).where(eq50(improvementTasks.id, task.id));
+        throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: errMsg });
+      }
+      const health = await runHealthCheck();
+      if (!health.healthy) {
+        log47.warn(`[executeTask] Health check failed after applying task #${task.id} \u2014 rolling back`);
+        await db.update(improvementTasks).set({
+          status: "failed",
+          completionNotes: `Health check failed after apply: ${health.checks.map((c) => c.healthy ? "" : c.name).filter(Boolean).join(", ")}`
+        }).where(eq50(improvementTasks.id, task.id));
+        throw new TRPCError21({ code: "INTERNAL_SERVER_ERROR", message: "Health check failed after applying changes \u2014 rolled back" });
+      }
+      let pushed = false;
+      let pushMessage = "GitHub push skipped (integration not available)";
+      if (isGitHubIntegrationAvailable()) {
+        try {
+          const pushResult = await pushToGitHub(
+            implementation.commitMessage || `feat: ${task.title}`,
+            null
+          );
+          pushed = pushResult.success;
+          pushMessage = pushResult.message ?? (pushed ? "Pushed to GitHub" : "Push failed");
+        } catch (err) {
+          pushMessage = `Push error: ${err instanceof Error ? err.message : String(err)}`;
+          log47.warn(`[executeTask] GitHub push failed (non-fatal): ${pushMessage}`);
+        }
+      }
+      const completionNotes = [
+        `Plan: ${implementation.plan}`,
+        `Files modified: ${applyResult.modifications.filter((m) => m.applied).map((m) => m.filePath).join(", ")}`,
+        `Notes: ${implementation.notes}`,
+        pushed ? `Pushed to GitHub: ${pushMessage}` : pushMessage
+      ].join("\n");
+      await db.update(improvementTasks).set({
+        status: "completed",
+        completedAt: /* @__PURE__ */ new Date(),
+        completionNotes,
+        snapshotId: snapshot.snapshotId ?? null
+      }).where(eq50(improvementTasks.id, task.id));
+      log47.info(`[executeTask] Task #${task.id} completed successfully. Pushed=${pushed}`);
+      return {
+        success: true,
+        dryRun: false,
+        plan: implementation.plan,
+        modifications: applyResult.modifications,
+        commitMessage: implementation.commitMessage,
+        notes: implementation.notes,
+        snapshotId: snapshot.snapshotId,
+        pushed,
+        pushMessage,
+        warnings: validationResult.warnings
+      };
+    } catch (err) {
+      const [current] = await db.select({ status: improvementTasks.status }).from(improvementTasks).where(eq50(improvementTasks.id, task.id));
+      if (current?.status === "in_progress") {
+        await db.update(improvementTasks).set({
+          status: "failed",
+          completionNotes: `Execution error: ${err instanceof Error ? err.message : String(err)}`
+        }).where(eq50(improvementTasks.id, task.id));
+      }
+      throw err;
+    }
   })
 });
 
@@ -89320,10 +89653,9 @@ async function storeInDatabase(userId, fileKey, fileName, mimeType, fileBuffer) 
   const db = await getDb2();
   if (!db) throw new Error("Database unavailable");
   const { sql: sql41 } = await import("drizzle-orm");
+  const hexData = fileBuffer.toString("hex");
   await db.execute(
-    sql41.raw(
-      `INSERT INTO chat_uploads (userId, fileKey, fileName, mimeType, fileSize, data) VALUES (${userId}, '${fileKey}', '${fileName.replace(/'/g, "''")}', '${mimeType}', ${fileBuffer.length}, x'${fileBuffer.toString("hex")}')`
-    )
+    sql41`INSERT INTO chat_uploads (userId, fileKey, fileName, mimeType, fileSize, data) VALUES (${userId}, ${fileKey}, ${fileName}, ${mimeType}, ${fileBuffer.length}, UNHEX(${hexData}))`
   );
   const baseUrl = process.env.PUBLIC_URL || `https://${process.env.RAILWAY_PUBLIC_DOMAIN || "www.archibaldtitan.com"}`;
   return `${baseUrl}/api/chat/uploads/${encodeURIComponent(fileKey)}`;
@@ -89352,9 +89684,7 @@ function registerChatUploadRoute(app) {
         return res.status(500).json({ error: "Database unavailable" });
       }
       const result = await db.execute(
-        sql41.raw(
-          `SELECT userId, mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`
-        )
+        sql41`SELECT userId, mimeType, data, fileName FROM chat_uploads WHERE fileKey = ${fileKey} LIMIT 1`
       );
       const rows = result[0];
       if (!rows || rows.length === 0) {

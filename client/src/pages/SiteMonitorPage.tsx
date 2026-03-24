@@ -140,6 +140,10 @@ export default function SiteMonitorPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showRepairDialog, setShowRepairDialog] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editSiteName, setEditSiteName] = useState("");
+  const [editSiteInterval, setEditSiteInterval] = useState(60);
 
   // ─── Queries ─────────────────────────────────────────────────
   const statsQuery = trpc.siteMonitor.getDashboardStats.useQuery(undefined, {
@@ -161,8 +165,12 @@ export default function SiteMonitorPage() {
   const limitsQuery = trpc.siteMonitor.getLimits.useQuery(undefined, {
     enabled: canAccess,
   });
+  const healthHistoryQuery = trpc.siteMonitor.getHealthHistory.useQuery(
+    { siteId: selectedSiteId!, hours: 24, limit: 100 },
+    { enabled: !!selectedSiteId && showHistoryDialog }
+  );
 
-  // ─── Mutations ───────────────────────────────────────────────
+  // ─── Mutations ─────────────────────────────────────────────────
   const addSiteMut = trpc.siteMonitor.addSite.useMutation({
     onSuccess: () => {
       toast.success("Site added for monitoring");
@@ -220,6 +228,14 @@ export default function SiteMonitorPage() {
     onSuccess: () => {
       toast.success("Incident ignored");
       incidentsQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const updateSiteMut = trpc.siteMonitor.updateSite.useMutation({
+    onSuccess: () => {
+      toast.success("Site settings updated");
+      sitesQuery.refetch();
+      setShowEditDialog(false);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -426,6 +442,16 @@ export default function SiteMonitorPage() {
                     setShowRepairDialog(true);
                   }}
                   onTestConnection={() => testConnectionMut.mutate({ id: site.id })}
+                  onViewHistory={() => {
+                    setSelectedSiteId(site.id);
+                    setShowHistoryDialog(true);
+                  }}
+                  onEdit={() => {
+                    setSelectedSiteId(site.id);
+                    setEditSiteName(site.name);
+                    setEditSiteInterval(site.checkIntervalSeconds ?? 60);
+                    setShowEditDialog(true);
+                  }}
                   isChecking={triggerCheckMut.isPending}
                 />
               ))
@@ -492,7 +518,7 @@ export default function SiteMonitorPage() {
         limits={limits}
       />
 
-      {/* ─── Repair Dialog ────────────────────────────────────── */}
+      {/* ─── Repair Dialog ──────────────────────────────────────────────────────── */}
       <RepairDialog
         open={showRepairDialog}
         onClose={() => { setShowRepairDialog(false); setSelectedSiteId(null); }}
@@ -505,11 +531,95 @@ export default function SiteMonitorPage() {
         }}
         isLoading={triggerRepairMut.isPending}
       />
+
+      {/* ─── Health History Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={showHistoryDialog} onOpenChange={(o) => { if (!o) { setShowHistoryDialog(false); } }}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-400" />
+              Health History — {sites.find(s => s.id === selectedSiteId)?.name}
+            </DialogTitle>
+            <DialogDescription>Last 24 hours of health checks</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto space-y-1">
+            {healthHistoryQuery.isLoading && <p className="text-zinc-400 text-sm">Loading...</p>}
+            {healthHistoryQuery.data?.length === 0 && <p className="text-zinc-500 text-sm">No health checks recorded yet.</p>}
+            {healthHistoryQuery.data?.map((check: any, i: number) => (
+              <div key={i} className={`flex items-center gap-3 p-2 rounded text-sm ${
+                check.status === "healthy" ? "bg-emerald-500/5 border border-emerald-500/20" :
+                check.status === "down" ? "bg-red-500/5 border border-red-500/20" :
+                "bg-yellow-500/5 border border-yellow-500/20"
+              }`}>
+                {getStatusIcon(check.status)}
+                <span className="text-zinc-300 font-mono">{check.httpStatusCode || "—"}</span>
+                <span className={`font-mono ${
+                  (check.responseTimeMs ?? 0) > 3000 ? "text-yellow-400" : "text-white"
+                }`}>{formatMs(check.responseTimeMs)}</span>
+                <span className="text-zinc-500 text-xs ml-auto">{formatTime(check.checkedAt)}</span>
+                {check.errorMessage && <span className="text-red-400 text-xs truncate max-w-32">{check.errorMessage}</span>}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowHistoryDialog(false)} className="border-zinc-700 text-zinc-300">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Site Dialog ─────────────────────────────────────────────────────────── */}
+      <Dialog open={showEditDialog} onOpenChange={(o) => { if (!o) setShowEditDialog(false); }}>
+        <DialogContent className="bg-zinc-900 border-zinc-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Settings className="h-5 w-5 text-zinc-400" />
+              Edit Site Settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-zinc-300">Display Name</Label>
+              <Input
+                value={editSiteName}
+                onChange={e => setEditSiteName(e.target.value)}
+                className="bg-zinc-800 border-zinc-700 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-zinc-300">Check Interval (seconds)</Label>
+              <Input
+                type="number"
+                value={editSiteInterval}
+                onChange={e => setEditSiteInterval(parseInt(e.target.value) || 60)}
+                min={30}
+                max={86400}
+                className="bg-zinc-800 border-zinc-700 text-white mt-1 font-mono"
+              />
+              <p className="text-xs text-zinc-500 mt-1">Minimum: 30s. Recommended: 60–300s.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="border-zinc-700 text-zinc-300">Cancel</Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                if (selectedSiteId) {
+                  updateSiteMut.mutate({ id: selectedSiteId, name: editSiteName, checkIntervalSeconds: editSiteInterval });
+                }
+              }}
+              disabled={updateSiteMut.isPending}
+            >
+              {updateSiteMut.isPending ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Settings className="h-4 w-4 mr-1" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-// ─── Stats Card ──────────────────────────────────────────────────
+// ─── Stats Card ────────────────────────────────────────────────────────
 
 function StatsCard({ label, value, icon, valueColor }: {
   label: string;
@@ -532,13 +642,15 @@ function StatsCard({ label, value, icon, valueColor }: {
 
 // ─── Site Card ───────────────────────────────────────────────────
 
-function SiteCard({ site, onCheck, onTogglePause, onDelete, onRepair, onTestConnection, isChecking }: {
+function SiteCard({ site, onCheck, onTogglePause, onDelete, onRepair, onTestConnection, onViewHistory, onEdit, isChecking }: {
   site: any;
   onCheck: () => void;
   onTogglePause: () => void;
   onDelete: () => void;
   onRepair: () => void;
   onTestConnection: () => void;
+  onViewHistory: () => void;
+  onEdit: () => void;
   isChecking: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -685,6 +797,22 @@ function SiteCard({ site, onCheck, onTogglePause, onDelete, onRepair, onTestConn
                   <Wrench className="h-3 w-3 mr-1" /> Repair
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-700 text-blue-400 hover:bg-blue-900/30"
+                onClick={onViewHistory}
+              >
+                <BarChart3 className="h-3 w-3 mr-1" /> History
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+                onClick={onEdit}
+              >
+                <Settings className="h-3 w-3 mr-1" /> Edit
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

@@ -141,6 +141,13 @@ export default function BinCheckerPage() {
   const validateCard = trpc.binChecker.validateCard.useMutation({ onError: (e) => toast.error(e.message) });
   const bulkValidate = trpc.binChecker.bulkValidate.useMutation({ onError: (e) => toast.error(e.message) });
   const reverseSearch = trpc.binChecker.reverseBinSearch.useMutation({ onError: (e) => toast.error(e.message) });
+  const bulkBinLookup = trpc.binChecker.bulkBinLookup.useMutation({ onError: (e) => toast.error(e.message) });
+  const [bulkBinInput, setBulkBinInput] = useState("");
+  const [networkPrefix, setNetworkPrefix] = useState("");
+  const { data: networkData, isLoading: networkLoading } = trpc.binChecker.detectNetwork.useQuery(
+    { prefix: networkPrefix },
+    { enabled: networkPrefix.length >= 1 }
+  );
 
   const formatCard = (val: string) => val.replace(/\D/g, "").replace(/(.{4})/g, "$1 ").trim().slice(0, 19);
 
@@ -168,6 +175,8 @@ export default function BinCheckerPage() {
           <TabsTrigger value="bin">BIN Lookup</TabsTrigger>
           <TabsTrigger value="validate">Card Validator</TabsTrigger>
           <TabsTrigger value="bulk">Bulk Check</TabsTrigger>
+          <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
+          <TabsTrigger value="network">Network ID</TabsTrigger>
           <TabsTrigger value="reverse">Reverse Search</TabsTrigger>
         </TabsList>
 
@@ -381,6 +390,87 @@ export default function BinCheckerPage() {
                     </div>
                   )}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ── Bulk BIN Lookup ── */}
+        <TabsContent value="bulkbin" className="mt-4 space-y-4">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Bulk BIN Lookup</CardTitle>
+              <CardDescription>Look up bank, country, and card type for up to 50 BIN numbers at once. 1 credit per lookup.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={bulkBinInput}
+                onChange={e => setBulkBinInput(e.target.value)}
+                placeholder={"411111\n552000\n378282"}
+                className="bg-zinc-800 border-zinc-700 font-mono text-sm min-h-[120px]"
+              />
+              <Button
+                onClick={() => {
+                  const bins = bulkBinInput.split("\n").map(l => l.trim().replace(/\D/g, "").slice(0, 8)).filter(l => l.length >= 6);
+                  if (bins.length === 0) { toast.error("No valid BINs found (6-8 digits each)"); return; }
+                  bulkBinLookup.mutate({ bins: bins.slice(0, 50) });
+                }}
+                disabled={bulkBinLookup.isPending || !bulkBinInput.trim()}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-semibold"
+              >
+                {bulkBinLookup.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
+                Lookup All BINs
+              </Button>
+              {bulkBinLookup.data && (
+                <div className="space-y-2">
+                  <div className="text-sm text-zinc-400">{bulkBinLookup.data.count} results</div>
+                  <div className="space-y-1 max-h-72 overflow-y-auto">
+                    {bulkBinLookup.data.results.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 rounded text-sm bg-zinc-800 border border-zinc-700">
+                        <span className="font-mono text-yellow-300 font-bold">{r.bin}</span>
+                        {r.network && <NetworkBadge name={r.network} />}
+                        <span className="text-zinc-400 text-xs">{r.bank}</span>
+                        <span className="text-zinc-500 text-xs ml-auto">{r.country}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* ── Network Identification ── */}
+        <TabsContent value="network" className="mt-4 space-y-4">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Card Network Identification</CardTitle>
+              <CardDescription>Instantly identify the card network from any prefix. Offline — no API call needed.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={networkPrefix}
+                  onChange={e => setNetworkPrefix(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  placeholder="Enter card prefix (e.g. 4111, 5500, 3782)"
+                  className="bg-zinc-800 border-zinc-700 font-mono"
+                  maxLength={8}
+                />
+                {networkLoading && <Loader2 className="w-5 h-5 animate-spin text-zinc-500 self-center" />}
+              </div>
+              {networkData?.found && networkData.network && (
+                <div className="p-4 rounded-lg bg-zinc-800 border border-zinc-700 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <NetworkBadge name={networkData.network.name} />
+                    <span className="text-sm text-zinc-400">Code: <span className="font-mono text-white">{networkData.network.code}</span></span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-zinc-500">Valid lengths:</span> <span className="font-mono text-white">{networkData.network.lengths.join(", ")}</span></div>
+                    <div><span className="text-zinc-500">CVV length:</span> <span className="font-mono text-white">{networkData.network.cvvLength}</span></div>
+                    <div><span className="text-zinc-500">Luhn check:</span> <span className={networkData.network.luhnCheck ? "text-green-400" : "text-red-400"}>{networkData.network.luhnCheck ? "Required" : "Not required"}</span></div>
+                  </div>
+                </div>
+              )}
+              {networkPrefix.length >= 1 && !networkLoading && !networkData?.found && (
+                <p className="text-sm text-zinc-500">No network matched for prefix <span className="font-mono text-zinc-300">{networkPrefix}</span></p>
               )}
             </CardContent>
           </Card>

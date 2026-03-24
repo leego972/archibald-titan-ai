@@ -4073,7 +4073,7 @@ async function execReadUploadedFile(
       if (!db) return { success: false, error: 'Database unavailable' };
       const { sql } = await import('drizzle-orm');
       const result = await db.execute(
-        sql.raw(`SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`)
+        sql`SELECT mimeType, data, fileName FROM chat_uploads WHERE fileKey = ${fileKey} LIMIT 1`
       );
       const rows = (result[0] as unknown as any[]);
       if (!rows || rows.length === 0) {

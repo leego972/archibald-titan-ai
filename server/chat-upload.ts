@@ -31,12 +31,11 @@ async function storeInDatabase(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  // Use raw SQL to insert the blob
+  // Use parameterized query to prevent SQL injection
   const { sql } = await import("drizzle-orm");
+  const hexData = fileBuffer.toString("hex");
   await db.execute(
-    sql.raw(
-      `INSERT INTO chat_uploads (userId, fileKey, fileName, mimeType, fileSize, data) VALUES (${userId}, '${fileKey}', '${fileName.replace(/'/g, "''")}', '${mimeType}', ${fileBuffer.length}, x'${fileBuffer.toString("hex")}')`
-    )
+    sql`INSERT INTO chat_uploads (userId, fileKey, fileName, mimeType, fileSize, data) VALUES (${userId}, ${fileKey}, ${fileName}, ${mimeType}, ${fileBuffer.length}, UNHEX(${hexData}))`
   );
 
   // Return a URL that points to our serve endpoint
@@ -82,9 +81,7 @@ export function registerChatUploadRoute(app: Express) {
 
       // ── AUTHORIZATION: Only return files owned by the authenticated user ──
       const result = await db.execute(
-        sql.raw(
-          `SELECT userId, mimeType, data, fileName FROM chat_uploads WHERE fileKey = '${fileKey.replace(/'/g, "''")}' LIMIT 1`
-        )
+        sql`SELECT userId, mimeType, data, fileName FROM chat_uploads WHERE fileKey = ${fileKey} LIMIT 1`
       );
 
       const rows = result[0] as unknown as any[];

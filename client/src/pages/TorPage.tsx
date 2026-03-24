@@ -19,9 +19,10 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import {
   Globe, Plus, Trash2, Play, Square, RefreshCw, CheckCircle, XCircle,
-  Clock, Loader2, Star, Shield, Zap, Lock, RotateCcw,
+  Clock, Loader2, Star, Shield, Zap, Lock, RotateCcw, Terminal,
 } from "lucide-react";
 
 function statusBadge(status: string) {
@@ -49,6 +50,11 @@ export default function TorPage() {
   const stopTor = trpc.tor.stopTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
   const newCircuit = trpc.tor.newCircuit.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
   const toggleFirewall = trpc.tor.toggleFirewall.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); toast.success(r.message); } });
+  const activeStateQuery = trpc.tor.getActiveState.useQuery();
+  const setTorActive = trpc.tor.setActive.useMutation({ onSuccess: (r: any) => { utils.tor.getStatus.invalidate(); activeStateQuery.refetch(); r.success ? toast.success(r.message) : toast.error(r.message); }, onError: (e: any) => toast.error(e.message) });
+  const runThroughTor = trpc.tor.runThroughTor.useMutation({ onSuccess: (r: any) => { setTorOutput(r.output); toast.success(`Command ran through Tor — Exit IP: ${r.torIp ?? 'unknown'}`); }, onError: (e: any) => toast.error(e.message) });
+  const [torCmd, setTorCmd] = useState("");
+  const [torOutput, setTorOutput] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [label, setLabel] = useState("");
@@ -216,6 +222,46 @@ export default function TorPage() {
           </div>
         )}
 
+        {/* Run Through Tor Panel — shown when a node is installed */}
+        {activeStateQuery.data?.installed && (
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2"><Terminal className="w-4 h-4 text-purple-400" />Run Command Through Tor</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400">Tor Active</span>
+                  <Switch
+                    checked={activeStateQuery.data?.active ?? false}
+                    onCheckedChange={(v) => setTorActive.mutate({ active: v })}
+                    disabled={setTorActive.isPending}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-zinc-500">Execute a shell command on your Tor node, routing it through the Tor circuit. Output is returned to you.</p>
+              <div className="flex gap-2">
+                <Input
+                  value={torCmd}
+                  onChange={e => setTorCmd(e.target.value)}
+                  placeholder="e.g. curl https://check.torproject.org/api/ip"
+                  className="bg-zinc-800 border-zinc-700 font-mono text-sm"
+                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && torCmd.trim()) runThroughTor.mutate({ command: torCmd }); }}
+                />
+                <Button
+                  onClick={() => runThroughTor.mutate({ command: torCmd })}
+                  disabled={runThroughTor.isPending || !torCmd.trim()}
+                  className="bg-purple-600 hover:bg-purple-700 flex-shrink-0"
+                >
+                  {runThroughTor.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                </Button>
+              </div>
+              {torOutput && (
+                <pre className="bg-[#0d1117] rounded p-3 text-xs text-green-300 font-mono overflow-x-auto max-h-48 overflow-y-auto border border-zinc-800 whitespace-pre-wrap">{torOutput}</pre>
+              )}
+            </CardContent>
+          </Card>
+        )}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2"><Zap className="w-4 h-4 text-purple-400" />Speed Optimisations (Auto-Applied on Deploy)</CardTitle>

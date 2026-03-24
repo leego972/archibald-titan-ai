@@ -122,6 +122,14 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
 
 function CredentialRow({ result }: { result: ScanResult }) {
   const [expanded, setExpanded] = useState(false);
+  const [breachResult, setBreachResult] = useState<{ breached: boolean; breachCount: number } | null>(null);
+  const checkBreach = trpc.credentialHealth.checkBreach.useMutation({
+    onSuccess: (d: any) => {
+      setBreachResult(d);
+      toast.success(d.breached ? `Found in ${d.breachCount?.toLocaleString()} breaches!` : 'Not found in any known breaches');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
@@ -243,6 +251,24 @@ function CredentialRow({ result }: { result: ScanResult }) {
               </ul>
             </div>
           )}
+          {/* Live Breach Check */}
+          <div className="border-t border-border pt-3 mt-3 flex items-center justify-between gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); checkBreach.mutate({ credentialId: result.credentialId }); }}
+              disabled={checkBreach.isPending}
+              className="border-zinc-700 text-xs"
+            >
+              {checkBreach.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ShieldX className="h-3 w-3 mr-1" />}
+              Live Breach Check (HIBP)
+            </Button>
+            {breachResult && (
+              <span className={`text-xs font-medium ${breachResult.breached ? 'text-red-400' : 'text-green-400'}`}>
+                {breachResult.breached ? `⚠️ Breached (${breachResult.breachCount?.toLocaleString()} times)` : '✓ Not found in any known breaches'}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

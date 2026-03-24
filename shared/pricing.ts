@@ -420,8 +420,31 @@ export const CREDIT_COSTS = {
   proxy_scrape: 50,              // Standard — scrape + validate fresh proxy list
   ip_rotation_circuit: 25,       // Light — new Tor circuit / IP rotation
 
-  // ── Web Agent ─────────────────────────────────────────────────────────────
+  // ── Web Agent ─────────────────────────────────────────────────────────────────────
   web_agent_task: 150,           // Heavy — autonomous browser task execution
+
+  // ── TOR / Anonymity ───────────────────────────────────────────────────────────────
+  tor_new_circuit: 25,           // Light — request new Tor exit node circuit
+  tor_run_command: 75,           // Medium — route command through Tor network
+
+  // ── Credential Health ───────────────────────────────────────────────────────────
+  credential_breach_check: 25,   // Light — HIBP breach lookup per credential
+
+  // ── TOTP Vault ───────────────────────────────────────────────────────────────────
+  totp_code_generate: 5,         // Micro — TOTP code generation (HMAC-SHA1)
+
+  // ── VPN Chain ─────────────────────────────────────────────────────────────────────
+  vpn_chain_build: 500,          // Power — WireGuard multi-hop chain assembly
+  vpn_chain_config: 150,         // Heavy — generate + download client config
+
+  // ── Isolated Browser ─────────────────────────────────────────────────────────────
+  isolated_browser_session: 200, // Heavy — spawn isolated Chromium + fingerprint spoof
+
+  // ── Site Monitor ──────────────────────────────────────────────────────────────────
+  site_monitor_check: 10,        // Light — manual health check trigger
+
+  // ── Proxy ─────────────────────────────────────────────────────────────────────────
+  proxy_add: 10,                 // Light — add + validate new proxy to pool
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

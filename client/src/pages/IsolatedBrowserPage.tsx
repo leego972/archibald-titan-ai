@@ -286,6 +286,11 @@ export default function IsolatedBrowserPage() {
   const { data: costInfo, isLoading: costLoading } = trpc.isolatedBrowser.getCostInfo.useQuery();
   const { data: sessionsData, refetch: refetchSessions } = trpc.isolatedBrowser.listSessions.useQuery();
   const { data: profilesData } = trpc.isolatedBrowser.getDeviceProfiles.useQuery();
+  const [gallerySessionId, setGallerySessionId] = useState<string | null>(null);
+  const { data: galleryData, isLoading: galleryLoading } = trpc.isolatedBrowser.getScreenshots.useQuery(
+    { sessionId: gallerySessionId! },
+    { enabled: !!gallerySessionId }
+  );
 
   // ── Mutations ──
   const launchMutation = trpc.isolatedBrowser.launch.useMutation({
@@ -907,6 +912,34 @@ export default function IsolatedBrowserPage() {
         </div>
       ) : null}
 
+      {/* ── Screenshot Gallery Dialog ── */}
+      {gallerySessionId && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setGallerySessionId(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2"><Camera className="w-5 h-5 text-purple-400" />Screenshot Gallery</h3>
+              <Button size="sm" variant="ghost" onClick={() => setGallerySessionId(null)}>Close</Button>
+            </div>
+            {galleryLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-zinc-500" /></div>
+            ) : !galleryData?.screenshots?.length ? (
+              <p className="text-center text-zinc-500 py-12">No screenshots saved for this session.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {(galleryData.screenshots as Array<{url: string; label?: string; takenAt: string}>).map((s, i) => (
+                  <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-zinc-700 hover:border-zinc-500 transition-colors">
+                    <img src={s.url} alt={s.label || `Screenshot ${i + 1}`} className="w-full object-cover" />
+                    <div className="p-2 bg-zinc-800">
+                      <p className="text-xs text-zinc-400 truncate">{s.label || `Screenshot ${i + 1}`}</p>
+                      <p className="text-xs text-zinc-600">{new Date(s.takenAt).toLocaleTimeString()}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* ── Session history ── */}
       {sessions.length > 0 && (
         <Card className="border-border bg-card">
@@ -929,9 +962,14 @@ export default function IsolatedBrowserPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {s.screenshotCount > 0 && (
-                      <span className="text-xs text-purple-400/70">
-                        <Camera className="w-3 h-3 inline mr-0.5" />{s.screenshotCount}
-                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs text-purple-400 hover:text-purple-300"
+                        onClick={() => setGallerySessionId(s.id)}
+                      >
+                        <Camera className="w-3 h-3 mr-1" />{s.screenshotCount}
+                      </Button>
                     )}
                     <span className="text-xs text-amber-400 font-semibold">{s.creditsConsumed} cr</span>
                     {statusBadge(s.status)}
