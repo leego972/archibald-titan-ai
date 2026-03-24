@@ -14,9 +14,10 @@
  * - Buyer persona profiling
  */
 
-import { getDb } from "./_core/db";
+import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
-import { logger } from "./_core/logger";
+import { createLogger } from "./_core/logger.js";
+const logger = createLogger('marketplace-intelligence');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,7 +166,7 @@ export async function getSimilarListings(
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   } catch (err) {
-    logger.error("getSimilarListings error", err);
+    logger.error("getSimilarListings error", { error: String(err) });
     return [];
   }
 }
@@ -232,7 +233,7 @@ export async function getBuyersAlsoBought(
       };
     }).filter((r) => r.listingId);
   } catch (err) {
-    logger.error("getBuyersAlsoBought error", err);
+    logger.error("getBuyersAlsoBought error", { error: String(err) });
     return [];
   }
 }
@@ -319,7 +320,7 @@ export async function getPersonalizedRecommendations(
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   } catch (err) {
-    logger.error("getPersonalizedRecommendations error", err);
+    logger.error("getPersonalizedRecommendations error", { error: String(err) });
     return [];
   }
 }
@@ -347,7 +348,7 @@ export async function getTrendingListings(
       eq(marketplaceListings.reviewStatus, "approved"),
     ];
     if (category && category !== "all") {
-      conditions.push(eq(marketplaceListings.category, category));
+      conditions.push(eq(marketplaceListings.category, category as any));
     }
 
     const listings = await db
@@ -396,7 +397,7 @@ export async function getTrendingListings(
 
     return sorted;
   } catch (err) {
-    logger.error("getTrendingListings error", err);
+    logger.error("getTrendingListings error", { error: String(err) });
     return [];
   }
 }
@@ -465,7 +466,7 @@ export async function getSellerLeaderboard(limit = 20): Promise<SellerLeaderboar
 
     return sorted;
   } catch (err) {
-    logger.error("getSellerLeaderboard error", err);
+    logger.error("getSellerLeaderboard error", { error: String(err) });
     return [];
   }
 }
@@ -555,7 +556,7 @@ export async function getSellerAnalytics(sellerId: number): Promise<SellerAnalyt
       refundRate: 0,
     };
   } catch (err) {
-    logger.error("getSellerAnalytics error", err);
+    logger.error("getSellerAnalytics error", { error: String(err) });
     return getEmptyAnalytics();
   }
 }
@@ -611,7 +612,7 @@ export async function getWishlist(userId: number): Promise<WishlistItem[]> {
       return [];
     }
   } catch (err) {
-    logger.error("getWishlist error", err);
+    logger.error("getWishlist error", { error: String(err) });
     return [];
   }
 }
@@ -635,14 +636,13 @@ export async function addToWishlist(userId: number, listingId: number): Promise<
         userId,
         listingId,
         priceAtAdd: listing?.priceCredits || 0,
-        createdAt: new Date().toISOString(),
       });
       return true;
     } catch {
       return false;
     }
   } catch (err) {
-    logger.error("addToWishlist error", err);
+    logger.error("addToWishlist error", { error: String(err) });
     return false;
   }
 }
@@ -669,7 +669,7 @@ export async function removeFromWishlist(userId: number, listingId: number): Pro
       return false;
     }
   } catch (err) {
-    logger.error("removeFromWishlist error", err);
+    logger.error("removeFromWishlist error", { error: String(err) });
     return false;
   }
 }
@@ -711,7 +711,7 @@ export async function getDisputes(userId: number, role: "buyer" | "seller" | "ad
       return [];
     }
   } catch (err) {
-    logger.error("getDisputes error", err);
+    logger.error("getDisputes error", { error: String(err) });
     return [];
   }
 }
@@ -749,17 +749,13 @@ export async function openDispute(
           description,
           status: "open",
           resolution: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .returning({ id: marketplaceDisputes.id });
-
-      return { success: true, disputeId: dispute.id };
+        });
+      return { success: true };
     } catch {
       return { success: false, error: "Dispute table not available — contact support" };
     }
   } catch (err) {
-    logger.error("openDispute error", err);
+    logger.error("openDispute error", { error: String(err) });
     return { success: false, error: String(err) };
   }
 }
@@ -794,7 +790,7 @@ export async function advancedSearch(params: AdvancedSearchParams) {
     ];
 
     if (params.category && params.category !== "all") {
-      conditions.push(eq(marketplaceListings.category, params.category));
+      conditions.push(eq(marketplaceListings.category, params.category as any));
     }
     if (params.minPrice !== undefined) {
       conditions.push(gte(marketplaceListings.priceCredits, params.minPrice));
@@ -812,7 +808,7 @@ export async function advancedSearch(params: AdvancedSearchParams) {
       conditions.push(eq(marketplaceListings.license, params.license));
     }
     if (params.riskCategory) {
-      conditions.push(eq(marketplaceListings.riskCategory, params.riskCategory));
+      conditions.push(eq(marketplaceListings.riskCategory, params.riskCategory as any));
     }
     if (params.query) {
       conditions.push(like(marketplaceListings.title, `%${params.query}%`));
@@ -848,7 +844,7 @@ export async function advancedSearch(params: AdvancedSearchParams) {
 
     return { results, total, page, totalPages };
   } catch (err) {
-    logger.error("advancedSearch error", err);
+    logger.error("advancedSearch error", { error: String(err) });
     return { results: [], total: 0, page: 1, totalPages: 0 };
   }
 }
@@ -887,7 +883,7 @@ Key Features: ${params.keyFeatures}`,
     const content = (result as any)?.choices?.[0]?.message?.content;
     return typeof content === "string" ? content : "";
   } catch (err) {
-    logger.error("generateListingDescription error", err);
+    logger.error("generateListingDescription error", { error: String(err) });
     return "";
   }
 }
@@ -911,7 +907,7 @@ export async function suggestPrice(params: {
       .from(marketplaceListings)
       .where(
         and(
-          eq(marketplaceListings.category, params.category),
+          eq(marketplaceListings.category, params.category as any),
           eq(marketplaceListings.status, "active"),
           eq(marketplaceListings.reviewStatus, "approved")
         )
@@ -933,7 +929,7 @@ export async function suggestPrice(params: {
       median,
     };
   } catch (err) {
-    logger.error("suggestPrice error", err);
+    logger.error("suggestPrice error", { error: String(err) });
     return { suggested: 100, min: 50, max: 500, median: 100 };
   }
 }

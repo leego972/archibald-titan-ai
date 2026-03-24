@@ -43,6 +43,7 @@ export type SystemTag =
   | "advertising"    // Advertising Orchestrator
   | "seo"            // SEO Engine
   | "affiliate"      // Affiliate + Marketing engines
+  | "content_creator" // Content Creator Intelligence
   | "misc"           // Blog, Grants, Auto-Fix, TikTok, etc.
   | "background";    // Legacy fallback — maps to "misc"
 
@@ -95,6 +96,7 @@ const systemKeys: Record<SystemTag, { primary: string; fallbacks?: string[] }> =
   advertising:   { primary: "OPENAI_API_KEY_1" },
   seo:           { primary: "OPENAI_API_KEY_2" },
   affiliate:     { primary: "OPENAI_API_KEY_3" },
+  content_creator: { primary: "OPENAI_API_KEY_4" }, // Content Creator uses misc key
   misc:          { primary: "OPENAI_API_KEY_4" },
   background:    { primary: "OPENAI_API_KEY_4" }, // Legacy "background" maps to misc key
 };

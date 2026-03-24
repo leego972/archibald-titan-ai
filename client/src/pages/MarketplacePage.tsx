@@ -192,7 +192,7 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const { data: trending = [] } = trpc.marketplaceIntelligence.getTrending.useQuery({ limit: 6 });
-  const { data: recommendations = [] } = trpc.marketplaceIntelligence.getRecommendations.useQuery({ limit: 6 });
+  const { data: recommendations = [] } = trpc.marketplaceIntelligence.getPersonalizedRecommendations.useQuery({ limit: 6 });
 
   const wishlistMutation = trpc.marketplaceIntelligence.addToWishlist.useMutation({
     onSuccess: () => toast.success("Added to wishlist!"),
@@ -1076,7 +1076,7 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
   const canBuy = sub.canUse("marketplace_buy");
   const { data: purchases = [], isLoading } = trpc.marketplace.myPurchases.useQuery(undefined, { enabled: canBuy });
   const { data: wishlist = [] } = trpc.marketplaceIntelligence.getWishlist.useQuery(undefined, { enabled: canBuy });
-  const { data: myDisputes = [] } = trpc.marketplaceIntelligence.getMyDisputes.useQuery(undefined, { enabled: canBuy });
+  const { data: myDisputes = [] } = trpc.marketplaceIntelligence.getMyDisputes.useQuery({ role: "buyer" }, { enabled: canBuy });
   const [downloading, setDownloading] = useState<string | null>(null);
   const [inventoryTab, setInventoryTab] = useState("purchases");
   const [disputeListingId, setDisputeListingId] = useState<number | null>(null);
@@ -1280,7 +1280,7 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
             <Button className="bg-red-600 hover:bg-red-700"
-              onClick={() => { if (disputeListingId && disputeReason) openDisputeMutation.mutate({ listingId: disputeListingId, reason: disputeReason, description: disputeDesc }); }}
+              onClick={() => { if (disputeListingId && disputeReason) openDisputeMutation.mutate({ purchaseId: disputeListingId, reason: disputeReason as any, description: disputeDesc }); }}
               disabled={!disputeReason || openDisputeMutation.isPending}>
               {openDisputeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <AlertTriangle className="w-3.5 h-3.5 mr-1" />}
               Submit Dispute
@@ -1918,13 +1918,13 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
                     </Button>
                     <Button size="sm" variant="outline" className="text-purple-400 border-purple-600/50 text-xs"
                       title="Boost listing for 7 days (200 credits)"
-                      onClick={() => { if (confirm("Boost this listing for 7 days? Costs 200 credits.")) boostMutation.mutate({ id: listing.id }); }}
+                      onClick={() => { if (confirm("Boost this listing for 7 days? Costs 200 credits.")) boostMutation.mutate({ listingId: listing.id }); }}
                       disabled={boostMutation.isPending}>
                       <Zap className="w-3.5 h-3.5" />
                     </Button>
                     <Button size="sm" variant="outline" className="text-amber-400 border-amber-600/50 text-xs"
                       title="Feature listing for 30 days (500 credits)"
-                      onClick={() => { if (confirm("Feature this listing for 30 days? Costs 500 credits.")) featureMutation.mutate({ id: listing.id }); }}
+                      onClick={() => { if (confirm("Feature this listing for 30 days? Costs 500 credits.")) featureMutation.mutate({ listingId: listing.id }); }}
                       disabled={featureMutation.isPending}>
                       <Crown className="w-3.5 h-3.5" />
                     </Button>
@@ -2310,7 +2310,7 @@ function SellerDashboardView() {
                   <div>
                     <h2 className="text-lg font-bold flex items-center gap-2">
                       {(profile?.profile as any)?.displayName}
-                      {(profile?.profile as any)?.verified && <CheckCircle2 className="w-4 h-4 text-blue-400" title="Verified Seller" />}
+                      {(profile?.profile as any)?.verified && <span title="Verified Seller"><CheckCircle2 className="w-4 h-4 text-blue-400" /></span>}
                     </h2>
                     <p className="text-sm text-muted-foreground">{(profile?.profile as any)?.bio || "No bio set"}</p>
                     <p className="text-xs text-muted-foreground mt-1">Member since {profile?.profile?.createdAt ? new Date((profile.profile as any).createdAt).toLocaleDateString() : "N/A"}</p>

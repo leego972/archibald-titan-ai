@@ -2398,3 +2398,43 @@ export const creditEscalation = mysqlTable("credit_escalation", {
 
 export type CreditEscalation = typeof creditEscalation.$inferSelect;
 export type InsertCreditEscalation = typeof creditEscalation.$inferInsert;
+
+// ─── Marketplace Wishlists ────────────────────────────────────────────────────
+export const marketplaceWishlists = mysqlTable("marketplace_wishlists", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  listingId: int("listingId").notNull(),
+  priceAtAdd: int("priceAtAdd").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MarketplaceWishlist = typeof marketplaceWishlists.$inferSelect;
+export type InsertMarketplaceWishlist = typeof marketplaceWishlists.$inferInsert;
+
+// ─── Marketplace Disputes ─────────────────────────────────────────────────────
+export const marketplaceDisputes = mysqlTable("marketplace_disputes", {
+  id: int("id").autoincrement().primaryKey(),
+  purchaseId: int("purchaseId").notNull(),
+  buyerId: int("buyerId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  reason: varchar("reason", { length: 128 }).notNull(),
+  description: text("description").notNull(),
+  status: mysqlEnum("status", ["open", "under_review", "resolved_buyer", "resolved_seller", "closed"]).notNull().default("open"),
+  resolution: text("resolution"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MarketplaceDispute = typeof marketplaceDisputes.$inferSelect;
+export type InsertMarketplaceDispute = typeof marketplaceDisputes.$inferInsert;
+
+// ─── Marketplace Version History ──────────────────────────────────────────────
+export const marketplaceVersionHistory = mysqlTable("marketplace_version_history", {
+  id: int("id").autoincrement().primaryKey(),
+  listingId: int("listingId").notNull(),
+  version: varchar("version", { length: 32 }).notNull(),
+  changelog: text("changelog").notNull(),
+  fileUrl: text("fileUrl"),
+  fileSize: int("fileSize"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferSelect;
+export type InsertMarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferInsert;

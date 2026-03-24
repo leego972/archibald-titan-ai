@@ -336,9 +336,9 @@ function EvergreenPanel() {
           <CardHeader className="pb-2"><CardTitle className="text-blue-300 text-sm flex items-center gap-2"><Star className="w-4 h-4" /> Top Refresh Opportunity</CardTitle></CardHeader>
           <CardContent>
             <p className="text-white font-medium">{top.data.title}</p>
-            <p className="text-gray-400 text-xs mt-1">{top.data.refreshReason}</p>
+            <p className="text-gray-400 text-xs mt-1">{(top.data as any).refreshReason}</p>
             <div className="flex gap-2 mt-2">
-              <Badge className="bg-blue-900 text-blue-300">Score: {top.data.refreshScore}</Badge>
+              <Badge className="bg-blue-900 text-blue-300">Score: {(top.data as any).refreshScore}</Badge>
               <Badge className="bg-[#21262d] text-gray-300">{top.data.priority} priority</Badge>
             </div>
           </CardContent>
@@ -422,7 +422,7 @@ function RepurposePanel() {
   const [targets, setTargets] = React.useState<string[]>(["linkedin","x_twitter","tiktok"]);
   const [result, setResult] = React.useState<any>(null);
   const repurpose = trpc.contentIntelligence.repurposeContent.useMutation({
-    onSuccess: (data) => { setResult(data); toast.success(`Repurposed into ${data.variants?.length} platform variants`); },
+    onSuccess: (data) => { setResult(data); toast.success(`Repurposed into ${(data as any).variants?.length} platform variants`); },
     onError: (e) => toast.error(e.message),
   });
   const allPlatforms = ["linkedin","x_twitter","blog","reddit","tiktok","email","instagram","discord","hackernews","youtube_shorts"];
@@ -1637,7 +1637,6 @@ export default function ContentCreatorPage() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
 
       {/* ═══ NEW CAMPAIGN DIALOG ═══ */}
       <Dialog open={showNewCampaign} onOpenChange={setShowNewCampaign}>
@@ -1886,37 +1885,6 @@ export default function ContentCreatorPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ SCHEDULE DIALOG ═══ */}
-      <Dialog open={!!schedulingPiece} onOpenChange={() => setSchedulingPiece(null)}>
-        <DialogContent className="bg-[#0d1117] border-[#21262d] text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-400" /> Schedule Content
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <p className="text-sm text-gray-400">
-              Scheduling: <span className="text-white">{schedulingPiece?.title || schedulingPiece?.headline || `Piece #${schedulingPiece?.id}`}</span>
-            </p>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
-                className="bg-[#161b22] border-[#21262d] text-white" />
-            </div>
-            <div className="space-y-2">
-              <Label>Time</Label>
-              <Input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
-                className="bg-[#161b22] border-[#21262d] text-white" />
-            </div>
-            <Button onClick={handleSchedule} disabled={schedulePiece.isPending}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0 gap-2">
-              {schedulePiece.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-              Schedule
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
         {/* ═══ PIPELINE TAB ═══ */}
         <TabsContent value="pipeline" className="mt-4 space-y-4">
           <Card className="bg-[#161b22] border-[#21262d]">
@@ -1983,6 +1951,37 @@ export default function ContentCreatorPage() {
         </TabsContent>
 
       </Tabs>
+
+      {/* ═══ SCHEDULE DIALOG ═══ */}
+      <Dialog open={!!schedulingPiece} onOpenChange={() => setSchedulingPiece(null)}>
+        <DialogContent className="bg-[#0d1117] border-[#21262d] text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-purple-400" /> Schedule Content
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-gray-400">
+              Scheduling: <span className="text-white">{schedulingPiece?.title || schedulingPiece?.headline || `Piece #${schedulingPiece?.id}`}</span>
+            </p>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
+                className="bg-[#161b22] border-[#21262d] text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Time</Label>
+              <Input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
+                className="bg-[#161b22] border-[#21262d] text-white" />
+            </div>
+            <Button onClick={handleSchedule} disabled={schedulePiece.isPending}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0 gap-2">
+              {schedulePiece.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+              Schedule
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ═══ PIECE EDITOR DIALOG ═══ */}
       <Dialog open={showPieceEditor} onOpenChange={setShowPieceEditor}>
