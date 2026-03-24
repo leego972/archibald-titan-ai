@@ -64,6 +64,8 @@ export default function SeoDashboard() {
   const [progSearch, setProgSearch] = useState("");
   const [indexNowUrls, setIndexNowUrls] = useState("");
   const [showLlmsFull, setShowLlmsFull] = useState(false);
+  const [schemaUrl, setSchemaUrl] = useState("/");
+  const [schemaResult, setSchemaResult] = useState<any>(null);
 
   const status = trpc.seo.getStatus.useQuery(undefined, { refetchInterval: 120_000 });
   const health = trpc.seo.getHealthScore.useQuery();
@@ -101,6 +103,34 @@ export default function SeoDashboard() {
   const analyzeFreshness = trpc.seo.analyzeContentFreshness.useMutation({
     onSuccess: (scores: any[]) => { toast.success(`Freshness analysis complete — ${scores.length} pages scored`); },
     onError: (err) => toast.error(err.message),
+  });
+
+  // ── Intelligence queries ──────────────────────────────────────────────────
+  const intelligenceReport = trpc.seoIntelligence.getIntelligenceReport.useQuery(undefined, { refetchInterval: 300_000 });
+  const rankings = trpc.seoIntelligence.getRankings.useQuery(undefined, { refetchInterval: 120_000 });
+  const strikingDistance = trpc.seoIntelligence.getStrikingDistance.useQuery();
+  const risingKeywords = trpc.seoIntelligence.getRisingKeywords.useQuery();
+  const fallingKeywords = trpc.seoIntelligence.getFallingKeywords.useQuery();
+  const contentDecay = trpc.seoIntelligence.getContentDecay.useQuery();
+  const backlinkGaps = trpc.seoIntelligence.getBacklinkGaps.useQuery();
+  const aiPresenceSummary = trpc.seoIntelligence.getAiPresenceSummary.useQuery();
+  const aiPresenceLog = trpc.seoIntelligence.getAiPresenceLog.useQuery({ limit: 30 });
+  const internalLinkSuggestions = trpc.seoIntelligence.getInternalLinkSuggestions.useQuery();
+  const orphanPages = trpc.seoIntelligence.getOrphanPages.useQuery();
+  const coreWebVitals = trpc.seoIntelligence.getCoreWebVitals.useQuery();
+  const serpFeatures = trpc.seoIntelligence.getSerpFeatures.useQuery();
+  const cannibalization = trpc.seoIntelligence.getCannibalization.useQuery();
+  const schemaAudit = trpc.seoIntelligence.auditAllSchemas.useQuery();
+  const validateSchemaQ = trpc.seoIntelligence.validateSchema.useQuery({ url: schemaUrl }, { enabled: false });
+
+  // ── Intelligence mutations ─────────────────────────────────────────────────
+  const checkAiPresence = trpc.seoIntelligence.checkAiPresence.useMutation({
+    onSuccess: () => { toast.success("AI presence check complete"); aiPresenceSummary.refetch(); aiPresenceLog.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateRankPositions = trpc.seoIntelligence.updateRankPositions.useMutation({
+    onSuccess: () => { toast.success("Rankings refreshed"); rankings.refetch(); },
+    onError: (e) => toast.error(e.message),
   });
 
   const submitIndexNow = trpc.seo.submitIndexNow.useMutation({
@@ -160,6 +190,15 @@ export default function SeoDashboard() {
           <TabsTrigger value="keywords" className="text-xs">Keywords</TabsTrigger>
           <TabsTrigger value="technical" className="text-xs">Technical</TabsTrigger>
           <TabsTrigger value="log" className="text-xs">Event Log</TabsTrigger>
+          <TabsTrigger value="rankings" className="text-xs">Rankings</TabsTrigger>
+          <TabsTrigger value="decay" className="text-xs">Content Decay</TabsTrigger>
+          <TabsTrigger value="backlinks" className="text-xs">Backlinks</TabsTrigger>
+          <TabsTrigger value="ai-search" className="text-xs">AI Search</TabsTrigger>
+          <TabsTrigger value="schema-audit" className="text-xs">Schema Audit</TabsTrigger>
+          <TabsTrigger value="link-intel" className="text-xs">Link Intel</TabsTrigger>
+          <TabsTrigger value="cwv" className="text-xs">Core Web Vitals</TabsTrigger>
+          <TabsTrigger value="serp" className="text-xs">SERP Features</TabsTrigger>
+          <TabsTrigger value="cannibal" className="text-xs">Cannibalization</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
@@ -633,6 +672,393 @@ export default function SeoDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── RANKINGS ─────────────────────────────────────────────────── */}
+        <TabsContent value="rankings" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">Keyword Rank Tracker</h3>
+            <Button size="sm" variant="outline" onClick={() => updateRankPositions.mutate({})} disabled={updateRankPositions.isPending}>
+              {updateRankPositions.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Updating...</> : <><RefreshCw className="w-3 h-3 mr-1" />Refresh</>}
+            </Button>
+          </div>
+          {strikingDistance.data && strikingDistance.data.length > 0 && (
+            <Card className="border-cyan-600/30 bg-cyan-950/20">
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-cyan-400 flex items-center gap-1"><Zap className="w-3.5 h-3.5" />Striking Distance — Positions 4-20 (Highest ROI)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {strikingDistance.data.map((kw: any) => (
+                    <div key={kw.keyword} className="bg-card rounded p-3 border border-border">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">{kw.keyword}</span>
+                        <Badge variant="outline" className="border-cyan-600/40 text-cyan-400">#{kw.currentPosition}</Badge>
+                      </div>
+                      <div className="flex gap-3 text-xs text-muted-foreground">
+                        <span>Vol: {kw.searchVolume?.toLocaleString()}</span>
+                        <span>Diff: {kw.difficulty}</span>
+                        <span className={kw.trend === "rising" ? "text-emerald-400" : kw.trend === "falling" ? "text-red-400" : "text-muted-foreground"}>
+                          {kw.trend === "rising" ? "↑" : kw.trend === "falling" ? "↓" : "→"} {kw.trend}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-emerald-400">↑ Rising Keywords</CardTitle></CardHeader>
+              <CardContent className="space-y-1">
+                {(risingKeywords.data ?? []).slice(0, 8).map((kw: any) => (
+                  <div key={kw.keyword} className="flex items-center justify-between text-xs p-1.5 rounded bg-muted/20">
+                    <span>{kw.keyword}</span>
+                    <span className="text-emerald-400 font-bold">#{kw.currentPosition} (+{kw.positionDelta})</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-red-400">↓ Falling Keywords</CardTitle></CardHeader>
+              <CardContent className="space-y-1">
+                {(fallingKeywords.data ?? []).slice(0, 8).map((kw: any) => (
+                  <div key={kw.keyword} className="flex items-center justify-between text-xs p-1.5 rounded bg-muted/20">
+                    <span>{kw.keyword}</span>
+                    <span className="text-red-400 font-bold">#{kw.currentPosition} ({kw.positionDelta})</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">All Tracked Keywords</CardTitle></CardHeader>
+            <CardContent>
+              <ScrollArea className="h-80">
+                <div className="space-y-1.5">
+                  {(rankings.data ?? []).map((kw: any) => (
+                    <div key={kw.keyword} className="flex items-center justify-between text-xs p-2 rounded bg-muted/20 border border-border">
+                      <span className="flex-1 font-medium">{kw.keyword}</span>
+                      <span className="text-muted-foreground mx-3 truncate">{kw.url}</span>
+                      <span className={`font-bold ${kw.currentPosition <= 10 ? "text-emerald-400" : kw.currentPosition <= 20 ? "text-cyan-400" : "text-muted-foreground"}`}>#{kw.currentPosition}</span>
+                      {kw.positionDelta !== 0 && (
+                        <span className={`ml-1 ${kw.positionDelta > 0 ? "text-emerald-400" : "text-red-400"}`}>({kw.positionDelta > 0 ? "+" : ""}{kw.positionDelta})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── CONTENT DECAY ───────────────────────────────────────────────── */}
+        <TabsContent value="decay" className="mt-4 space-y-3">
+          {(contentDecay.data ?? []).map((page: any) => (
+            <Card key={page.url} className={`border-border bg-card ${page.priority === "critical" ? "border-red-600/40" : page.priority === "high" ? "border-orange-600/40" : ""}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className={page.priority === "critical" ? "border-red-600/40 text-red-400" : page.priority === "high" ? "border-orange-600/40 text-orange-400" : "border-yellow-600/40 text-yellow-400"}>{page.priority}</Badge>
+                      <span className="text-xs text-muted-foreground">{page.recommendedAction}</span>
+                    </div>
+                    <p className="text-sm font-medium">{page.title}</p>
+                    <p className="text-xs text-muted-foreground">{page.url}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-lg font-bold text-red-400">{page.decayScore}/100</div>
+                    <div className="text-xs text-muted-foreground">{page.daysSinceUpdate}d old</div>
+                  </div>
+                </div>
+                <Progress value={page.decayScore} className="h-1.5 mb-2" />
+                {page.refreshBrief && (
+                  <div className="bg-muted/20 rounded p-2 text-xs">
+                    <span className="text-cyan-400 font-semibold">Refresh Brief: </span>
+                    <span className="text-muted-foreground">{page.refreshBrief}</span>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {page.topKeywords?.map((kw: string) => (
+                    <span key={kw} className="text-xs px-2 py-0.5 rounded-full bg-muted/30 border border-border text-muted-foreground">{kw}</span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        {/* ── BACKLINKS ───────────────────────────────────────────────────── */}
+        <TabsContent value="backlinks" className="mt-4 space-y-3">
+          {(backlinkGaps.data ?? []).map((bl: any) => (
+            <Card key={bl.domain} className="border-border bg-card">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-sm font-bold">{bl.domain}</span>
+                  <Badge variant="outline" className="border-blue-600/40 text-blue-400">DA {bl.domainAuthority}</Badge>
+                  <Badge variant="outline" className="border-purple-600/40 text-purple-400">{bl.relevanceScore}% relevant</Badge>
+                </div>
+                {bl.linkedToCompetitors?.length > 0 && (
+                  <p className="text-xs text-muted-foreground mb-2">Links to: {bl.linkedToCompetitors.join(", ")}</p>
+                )}
+                <div className="bg-muted/20 rounded p-3 space-y-1.5 text-xs">
+                  <div><span className="text-cyan-400 font-semibold">Outreach Angle: </span><span className="text-muted-foreground">{bl.outreachAngle}</span></div>
+                  <div><span className="text-yellow-400 font-semibold">Contact: </span><span className="text-muted-foreground">{bl.contactHint}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        {/* ── AI SEARCH ───────────────────────────────────────────────────── */}
+        <TabsContent value="ai-search" className="mt-4 space-y-4">
+          {aiPresenceSummary.data && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Mention Rate", value: `${aiPresenceSummary.data.mentionRate}%`, color: "text-cyan-400" },
+                { label: "Avg Position", value: aiPresenceSummary.data.avgPosition > 0 ? `#${aiPresenceSummary.data.avgPosition}` : "—", color: "text-purple-400" },
+                { label: "Total Checks", value: aiPresenceSummary.data.totalChecks, color: "text-muted-foreground" },
+                { label: "Top Query", value: aiPresenceSummary.data.topQuery || "—", color: "text-amber-400" },
+              ].map(m => (
+                <Card key={m.label} className="border-border bg-card">
+                  <CardContent className="pt-4 pb-3">
+                    <div className={`text-xl font-bold ${m.color} truncate`}>{m.value}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{m.label}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          {aiPresenceSummary.data?.platformBreakdown && (
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Platform Breakdown</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3">
+                  {Object.entries(aiPresenceSummary.data.platformBreakdown).map(([platform, stats]: [string, any]) => (
+                    <div key={platform} className="bg-muted/20 rounded p-3">
+                      <div className="text-sm font-medium capitalize">{platform}</div>
+                      <div className="text-lg font-bold text-cyan-400 mt-1">{Math.round((stats.mentions / Math.max(stats.checks, 1)) * 100)}%</div>
+                      <div className="text-xs text-muted-foreground">{stats.mentions}/{stats.checks}</div>
+                      <Progress value={(stats.mentions / Math.max(stats.checks, 1)) * 100} className="h-1 mt-2" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <Button onClick={() => checkAiPresence.mutate()} disabled={checkAiPresence.isPending} className="bg-purple-700 hover:bg-purple-600 text-white w-full">
+            {checkAiPresence.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Checking...</> : <><Bot className="w-4 h-4 mr-2" />Run AI Presence Check</>}
+          </Button>
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Recent Checks</CardTitle></CardHeader>
+            <CardContent>
+              <ScrollArea className="h-80">
+                <div className="space-y-2">
+                  {(aiPresenceLog.data ?? []).map((entry: any, i: number) => (
+                    <div key={i} className={`rounded p-3 border text-xs ${entry.titanMentioned ? "border-emerald-600/30 bg-emerald-950/10" : "border-border bg-muted/20"}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium capitalize">{entry.platform}</span>
+                        {entry.titanMentioned ? (
+                          <span className="text-emerald-400 font-bold">✓ Mentioned{entry.titanPosition ? ` (#${entry.titanPosition})` : ""}</span>
+                        ) : (
+                          <span className="text-red-400">✗ Not mentioned</span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground italic">"{entry.query}"</p>
+                      {!entry.titanMentioned && entry.recommendedAction && (
+                        <p className="text-cyan-400 mt-1">→ {entry.recommendedAction}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── SCHEMA AUDIT ────────────────────────────────────────────────── */}
+        <TabsContent value="schema-audit" className="mt-4 space-y-4">
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Validate Schema for a Page</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-3">
+                <Input value={schemaUrl} onChange={e => setSchemaUrl(e.target.value)} placeholder="/features" className="flex-1" />
+                <Button onClick={() => validateSchemaQ.refetch().then(r => setSchemaResult(r.data))} className="bg-cyan-700 hover:bg-cyan-600 text-white shrink-0">Validate</Button>
+              </div>
+              {schemaResult && (
+                <div className="bg-muted/20 rounded p-4 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <ScoreBadge score={schemaResult.score} />
+                    <span className="text-sm">{schemaResult.url} — {schemaResult.pageType}</span>
+                  </div>
+                  {schemaResult.missingSchema?.length > 0 && (
+                    <div className="text-xs"><span className="text-red-400 font-semibold">Missing: </span><span className="text-muted-foreground">{schemaResult.missingSchema.join(", ")}</span></div>
+                  )}
+                  {schemaResult.generatedSchema && (
+                    <div>
+                      <span className="text-xs text-emerald-400 font-semibold">Generated Schema:</span>
+                      <ScrollArea className="h-40 mt-1"><pre className="text-xs font-mono text-muted-foreground">{JSON.stringify(schemaResult.generatedSchema, null, 2)}</pre></ScrollArea>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">All Pages Schema Audit</CardTitle></CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
+                <div className="space-y-2">
+                  {(schemaAudit.data ?? []).map((s: any) => (
+                    <div key={s.url} className="p-3 rounded bg-muted/20 border border-border text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">{s.url}</span>
+                        <ScoreBadge score={s.score} />
+                      </div>
+                      <div className="text-muted-foreground">Has: {s.existingSchema?.join(", ") || "none"}</div>
+                      {s.missingSchema?.length > 0 && <div className="text-red-400 mt-0.5">Missing: {s.missingSchema.join(", ")}</div>}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── LINK INTEL ──────────────────────────────────────────────────── */}
+        <TabsContent value="link-intel" className="mt-4 space-y-4">
+          {orphanPages.data && orphanPages.data.length > 0 && (
+            <Card className="border-red-600/30 bg-red-950/10">
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-red-400">⚠ Orphan Pages (fewer than 2 inbound links)</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {orphanPages.data.map((p: any) => (
+                  <div key={p.url} className="flex items-center justify-between text-xs p-2 rounded bg-muted/20 border border-border">
+                    <span className="font-medium">{p.title}</span>
+                    <span className="text-red-400">{p.inboundLinks} links</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Internal Link Suggestions</CardTitle></CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
+                <div className="space-y-2">
+                  {(internalLinkSuggestions.data ?? []).map((link: any, i: number) => (
+                    <div key={i} className="p-3 rounded bg-muted/20 border border-border text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-muted-foreground">{link.sourceTitle} → {link.targetTitle}</span>
+                        <span className="text-cyan-400">{link.relevanceScore}%</span>
+                      </div>
+                      <div>Anchor: <span className="text-cyan-300 font-medium">"{link.anchorText}"</span></div>
+                      <div className="text-muted-foreground mt-0.5">{link.sourceUrl} → {link.targetUrl}</div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── CORE WEB VITALS ─────────────────────────────────────────────── */}
+        <TabsContent value="cwv" className="mt-4 space-y-4">
+          {(coreWebVitals.data ?? []).map((page: any) => (
+            <Card key={page.url} className="border-border bg-card">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">{page.url}</CardTitle>
+                  <ScoreBadge score={page.overallScore} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  {[
+                    { label: "LCP", value: `${page.lcp?.value}ms`, rating: page.lcp?.rating, fix: page.lcp?.fix },
+                    { label: "CLS", value: page.cls?.value?.toFixed(3), rating: page.cls?.rating, fix: page.cls?.fix },
+                    { label: "FID", value: `${page.fid?.value}ms`, rating: page.fid?.rating, fix: page.fid?.fix },
+                    { label: "INP", value: `${page.inp?.value}ms`, rating: page.inp?.rating, fix: page.inp?.fix },
+                  ].map(metric => (
+                    <div key={metric.label} className="bg-muted/20 rounded p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-muted-foreground">{metric.label}</span>
+                        <Badge variant="outline" className={`text-xs ${metric.rating === "good" ? "border-emerald-600/40 text-emerald-400" : metric.rating === "needs-improvement" ? "border-yellow-600/40 text-yellow-400" : "border-red-600/40 text-red-400"}`}>{metric.rating}</Badge>
+                      </div>
+                      <div className="text-lg font-bold">{metric.value}</div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{metric.fix}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-cyan-950/20 rounded p-2 border border-cyan-600/20 text-xs">
+                  <span className="text-cyan-400 font-semibold">Top Fix: </span>
+                  <span className="text-muted-foreground">{page.topFix}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        {/* ── SERP FEATURES ───────────────────────────────────────────────── */}
+        <TabsContent value="serp" className="mt-4 space-y-3">
+          {(serpFeatures.data ?? []).map((feature: any, i: number) => (
+            <Card key={i} className="border-border bg-card">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs capitalize">{feature.feature?.replace(/_/g, " ")}</Badge>
+                      {feature.titanOwns ? (
+                        <span className="text-xs text-emerald-400 font-bold">✓ Titan Owns</span>
+                      ) : feature.competitorOwns ? (
+                        <span className="text-xs text-red-400">✗ {feature.competitorOwns} owns</span>
+                      ) : (
+                        <span className="text-xs text-yellow-400">Unclaimed</span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium">"{feature.keyword}"</p>
+                  </div>
+                </div>
+                <div className="bg-muted/20 rounded p-3 space-y-1.5 text-xs">
+                  <div><span className="text-cyan-400 font-semibold">Capture Strategy: </span><span className="text-muted-foreground">{feature.captureStrategy}</span></div>
+                  <div><span className="text-purple-400 font-semibold">Content Template: </span><span className="text-muted-foreground">{feature.contentTemplate}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        {/* ── CANNIBALIZATION ─────────────────────────────────────────────── */}
+        <TabsContent value="cannibal" className="mt-4 space-y-4">
+          {!cannibalization.data || cannibalization.data.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-emerald-400" />
+              <p className="text-sm">No keyword cannibalization detected</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cannibalization.data.map((issue: any) => (
+                <Card key={issue.keyword} className="border-orange-600/30 bg-orange-950/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm font-bold text-orange-400">Cannibalization: "{issue.keyword}"</span>
+                    </div>
+                    <div className="space-y-1.5 mb-3">
+                      {issue.competingUrls?.map((url: any) => (
+                        <div key={url.url} className="flex items-center justify-between text-xs p-2 rounded bg-muted/20 border border-border">
+                          <span className="font-medium">{url.title}</span>
+                          <span className="text-muted-foreground">{url.url} — #{url.position}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-muted/20 rounded p-3 space-y-1 text-xs">
+                      <div><span className="text-emerald-400 font-semibold">Canonical: </span><span className="text-muted-foreground">{issue.recommendedCanonical}</span></div>
+                      <div><span className="text-cyan-400 font-semibold">Strategy: </span><span className="text-muted-foreground">{issue.consolidationStrategy}</span></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
       </Tabs>

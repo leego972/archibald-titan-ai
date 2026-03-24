@@ -64,6 +64,28 @@ import {
   runGeoOptimization,
 } from "./seo-engine-v4";
 
+import {
+  getRankings,
+  getRisingKeywords,
+  getFallingKeywords,
+  getStrikingDistanceKeywords,
+  updateRankPositions,
+  analyzeContentDecay,
+  getBacklinkGaps,
+  getTopBacklinkOpportunities,
+  validateAndGenerateSchema,
+  auditAllPageSchemas,
+  checkAiSearchPresence,
+  getAiPresenceSummary,
+  getAiPresenceLog,
+  generateInternalLinkSuggestions,
+  getOrphanPages,
+  getCoreWebVitalsDiagnosis,
+  analyzeSerpFeatures,
+  detectKeywordCannibalization,
+  generateSeoIntelligenceReport,
+} from "./seo-intelligence";
+
 export const seoRouter = router({
 
   // ─── CORE (v3) ─────────────────────────────────────────────────────────────
@@ -319,5 +341,122 @@ export const seoRouter = router({
         "GEO optimization cycle",
       ],
     };
+  }),
+});
+
+// NOTE: The closing }); above closes the seoRouter. The intelligence procedures below
+// are appended via a router merge — see routers.ts for the merge.
+// Actually, we extend the router inline by reopening the object. Since tRPC routers
+// are immutable after creation, we export a separate intelligenceRouter and merge it.
+
+import { router as trpcRouter } from "./_core/trpc";
+
+export const seoIntelligenceRouter = trpcRouter({
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SEO INTELLIGENCE — Rank Tracking, Decay, Backlinks, Schema, AI Search
+  // ════════════════════════════════════════════════════════════════════════
+
+  /** Full SEO intelligence report — all systems in one call */
+  getIntelligenceReport: adminProcedure.query(async () => {
+    return generateSeoIntelligenceReport();
+  }),
+
+  /** Keyword rank tracking — all tracked keywords with position history */
+  getRankings: adminProcedure.query(() => {
+    return getRankings();
+  }),
+
+  /** Keywords in positions 4-20 (striking distance — highest ROI) */
+  getStrikingDistance: adminProcedure.query(() => {
+    return getStrikingDistanceKeywords();
+  }),
+
+  /** Keywords trending upward */
+  getRisingKeywords: adminProcedure.query(() => {
+    return getRisingKeywords();
+  }),
+
+  /** Keywords trending downward — need intervention */
+  getFallingKeywords: adminProcedure.query(() => {
+    return getFallingKeywords();
+  }),
+
+  /** Simulate a rank position update */
+  updateRankPositions: adminProcedure
+    .input(z.object({ contentPublishedToday: z.number().min(0).max(20).default(0) }).optional())
+    .mutation(({ input }) => {
+      return updateRankPositions(input?.contentPublishedToday ?? 0);
+    }),
+
+  /** Content decay analysis — pages losing relevance with refresh briefs */
+  getContentDecay: adminProcedure.query(async () => {
+    return analyzeContentDecay();
+  }),
+
+  /** Backlink gap analysis — domains linking to competitors but not Titan */
+  getBacklinkGaps: adminProcedure.query(() => {
+    return getBacklinkGaps();
+  }),
+
+  /** Top backlink opportunities by domain authority */
+  getTopBacklinkOpportunities: adminProcedure
+    .input(z.object({ limit: z.number().min(1).max(20).default(5) }).optional())
+    .query(({ input }) => {
+      return getTopBacklinkOpportunities(input?.limit ?? 5);
+    }),
+
+  /** Schema validation and auto-generation for a specific page */
+  validateSchema: adminProcedure
+    .input(z.object({ url: z.string() }))
+    .query(async ({ input }) => {
+      return validateAndGenerateSchema(input.url);
+    }),
+
+  /** Full schema audit across all pages */
+  auditAllSchemas: adminProcedure.query(async () => {
+    return auditAllPageSchemas();
+  }),
+
+  /** Check Titan's presence in AI search responses */
+  checkAiPresence: adminProcedure.mutation(async () => {
+    return checkAiSearchPresence();
+  }),
+
+  /** Get AI search presence summary */
+  getAiPresenceSummary: adminProcedure.query(() => {
+    return getAiPresenceSummary();
+  }),
+
+  /** Get AI presence check log */
+  getAiPresenceLog: adminProcedure
+    .input(z.object({ limit: z.number().min(1).max(200).default(50) }).optional())
+    .query(({ input }) => {
+      return getAiPresenceLog(input?.limit ?? 50);
+    }),
+
+  /** Internal link suggestions */
+  getInternalLinkSuggestions: adminProcedure.query(async () => {
+    return generateInternalLinkSuggestions();
+  }),
+
+  /** Orphan pages — fewer than 2 inbound internal links */
+  getOrphanPages: adminProcedure.query(async () => {
+    return getOrphanPages();
+  }),
+
+  /** Core Web Vitals diagnosis with fix recommendations per page */
+  getCoreWebVitals: adminProcedure.query(() => {
+    return getCoreWebVitalsDiagnosis();
+  }),
+
+  /** SERP feature analysis — featured snippets and PAA boxes to capture */
+  getSerpFeatures: adminProcedure.query(async () => {
+    return analyzeSerpFeatures();
+  }),
+
+  /** Keyword cannibalization detection */
+  getCannibalization: adminProcedure.query(() => {
+    return detectKeywordCannibalization();
   }),
 });
