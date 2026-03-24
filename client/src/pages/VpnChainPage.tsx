@@ -175,7 +175,7 @@ export default function VpnChainPage() {
 
   const deployedHops = hops.filter((h: any) => h.installed || h.status === "ready");
   const canBuild = deployedHops.length > 0;
-  const chainBuilt = status?.chainBuilt ?? false;
+  const chainBuilt = status?.chainActive ?? false;
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -223,11 +223,11 @@ export default function VpnChainPage() {
       {status && (
         <div className="grid grid-cols-3 gap-3">
           <div className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-center">
-            <p className="text-2xl font-bold text-blue-400">{status.totalHops ?? hops.length}</p>
+            <p className="text-2xl font-bold text-blue-400">{status.hopCount ?? hops.length}</p>
             <p className="text-xs text-zinc-500 mt-1">Total Hops</p>
           </div>
           <div className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-center">
-            <p className="text-2xl font-bold text-green-400">{status.deployedHops ?? deployedHops.length}</p>
+            <p className="text-2xl font-bold text-green-400">{status.readyCount ?? deployedHops.length}</p>
             <p className="text-xs text-zinc-500 mt-1">Deployed</p>
           </div>
           <div className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-center">

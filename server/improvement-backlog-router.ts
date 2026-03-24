@@ -522,7 +522,7 @@ ${task.description}`,
         canAutoApply: boolean;
       };
       try {
-        analysis = typeof content === "string" ? JSON.parse(content) : content as typeof analysis;
+        analysis = typeof content === "string" ? JSON.parse(content) : content as unknown as typeof analysis;
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid analysis" });
       }
@@ -547,7 +547,7 @@ ${task.description}`,
       id: z.number().int(),
       dryRun: z.boolean().optional().default(false),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
@@ -661,7 +661,7 @@ Generate the code changes needed to implement this task. Read any relevant exist
           notes: string;
         };
         try {
-          implementation = typeof planContent === "string" ? JSON.parse(planContent) : planContent as typeof implementation;
+          implementation = typeof planContent === "string" ? JSON.parse(planContent) : planContent as unknown as typeof implementation;
         } catch {
           await db.update(improvementTasks).set({ status: "failed", completionNotes: "AI returned invalid JSON" }).where(eq(improvementTasks.id, task.id));
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid implementation plan" });
@@ -697,17 +697,16 @@ Generate the code changes needed to implement this task. Read any relevant exist
 
         // ── Step 4: Create snapshot ──
         const snapshot = await createSnapshot(
+          implementation.modifications.map(m => m.filePath),
           `Pre-task-${task.id}: ${task.title}`,
-          null,
-          implementation.modifications.map(m => m.filePath)
+          `self_improvement_task_${task.id}`
         );
 
         // ── Step 5: Apply changes ──
         const applyResult = await applyModifications(
           implementation.modifications,
           null,
-          `Self-improvement task #${task.id}: ${task.title}`,
-          snapshot.snapshotId ?? undefined
+          `self_improvement_task_${task.id}`
         );
 
         if (!applyResult.success) {
@@ -723,7 +722,8 @@ Generate the code changes needed to implement this task. Read any relevant exist
           // Rollback is handled by applyModifications internally if health check fails
           await db.update(improvementTasks).set({
             status: "failed",
-            completionNotes: `Health check failed after apply: ${health.checks.map(c => c.healthy ? "" : c.name).filter(Boolean).join(", ")}`,
+            completionNotes: `Health check failed after apply: ${health.checks.map(c => c.passed ? "" : c.name).filter(Boolean).join(", ")}`,
+
           }).where(eq(improvementTasks.id, task.id));
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Health check failed after applying changes — rolled back" });
         }
@@ -734,11 +734,11 @@ Generate the code changes needed to implement this task. Read any relevant exist
         if (isGitHubIntegrationAvailable()) {
           try {
             const pushResult = await pushToGitHub(
-              implementation.commitMessage || `feat: ${task.title}`,
-              null
+              implementation.modifications.map(m => m.filePath),
+              implementation.commitMessage || `feat: ${task.title}`
             );
             pushed = pushResult.success;
-            pushMessage = pushResult.message ?? (pushed ? "Pushed to GitHub" : "Push failed");
+            pushMessage = pushResult.error ?? (pushed ? "Pushed to GitHub" : "Push failed");
           } catch (err) {
             pushMessage = `Push error: ${err instanceof Error ? err.message : String(err)}`;
             log.warn(`[executeTask] GitHub push failed (non-fatal): ${pushMessage}`);
