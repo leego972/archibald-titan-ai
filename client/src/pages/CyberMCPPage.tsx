@@ -5,6 +5,8 @@
  * Provides 14 security tools across 4 categories:
  * Authentication, Injection, Data Protection, Infrastructure
  *
+ * Full Scan tab uses SSE streaming for real-time per-check progress.
+ *
  * Reference: https://github.com/ricauts/CyberMCP
  */
 import { useState } from "react";
@@ -19,16 +21,17 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Shield, ShieldAlert, ShieldCheck, ShieldX,
-  Lock, Unlock, Key, Search, Zap, Globe,
+  Shield, Lock, Zap,
   AlertTriangle, CheckCircle, XCircle, Info,
   Play, RefreshCw, Copy, ChevronDown, ChevronUp,
-  Database, Code, Activity, Eye, FileText,
+  Code, Activity, Eye, Loader2, StopCircle,
 } from "lucide-react";
+import { useCyberMcpScan, type CheckProgress } from "@/hooks/useCyberMcpScan";
 
 // ─── Risk Badge ───────────────────────────────────────────────────
 function RiskBadge({ risk }: { risk: string }) {
@@ -73,80 +76,215 @@ function ResultPanel({ title, data, risk }: { title: string; data: any; risk?: s
   );
 }
 
+// ─── Check Row (live progress indicator) ─────────────────────────
+function CheckRow({ check }: { check: CheckProgress }) {
+  const statusIcon = () => {
+    if (check.status === "pending")  return <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />;
+    if (check.status === "running")  return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
+    if (check.status === "done")     return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (check.status === "error")    return <XCircle className="h-4 w-4 text-red-500" />;
+    return null;
+  };
+
+  const riskFromResult = check.result?.risk;
+
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-300 ${
+      check.status === "running" ? "border-primary/40 bg-primary/5" :
+      check.status === "done"    ? "border-green-500/20 bg-green-500/5" :
+      check.status === "error"   ? "border-red-500/20 bg-red-500/5" :
+      "border-border/40 bg-muted/20"
+    }`}>
+      <div className="flex items-center gap-3">
+        {statusIcon()}
+        <div>
+          <p className="text-xs font-medium">{check.label}</p>
+          {check.status === "running" && (
+            <p className="text-[11px] text-muted-foreground animate-pulse">Scanning...</p>
+          )}
+          {check.status === "done" && check.result && (
+            <p className="text-[11px] text-muted-foreground">
+              {check.result.score !== undefined && `Score: ${check.result.score}%`}
+              {check.result.vulnerable !== undefined && (check.result.vulnerable ? " · Vulnerable" : " · Clean")}
+              {check.result.findingCount !== undefined && ` · ${check.result.findingCount} findings`}
+              {check.result.criticalMissing !== undefined && ` · ${check.result.criticalMissing} critical missing`}
+            </p>
+          )}
+          {check.status === "error" && check.result?.error && (
+            <p className="text-[11px] text-red-400 truncate max-w-[200px]">{check.result.error}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {riskFromResult && check.status !== "pending" && <RiskBadge risk={riskFromResult} />}
+      </div>
+    </div>
+  );
+}
+
 // ─── Full Scan Tab ────────────────────────────────────────────────
 function FullScanTab() {
   const [endpoint, setEndpoint] = useState("");
   const [method, setMethod] = useState<"GET" | "POST">("GET");
   const [authToken, setAuthToken] = useState("");
   const [paramName, setParamName] = useState("id");
-  const [result, setResult] = useState<any>(null);
 
-  const scan = trpc.cyberMcp.runFullScan.useMutation({
-    onSuccess: (data) => { setResult(data); toast.success(`Full scan complete — risk: ${data.overallRisk.toUpperCase()}`); },
-    onError: (e) => toast.error(e.message),
-  });
+  const { start, cancel, isScanning, checks, finalResult, error, reset } = useCyberMcpScan();
 
-  const riskColor = (r: string) => r === "critical" ? "text-red-500" : r === "high" ? "text-orange-500" : r === "medium" ? "text-yellow-500" : r === "pass" ? "text-green-500" : "text-muted-foreground";
+  const doneCount = checks.filter(c => c.status === "done" || c.status === "error").length;
+  const progressPct = isScanning ? Math.round((doneCount / checks.length) * 100) : (finalResult ? 100 : 0);
+
+  const handleStart = () => {
+    if (!endpoint) return;
+    reset();
+    start({ endpoint, method, authToken: authToken || undefined, paramName: paramName || "id" });
+  };
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /> Full Security Scan</CardTitle>
-          <CardDescription className="text-xs">Runs all 5 security checks against the target endpoint in one go</CardDescription>
+          <CardDescription className="text-xs">
+            Runs 5 security checks with live per-check progress — Security Headers, Auth Bypass, SQL Injection, XSS, Sensitive Data
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2 space-y-1">
               <Label className="text-xs">Target Endpoint URL</Label>
-              <Input placeholder="https://api.example.com/users" value={endpoint} onChange={e => setEndpoint(e.target.value)} className="h-9 text-sm font-mono" />
+              <Input
+                placeholder="https://api.example.com/users"
+                value={endpoint}
+                onChange={e => setEndpoint(e.target.value)}
+                className="h-9 text-sm font-mono"
+                disabled={isScanning}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">HTTP Method</Label>
-              <Select value={method} onValueChange={(v: any) => setMethod(v)}>
+              <Select value={method} onValueChange={(v: any) => setMethod(v)} disabled={isScanning}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="GET">GET</SelectItem><SelectItem value="POST">POST</SelectItem></SelectContent>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Auth Token (optional)</Label>
-              <Input placeholder="eyJhbGciOiJIUzI1NiJ9..." value={authToken} onChange={e => setAuthToken(e.target.value)} className="h-9 text-sm font-mono" />
+              <Input
+                placeholder="eyJhbGciOiJIUzI1NiJ9..."
+                value={authToken}
+                onChange={e => setAuthToken(e.target.value)}
+                className="h-9 text-sm font-mono"
+                disabled={isScanning}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Parameter Name (for injection tests)</Label>
-              <Input placeholder="id" value={paramName} onChange={e => setParamName(e.target.value)} className="h-9 text-sm" />
+              <Input
+                placeholder="id"
+                value={paramName}
+                onChange={e => setParamName(e.target.value)}
+                className="h-9 text-sm"
+                disabled={isScanning}
+              />
             </div>
           </div>
-          <Button onClick={() => scan.mutate({ endpoint, method, authToken: authToken || undefined, paramName })} disabled={!endpoint || scan.isPending} className="w-full">
-            {scan.isPending ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Scanning...</> : <><Play className="h-4 w-4 mr-2" /> Run Full Scan</>}
-          </Button>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={handleStart}
+              disabled={!endpoint || isScanning}
+              className="flex-1"
+            >
+              {isScanning
+                ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Scanning ({doneCount}/{checks.length})...</>
+                : <><Play className="h-4 w-4 mr-2" /> Run Full Scan</>
+              }
+            </Button>
+            {isScanning && (
+              <Button variant="outline" onClick={cancel} className="gap-2">
+                <StopCircle className="h-4 w-4" /> Cancel
+              </Button>
+            )}
+          </div>
+
+          {/* Credit cost notice */}
+          <p className="text-[11px] text-muted-foreground text-center">
+            150 credits · Runs 5 security checks in sequence
+          </p>
         </CardContent>
       </Card>
 
-      {result && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Scan Results</h3>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Overall Risk:</span>
-              <RiskBadge risk={result.overallRisk} />
-              <span className="text-xs text-muted-foreground">{result.duration}ms</span>
+      {/* Live progress panel — shown while scanning or after completion */}
+      {(isScanning || finalResult || error) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                {isScanning
+                  ? <><Loader2 className="h-4 w-4 animate-spin text-primary" /> Live Scan Progress</>
+                  : finalResult
+                  ? <><CheckCircle className="h-4 w-4 text-green-500" /> Scan Complete</>
+                  : <><XCircle className="h-4 w-4 text-red-500" /> Scan Failed</>
+                }
+              </CardTitle>
+              {finalResult && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Overall Risk:</span>
+                  <RiskBadge risk={finalResult.overallRisk} />
+                  <span className="text-xs text-muted-foreground">{finalResult.duration}ms</span>
+                </div>
+              )}
             </div>
-          </div>
+            {(isScanning || finalResult) && (
+              <div className="mt-2 space-y-1">
+                <Progress value={progressPct} className="h-1.5" />
+                <p className="text-[11px] text-muted-foreground text-right">{progressPct}%</p>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2 pb-4">
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                <p className="text-xs text-red-400">{error}</p>
+              </div>
+            )}
+            {checks.map(check => (
+              <CheckRow key={check.key} check={check} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Final results grid */}
+      {finalResult && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold">Check Summary</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {Object.entries(result.scanResults).map(([key, val]: [string, any]) => (
+            {Object.entries(finalResult.scanResults).map(([key, val]: [string, any]) => (
               <Card key={key} className="p-3 text-center">
-                <p className="text-xs text-muted-foreground capitalize mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                <p className="text-xs text-muted-foreground capitalize mb-1">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </p>
                 <RiskBadge risk={val?.risk || "info"} />
                 {val?.score !== undefined && <p className="text-xs mt-1 font-mono">{val.score}%</p>}
-                {val?.vulnerableCount !== undefined && <p className="text-xs mt-1">{val.vulnerableCount} found</p>}
-                {val?.findingCount !== undefined && <p className="text-xs mt-1">{val.findingCount} findings</p>}
+                {val?.vulnerable !== undefined && (
+                  <p className={`text-xs mt-1 ${val.vulnerable ? "text-red-400" : "text-green-400"}`}>
+                    {val.vulnerable ? "Vulnerable" : "Clean"}
+                  </p>
+                )}
+                {val?.findingCount !== undefined && <p className="text-xs mt-1">{val.findingCount} found</p>}
+                {val?.criticalMissing !== undefined && <p className="text-xs mt-1">{val.criticalMissing} missing</p>}
               </Card>
             ))}
           </div>
-          <ResultPanel title="Raw Scan Data" data={result} risk={result.overallRisk} />
+          <ResultPanel title="Raw Scan Data" data={finalResult} risk={finalResult.overallRisk} />
         </div>
       )}
     </div>
@@ -186,7 +324,9 @@ function AuthTab() {
         <CardContent className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             {(["bypass", "jwt", "basic", "token"] as const).map(m => (
-              <Button key={m} variant={mode === m ? "default" : "outline"} size="sm" onClick={() => setMode(m)} className="h-8 text-xs capitalize">{m === "bypass" ? "Auth Bypass" : m === "jwt" ? "JWT Analysis" : m === "basic" ? "Basic Auth" : "Token Auth"}</Button>
+              <Button key={m} variant={mode === m ? "default" : "outline"} size="sm" onClick={() => setMode(m)} className="h-8 text-xs capitalize">
+                {m === "bypass" ? "Auth Bypass" : m === "jwt" ? "JWT Analysis" : m === "basic" ? "Basic Auth" : "Token Auth"}
+              </Button>
             ))}
           </div>
 
@@ -207,7 +347,12 @@ function AuthTab() {
           {mode === "jwt" && (
             <div className="space-y-1">
               <Label className="text-xs">JWT Token to Analyse</Label>
-              <Textarea placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature" value={token} onChange={e => setToken(e.target.value)} className="text-sm font-mono h-24 resize-none" />
+              <Textarea
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"
+                value={token}
+                onChange={e => setToken(e.target.value)}
+                className="text-sm font-mono h-20 resize-none"
+              />
             </div>
           )}
 

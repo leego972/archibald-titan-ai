@@ -448,6 +448,8 @@ export const CREDIT_COSTS = {
   // ── Linken Sphere ─────────────────────────────────────────────────────────────────
   linken_session_start: 50,      // Standard — start a Linken Sphere stealth browser session
   linken_quick_create: 25,       // Light — create a quick Linken Sphere session profile
+  // ── CyberMCP ──────────────────────────────────────────────────────────────────────
+  cybermcp_scan: 150,            // Heavy — full 5-check security scan with live SSE progress
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

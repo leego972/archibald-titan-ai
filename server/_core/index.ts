@@ -397,6 +397,9 @@ async function startServer() {
   // Isolated Browser SSE screenshot stream
   const { registerIsolatedBrowserSSE } = await import('../isolated-browser-router.js');
   registerIsolatedBrowserSSE(app);
+  // CyberMCP full scan SSE streaming (real-time progress per check)
+  const { registerCyberMcpStreamRoutes } = await import('../cybermcp-stream.js');
+  registerCyberMcpStreamRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

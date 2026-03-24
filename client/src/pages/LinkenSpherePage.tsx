@@ -186,12 +186,18 @@ export default function LinkenSpherePage() {
       enabled: connectionStatus === "connected",
       refetchInterval: connectionStatus === "connected" ? 10_000 : false,
       retry: false,
-      onSuccess: (data) => {
-        if (Array.isArray(data)) setSessions(data as LSSession[]);
-      },
-      onError: () => setConnectionStatus("error"),
     }
   );
+
+  // Sync sessions from query data
+  useEffect(() => {
+    if (sessionsQuery.data && Array.isArray(sessionsQuery.data)) {
+      setSessions(sessionsQuery.data as LSSession[]);
+    }
+    if (sessionsQuery.isError) {
+      setConnectionStatus("error");
+    }
+  }, [sessionsQuery.data, sessionsQuery.isError]);
 
   const signInMutation = trpc.linkenSphere.signIn.useMutation({
     onSuccess: () => {
@@ -468,7 +474,7 @@ export default function LinkenSpherePage() {
                           <Play className="h-3 w-3" /> Start
                         </Button>
                       ) : session.status === "running" ? (
-                        <Button size="sm" variant="outline" onClick={() => handleStop(session.uuid)} disabled={stopSessionMutation.isLoading} className="gap-1 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10">
+                        <Button size="sm" variant="outline" onClick={() => handleStop(session.uuid)} disabled={stopSessionMutation.isPending} className="gap-1 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10">
                           <Square className="h-3 w-3" /> Stop
                         </Button>
                       ) : null}
@@ -588,8 +594,8 @@ export default function LinkenSpherePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
-            <Button onClick={handleSavePort} disabled={savePortMutation.isLoading} className="gap-1.5">
-              {savePortMutation.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <Button onClick={handleSavePort} disabled={savePortMutation.isPending} className="gap-1.5">
+              {savePortMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <Save className="h-3.5 w-3.5" /> Save Port
             </Button>
           </DialogFooter>
@@ -620,8 +626,8 @@ export default function LinkenSpherePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAuthDialog(false)}>Cancel</Button>
-            <Button onClick={handleSignIn} disabled={signInMutation.isLoading || !authEmail || !authPassword} className="gap-1.5">
-              {signInMutation.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <Button onClick={handleSignIn} disabled={signInMutation.isPending || !authEmail || !authPassword} className="gap-1.5">
+              {signInMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <LogIn className="h-3.5 w-3.5" /> Sign In
             </Button>
           </DialogFooter>
@@ -644,8 +650,8 @@ export default function LinkenSpherePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={createSessionsMutation.isLoading} className="bg-cyan-600 hover:bg-cyan-700 gap-1.5">
-              {createSessionsMutation.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <Button onClick={handleCreate} disabled={createSessionsMutation.isPending} className="bg-cyan-600 hover:bg-cyan-700 gap-1.5">
+              {createSessionsMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Create {createCount} Session{createCount > 1 ? "s" : ""}
             </Button>
           </DialogFooter>
@@ -679,8 +685,8 @@ export default function LinkenSpherePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStartDialog(false)}>Cancel</Button>
-            <Button onClick={handleStart} disabled={startSessionMutation.isLoading} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5">
-              {startSessionMutation.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <Button onClick={handleStart} disabled={startSessionMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5">
+              {startSessionMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <Play className="h-3.5 w-3.5" /> Start Session
             </Button>
           </DialogFooter>
@@ -699,8 +705,8 @@ export default function LinkenSpherePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>Cancel</Button>
-            <Button onClick={handleRename} disabled={renameSessionMutation.isLoading || !renameName.trim()} className="bg-cyan-600 hover:bg-cyan-700 gap-1.5">
-              {renameSessionMutation.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <Button onClick={handleRename} disabled={renameSessionMutation.isPending || !renameName.trim()} className="bg-cyan-600 hover:bg-cyan-700 gap-1.5">
+              {renameSessionMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Rename
             </Button>
           </DialogFooter>

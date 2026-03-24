@@ -221,15 +221,15 @@ export const linkenSphereRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const port = input.port ?? (await getLsPort(ctx.user.id));
-      const creditCheck = await checkCredits(ctx.user.id, "linken_quick_create", input.count);
+      const creditCheck = await checkCredits(ctx.user.id, "linken_quick_create");
       if (!creditCheck.allowed) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: `Insufficient credits. Need ${25 * input.count} credits to create ${input.count} session(s). You have ${creditCheck.balance}.`,
+          message: `Insufficient credits. Need ${25 * input.count} credits to create ${input.count} session(s). You have ${creditCheck.currentBalance}.`,
         });
       }
       const result = await lsRequest(port, "POST", "/sessions/create_quick", { count: input.count });
-      await consumeCredits(ctx.user.id, "linken_quick_create", input.count, `Created ${input.count} Linken Sphere quick session(s)`);
+      await consumeCredits(ctx.user.id, "linken_quick_create", `Created ${input.count} Linken Sphere quick session(s)`);
       log.info(`[createQuickSessions] User ${ctx.user.id} created ${input.count} LS sessions`);
       return result;
     }),
@@ -251,13 +251,13 @@ export const linkenSphereRouter = router({
       if (!creditCheck.allowed) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: `Insufficient credits. Need 50 credits to start a Linken Sphere session. You have ${creditCheck.balance}.`,
+          message: `Insufficient credits. Need 50 credits to start a Linken Sphere session. You have ${creditCheck.currentBalance}.`,
         });
       }
       const body: Record<string, unknown> = { uuid: input.uuid, headless: input.headless };
       if (input.debugPort) body.debug_port = input.debugPort;
       const result = await lsRequest(port, "POST", "/sessions/start", body);
-      await consumeCredits(ctx.user.id, "linken_session_start", 1, `Started Linken Sphere session ${input.uuid}`);
+      await consumeCredits(ctx.user.id, "linken_session_start", `Started Linken Sphere session ${input.uuid}`);
       log.info(`[startSession] User ${ctx.user.id} started LS session ${input.uuid}`);
       return result;
     }),
