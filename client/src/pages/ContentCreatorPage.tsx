@@ -138,7 +138,15 @@ function StatCard({ label, value, icon: Icon, color }: {
 
 // ─── Main Component ───────────────────────────────────────────────────────
 export default function ContentCreatorPage() {
-  const [activeTab, setActiveTab] = useState<"studio" | "queue" | "campaigns" | "tiktok" | "analytics">("studio");
+  const [activeTab, setActiveTab] = useState<"studio" | "queue" | "campaigns" | "calendar" | "tiktok" | "analytics">("studio");
+
+  // Content Calendar state
+  const [calendarStart, setCalendarStart] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); });
+  const [calendarEnd, setCalendarEnd] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); return d.toISOString().slice(0, 10); });
+  const [calendarCampaignId, setCalendarCampaignId] = useState<number | undefined>();
+
+  // Campaign analytics state
+  const [analyticsTargetCampaign, setAnalyticsTargetCampaign] = useState<number | undefined>();
 
   // Studio state
   const [selectedPlatform, setSelectedPlatform] = useState("tiktok");
@@ -284,6 +292,31 @@ export default function ContentCreatorPage() {
       setShowSeoBriefs(false);
     },
     onError: (err) => toast.error(`Failed: ${err.message}`),
+  });
+
+  const contentCalendar = trpc.contentCreator.getContentCalendar.useQuery(
+    { startDate: calendarStart, endDate: calendarEnd, campaignId: calendarCampaignId },
+    { enabled: activeTab === "calendar" }
+  );
+
+  const campaignAnalytics = trpc.contentCreator.getCampaignAnalytics.useQuery(
+    { id: analyticsTargetCampaign! },
+    { enabled: !!analyticsTargetCampaign }
+  );
+
+  const deleteCampaign = trpc.contentCreator.deleteCampaign.useMutation({
+    onSuccess: () => { toast.success("Campaign deleted"); campaigns.refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const rejectPiece = trpc.contentCreator.rejectPiece.useMutation({
+    onSuccess: () => { toast.success("Piece rejected"); pieces.refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const cancelSchedule = trpc.contentCreator.cancelSchedule.useMutation({
+    onSuccess: () => { toast.success("Schedule cancelled"); schedules.refetch(); pieces.refetch(); },
+    onError: (err) => toast.error(err.message),
   });
 
   const processDue = trpc.contentCreator.processDueSchedules.useMutation({
@@ -456,6 +489,7 @@ export default function ContentCreatorPage() {
             <TabsTrigger value="queue" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Layers className="w-3.5 h-3.5" /> Content Queue</TabsTrigger>
             <TabsTrigger value="campaigns" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Megaphone className="w-3.5 h-3.5" /> Campaigns</TabsTrigger>
             <TabsTrigger value="tiktok" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Music2 className="w-3.5 h-3.5" /> TikTok Hub</TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><Calendar className="w-3.5 h-3.5" /> Calendar</TabsTrigger>
             <TabsTrigger value="analytics" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap px-3"><BarChart3 className="w-3.5 h-3.5" /> Analytics</TabsTrigger>
           </TabsList>
         </div>
@@ -827,10 +861,16 @@ export default function ContentCreatorPage() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {piece.status === "draft" && (
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                            onClick={() => approvePiece.mutate({ id: piece.id })}>
-                            <CheckCircle2 className="w-4 h-4" />
-                          </Button>
+                          <>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                              onClick={() => approvePiece.mutate({ id: piece.id })} title="Approve">
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                              onClick={() => rejectPiece.mutate({ id: piece.id })} title="Reject">
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          </>
                         )}
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
                           onClick={() => { setEditingPiece(piece); setShowPieceEditor(true); }}>
@@ -952,9 +992,86 @@ export default function ContentCreatorPage() {
                         onClick={() => { setShowSeoBriefs(true); setSelectedCampaignId(campaign.id); }}>
                         <Search className="w-3 h-3 text-blue-400" /> SEO Briefs
                       </Button>
+                      <Button size="sm" variant="outline"
+                        className="border-[#21262d] text-gray-300 hover:bg-[#21262d] gap-1 text-xs"
+                        onClick={() => { setAnalyticsTargetCampaign(campaign.id); setActiveTab("analytics"); }}>
+                        <BarChart3 className="w-3 h-3 text-cyan-400" /> Analytics
+                      </Button>
+                      <Button size="sm" variant="ghost"
+                        className="h-7 w-7 p-0 text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+                        onClick={() => { if (confirm(`Delete campaign "${campaign.name}"? This cannot be undone.`)) deleteCampaign.mutate({ id: campaign.id }); }}
+                        title="Delete campaign">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══ CONTENT CALENDAR TAB ═══ */}
+        <TabsContent value="calendar" className="mt-4 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-purple-400" /> Content Calendar
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <input type="date" value={calendarStart} onChange={e => setCalendarStart(e.target.value)}
+                className="text-xs bg-[#161b22] border border-[#21262d] text-white rounded-md px-2 py-1.5" />
+              <span className="text-gray-500 text-xs">to</span>
+              <input type="date" value={calendarEnd} onChange={e => setCalendarEnd(e.target.value)}
+                className="text-xs bg-[#161b22] border border-[#21262d] text-white rounded-md px-2 py-1.5" />
+              <Select value={calendarCampaignId?.toString() || "all"} onValueChange={v => setCalendarCampaignId(v === "all" ? undefined : Number(v))}>
+                <SelectTrigger className="w-40 bg-[#161b22] border-[#21262d] text-white text-xs h-8"><SelectValue placeholder="All campaigns" /></SelectTrigger>
+                <SelectContent className="bg-[#161b22] border-[#21262d]">
+                  <SelectItem value="all" className="text-white hover:bg-[#21262d] text-xs">All Campaigns</SelectItem>
+                  {campaigns.data?.map(c => <SelectItem key={c.id} value={c.id.toString()} className="text-white hover:bg-[#21262d] text-xs">{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" className="border-[#21262d] text-gray-400 hover:bg-[#21262d] gap-1 text-xs" onClick={() => contentCalendar.refetch()}>
+                <RefreshCw className="w-3 h-3" /> Refresh
+              </Button>
+            </div>
+          </div>
+
+          {contentCalendar.isLoading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-purple-400" /></div>
+          ) : !contentCalendar.data?.length ? (
+            <Card className="bg-[#0d1117] border-[#21262d]">
+              <CardContent className="text-center py-12">
+                <Calendar className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400">No scheduled content in this date range</p>
+                <p className="text-gray-600 text-sm mt-1">Schedule pieces from the Content Queue to see them here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {(contentCalendar.data as any[]).map((piece: any) => (
+                <div key={piece.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#161b22] border border-[#21262d] hover:border-gray-600 transition-colors">
+                  <div className="text-center min-w-[48px]">
+                    <p className="text-xs text-gray-500">{new Date(piece.scheduledAt).toLocaleDateString(undefined, { month: "short" })}</p>
+                    <p className="text-lg font-bold text-white">{new Date(piece.scheduledAt).getDate()}</p>
+                    <p className="text-xs text-gray-500">{new Date(piece.scheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                  <div className="w-px h-10 bg-[#21262d]" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <PlatformBadge platform={piece.platform} />
+                      <StatusBadge status={piece.status} />
+                    </div>
+                    <p className="text-sm text-white font-medium truncate">{piece.title || piece.headline || "Untitled"}</p>
+                    <p className="text-xs text-gray-500 truncate">{piece.body?.slice(0, 80)}...</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+                      onClick={() => { const s = schedules.data?.find((sc: any) => sc.pieceId === piece.id); if (s) cancelSchedule.mutate({ scheduleId: (s as any).id }); }}
+                      title="Cancel schedule">
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           )}

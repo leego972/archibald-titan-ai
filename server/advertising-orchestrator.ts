@@ -2588,8 +2588,8 @@ export async function runAdvertisingCycle(): Promise<AdvertisingCycleResult> {
 
 let advertisingInterval: ReturnType<typeof setInterval> | null = null;
 
-/** Advertising run days: Monday (1), Wednesday (3), Friday (5) */
-const ADVERTISING_RUN_DAYS = [1, 3, 5];
+/** Advertising run days: Every day — daily promotion of archibaldtitan.com */
+const ADVERTISING_RUN_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 /**
  * Get the last advertising run date from the database.
@@ -2628,7 +2628,7 @@ async function setLastRunDate(dateStr: string): Promise<void> {
  * Persists last run date in DB so Railway restarts don't cause missed cycles.
  */
 export function startAdvertisingScheduler(): void {
-  log.info("[AdvertisingOrchestrator] Starting autonomous advertising scheduler (Mon/Wed/Fri)...");
+  log.info("[AdvertisingOrchestrator] Starting autonomous advertising scheduler (DAILY — promoting archibaldtitan.com every day)...");
 
   const runCheck = async () => {
     try {
@@ -2642,7 +2642,7 @@ export function startAdvertisingScheduler(): void {
       // Run on designated days, only once per day
       if (ADVERTISING_RUN_DAYS.includes(dayOfWeek) && lastRunDate !== todayStr) {
         await setLastRunDate(todayStr);
-        log.info(`[AdvertisingOrchestrator] Running scheduled advertising cycle (${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayOfWeek]})...`);
+        log.info(`[AdvertisingOrchestrator] Running daily advertising cycle (${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayOfWeek]}) — promoting archibaldtitan.com...`);
         await runAdvertisingCycle();
       }
     } catch (err: unknown) {
@@ -2702,7 +2702,7 @@ export function getStrategyOverview() {
       ...(platform === "reddit" ? { subreddits: (config as any).subreddits } : {}),
     })),
     schedule: {
-      advertisingCycle: "Mon/Wed/Fri (3x per week, 8-10 AM server time)",
+      advertisingCycle: "Daily (every day, 8-10 AM server time) — promoting archibaldtitan.com",
       seoOptimization: "Daily",
       blogPosts: "Mon/Wed/Fri",
       socialMedia: "Daily (2-3 posts)",
