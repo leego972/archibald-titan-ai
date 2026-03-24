@@ -39,6 +39,7 @@ import { registerSeoRoutes, startScheduledSeo } from "../seo-engine";
 import { registerSeoV4Routes, runGeoOptimization } from "../seo-engine-v4";
 import { runStartupDiagnostic, registerIndexNowRoute, patchIndexNowKey, startPeriodicSync } from "../autonomous-sync";
 import { registerChatStreamRoutes } from "../chat-stream";
+import { registerContentStreamRoutes } from "../content-stream";
 import { registerChatUploadRoute } from "../chat-upload";
 import { registerProjectDownloadRoutes } from "../project-download-router";
 import { registerMarketplaceFileRoutes } from "../marketplace-files";
@@ -389,6 +390,7 @@ async function startServer() {
   registerProjectDownloadRoutes(app);
   // Chat SSE streaming and abort endpoints
   registerChatStreamRoutes(app);
+  registerContentStreamRoutes(app);
   // Isolated Browser SSE screenshot stream
   const { registerIsolatedBrowserSSE } = await import('../isolated-browser-router.js');
   registerIsolatedBrowserSSE(app);
