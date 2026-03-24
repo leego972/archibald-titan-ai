@@ -6,6 +6,17 @@ import { TRPCError } from "@trpc/server";
 import { desc, eq, sql, and } from "drizzle-orm";
 import { improvementTasks } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
+import { invokeLLM } from "./_core/llm";
+import {
+  createSnapshot,
+  applyModifications,
+  validateModifications,
+  runHealthCheck,
+  pushToGitHub,
+  readFile,
+  listFiles,
+  isGitHubIntegrationAvailable,
+} from "./self-improvement-engine";
 const log = createLogger("ImprovementBacklogRouter");
 
 // ─── Curated Improvement Task Seed Data ──────────────────────────────
@@ -411,5 +422,369 @@ export const improvementBacklogRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db.delete(improvementTasks).where(eq(improvementTasks.id, input.id));
       return { message: "Task deleted" };
+    }),
+
+  /** Get a single task by ID */
+  getTask: adminProcedure
+    .input(z.object({ id: z.number().int() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
+      if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+      return task;
+    }),
+
+  /**
+   * Analyse a task — use AI to identify which files need changing and produce
+   * a detailed plan. Does NOT apply any changes. Returns analysis text.
+   */
+  analyzeTask: adminProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
+      if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+      log.info(`[analyzeTask] Analysing task #${task.id}: ${task.title}`);
+
+      // Gather codebase context — list top-level dirs and key files
+      const serverFiles = listFiles("server");
+      const clientFiles = listFiles("client/src");
+      const sharedFiles = listFiles("shared");
+
+      const contextSummary = [
+        `Server files: ${serverFiles.files?.slice(0, 30).join(", ") ?? "unavailable"}`,
+        `Client pages: ${clientFiles.files?.slice(0, 30).join(", ") ?? "unavailable"}`,
+        `Shared files: ${sharedFiles.files?.slice(0, 20).join(", ") ?? "unavailable"}`,
+      ].join("\n");
+
+      const response = await invokeLLM({
+        priority: "background",
+        model: "strong",
+        messages: [
+          {
+            role: "system",
+            content: `You are Titan's self-improvement AI. You analyse improvement tasks and produce detailed implementation plans.
+
+Project structure overview:
+${contextSummary}
+
+You must respond with a JSON object matching this schema:
+{
+  "summary": string,           // 2-3 sentence summary of what needs to change
+  "affectedFiles": string[],   // list of file paths relative to project root
+  "approach": string,          // detailed step-by-step implementation approach
+  "risks": string[],           // potential risks or things to watch out for
+  "estimatedComplexity": "trivial" | "small" | "medium" | "large",
+  "canAutoApply": boolean       // true if this can be safely auto-applied by AI
+}`,
+          },
+          {
+            role: "user",
+            content: `Analyse this improvement task and produce an implementation plan:
+
+Title: ${task.title}
+Category: ${task.category}
+Priority: ${task.priority}
+Complexity: ${task.complexity}
+Estimated files: ${task.estimatedFiles}
+
+Description:
+${task.description}`,
+          },
+        ],
+        outputSchema: {
+          name: "task_analysis",
+          schema: {
+            type: "object",
+            properties: {
+              summary: { type: "string" },
+              affectedFiles: { type: "array", items: { type: "string" } },
+              approach: { type: "string" },
+              risks: { type: "array", items: { type: "string" } },
+              estimatedComplexity: { type: "string", enum: ["trivial", "small", "medium", "large"] },
+              canAutoApply: { type: "boolean" },
+            },
+            required: ["summary", "affectedFiles", "approach", "risks", "estimatedComplexity", "canAutoApply"],
+          },
+        },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      let analysis: {
+        summary: string;
+        affectedFiles: string[];
+        approach: string;
+        risks: string[];
+        estimatedComplexity: string;
+        canAutoApply: boolean;
+      };
+      try {
+        analysis = typeof content === "string" ? JSON.parse(content) : content as typeof analysis;
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid analysis" });
+      }
+
+      log.info(`[analyzeTask] Analysis complete for task #${task.id}. canAutoApply=${analysis.canAutoApply}`);
+      return { taskId: task.id, title: task.title, ...analysis };
+    }),
+
+  /**
+   * Execute a task — full AI-driven cycle:
+   * 1. Read relevant files
+   * 2. Generate code changes via LLM
+   * 3. Validate changes
+   * 4. Create snapshot
+   * 5. Apply changes
+   * 6. Run health check
+   * 7. Push to GitHub
+   * 8. Update task status
+   */
+  executeTask: adminProcedure
+    .input(z.object({
+      id: z.number().int(),
+      dryRun: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
+      if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+      if (task.status === "completed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Task is already completed" });
+      }
+      if (task.status === "in_progress") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Task is already in progress" });
+      }
+
+      log.info(`[executeTask] Starting task #${task.id}: ${task.title} (dryRun=${input.dryRun})`);
+
+      // Mark as in_progress
+      await db.update(improvementTasks).set({ status: "in_progress" }).where(eq(improvementTasks.id, task.id));
+
+      try {
+        // ── Step 1: Gather codebase context ──
+        const serverFiles = listFiles("server");
+        const clientFiles = listFiles("client/src");
+        const sharedFiles = listFiles("shared");
+        const contextSummary = [
+          `Server files: ${serverFiles.files?.slice(0, 40).join(", ") ?? "unavailable"}`,
+          `Client pages: ${clientFiles.files?.slice(0, 40).join(", ") ?? "unavailable"}`,
+          `Shared files: ${sharedFiles.files?.slice(0, 20).join(", ") ?? "unavailable"}`,
+        ].join("\n");
+
+        // ── Step 2: AI analysis — identify files and generate changes ──
+        log.info(`[executeTask] Calling AI to generate changes for task #${task.id}`);
+        const planResponse = await invokeLLM({
+          priority: "background",
+          model: "strong",
+          maxTokens: 8000,
+          messages: [
+            {
+              role: "system",
+              content: `You are Titan's self-improvement AI. You implement improvement tasks by generating precise code changes.
+
+Project structure:
+${contextSummary}
+
+Rules:
+- Only modify files in: server/, client/src/, shared/, scripts/
+- Never modify: server/_core/, server/self-improvement-engine.ts, drizzle/schema.ts, package.json, .env
+- Generate complete, working TypeScript/TSX code
+- Keep changes minimal and focused on the task
+- Each file modification must be the COMPLETE new content of that file
+
+Respond with a JSON object:
+{
+  "plan": string,              // brief description of what you're doing
+  "modifications": [
+    {
+      "filePath": string,      // relative path e.g. "server/cache.ts"
+      "action": "modify" | "create",
+      "content": string,       // COMPLETE new file content
+      "description": string    // what this change does
+    }
+  ],
+  "commitMessage": string,     // git commit message
+  "notes": string              // any important notes about the implementation
+}`,
+            },
+            {
+              role: "user",
+              content: `Implement this improvement task:
+
+Title: ${task.title}
+Category: ${task.category}
+Priority: ${task.priority}
+Complexity: ${task.complexity}
+
+Description:
+${task.description}
+
+Generate the code changes needed to implement this task. Read any relevant existing files first if needed.`,
+            },
+          ],
+          outputSchema: {
+            name: "task_implementation",
+            schema: {
+              type: "object",
+              properties: {
+                plan: { type: "string" },
+                modifications: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      filePath: { type: "string" },
+                      action: { type: "string", enum: ["modify", "create"] },
+                      content: { type: "string" },
+                      description: { type: "string" },
+                    },
+                    required: ["filePath", "action", "content", "description"],
+                  },
+                },
+                commitMessage: { type: "string" },
+                notes: { type: "string" },
+              },
+              required: ["plan", "modifications", "commitMessage", "notes"],
+            },
+          },
+        });
+
+        const planContent = planResponse.choices[0]?.message?.content;
+        let implementation: {
+          plan: string;
+          modifications: Array<{ filePath: string; action: "modify" | "create"; content: string; description: string }>;
+          commitMessage: string;
+          notes: string;
+        };
+        try {
+          implementation = typeof planContent === "string" ? JSON.parse(planContent) : planContent as typeof implementation;
+        } catch {
+          await db.update(improvementTasks).set({ status: "failed", completionNotes: "AI returned invalid JSON" }).where(eq(improvementTasks.id, task.id));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid implementation plan" });
+        }
+
+        if (!implementation.modifications || implementation.modifications.length === 0) {
+          await db.update(improvementTasks).set({ status: "failed", completionNotes: "AI produced no modifications" }).where(eq(improvementTasks.id, task.id));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI produced no file modifications" });
+        }
+
+        log.info(`[executeTask] AI plan: ${implementation.plan}. Files to modify: ${implementation.modifications.length}`);
+
+        // ── Step 3: Validate changes ──
+        const validationResult = validateModifications(implementation.modifications);
+        if (!validationResult.valid) {
+          const errMsg = `Validation failed: ${validationResult.errors.join("; ")}`;
+          await db.update(improvementTasks).set({ status: "failed", completionNotes: errMsg }).where(eq(improvementTasks.id, task.id));
+          throw new TRPCError({ code: "BAD_REQUEST", message: errMsg });
+        }
+
+        if (input.dryRun) {
+          await db.update(improvementTasks).set({ status: "pending" }).where(eq(improvementTasks.id, task.id));
+          return {
+            success: true,
+            dryRun: true,
+            plan: implementation.plan,
+            modifications: implementation.modifications.map(m => ({ filePath: m.filePath, action: m.action, description: m.description })),
+            commitMessage: implementation.commitMessage,
+            notes: implementation.notes,
+            warnings: validationResult.warnings,
+          };
+        }
+
+        // ── Step 4: Create snapshot ──
+        const snapshot = await createSnapshot(
+          `Pre-task-${task.id}: ${task.title}`,
+          null,
+          implementation.modifications.map(m => m.filePath)
+        );
+
+        // ── Step 5: Apply changes ──
+        const applyResult = await applyModifications(
+          implementation.modifications,
+          null,
+          `Self-improvement task #${task.id}: ${task.title}`,
+          snapshot.snapshotId ?? undefined
+        );
+
+        if (!applyResult.success) {
+          const errMsg = `Apply failed: ${applyResult.modifications.filter(m => !m.applied).map(m => m.error).join("; ")} `;
+          await db.update(improvementTasks).set({ status: "failed", completionNotes: errMsg }).where(eq(improvementTasks.id, task.id));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: errMsg });
+        }
+
+        // ── Step 6: Health check ──
+        const health = await runHealthCheck();
+        if (!health.healthy) {
+          log.warn(`[executeTask] Health check failed after applying task #${task.id} — rolling back`);
+          // Rollback is handled by applyModifications internally if health check fails
+          await db.update(improvementTasks).set({
+            status: "failed",
+            completionNotes: `Health check failed after apply: ${health.checks.map(c => c.healthy ? "" : c.name).filter(Boolean).join(", ")}`,
+          }).where(eq(improvementTasks.id, task.id));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Health check failed after applying changes — rolled back" });
+        }
+
+        // ── Step 7: Push to GitHub ──
+        let pushed = false;
+        let pushMessage = "GitHub push skipped (integration not available)";
+        if (isGitHubIntegrationAvailable()) {
+          try {
+            const pushResult = await pushToGitHub(
+              implementation.commitMessage || `feat: ${task.title}`,
+              null
+            );
+            pushed = pushResult.success;
+            pushMessage = pushResult.message ?? (pushed ? "Pushed to GitHub" : "Push failed");
+          } catch (err) {
+            pushMessage = `Push error: ${err instanceof Error ? err.message : String(err)}`;
+            log.warn(`[executeTask] GitHub push failed (non-fatal): ${pushMessage}`);
+          }
+        }
+
+        // ── Step 8: Mark task as completed ──
+        const completionNotes = [
+          `Plan: ${implementation.plan}`,
+          `Files modified: ${applyResult.modifications.filter(m => m.applied).map(m => m.filePath).join(", ")}`,
+          `Notes: ${implementation.notes}`,
+          pushed ? `Pushed to GitHub: ${pushMessage}` : pushMessage,
+        ].join("\n");
+
+        await db.update(improvementTasks).set({
+          status: "completed",
+          completedAt: new Date(),
+          completionNotes,
+          snapshotId: snapshot.snapshotId ?? null,
+        }).where(eq(improvementTasks.id, task.id));
+
+        log.info(`[executeTask] Task #${task.id} completed successfully. Pushed=${pushed}`);
+
+        return {
+          success: true,
+          dryRun: false,
+          plan: implementation.plan,
+          modifications: applyResult.modifications,
+          commitMessage: implementation.commitMessage,
+          notes: implementation.notes,
+          snapshotId: snapshot.snapshotId,
+          pushed,
+          pushMessage,
+          warnings: validationResult.warnings,
+        };
+
+      } catch (err) {
+        // If we haven't already set a terminal status, mark as failed
+        const [current] = await db.select({ status: improvementTasks.status }).from(improvementTasks).where(eq(improvementTasks.id, task.id));
+        if (current?.status === "in_progress") {
+          await db.update(improvementTasks).set({
+            status: "failed",
+            completionNotes: `Execution error: ${err instanceof Error ? err.message : String(err)}`,
+          }).where(eq(improvementTasks.id, task.id));
+        }
+        throw err;
+      }
     }),
 });

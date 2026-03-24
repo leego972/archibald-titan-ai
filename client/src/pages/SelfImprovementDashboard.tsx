@@ -979,15 +979,158 @@ export default function SelfImprovementDashboard() {
   );
 }
 
+// ─── Task Execution Result Modal ─────────────────────────────────────
+function TaskResultModal({
+  result,
+  onClose,
+}: {
+  result: {
+    taskId?: number;
+    title?: string;
+    plan?: string;
+    modifications?: Array<{ filePath?: string; action?: string; description?: string; applied?: boolean; error?: string }>;
+    commitMessage?: string;
+    notes?: string;
+    warnings?: string[];
+    pushed?: boolean;
+    pushMessage?: string;
+    snapshotId?: number;
+    dryRun?: boolean;
+    // analysis fields
+    summary?: string;
+    affectedFiles?: string[];
+    approach?: string;
+    risks?: string[];
+    estimatedComplexity?: string;
+    canAutoApply?: boolean;
+  } | null;
+  onClose: () => void;
+}) {
+  if (!result) return null;
+  const isAnalysis = "summary" in result && result.summary;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            {isAnalysis ? <Eye className="h-5 w-5 text-blue-400" /> : result.dryRun ? <ArrowDownToLine className="h-5 w-5 text-amber-400" /> : <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
+            {isAnalysis ? "Task Analysis" : result.dryRun ? "Dry Run Preview" : "Execution Complete"}
+          </h3>
+          <Button size="sm" variant="ghost" onClick={onClose}>✕</Button>
+        </div>
+        {isAnalysis ? (
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Summary</p>
+              <p className="text-sm">{result.summary}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Approach</p>
+              <p className="text-sm whitespace-pre-wrap">{result.approach}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Affected Files ({result.affectedFiles?.length ?? 0})</p>
+              <div className="space-y-1">
+                {result.affectedFiles?.map((f, i) => (
+                  <p key={i} className="text-xs font-mono bg-muted/30 rounded px-2 py-1">{f}</p>
+                ))}
+              </div>
+            </div>
+            {result.risks && result.risks.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Risks</p>
+                <div className="space-y-1">
+                  {result.risks.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-amber-400">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      {r}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="text-[10px]">Complexity: {result.estimatedComplexity}</Badge>
+              <Badge className={`text-[10px] ${result.canAutoApply ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-amber-500/10 text-amber-400 border-amber-500/30"}`}>
+                {result.canAutoApply ? "✓ Can Auto-Apply" : "⚠ Manual Review Recommended"}
+              </Badge>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {result.plan && (
+              <div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Plan</p>
+                <p className="text-sm">{result.plan}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">File Changes ({result.modifications?.length ?? 0})</p>
+              <div className="space-y-1">
+                {result.modifications?.map((m, i) => (
+                  <div key={i} className={`flex items-center gap-2 text-xs rounded px-2 py-1.5 ${
+                    m.applied === false ? "bg-red-500/10 text-red-400" : "bg-muted/30"
+                  }`}>
+                    {m.applied === false ? <XCircle className="h-3 w-3 shrink-0" /> : <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />}
+                    <span className="font-mono">{m.filePath}</span>
+                    <Badge variant="outline" className="text-[9px] ml-auto">{m.action}</Badge>
+                    {m.error && <span className="text-red-400 text-[10px]">{m.error}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {result.commitMessage && (
+              <div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Commit Message</p>
+                <p className="text-xs font-mono bg-muted/30 rounded px-2 py-1.5">{result.commitMessage}</p>
+              </div>
+            )}
+            {result.notes && (
+              <div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Notes</p>
+                <p className="text-sm text-muted-foreground">{result.notes}</p>
+              </div>
+            )}
+            {result.warnings && result.warnings.length > 0 && (
+              <div className="space-y-1">
+                {result.warnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-amber-400">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    {w}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!result.dryRun && (
+              <div className="flex items-center gap-3 pt-2 border-t border-border/30">
+                {result.snapshotId && (
+                  <Badge variant="outline" className="text-[10px]">Snapshot #{result.snapshotId}</Badge>
+                )}
+                <Badge className={`text-[10px] ${result.pushed ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground border-border/50"}`}>
+                  {result.pushed ? "✓ Pushed to GitHub" : result.pushMessage ?? "Not pushed"}
+                </Badge>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Improvement Backlog ─────────────────────────────────────────────
 function ImprovementBacklogPanel() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
+  const [taskResult, setTaskResult] = useState<any>(null);
 
   const { data: tasks, isLoading, refetch } = trpc.improvementBacklog.list.useQuery(
     {
       category: categoryFilter === "all" ? undefined : categoryFilter as any,
       priority: priorityFilter === "all" ? undefined : priorityFilter as any,
+      status: statusFilter === "all" ? undefined : statusFilter as any,
     },
     { refetchOnWindowFocus: false }
   );
@@ -995,18 +1138,44 @@ function ImprovementBacklogPanel() {
   const { data: stats } = trpc.improvementBacklog.stats.useQuery(undefined, { refetchOnWindowFocus: false });
 
   const seedMutation = trpc.improvementBacklog.seed.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.message);
-      refetch();
-    },
+    onSuccess: (data) => { toast.success(data.message); refetch(); },
     onError: (err) => toast.error(err.message),
   });
 
-  const updateStatusMutation = trpc.improvementBacklog.updateStatus.useMutation({
-    onSuccess: () => {
-      toast.success("Task updated");
-      refetch();
+  const analyzeTaskMutation = trpc.improvementBacklog.analyzeTask.useMutation({
+    onSuccess: (data) => {
+      setActiveTaskId(null);
+      setTaskResult(data);
+      toast.success("Analysis complete");
     },
+    onError: (err) => { setActiveTaskId(null); toast.error(`Analysis failed: ${err.message}`); },
+  });
+
+  const executeTaskMutation = trpc.improvementBacklog.executeTask.useMutation({
+    onSuccess: (data) => {
+      setActiveTaskId(null);
+      setTaskResult(data);
+      refetch();
+      if (data.dryRun) {
+        toast.success("Dry run complete — no changes applied");
+      } else {
+        toast.success("Task executed successfully!");
+      }
+    },
+    onError: (err) => {
+      setActiveTaskId(null);
+      refetch();
+      toast.error(`Execution failed: ${err.message}`);
+    },
+  });
+
+  const updateStatusMutation = trpc.improvementBacklog.updateStatus.useMutation({
+    onSuccess: () => { toast.success("Task updated"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteMutation = trpc.improvementBacklog.delete.useMutation({
+    onSuccess: () => { toast.success("Task deleted"); refetch(); },
     onError: (err) => toast.error(err.message),
   });
 
@@ -1035,159 +1204,257 @@ function ImprovementBacklogPanel() {
     skipped: "bg-slate-500/10 text-slate-400 border-slate-500/30",
   };
 
+  const isRunning = analyzeTaskMutation.isPending || executeTaskMutation.isPending;
+
   return (
-    <div className="bg-card border border-border/50 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <ListTodo className="h-5 w-5 text-violet-400" />
-          <h3 className="font-semibold">Improvement Backlog</h3>
-          {stats && (
-            <Badge variant="outline" className="text-[10px]">
-              {stats.completed}/{stats.total} done
-            </Badge>
-          )}
+    <>
+      {taskResult && <TaskResultModal result={taskResult} onClose={() => setTaskResult(null)} />}
+      <div className="bg-card border border-border/50 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-violet-400" />
+            <h3 className="font-semibold">Improvement Backlog</h3>
+            {stats && (
+              <Badge variant="outline" className="text-[10px]">
+                {stats.completed}/{stats.total} done
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {tasks && tasks.length === 0 && (
+              <Button size="sm" variant="outline" onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+                {seedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                Seed Tasks
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {tasks && tasks.length === 0 && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => seedMutation.mutate()}
-              disabled={seedMutation.isPending}
-            >
-              {seedMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Plus className="h-4 w-4 mr-1" />
-              )}
-              Seed Tasks
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {/* Stats Summary */}
-      {stats && stats.total > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-          <div className="bg-muted/30 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold">{stats.pending}</p>
-            <p className="text-[10px] text-muted-foreground">Pending</p>
-          </div>
-          <div className="bg-blue-500/5 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-blue-400">{stats.inProgress}</p>
-            <p className="text-[10px] text-muted-foreground">In Progress</p>
-          </div>
-          <div className="bg-emerald-500/5 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-emerald-400">{stats.completed}</p>
-            <p className="text-[10px] text-muted-foreground">Completed</p>
-          </div>
-          <div className="bg-red-500/5 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-red-400">{stats.failed}</p>
-            <p className="text-[10px] text-muted-foreground">Failed</p>
+        {/* AI Execution Info Banner */}
+        <div className="bg-violet-500/5 border border-violet-500/20 rounded-lg p-3 mb-4 flex items-start gap-3">
+          <Zap className="h-4 w-4 text-violet-400 mt-0.5 shrink-0" />
+          <div className="text-xs text-muted-foreground">
+            <span className="text-violet-300 font-medium">AI-Powered Execution</span> — Each task can be analysed, dry-run previewed, or fully executed by Titan's AI engine.
+            Execution reads relevant files, generates code changes, validates them, applies them, and pushes to GitHub automatically.
           </div>
         </div>
-      )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="performance">Performance</SelectItem>
-            <SelectItem value="security">Security</SelectItem>
-            <SelectItem value="ux">UX</SelectItem>
-            <SelectItem value="feature">Feature</SelectItem>
-            <SelectItem value="reliability">Reliability</SelectItem>
-            <SelectItem value="testing">Testing</SelectItem>
-            <SelectItem value="infrastructure">Infrastructure</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="h-8 w-[120px] text-xs">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Task List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : !tasks || tasks.length === 0 ? (
-        <div className="text-center py-8">
-          <ListTodo className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No improvement tasks yet.</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Click "Seed Tasks" to populate the backlog with curated improvements.</p>
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-[500px] overflow-y-auto">
-          {tasks.map((task) => (
-            <div key={task.id} className="border border-border/30 rounded-lg p-3 hover:bg-muted/10 transition-colors">
-              <div className="flex items-start gap-3">
-                <div className="shrink-0 mt-0.5">
-                  {categoryIcons[task.category] || <FileCode className="h-3.5 w-3.5 text-muted-foreground" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-sm font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
-                      {task.title}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <Badge className={`text-[10px] ${priorityColors[task.priority] || ""}`}>
-                      {task.priority}
-                    </Badge>
-                    <Badge className={`text-[10px] ${statusColors[task.status] || ""}`}>
-                      {task.status.replace("_", " ")}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      {task.complexity}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground/50 ml-auto">
-                      ~{task.estimatedFiles} file{(task.estimatedFiles ?? 1) > 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-                {task.status === "pending" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs shrink-0"
-                    onClick={() => updateStatusMutation.mutate({ id: task.id, status: "in_progress" })}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    Start
-                  </Button>
-                )}
-                {task.status === "in_progress" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs text-emerald-400 shrink-0"
-                    onClick={() => updateStatusMutation.mutate({ id: task.id, status: "completed" })}
-                    disabled={updateStatusMutation.isPending}
-                  >
-                    Done
-                  </Button>
-                )}
-              </div>
+        {/* Stats Summary */}
+        {stats && stats.total > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+            <div className="bg-muted/30 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold">{stats.pending}</p>
+              <p className="text-[10px] text-muted-foreground">Pending</p>
             </div>
-          ))}
+            <div className="bg-blue-500/5 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-blue-400">{stats.inProgress}</p>
+              <p className="text-[10px] text-muted-foreground">In Progress</p>
+            </div>
+            <div className="bg-emerald-500/5 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-emerald-400">{stats.completed}</p>
+              <p className="text-[10px] text-muted-foreground">Completed</p>
+            </div>
+            <div className="bg-red-500/5 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-red-400">{stats.failed}</p>
+              <p className="text-[10px] text-muted-foreground">Failed</p>
+            </div>
+            <div className="bg-muted/20 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-muted-foreground">{stats.skipped}</p>
+              <p className="text-[10px] text-muted-foreground">Skipped</p>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="performance">Performance</SelectItem>
+              <SelectItem value="security">Security</SelectItem>
+              <SelectItem value="ux">UX</SelectItem>
+              <SelectItem value="feature">Feature</SelectItem>
+              <SelectItem value="reliability">Reliability</SelectItem>
+              <SelectItem value="testing">Testing</SelectItem>
+              <SelectItem value="infrastructure">Infrastructure</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="h-8 w-[120px] text-xs"><SelectValue placeholder="Priority" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 w-[120px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="skipped">Skipped</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      )}
-    </div>
+
+        {/* Task List */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : !tasks || tasks.length === 0 ? (
+          <div className="text-center py-8">
+            <ListTodo className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">No improvement tasks yet.</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Click "Seed Tasks" to populate the backlog with curated improvements.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {tasks.map((task) => {
+              const isThisRunning = activeTaskId === task.id && isRunning;
+              return (
+                <div key={task.id} className={`border rounded-lg p-3 transition-colors ${
+                  task.status === "in_progress" ? "border-blue-500/30 bg-blue-500/5" :
+                  task.status === "completed" ? "border-emerald-500/20 bg-emerald-500/5" :
+                  task.status === "failed" ? "border-red-500/20 bg-red-500/5" :
+                  "border-border/30 hover:bg-muted/10"
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">
+                      {isThisRunning ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
+                      ) : (
+                        categoryIcons[task.category] || <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-sm font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
+                      {task.completionNotes && task.status !== "pending" && (
+                        <p className="text-[10px] text-muted-foreground/60 mt-1 line-clamp-2 italic">{task.completionNotes}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <Badge className={`text-[10px] ${priorityColors[task.priority] || ""}`}>{task.priority}</Badge>
+                        <Badge className={`text-[10px] ${statusColors[task.status] || ""}`}>{task.status.replace("_", " ")}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{task.complexity}</Badge>
+                        <span className="text-[10px] text-muted-foreground/50 ml-auto">~{task.estimatedFiles} file{(task.estimatedFiles ?? 1) > 1 ? "s" : ""}</span>
+                      </div>
+                    </div>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {task.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                            onClick={() => { setActiveTaskId(task.id); analyzeTaskMutation.mutate({ id: task.id }); }}
+                            disabled={isRunning}
+                            title="Analyse — AI identifies affected files and creates a plan (no changes applied)"
+                          >
+                            {isThisRunning && analyzeTaskMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                            onClick={() => { setActiveTaskId(task.id); executeTaskMutation.mutate({ id: task.id, dryRun: true }); }}
+                            disabled={isRunning}
+                            title="Dry Run — AI generates changes but does NOT apply them"
+                          >
+                            {isThisRunning && executeTaskMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowDownToLine className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                            onClick={() => {
+                              if (confirm(`Execute task "${task.title}"?\n\nThis will:\n1. Generate code changes via AI\n2. Validate them\n3. Apply them to the codebase\n4. Run health check\n5. Push to GitHub\n\nA snapshot will be created first for rollback.`)) {
+                                setActiveTaskId(task.id);
+                                executeTaskMutation.mutate({ id: task.id, dryRun: false });
+                              }
+                            }}
+                            disabled={isRunning}
+                            title="Execute — AI generates, validates, applies changes and pushes to GitHub"
+                          >
+                            {isThisRunning && executeTaskMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-muted-foreground hover:text-muted-foreground/70"
+                            onClick={() => updateStatusMutation.mutate({ id: task.id, status: "skipped" })}
+                            disabled={isRunning}
+                            title="Skip this task"
+                          >
+                            <ArrowDownToLine className="h-3 w-3 rotate-90" />
+                          </Button>
+                        </>
+                      )}
+                      {task.status === "failed" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-amber-400 hover:text-amber-300"
+                          onClick={() => updateStatusMutation.mutate({ id: task.id, status: "pending" })}
+                          disabled={isRunning}
+                          title="Reset to pending"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {task.status === "skipped" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-muted-foreground"
+                          onClick={() => updateStatusMutation.mutate({ id: task.id, status: "pending" })}
+                          disabled={isRunning}
+                          title="Restore to pending"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-muted-foreground/40 hover:text-red-400"
+                        onClick={() => { if (confirm("Delete this task?")) deleteMutation.mutate({ id: task.id }); }}
+                        disabled={isRunning}
+                        title="Delete task"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Legend */}
+        {tasks && tasks.length > 0 && (
+          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><Eye className="h-3 w-3 text-blue-400" /> Analyse</span>
+            <span className="flex items-center gap-1"><ArrowDownToLine className="h-3 w-3 text-amber-400" /> Dry Run</span>
+            <span className="flex items-center gap-1"><Rocket className="h-3 w-3 text-emerald-400" /> Execute</span>
+            <span className="flex items-center gap-1"><RotateCcw className="h-3 w-3" /> Reset</span>
+            <span className="flex items-center gap-1"><Trash2 className="h-3 w-3" /> Delete</span>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
