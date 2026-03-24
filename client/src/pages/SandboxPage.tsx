@@ -320,17 +320,26 @@ function FileBrowser({
     { refetchInterval: false }
   );
 
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ path: string; name: string } | null>(null);
+  const [renameTo, setRenameTo] = useState("");
+
   const utils = trpc.useUtils();
+  const invalidateFiles = () => utils.sandbox.listFiles.invalidate({ sandboxId, path: currentPath });
+
   const writeMutation = trpc.sandbox.writeFile.useMutation({
-    onSuccess: () => {
-      utils.sandbox.listFiles.invalidate({ sandboxId, path: currentPath });
-      toast.success("Created successfully");
-    },
+    onSuccess: () => { invalidateFiles(); toast.success("Created successfully"); },
+  });
+  const deleteFileMutation = trpc.sandbox.deleteFile.useMutation({
+    onSuccess: () => { invalidateFiles(); toast.success("Deleted"); },
+    onError: (err) => toast.error(err.message),
+  });
+  const createDirMutation = trpc.sandbox.createDir.useMutation({
+    onSuccess: () => { invalidateFiles(); toast.success("Folder created"); },
+    onError: (err) => toast.error(err.message),
   });
   const execMutation = trpc.sandbox.exec.useMutation({
-    onSuccess: () => {
-      utils.sandbox.listFiles.invalidate({ sandboxId, path: currentPath });
-    },
+    onSuccess: () => { invalidateFiles(); },
   });
 
   useEffect(() => {
@@ -354,22 +363,37 @@ function FileBrowser({
   const createFolder = () => {
     if (!newName.trim()) return;
     const folderPath = `${currentPath}/${newName.trim()}`;
-    execMutation.mutate({
-      sandboxId,
-      command: `mkdir -p "${folderPath}"`,
-      workingDirectory: currentPath,
-    });
+    createDirMutation.mutate({ sandboxId, path: folderPath });
     setShowNewFolderDialog(false);
     setNewName("");
   };
 
-  const deleteItem = (itemPath: string, isDir: boolean) => {
-    if (!confirm(`Delete ${isDir ? "folder" : "file"}: ${itemPath}?`)) return;
+  const deleteItem = (itemPath: string) => {
+    if (!confirm(`Delete: ${itemPath}?`)) return;
+    deleteFileMutation.mutate({ sandboxId, path: itemPath });
+  };
+
+  const startRename = (path: string, name: string) => {
+    setRenameTarget({ path, name });
+    setRenameTo(name);
+    setShowRenameDialog(true);
+  };
+
+  const doRename = () => {
+    if (!renameTarget || !renameTo.trim() || renameTo.trim() === renameTarget.name) {
+      setShowRenameDialog(false);
+      return;
+    }
+    const dir = renameTarget.path.split("/").slice(0, -1).join("/") || "/";
+    const newPath = `${dir}/${renameTo.trim()}`;
     execMutation.mutate({
       sandboxId,
-      command: isDir ? `rm -rf "${itemPath}"` : `rm -f "${itemPath}"`,
+      command: `mv "${renameTarget.path}" "${newPath}"`,
       workingDirectory: currentPath,
     });
+    setShowRenameDialog(false);
+    setRenameTarget(null);
+    setRenameTo("");
   };
 
   const getFileIcon = (name: string) => {
@@ -484,7 +508,14 @@ function FileBrowser({
                 <span className="text-zinc-600 shrink-0">{formatSize(file.size)}</span>
               )}
               <button
-                onClick={() => deleteItem(file.path, file.isDirectory)}
+                onClick={() => startRename(file.path, file.name)}
+                className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-300 p-0.5 transition-opacity"
+                title="Rename"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => deleteItem(file.path)}
                 className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 p-0.5 transition-opacity"
                 title="Delete"
               >
@@ -536,6 +567,27 @@ function FileBrowser({
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewFolderDialog(false)} className="border-zinc-700 text-zinc-400">Cancel</Button>
             <Button onClick={createFolder} className="bg-cyan-600 hover:bg-cyan-700 text-white">Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="bg-[#161b22] border-zinc-700 text-zinc-200">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-100">Rename</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameTo}
+            onChange={(e) => setRenameTo(e.target.value)}
+            placeholder="new-name"
+            className="bg-[#0d1117] border-zinc-700 text-zinc-200"
+            onKeyDown={(e) => e.key === "Enter" && doRename()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)} className="border-zinc-700 text-zinc-400">Cancel</Button>
+            <Button onClick={doRename} className="bg-cyan-600 hover:bg-cyan-700 text-white">Rename</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -698,11 +750,13 @@ function PackageManager({ sandboxId }: { sandboxId: number }) {
   const [packageName, setPackageName] = useState("");
   const [packageManager, setPackageManager] = useState<"npm" | "pip" | "apt">("npm");
 
+  const utils = trpc.useUtils();
   const installMutation = trpc.sandbox.installPackage.useMutation({
     onSuccess: (result) => {
       if (result.success) {
         toast.success(`Installed ${packageName}`);
         setPackageName("");
+        utils.sandbox.getPackages.invalidate({ sandboxId });
       } else {
         toast.error(`Failed: ${result.output.slice(0, 200)}`);
       }
@@ -710,7 +764,7 @@ function PackageManager({ sandboxId }: { sandboxId: number }) {
     onError: (err) => toast.error(err.message),
   });
 
-  const { data: sandbox } = trpc.sandbox.get.useQuery({ sandboxId });
+  const { data: packages } = trpc.sandbox.getPackages.useQuery({ sandboxId });
 
   return (
     <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
@@ -767,9 +821,9 @@ function PackageManager({ sandboxId }: { sandboxId: number }) {
       {/* Installed packages */}
       <div className="flex-1 overflow-y-auto p-3">
         <p className="text-zinc-500 text-xs mb-2 font-medium">Installed</p>
-        {sandbox?.installedPackages && sandbox.installedPackages.length > 0 ? (
+        {packages && packages.length > 0 ? (
           <div className="space-y-1">
-            {sandbox.installedPackages.map((pkg, i) => {
+            {packages.map((pkg, i) => {
               const [pm, name] = (pkg as string).split(":");
               return (
                 <div key={i} className="flex items-center gap-2 text-xs text-zinc-400 py-1 px-2 rounded hover:bg-zinc-800/50">
@@ -798,19 +852,28 @@ function EnvVarsManager({ sandboxId }: { sandboxId: number }) {
   const [newValue, setNewValue] = useState("");
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
 
-  const { data: sandbox, refetch } = trpc.sandbox.get.useQuery({ sandboxId });
+  const utils = trpc.useUtils();
+  const { data: envData } = trpc.sandbox.getEnv.useQuery({ sandboxId });
 
   const updateMutation = trpc.sandbox.updateEnv.useMutation({
     onSuccess: () => {
       toast.success("Environment updated");
-      refetch();
+      utils.sandbox.getEnv.invalidate({ sandboxId });
       setNewKey("");
       setNewValue("");
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const envVars = (sandbox?.envVars || {}) as Record<string, string>;
+  const deleteEnvMutation = trpc.sandbox.deleteEnv.useMutation({
+    onSuccess: () => {
+      toast.success("Variable deleted");
+      utils.sandbox.getEnv.invalidate({ sandboxId });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const envVars = (envData || {}) as Record<string, string>;
 
   const addVar = () => {
     if (!newKey.trim()) return;
@@ -818,10 +881,7 @@ function EnvVarsManager({ sandboxId }: { sandboxId: number }) {
   };
 
   const deleteVar = (key: string) => {
-    const updated = { ...envVars };
-    delete updated[key];
-    // Set to empty string to "delete" (engine merges)
-    updateMutation.mutate({ sandboxId, envVars: { [key]: "" } });
+    deleteEnvMutation.mutate({ sandboxId, key });
   };
 
   return (
@@ -1589,11 +1649,23 @@ function SandboxSettings({
   onReset: () => void;
   onDelete: () => void;
 }) {
+  const utils = trpc.useUtils();
   const { data: sandbox } = trpc.sandbox.get.useQuery({ sandboxId });
   const [newName, setNewName] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
 
   const persistMutation = trpc.sandbox.persist.useMutation({
     onSuccess: () => toast.success("Workspace saved to cloud"),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const renameMutation = trpc.sandbox.rename.useMutation({
+    onSuccess: () => {
+      toast.success("Sandbox renamed");
+      utils.sandbox.get.invalidate({ sandboxId });
+      utils.sandbox.list.invalidate();
+      setIsEditingName(false);
+    },
     onError: (err) => toast.error(err.message),
   });
 
@@ -1611,9 +1683,43 @@ function SandboxSettings({
         <div className="space-y-2">
           <p className="text-zinc-400 text-xs font-medium">Sandbox Info</p>
           <div className="bg-[#161b22] rounded p-3 space-y-2 text-xs">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-zinc-500">Name</span>
-              <span className="text-zinc-300">{sandbox?.name}</span>
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="h-6 text-xs bg-[#0d1117] border-zinc-700 text-zinc-200 w-32"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newName.trim()) renameMutation.mutate({ sandboxId, name: newName.trim() });
+                      if (e.key === "Escape") setIsEditingName(false);
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => { if (newName.trim()) renameMutation.mutate({ sandboxId, name: newName.trim() }); }}
+                    className="text-green-400 hover:text-green-300 p-0.5"
+                    disabled={renameMutation.isPending}
+                  >
+                    {renameMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  </button>
+                  <button onClick={() => setIsEditingName(false)} className="text-zinc-500 hover:text-zinc-300 p-0.5">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <span className="text-zinc-300">{sandbox?.name}</span>
+                  <button
+                    onClick={() => { setNewName(sandbox?.name || ""); setIsEditingName(true); }}
+                    className="text-zinc-600 hover:text-zinc-400 p-0.5"
+                    title="Rename sandbox"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-500">OS</span>
