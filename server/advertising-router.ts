@@ -37,6 +37,21 @@ import {
   getActiveABTests,
   createABTest,
   recordABTestResult,
+  // Growth Intelligence
+  getGrowthIntelligenceSummary,
+  getGrowthVelocity,
+  getAnomalyAlerts,
+  getAttribution,
+  getBudgetRecommendations,
+  getMVTTests,
+  startMVTTest,
+  recordMVT,
+  getViralPatterns,
+  generateViralPost,
+  getChannelHealth,
+  resumePausedChannel,
+  getCompetitorGaps,
+  getWeeklyGrowthReport,
 } from "./advertising-orchestrator";
 import {
   runTikTokContentPipeline,
@@ -597,4 +612,110 @@ export const advertisingRouter = router({
       const { autoApproveHighQualityContent } = await import("./content-creator-engine");
       return autoApproveHighQualityContent();
     }),
+
+  // ════════════════════════════════════════════════════════════════════════
+  // GROWTH INTELLIGENCE
+  // ════════════════════════════════════════════════════════════════════════
+
+  /** Full intelligence summary — MVT tests, channel health, viral patterns, velocities, anomalies, attribution, budget */
+  getIntelligenceSummary: adminProcedure.query(async () => {
+    return getGrowthIntelligenceSummary();
+  }),
+
+  /** Week-over-week growth velocity per channel */
+  getGrowthVelocity: adminProcedure.query(async () => {
+    return getGrowthVelocity();
+  }),
+
+  /** Active anomaly alerts with diagnosis and recommended action */
+  getAnomalyAlerts: adminProcedure.query(async () => {
+    return getAnomalyAlerts();
+  }),
+
+  /** Multi-touch attribution breakdown (first/last/linear/time-decay/blended) */
+  getAttribution: adminProcedure
+    .input(z.object({ days: z.number().min(1).max(365).default(30) }).optional())
+    .query(async ({ input }) => {
+      return getAttribution(input?.days ?? 30);
+    }),
+
+  /** Optimal budget allocation recommendations based on ROI */
+  getBudgetRecommendations: adminProcedure
+    .input(z.object({
+      totalBudget: z.number().min(0).default(500),
+      currentAllocations: z.record(z.string(), z.number()).default({}),
+    }).optional())
+    .query(({ input }) => {
+      return getBudgetRecommendations(
+        input?.totalBudget ?? 500,
+        input?.currentAllocations ?? {}
+      );
+    }),
+
+  /** Get all MVT tests (active and completed) */
+  getMVTTests: adminProcedure.query(() => {
+    return getMVTTests();
+  }),
+
+  /** Create a new multi-variate test */
+  createMVTTest: adminProcedure
+    .input(z.object({
+      channel: z.string(),
+      variables: z.array(z.object({
+        name: z.enum(["hook", "body", "cta", "format", "tone"]),
+        variants: z.array(z.string()).min(2).max(5),
+      })).min(1).max(4),
+    }))
+    .mutation(({ input }) => {
+      return startMVTTest(input.channel, input.variables);
+    }),
+
+  /** Record an MVT test result */
+  recordMVTResult: adminProcedure
+    .input(z.object({
+      testId: z.string(),
+      variant: z.string(),
+      converted: z.boolean(),
+    }))
+    .mutation(({ input }) => {
+      recordMVT(input.testId, input.variant, input.converted);
+      return { success: true };
+    }),
+
+  /** Get all viral content patterns with engagement rates */
+  getViralPatterns: adminProcedure.query(() => {
+    return getViralPatterns();
+  }),
+
+  /** Generate viral content using the best pattern for a platform */
+  generateViralContent: adminProcedure
+    .input(z.object({
+      platform: z.string(),
+      topic: z.string().min(3).max(500),
+    }))
+    .mutation(async ({ input }) => {
+      return generateViralPost(input.platform, input.topic);
+    }),
+
+  /** Get channel health statuses with pause/resume controls */
+  getChannelHealth: adminProcedure.query(() => {
+    return getChannelHealth();
+  }),
+
+  /** Resume a paused channel */
+  resumeChannel: adminProcedure
+    .input(z.object({ channel: z.string() }))
+    .mutation(({ input }) => {
+      return resumePausedChannel(input.channel);
+    }),
+
+  /** Get competitor gap analysis — topics to own, weaknesses to exploit */
+  getCompetitorGaps: adminProcedure.query(async () => {
+    return getCompetitorGaps();
+  }),
+
+  /** Generate the weekly growth report on demand */
+  getWeeklyReport: adminProcedure.query(async () => {
+    return getWeeklyGrowthReport();
+  }),
 });

@@ -57,6 +57,40 @@ import { runTikTokContentPipeline, getTikTokContentStats, isTikTokContentConfigu
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { generateShortFormVideo, generateMarketingVideo, generateSocialClip, isVideoGenerationAvailable } from "./_core/videoGeneration";
+import {
+  analyzeCompetitorGaps,
+  generateViralContent,
+  getBestViralPattern,
+  updateViralPatternPerformance,
+  createMVTTest,
+  selectMVTVariant,
+  recordMVTResult,
+  getActiveMVTTests,
+  getAllMVTTests,
+  recordTouchPoint,
+  calculateMultiTouchAttribution,
+  calculateOptimalBudgetAllocation,
+  recordChannelROI,
+  recordPublishResult,
+  initChannelHealth,
+  getChannelHealthStatus,
+  resumeChannel,
+  getRetryDelay,
+  recordPostEngagement,
+  getPredictedOptimalPostingTime,
+  calculateGrowthVelocity,
+  detectAnomalies,
+  generateWeeklyGrowthReport,
+  getIntelligenceSummary,
+  getAllViralPatterns,
+  type MVTTest,
+  type AttributionResult,
+  type BudgetAllocation,
+  type ChannelHealth,
+  type GrowthVelocity,
+  type AnomalyAlert,
+  type WeeklyGrowthReport,
+} from "./growth-intelligence";
 const log = createLogger("AdvertisingOrchestrator");
 
 // ============================================
@@ -2544,6 +2578,55 @@ export async function runAdvertisingCycle(): Promise<AdvertisingCycleResult> {
 
   log.info(`[AdvertisingOrchestrator] Cycle complete: ${successCount} success, ${failCount} failed, ${duration}ms`);
 
+  // ─── Growth Intelligence Layer ───────────────────────────────────────────────
+  try {
+    // Record channel health for all actions in this cycle
+    for (const action of actions) {
+      initChannelHealth(action.channel);
+      recordPublishResult(action.channel, action.status === "success", 0);
+    }
+
+    // Record ROI data for channels that had activity
+    const channelsWithActivity = [...new Set(actions.filter(a => a.status === "success").map(a => a.channel))];
+    for (const channel of channelsWithActivity) {
+      recordChannelROI({
+        channel,
+        spend: 0, // free channels
+        conversions: 0, // would come from analytics
+        impressions: actions.filter(a => a.channel === channel && a.status === "success").length,
+        clicks: 0,
+      });
+    }
+
+    // Run competitor gap analysis (non-blocking, used for next cycle's content)
+    analyzeCompetitorGaps().then(gaps => {
+      if (gaps.recommendedTopics?.length > 0) {
+        log.info(`[GrowthIntelligence] Competitor gaps identified: ${gaps.recommendedTopics.slice(0, 3).join(", ")}`);
+      }
+    }).catch(() => {});
+
+    // Detect anomalies and log them
+    detectAnomalies().then(anomalies => {
+      if (anomalies.length > 0) {
+        const critical = anomalies.filter(a => a.severity === "critical");
+        if (critical.length > 0) {
+          log.warn(`[GrowthIntelligence] ${critical.length} critical anomalies detected: ${critical.map(a => a.channel).join(", ")}`);
+        }
+      }
+    }).catch(() => {});
+
+    // Monday: generate weekly growth report
+    if (now.getDay() === 1) {
+      generateWeeklyGrowthReport().then(report => {
+        log.info(`[GrowthIntelligence] Weekly report generated for ${report.weekOf}`);
+      }).catch(() => {});
+    }
+
+    log.info("[GrowthIntelligence] Intelligence layer processing complete");
+  } catch (err: unknown) {
+    log.warn("[AdvertisingOrchestrator] Growth intelligence layer failed (non-critical):", { error: getErrorMessage(err) });
+  }
+
   // ─── Content Creator: Full Autonomous Content Cycle ─────────────────────────
   try {
     // Dynamic import avoids circular dependency (content-creator-engine imports advertising-orchestrator)
@@ -2804,3 +2887,118 @@ export async function getPerformanceMetrics(days = 30) {
     return null;
   }
 }
+
+// ============================================
+// GROWTH INTELLIGENCE PUBLIC API
+// ============================================
+
+/**
+ * Get the full intelligence summary for the dashboard.
+ * Includes MVT tests, channel health, viral patterns, velocities, anomalies, attribution, budget recommendations.
+ */
+export async function getGrowthIntelligenceSummary() {
+  return getIntelligenceSummary();
+}
+
+/**
+ * Get growth velocity per channel (week-over-week).
+ */
+export async function getGrowthVelocity() {
+  return calculateGrowthVelocity();
+}
+
+/**
+ * Get active anomaly alerts.
+ */
+export async function getAnomalyAlerts() {
+  return detectAnomalies();
+}
+
+/**
+ * Get multi-touch attribution breakdown.
+ */
+export async function getAttribution(days = 30) {
+  return calculateMultiTouchAttribution(days);
+}
+
+/**
+ * Get optimal budget allocation recommendations.
+ */
+export function getBudgetRecommendations(totalBudget: number, currentAllocations: Record<string, number>) {
+  return calculateOptimalBudgetAllocation(totalBudget, currentAllocations);
+}
+
+/**
+ * Get all MVT tests (active and completed).
+ */
+export function getMVTTests() {
+  return getAllMVTTests();
+}
+
+/**
+ * Create a new MVT test.
+ */
+export function startMVTTest(channel: string, variables: Array<{ name: "hook" | "body" | "cta" | "format" | "tone"; variants: string[] }>) {
+  return createMVTTest(channel, variables);
+}
+
+/**
+ * Record an MVT test result.
+ */
+export function recordMVT(testId: string, variant: string, converted: boolean) {
+  recordMVTResult(testId, variant, converted);
+}
+
+/**
+ * Get all viral content patterns.
+ */
+export function getViralPatterns() {
+  return getAllViralPatterns();
+}
+
+/**
+ * Generate content using the best viral pattern for a platform.
+ */
+export async function generateViralPost(platform: string, topic: string) {
+  return generateViralContent({ platform, topic });
+}
+
+/**
+ * Get channel health statuses.
+ */
+export function getChannelHealth() {
+  return getChannelHealthStatus();
+}
+
+/**
+ * Resume a paused channel.
+ */
+export function resumePausedChannel(channel: string) {
+  resumeChannel(channel);
+  return { success: true, message: `Channel ${channel} resumed` };
+}
+
+/**
+ * Get competitor gap analysis.
+ */
+export async function getCompetitorGaps() {
+  return analyzeCompetitorGaps();
+}
+
+/**
+ * Generate the weekly growth report on demand.
+ */
+export async function getWeeklyGrowthReport() {
+  return generateWeeklyGrowthReport();
+}
+
+// Re-export intelligence types for the router
+export type {
+  MVTTest,
+  AttributionResult,
+  BudgetAllocation,
+  ChannelHealth,
+  GrowthVelocity,
+  AnomalyAlert,
+  WeeklyGrowthReport,
+};
