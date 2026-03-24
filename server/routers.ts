@@ -51,6 +51,7 @@ import { exploitpackRouter } from "./exploitpack-router";
 import { filesRouter } from "./api/files";
 import { contentCreatorRouter } from "./content-creator-router";
 import { contentIntelligenceRouter } from "./content-intelligence-router";
+import { masterGrowthRouter } from "./master-growth-router";
 import { cybermcpRouter } from "./cybermcp-router";
 import { astraRouter } from "./astra-router";
 import { argusRouter } from "./argus-router";
@@ -144,6 +145,7 @@ export const appRouter = router({
   exploitpack: exploitpackRouter,
   contentCreator: contentCreatorRouter,
   contentIntelligence: contentIntelligenceRouter,
+  masterGrowth: masterGrowthRouter,
   cyberMcp: cybermcpRouter,
   astra: astraRouter,
   argus: argusRouter,

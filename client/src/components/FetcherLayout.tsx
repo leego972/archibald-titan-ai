@@ -198,6 +198,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_33_r5c1"), label: t("nav.blogEngine"), path: "/blog-admin", adminOnly: true, isNew: true },
       { icon: featureIcon("icon_31_r4c7"), label: t("nav.marketingEngine"), path: "/marketing", adminOnly: true, isNew: true },
       { icon: featureIcon("icon_12_r2c4"), label: t("nav.contentCreator"), path: "/content-creator", adminOnly: true, isNew: true },
+      { icon: featureIcon("icon_13_r2c5"), label: "Master Growth", path: "/master-growth", adminOnly: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -266,7 +267,7 @@ const allMenuItemPaths = [
   "/cybermcp", "/astra", "/argus", "/replicate", "/evilginx", "/blackeye", "/metasploit", "/storage",
   "/grants", "/grant-applications", "/companies", "/business-plans", "/crowdfunding",
   "/crowdfunding/my-campaigns", "/advertising", "/affiliate", "/referrals", "/seo",
-  "/blog-admin", "/marketing", "/content-creator",
+  "/blog-admin", "/marketing", "/content-creator", "/master-growth",
   "/dashboard/subscription", "/dashboard/credits", "/fetcher/credentials", "/fetcher/api-access",
   "/fetcher/team", "/fetcher/team-vault", "/fetcher/settings",
   "/fetcher/export", "/fetcher/import", "/fetcher/bulk-sync", "/fetcher/auto-sync",

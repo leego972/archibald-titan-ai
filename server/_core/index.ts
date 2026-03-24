@@ -27,6 +27,7 @@ import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-
 import { updateCampaignImages } from "../crowdfunding-aggregator";
 import { updateCampaign, listCampaigns } from "../db";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
+import { startMasterOrchestrator } from "../master-growth-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
 import { startBusinessModuleGeneratorScheduler } from "../business-module-generator";
 import { startSecuritySweepScheduler } from "../security-hardening";
@@ -772,6 +773,10 @@ async function startServer() {
     // Runs daily: blog generation, social media, community engagement,
     // email nurture, backlink outreach, affiliate optimization, SEO
     startAdvertisingScheduler();
+    // ─── Master Growth Orchestrator ───────────────────────────────
+    // Unified brain: SEO → Content → Advertising in dependency order
+    // Runs daily at 6:00 AM — cross-system intelligence sharing
+    startMasterOrchestrator();
 
     // ─── Affiliate Engine v2 Optimization ─────────────────────────
     // Runs daily at 4 AM UTC: EPC recalculation, fraud cleanup,

@@ -72,6 +72,7 @@ import BusinessPlanPage from "./pages/BusinessPlanPage";
 import CrowdfundingPage from "./pages/CrowdfundingPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import AdvertisingDashboard from "./pages/AdvertisingDashboard";
+import MasterGrowthDashboard from "./pages/MasterGrowthDashboard";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import SeoDashboard from "./pages/SeoDashboard";
 import BlogAdmin from "./pages/BlogAdmin";
@@ -184,6 +185,7 @@ function DashboardRouter() {
         <Route path="/crowdfunding/:rest*" component={CrowdfundingPage} />
         <Route path="/referrals" component={ReferralsPage} />
         <Route path="/advertising" component={AdvertisingDashboard} />
+        <Route path="/master-growth" component={MasterGrowthDashboard} />
         <Route path="/affiliate" component={AffiliateDashboard} />
         <Route path="/seo" component={SeoDashboard} />
         <Route path="/blog-admin" component={BlogAdmin} />
