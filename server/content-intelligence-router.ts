@@ -15,6 +15,9 @@
 
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
 import {
   runContentPipeline,
   generateContentAtom,
@@ -33,6 +36,8 @@ import {
   getContentIntelligenceSummary,
 } from "./content-intelligence";
 
+const log = createLogger("ContentIntelligenceRouter");
+
 export const contentIntelligenceRouter = router({
 
   // ─── 5-Stage Refinement Pipeline ─────────────────────────────────────────
@@ -44,8 +49,18 @@ export const contentIntelligenceRouter = router({
       persona: z.string().optional(),
       minScore: z.number().min(0).max(100).optional(),
     }))
-    .mutation(async ({ input }) => {
-      return runContentPipeline(input);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_bulk_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for pipeline. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await runContentPipeline(input);
+      try {
+        await consumeCredits(ctx.user.id, "content_bulk_generate", `Content pipeline: ${input.platform} — ${input.prompt.slice(0, 60)}`);
+      } catch (e) {
+        log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+      return result;
     }),
 
   // ─── Content Atom System (1 topic → 9 variants) ───────────────────────────
@@ -55,8 +70,18 @@ export const contentIntelligenceRouter = router({
       targetKeywords: z.array(z.string()).optional(),
       persona: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
-      return generateContentAtom(input);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_bulk_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for atom generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await generateContentAtom(input);
+      try {
+        await consumeCredits(ctx.user.id, "content_bulk_generate", `Content atom: ${input.topic}`);
+      } catch (e) {
+        log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+      return result;
     }),
 
   // ─── Trend Intelligence ───────────────────────────────────────────────────
@@ -94,8 +119,18 @@ export const contentIntelligenceRouter = router({
   // ─── Brand Voice DNA ──────────────────────────────────────────────────────
   scoreBrandVoice: adminProcedure
     .input(z.object({ content: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      return scoreBrandVoice(input.content);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for brand voice scoring. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await scoreBrandVoice(input.content);
+      try {
+        await consumeCredits(ctx.user.id, "content_generate", `Brand voice score: ${input.content.slice(0, 40)}`);
+      } catch (e) {
+        log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+      return result;
     }),
 
   // ─── Performance Feedback Loop ────────────────────────────────────────────
@@ -151,8 +186,18 @@ export const contentIntelligenceRouter = router({
       sourcePlatform: z.string(),
       targetPlatforms: z.array(z.string()).min(1),
     }))
-    .mutation(async ({ input }) => {
-      return repurposeContent(input);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for repurposing. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await repurposeContent(input);
+      try {
+        await consumeCredits(ctx.user.id, "content_generate", `Repurpose: ${input.sourcePlatform} → ${input.targetPlatforms.join(", ")}`);
+      } catch (e) {
+        log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+      return result;
     }),
 
   // ─── Full Intelligence Summary ────────────────────────────────────────────

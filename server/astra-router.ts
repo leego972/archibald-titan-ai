@@ -25,6 +25,10 @@ import { Client as SSHClient } from "ssh2";
 import { encrypt, decrypt } from "./fetcher-db";
 import { logAdminAction } from "./admin-activity-log";
 import { getTitanServerConfig, execSSHCommand as execTitanSSH } from "./titan-server";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+const log = createLogger("AstraRouter");
 
 // ─── SSH Execution Helper ─────────────────────────────────────────
 interface SSHConfig {
@@ -228,6 +232,10 @@ export const astraRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
+      const creditCheck = await checkCredits(ctx.user.id, "astra_scan");
+      if (!creditCheck.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for Astra scan. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+      }
       const ssh = await getSshConfig(ctx.user.id);
       const payload = {
         appname: input.appname,
@@ -241,6 +249,11 @@ export const astraRouter = router({
       const result = await astraApiCall(ssh, "/scan/", "POST", payload, 30000);
       if (result.data?.status && result.data.status !== "Failed") {
         await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_start_scan", category: "security", details: { appname: input.appname, url: input.url }, ipAddress: ctx.req?.ip || "unknown" });
+        try {
+          await consumeCredits(ctx.user.id, "astra_scan", `Astra scan: ${input.url}`);
+        } catch (e) {
+          log.warn("[Astra] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+        }
         return { success: true, scanId: result.data.status, message: `Scan started for ${input.url}` };
       }
       throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to start scan — ensure Astra is running and the target URL is reachable" });
@@ -286,11 +299,20 @@ export const astraRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
+      const creditCheck = await checkCredits(ctx.user.id, "astra_scan");
+      if (!creditCheck.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for Astra Postman scan. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+      }
       const ssh = await getSshConfig(ctx.user.id);
       const payload = { collection_url: input.collectionUrl, appname: input.appname, auth_header: input.authHeader || "" };
       const result = await astraApiCall(ssh, "/scan/postman/", "POST", payload, 30000);
       if (result.data?.status && result.data.status !== "Failed") {
         await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_postman_scan", category: "security", details: { appname: input.appname, collectionUrl: input.collectionUrl }, ipAddress: ctx.req?.ip || "unknown" });
+        try {
+          await consumeCredits(ctx.user.id, "astra_scan", `Astra Postman scan: ${input.appname}`);
+        } catch (e) {
+          log.warn("[Astra] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+        }
         return { success: true, scanId: result.data.status, message: "Postman collection scan started" };
       }
       throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to start Postman scan" });

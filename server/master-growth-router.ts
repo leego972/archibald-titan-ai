@@ -5,6 +5,9 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc.js";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
 import {
   runMasterGrowthCycle,
   startMasterOrchestrator,
@@ -20,10 +23,22 @@ import {
   resolveAnomaly,
 } from "./master-growth-orchestrator.js";
 
+const log = createLogger("MasterGrowthRouter");
+
 export const masterGrowthRouter = router({
   // Run a full growth cycle immediately
-  runCycle: protectedProcedure.mutation(async () => {
-    return await runMasterGrowthCycle();
+  runCycle: protectedProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for master growth cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await runMasterGrowthCycle();
+    try {
+      await consumeCredits(ctx.user.id, "advertising_run", "Master growth orchestrator cycle");
+    } catch (e) {
+      log.warn("[MasterGrowth] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
+    return result;
   }),
 
   // Start the daily scheduler

@@ -32,6 +32,7 @@ import {
 import { isTikTokContentConfigured } from "./tiktok-content-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { consumeCredits, checkCredits } from "./credit-service";
 
 const log = createLogger("ContentCreatorRouter");
 
@@ -91,9 +92,17 @@ export const contentCreatorRouter = router({
       tiktokLinked: z.boolean().default(false),
       generateStrategy: z.boolean().default(true),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
+
+      // Charge credits for AI strategy generation
+      if (input.generateStrategy) {
+        const creditCheck = await checkCredits(ctx.user.id, "content_campaign_create");
+        if (!creditCheck.allowed) {
+          throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+        }
+      }
 
       // Generate AI strategy if requested
       let aiStrategy: string | undefined;
@@ -107,6 +116,12 @@ export const contentCreatorRouter = router({
           });
         } catch (err) {
           log.warn("[ContentCreator] Strategy generation failed:", { error: getErrorMessage(err) });
+        }
+        // Consume credits after strategy generation
+        try {
+          await consumeCredits(ctx.user.id, "content_campaign_create", `Campaign strategy: ${input.name}`);
+        } catch (e) {
+          log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
         }
       }
 
@@ -222,10 +237,22 @@ export const contentCreatorRouter = router({
       campaignId: z.number().optional(),
       saveToDraft: z.boolean().default(true),
     }))
-    .mutation(async ({ input }) => {
-      const { saveToDraft, ...genParams } = input;
+    .mutation(async ({ ctx, input }) => {
+      // Check and consume credits before generation
+      const creditCheck = await checkCredits(ctx.user.id, "content_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
 
+      const { saveToDraft, ...genParams } = input;
       const content = await generateCreatorContent(genParams);
+
+      // Consume credits after successful generation
+      try {
+        await consumeCredits(ctx.user.id, "content_generate", `Generate ${input.platform} ${input.contentType}`);
+      } catch (e) {
+        log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
 
       if (saveToDraft) {
         const db = await getDb();
@@ -269,8 +296,22 @@ export const contentCreatorRouter = router({
       includeImages: z.boolean().default(false),
       campaignObjective: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
-      return bulkGenerateForCampaign(input);
+    .mutation(async ({ ctx, input }) => {
+      // Check credits before bulk generation
+      const creditCheck = await checkCredits(ctx.user.id, "content_bulk_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for bulk generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+
+      const result = await bulkGenerateForCampaign(input);
+
+      try {
+        await consumeCredits(ctx.user.id, "content_bulk_generate", `Bulk generate for campaign ${input.campaignId}`);
+      } catch (e) {
+        log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
+
+      return result;
     }),
 
   updatePiece: adminProcedure
@@ -443,7 +484,13 @@ export const contentCreatorRouter = router({
       campaignId: z.number().optional(),
       includeImages: z.boolean().default(false),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Check credits before SEO brief generation
+      const creditCheck = await checkCredits(ctx.user.id, "content_seo_brief");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for SEO brief generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
@@ -491,6 +538,13 @@ export const contentCreatorRouter = router({
         } catch (err) {
           results.push({ platform, error: getErrorMessage(err) });
         }
+      }
+
+      // Consume credits after generation
+      try {
+        await consumeCredits(ctx.user.id, "content_seo_brief", `SEO brief: ${input.topic}`);
+      } catch (e) {
+        log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
 
       return { success: true, generated: results.filter(r => !r.error).length, results };
@@ -588,8 +642,17 @@ export const contentCreatorRouter = router({
       platforms: z.array(z.string()),
       targetAudience: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_campaign_create");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const strategy = await generateCampaignStrategy(input);
+      try {
+        await consumeCredits(ctx.user.id, "content_campaign_create", `Strategy for: ${input.name}`);
+      } catch (e) {
+        log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
       return { strategy };
     }),
 

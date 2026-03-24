@@ -31,6 +31,11 @@ import {
   type ChannelId,
 } from "./marketing-channels";
 
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+const log = createLogger("MarketingRouter");
+
 export const marketingRouter = router({
   // ============================================
   // SETTINGS & CONFIGURATION
@@ -186,7 +191,11 @@ export const marketingRouter = router({
         includeImage: z.boolean().default(true),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for content generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const content = await generateContent(input);
 
       const db = await getDb();
@@ -265,7 +274,11 @@ export const marketingRouter = router({
         focusChannels: z.array(z.string()).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_campaign_create");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for campaign creation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -484,10 +497,20 @@ export const marketingRouter = router({
   // ============================================
 
   /** Manually trigger an autonomous marketing cycle */
-  runCycle: adminProcedure.mutation(async () => {
+  runCycle: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for autonomous marketing cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
     const db = await getDb();
 
     const result = await runAutonomousCycle();
+
+    try {
+      await consumeCredits(ctx.user.id, "advertising_run", "Autonomous marketing cycle");
+    } catch (e) {
+      log.warn("[Marketing] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
 
     if (db) {
       await db.insert(marketingActivityLog).values({

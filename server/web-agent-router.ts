@@ -23,6 +23,7 @@ import {
 } from "./web-agent-engine";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { consumeCredits, checkCredits } from "./credit-service";
 
 const log = createLogger("WebAgentRouter");
 
@@ -38,9 +39,20 @@ export const webAgentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "web_agent_task");
+      if (!creditCheck.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for Web Agent task. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const userId = ctx.user.id;
+
+      // Consume credits upfront before running the task
+      try {
+        await consumeCredits(ctx.user.id, "web_agent_task", `Web Agent: ${input.instruction.slice(0, 80)}`);
+      } catch (e) {
+        log.warn("[WebAgent] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
 
       // Create task record
       const result = await db.insert(webAgentTasks).values({

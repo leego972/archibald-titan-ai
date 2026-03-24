@@ -12,6 +12,8 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { getErrorMessage } from "./_core/errors.js";
 import { torSupervisor } from "./ip-rotation/tor-supervisor";
 import { proxyPool } from "./ip-rotation/proxy-pool";
 import { setIPRotationConfig, getIPRotationConfig } from "./ip-rotation/request-interceptor";
@@ -153,13 +155,22 @@ export const ipRotationRouter = router({
     }),
 
   /** Explicitly start Tor and wait for bootstrap */
-  startTor: protectedProcedure.mutation(async () => {
+  startTor: protectedProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to start Tor. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const status = torSupervisor.getStatus();
     if (status.state === "running") return { success: true, message: "Tor is already running", exitIp: status.exitIp };
     if (status.state === "starting" || status.state === "bootstrapping") {
       return { success: false, message: "Tor is already starting up, please wait...", exitIp: null };
     }
     const result = await torSupervisor.start();
+    try {
+      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Tor circuit started");
+    } catch (e) {
+      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     const newStatus = torSupervisor.getStatus();
     return { ...result, exitIp: newStatus.exitIp };
   }),
@@ -174,8 +185,17 @@ export const ipRotationRouter = router({
   }),
 
   /** Request a new Tor circuit — verifies the IP actually changed */
-  newCircuit: protectedProcedure.mutation(async () => {
+  newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for new Tor circuit. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const result = await torSupervisor.requestNewCircuit();
+    try {
+      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "New Tor circuit requested");
+    } catch (e) {
+      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     return result;
   }),
 
@@ -216,9 +236,18 @@ export const ipRotationRouter = router({
 
   /** Manually trigger a proxy scrape */
   scrapeProxies: protectedProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to scrape proxies. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     // Ensure pool is initialized with this user's ID for persistence
     proxyPool.start(ctx.user.id).catch(() => {});
     const result = await proxyPool.triggerScrape();
+    try {
+      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Proxy scrape triggered");
+    } catch (e) {
+      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     return result;
   }),
 

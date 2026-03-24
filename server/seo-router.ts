@@ -86,6 +86,11 @@ import {
   generateSeoIntelligenceReport,
 } from "./seo-intelligence";
 
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+const log = createLogger("SeoRouter");
+
 export const seoRouter = router({
 
   // ─── CORE (v3) ─────────────────────────────────────────────────────────────
@@ -108,8 +113,18 @@ export const seoRouter = router({
     return generateSeoReport();
   }),
 
-  runOptimization: adminProcedure.mutation(async () => {
-    return runScheduledSeoOptimization();
+  runOptimization: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "seo_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for SEO optimization. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await runScheduledSeoOptimization();
+    try {
+      await consumeCredits(ctx.user.id, "seo_run", "SEO optimization run");
+    } catch (e) {
+      log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
+    return result;
   }),
 
   getStructuredData: adminProcedure.query(async () => {
@@ -184,8 +199,17 @@ export const seoRouter = router({
     }),
 
   /** Run full GEO optimization cycle */
-  runGeoOptimization: adminProcedure.mutation(async () => {
+  runGeoOptimization: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "seo_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for GEO optimization. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
     await runGeoOptimization();
+    try {
+      await consumeCredits(ctx.user.id, "seo_run", "GEO optimization run");
+    } catch (e) {
+      log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     return { success: true, message: "GEO optimization complete — llms.txt, AI meta tags, and structured data updated" };
   }),
 
@@ -272,8 +296,18 @@ export const seoRouter = router({
   // ─── CONTENT INTELLIGENCE (v4) ─────────────────────────────────────────────
 
   /** Analyze content freshness across all pages */
-  analyzeContentFreshness: adminProcedure.mutation(async () => {
-    return analyzeContentFreshness();
+  analyzeContentFreshness: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "seo_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for content freshness analysis. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await analyzeContentFreshness();
+    try {
+      await consumeCredits(ctx.user.id, "seo_run", "Content freshness analysis");
+    } catch (e) {
+      log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
+    return result;
   }),
 
   /** Get search intent mappings (informational / transactional / navigational / commercial) */
@@ -282,8 +316,18 @@ export const seoRouter = router({
   }),
 
   /** Analyze content gaps vs competitors */
-  analyzeContentGaps: adminProcedure.mutation(async () => {
-    return analyzeContentGaps();
+  analyzeContentGaps: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "seo_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for content gap analysis. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await analyzeContentGaps();
+    try {
+      await consumeCredits(ctx.user.id, "seo_run", "Content gap analysis");
+    } catch (e) {
+      log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
+    return result;
   }),
 
   /** Get semantic keyword clusters */
@@ -419,8 +463,18 @@ export const seoIntelligenceRouter = trpcRouter({
   }),
 
   /** Check Titan's presence in AI search responses */
-  checkAiPresence: adminProcedure.mutation(async () => {
-    return checkAiSearchPresence();
+  checkAiPresence: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "seo_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for AI search presence check. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await checkAiSearchPresence();
+    try {
+      await consumeCredits(ctx.user.id, "seo_run", "AI search presence check");
+    } catch (e) {
+      log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
+    return result;
   }),
 
   /** Get AI search presence summary */

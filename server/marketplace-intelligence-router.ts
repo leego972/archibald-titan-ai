@@ -6,6 +6,10 @@
 
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+const log = createLogger("MarketplaceIntelligenceRouter");
 import {
   getSimilarListings,
   getBuyersAlsoBought,
@@ -144,8 +148,17 @@ export const marketplaceIntelligenceRouter = router({
       language: z.string().optional(),
       keyFeatures: z.string(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "marketplace_ai_describe");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for AI description. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const description = await generateListingDescription(input);
+      try {
+        await consumeCredits(ctx.user.id, "marketplace_ai_describe", `AI description: ${input.title}`);
+      } catch (e) {
+        log.warn("[MarketplaceIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
       return { description };
     }),
 

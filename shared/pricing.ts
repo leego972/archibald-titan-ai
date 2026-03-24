@@ -394,6 +394,34 @@ export const CREDIT_COSTS = {
   // ── Affiliate & API ──────────────────────────────────────────────────
   affiliate_action: 15,          // Light — link/campaign creation + tracking setup
   api_call: 5,                   // Micro — single external API call
+
+  // ── Content Creator ───────────────────────────────────────────────────────
+  content_campaign_create: 50,   // Standard — AI strategy generation for new campaign
+  content_bulk_generate: 200,    // Heavy — multi-platform bulk content generation cycle
+  content_seo_brief: 100,        // Medium — SEO-driven content generation per platform
+
+  // ── Marketplace Intelligence ──────────────────────────────────────────────
+  marketplace_ai_describe: 50,   // Standard — AI listing description generation
+  marketplace_ai_price: 25,      // Light — AI price suggestion analysis
+
+  // ── Security / Astra ──────────────────────────────────────────────────────
+  astra_scan: 200,               // Heavy — active vulnerability scan + AI analysis
+  exploit_exec: 500,             // Power — exploit module execution on node
+  exploit_cve_search: 50,        // Standard — CVE database search + AI enrichment
+
+  // ── BIN Checker ───────────────────────────────────────────────────────────
+  bin_lookup: 5,                 // Micro — single BIN database lookup
+  bin_bulk_lookup: 50,           // Standard — bulk BIN lookup batch (up to 100)
+  bin_reverse_search: 25,        // Light — reverse BIN search by country/network
+
+  // ── Proxy & IP Rotation ───────────────────────────────────────────────────
+  proxy_test: 10,                // Light — single proxy connectivity test
+  proxy_test_all: 75,            // Medium — full proxy pool health check
+  proxy_scrape: 50,              // Standard — scrape + validate fresh proxy list
+  ip_rotation_circuit: 25,       // Light — new Tor circuit / IP rotation
+
+  // ── Web Agent ─────────────────────────────────────────────────────────────
+  web_agent_task: 150,           // Heavy — autonomous browser task execution
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

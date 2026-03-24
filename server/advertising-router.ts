@@ -80,6 +80,11 @@ import {
 } from "../drizzle/schema";
 import { eq, desc, and, gte, sql, count } from "drizzle-orm";
 
+import { consumeCredits, checkCredits } from "./credit-service";
+import { createLogger } from "./_core/logger.js";
+import { getErrorMessage } from "./_core/errors.js";
+const log = createLogger("AdvertisingRouter");
+
 export const advertisingRouter = router({
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -116,8 +121,17 @@ export const advertisingRouter = router({
   /**
    * Manually trigger an advertising cycle (for testing or immediate action)
    */
-  runCycle: adminProcedure.mutation(async () => {
+  runCycle: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for advertising cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
     const result = await runAdvertisingCycle();
+    try {
+      await consumeCredits(ctx.user.id, "advertising_run", "Advertising cycle run");
+    } catch (e) {
+      log.warn("[Advertising] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     return result;
   }),
 
@@ -302,7 +316,11 @@ export const advertisingRouter = router({
   /**
    * Manually trigger TikTok content generation and posting
    */
-  triggerTikTokPost: adminProcedure.mutation(async () => {
+  triggerTikTokPost: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for TikTok post. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
     const result = await runTikTokContentPipeline();
     return result;
   }),
@@ -340,7 +358,11 @@ export const advertisingRouter = router({
         model: z.enum(["seedance", "grok-video"]).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "video_generation");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for video generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const result = await generateVideo({
         prompt: input.prompt,
         duration: input.duration,
@@ -360,7 +382,11 @@ export const advertisingRouter = router({
         scriptSummary: z.string().min(3).max(500),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "video_generation");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for short video generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const result = await generateShortFormVideo(input.hook, input.scriptSummary);
       return result;
     }),
@@ -375,7 +401,11 @@ export const advertisingRouter = router({
         cta: z.string().min(3).max(200),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "video_generation");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for ad video generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const result = await generateMarketingVideo(input.topic, input.cta);
       return result;
     }),
@@ -390,7 +420,11 @@ export const advertisingRouter = router({
         platform: z.enum(["tiktok", "youtube", "linkedin", "twitter", "instagram"]),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "video_generation");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for social clip generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const result = await generateSocialClip(input.feature, input.platform);
       return result;
     }),
@@ -595,7 +629,11 @@ export const advertisingRouter = router({
         autoPublishTikTok: z.boolean().default(true),
       }).optional()
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "content_bulk_generate");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for content cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const { runAutonomousContentCycle } = await import("./content-creator-engine");
       return runAutonomousContentCycle({
         maxPieces: input?.maxPiecesPerPlatform ?? 2,

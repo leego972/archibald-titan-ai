@@ -23,6 +23,8 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { getErrorMessage } from "./_core/errors.js";
 
 const log = createLogger("ProxyRotation");
 
@@ -369,6 +371,10 @@ export const proxyRotationRouter = router({
 
   /** Test all proxies (health check sweep) */
   testAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "proxy_test_all");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to test proxies. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const proxies = await getProxyList(ctx.user.id);
     if (!proxies.length) throw new TRPCError({ code: "BAD_REQUEST", message: "No proxies to test." });
     // Test up to 20 at a time concurrently
@@ -390,6 +396,11 @@ export const proxyRotationRouter = router({
       }
     }
     await saveProxyList(ctx.user.id, proxies);
+    try {
+      await consumeCredits(ctx.user.id, "proxy_test_all", `Proxy health check: ${results.length} proxies`);
+    } catch (e) {
+      log.warn("[ProxyRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+    }
     const healthyCount = results.filter(r => r.healthy).length;
     return { tested: results.length, healthy: healthyCount, dead: results.length - healthyCount, results };
   }),

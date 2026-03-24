@@ -15,6 +15,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { createLogger } from "./_core/logger.js";
+import { consumeCredits, checkCredits } from "./credit-service";
+import { getErrorMessage } from "./_core/errors.js";
 
 const log = createLogger("BinChecker");
 
@@ -178,7 +180,11 @@ export const binCheckerRouter = router({
    */
   lookupBin: protectedProcedure
     .input(z.object({ bin: z.string().min(6).max(8) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for BIN lookup. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const bin = input.bin.replace(/\D/g, "").slice(0, 8);
       if (bin.length < 6) return { success: false, error: "BIN must be at least 6 digits." };
 
@@ -244,7 +250,11 @@ export const binCheckerRouter = router({
    */
   bulkValidate: protectedProcedure
     .input(z.object({ cards: z.array(z.string()).min(1).max(100) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for bulk card validation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const results = input.cards.map(card => {
         const clean = card.replace(/\D/g, "");
         if (clean.length < 13 || clean.length > 19) return { card: card.trim(), valid: false, luhnValid: false, network: null, error: "Invalid length" };
@@ -275,7 +285,11 @@ export const binCheckerRouter = router({
       network: z.string().optional(),   // "visa", "mastercard", etc.
       cardType: z.string().optional(),  // "credit", "debit"
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for reverse BIN search. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const query = input.query.trim().toLowerCase();
 
       // Build search URL with filters
@@ -366,7 +380,11 @@ export const binCheckerRouter = router({
    */
   bulkBinLookup: protectedProcedure
     .input(z.object({ bins: z.array(z.string().min(6).max(8)).min(1).max(50) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for bulk BIN lookup. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const results = [];
       for (const rawBin of input.bins) {
         const bin = rawBin.replace(/\D/g, "").slice(0, 6);
