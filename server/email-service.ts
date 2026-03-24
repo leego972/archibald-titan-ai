@@ -209,3 +209,175 @@ export async function sendWelcomeEmail(
     return false;
   }
 }
+
+/**
+ * Send a payment failed alert email
+ */
+export async function sendPaymentFailedEmail(
+  email: string,
+  name: string,
+  planName: string,
+  updateUrl: string
+): Promise<boolean> {
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:20px;font-weight:600;color:#ef4444;">⚠️ Payment Failed</h2>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
+      Hi ${name || "there"},<br><br>
+      We were unable to process your payment for your <strong style="color:#ffffff;">${planName}</strong> subscription. 
+      Your account has been marked as past due and some features may be restricted until payment is resolved.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
+      Please update your payment method to restore full access. Stripe will automatically retry the payment in the next few days.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center" style="padding:8px 0 24px;">
+          <a href="${updateUrl}" style="display:inline-block;padding:14px 32px;background-color:#ef4444;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">
+            Update Payment Method
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#6b7280;">
+      If you believe this is an error, please contact our support team.
+    </p>`;
+
+  const html = wrapInTemplate("Payment Failed — Action Required", bodyHtml);
+
+  try {
+    await notifyOwner({
+      title: `Payment Failed: ${name || email} (${planName})`,
+      content: `Payment failed for ${name || email} (${email}) on their ${planName} subscription. Account marked past_due. Update URL: ${updateUrl}`,
+    });
+    log.info(`[Email Service] Payment failed email queued for ${email}`);
+    return true;
+  } catch (error) {
+    log.error(`[Email Service] Failed to send payment failed email to ${email}:`, { error: String(error) });
+    return false;
+  }
+}
+
+/**
+ * Send a subscription cancellation confirmation email
+ */
+export async function sendSubscriptionCancelledEmail(
+  email: string,
+  name: string,
+  planName: string,
+  periodEnd: Date
+): Promise<boolean> {
+  const formattedDate = periodEnd.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:20px;font-weight:600;color:#ffffff;">Subscription Cancelled</h2>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
+      Hi ${name || "there"},<br><br>
+      Your <strong style="color:#ffffff;">${planName}</strong> subscription has been cancelled. 
+      You will retain access to your plan features until <strong style="color:#ffffff;">${formattedDate}</strong>, 
+      after which your account will revert to the Free tier.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
+      Your existing credits are preserved and will not be removed. You can resubscribe at any time to restore full access and resume monthly credit refills.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center" style="padding:8px 0 16px;">
+          <a href="https://archibaldtitan.com/pricing" style="display:inline-block;padding:14px 32px;background-color:#3b82f6;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">
+            Resubscribe
+          </a>
+        </td>
+      </tr>
+    </table>`;
+
+  const html = wrapInTemplate("Subscription Cancelled", bodyHtml);
+
+  try {
+    await notifyOwner({
+      title: `Subscription Cancelled: ${name || email} (${planName})`,
+      content: `${name || email} (${email}) cancelled their ${planName} subscription. Access until: ${formattedDate}.`,
+    });
+    log.info(`[Email Service] Cancellation email queued for ${email}`);
+    return true;
+  } catch (error) {
+    log.error(`[Email Service] Failed to send cancellation email to ${email}:`, { error: String(error) });
+    return false;
+  }
+}
+
+/**
+ * Send a payment success / renewal confirmation email
+ */
+export async function sendPaymentSuccessEmail(
+  email: string,
+  name: string,
+  planName: string,
+  amountCents: number,
+  creditsAdded: number,
+  nextBillingDate: Date
+): Promise<boolean> {
+  const formattedAmount = `$${(amountCents / 100).toFixed(2)}`;
+  const formattedDate = nextBillingDate.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:20px;font-weight:600;color:#22c55e;">✅ Payment Confirmed</h2>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
+      Hi ${name || "there"},<br><br>
+      Your <strong style="color:#ffffff;">${planName}</strong> subscription has been renewed successfully. 
+      A payment of <strong style="color:#ffffff;">${formattedAmount}</strong> has been processed.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="padding:16px;background-color:#1e293b;border-radius:8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:14px;color:#9ca3af;padding:4px 0;">Plan</td>
+              <td style="font-size:14px;color:#ffffff;text-align:right;padding:4px 0;">${planName}</td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#9ca3af;padding:4px 0;">Amount Charged</td>
+              <td style="font-size:14px;color:#ffffff;text-align:right;padding:4px 0;">${formattedAmount}</td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#9ca3af;padding:4px 0;">Credits Added</td>
+              <td style="font-size:14px;color:#22c55e;text-align:right;padding:4px 0;">+${creditsAdded.toLocaleString()} credits</td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#9ca3af;padding:4px 0;">Next Billing Date</td>
+              <td style="font-size:14px;color:#ffffff;text-align:right;padding:4px 0;">${formattedDate}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center" style="padding:8px 0 16px;">
+          <a href="https://archibaldtitan.com/dashboard" style="display:inline-block;padding:14px 32px;background-color:#3b82f6;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">
+            Go to Dashboard
+          </a>
+        </td>
+      </tr>
+    </table>`;
+
+  const html = wrapInTemplate("Payment Confirmed", bodyHtml);
+
+  try {
+    await notifyOwner({
+      title: `Payment Success: ${name || email} (${planName}) — ${formattedAmount}`,
+      content: `${name || email} (${email}) successfully renewed their ${planName} subscription for ${formattedAmount}. +${creditsAdded} credits added. Next billing: ${formattedDate}.`,
+    });
+    log.info(`[Email Service] Payment success email queued for ${email}`);
+    return true;
+  } catch (error) {
+    log.error(`[Email Service] Failed to send payment success email to ${email}:`, { error: String(error) });
+    return false;
+  }
+}

@@ -27,6 +27,11 @@ export const NOTIFICATION_EVENT_TYPES = [
   "health.score_dropped",
   "import.completed",
   "team.member_joined",
+  "payment.failed",
+  "payment.succeeded",
+  "subscription.cancelled",
+  "subscription.upgraded",
+  "credits.low_balance",
 ] as const;
 
 // ─── Slack Message Formatter ──────────────────────────────────────
@@ -43,6 +48,11 @@ function formatSlackMessage(event: string, details: Record<string, unknown>): Re
     "health.score_dropped": "📉 Health Score Dropped",
     "import.completed": "📥 Import Completed",
     "team.member_joined": "👤 Team Member Joined",
+    "payment.failed": "❌ Payment Failed",
+    "payment.succeeded": "✅ Payment Confirmed",
+    "subscription.cancelled": "🚫 Subscription Cancelled",
+    "subscription.upgraded": "⬆️ Plan Upgraded",
+    "credits.low_balance": "⚠️ Low Credit Balance",
   };
 
   const title = eventLabels[event] || `📢 ${event}`;
@@ -95,6 +105,11 @@ function formatDiscordMessage(event: string, details: Record<string, unknown>): 
     "health.score_dropped": 0xf59e0b,
     "import.completed": 0x3b82f6,
     "team.member_joined": 0x8b5cf6, // purple
+    "payment.failed": 0xef4444,
+    "payment.succeeded": 0x22c55e,
+    "subscription.cancelled": 0xf59e0b,
+    "subscription.upgraded": 0x22c55e,
+    "credits.low_balance": 0xf59e0b,
   };
 
   const fields = Object.entries(details)

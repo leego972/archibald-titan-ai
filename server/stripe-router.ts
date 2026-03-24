@@ -13,6 +13,8 @@ import { sellerProfiles } from "../drizzle/schema";
 import type { Express, Request, Response } from "express";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
+import { sendPaymentFailedEmail, sendSubscriptionCancelledEmail, sendPaymentSuccessEmail } from "./email-service";
+import { dispatchNotification } from "./notification-channels-router";
 const log = createLogger("StripeRouter");
 
 /** In-memory set of processed Stripe webhook event IDs for idempotency */
@@ -1525,7 +1527,42 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 
   if (subRecord[0]) {
-    log.info(`[Stripe Webhook] Subscription deleted for user=${subRecord[0].userId}. Credits preserved — no more monthly refills.`);
+    const userId = subRecord[0].userId;
+    log.info(`[Stripe Webhook] Subscription deleted for user=${userId}. Credits preserved — no more monthly refills.`);
+
+    // Look up user email and plan for notifications
+    try {
+      const userRecord = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (userRecord.length > 0) {
+        const { email, name } = userRecord[0];
+        const tier = PRICING_TIERS.find((t) => t.id === subRecord[0].plan);
+        const planName = tier?.name || subRecord[0].plan;
+        const periodEnd = subRecord[0].currentPeriodEnd || new Date();
+
+        // Send cancellation confirmation email
+        if (email) {
+          await sendSubscriptionCancelledEmail(email, name || "", planName, periodEnd).catch((e) =>
+            log.warn(`[Stripe Webhook] Could not send cancellation email for user=${userId}: ${getErrorMessage(e)}`)
+          );
+        }
+
+        // Dispatch to notification channels
+        await dispatchNotification(userId, "subscription.cancelled", {
+          plan: planName,
+          accessUntil: periodEnd.toISOString(),
+          timestamp: new Date().toISOString(),
+        }).catch((e) =>
+          log.warn(`[Stripe Webhook] Could not dispatch subscription.cancelled notification for user=${userId}: ${getErrorMessage(e)}`)
+        );
+      }
+    } catch (e) {
+      log.warn(`[Stripe Webhook] Post-cancellation notifications failed for user=${userId}: ${getErrorMessage(e)}`);
+    }
   }
 }
 
@@ -1628,6 +1665,48 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     } catch (escalationErr) {
       log.warn(`[Stripe Webhook] Could not reset escalation state for user=${userId}: ${getErrorMessage(escalationErr)}`);
     }
+
+    // ── Send renewal confirmation email + notification ─────────────────
+    try {
+      const userRecord = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (userRecord.length > 0) {
+        const { email, name } = userRecord[0];
+        const tier2 = PRICING_TIERS.find((t) => t.id === planId);
+        const planName = tier2?.name || planId;
+        const amountCents = (invoice as any).amount_paid ?? 0;
+        const nextBillingDate = newPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+        if (email) {
+          await sendPaymentSuccessEmail(
+            email,
+            name || "",
+            planName,
+            amountCents,
+            allocation,
+            nextBillingDate
+          ).catch((e) =>
+            log.warn(`[Stripe Webhook] Could not send renewal email for user=${userId}: ${getErrorMessage(e)}`)
+          );
+        }
+
+        await dispatchNotification(userId, "payment.succeeded", {
+          plan: planName,
+          creditsAdded: allocation,
+          invoiceId: invoice.id,
+          nextBillingDate: nextBillingDate.toISOString(),
+          timestamp: new Date().toISOString(),
+        }).catch((e) =>
+          log.warn(`[Stripe Webhook] Could not dispatch payment.succeeded notification for user=${userId}: ${getErrorMessage(e)}`)
+        );
+      }
+    } catch (e) {
+      log.warn(`[Stripe Webhook] Post-renewal notifications failed for user=${userId}: ${getErrorMessage(e)}`);
+    }
   } else if (billingReason === "subscription_update") {
     // Plan was changed (upgrade/downgrade) — the proration invoice was paid
     log.info(`[Stripe Webhook] Plan change invoice paid: user=${userId}, plan=${planId}`);
@@ -1649,14 +1728,58 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     ? (invoice as any).subscription
     : (invoice as any).subscription?.id;
 
-  if (subId) {
-    const subscriptionId = typeof subId === "string" ? subId : subId;
-    await db
-      .update(subscriptions)
-      .set({ status: "past_due" })
-      .where(eq(subscriptions.stripeSubscriptionId, subscriptionId));
+  if (!subId) return;
 
-    log.info(`[Stripe Webhook] Invoice payment failed: ${invoice.id}, subscription marked past_due`);
+  // Mark subscription as past_due
+  await db
+    .update(subscriptions)
+    .set({ status: "past_due" })
+    .where(eq(subscriptions.stripeSubscriptionId, subId));
+
+  log.info(`[Stripe Webhook] Invoice payment failed: ${invoice.id}, subscription marked past_due`);
+
+  // Look up the user to send email + notification
+  const subRecord = await db
+    .select({ userId: subscriptions.userId, plan: subscriptions.plan })
+    .from(subscriptions)
+    .where(eq(subscriptions.stripeSubscriptionId, subId))
+    .limit(1);
+
+  if (subRecord.length === 0) return;
+  const { userId, plan } = subRecord[0];
+
+  const userRecord = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (userRecord.length === 0) return;
+  const { email, name } = userRecord[0];
+
+  const tier = PRICING_TIERS.find((t) => t.id === plan);
+  const planName = tier?.name || plan;
+  const updateUrl = `${process.env.APP_URL || "https://www.archibaldtitan.com"}/settings/billing`;
+
+  // Send transactional email
+  try {
+    if (email) {
+      await sendPaymentFailedEmail(email, name || "", planName, updateUrl);
+    }
+  } catch (e) {
+    log.warn(`[Stripe Webhook] Could not send payment failed email for user=${userId}: ${getErrorMessage(e)}`);
+  }
+
+  // Dispatch to notification channels (Slack/Discord/etc)
+  try {
+    await dispatchNotification(userId, "payment.failed", {
+      plan: planName,
+      invoiceId: invoice.id,
+      updateUrl,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    log.warn(`[Stripe Webhook] Could not dispatch payment.failed notification for user=${userId}: ${getErrorMessage(e)}`);
   }
 }
 
