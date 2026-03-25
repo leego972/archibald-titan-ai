@@ -1815,17 +1815,20 @@ Do NOT attempt any tool calls or builds.`;
             /\b(enterprise|production|professional|advanced|full.?stack|microservice|api.?gateway|distributed|scalable|high.?availability|real.?time|websocket|graphql|grpc|kubernetes|docker|ci.?cd|pipeline)\b/i.test(input.message)
           );
           let modelTier: "fast" | "strong" | "premium" | undefined;
-          // Security builds use Venice/OpenRouter uncensored model:
-          //   - Venice mistral-31-24b (with tools) or venice-uncensored-role-play (chat only)
-          //   - Falls back to OpenRouter Dolphin free, then OpenAI gpt-4.1
-          // forceOpenRouter flag triggers the Venice → OpenRouter → OpenAI fallback chain.
-          // Admin users ALWAYS use the uncensored model for ALL build requests.
+          // Admin users route through Venice for ALL requests (chat + build + security).
+          // Venice fallback chain: Venice mistral-31-24b (tools) / venice-uncensored-role-play (chat)
+          //   → OpenRouter Dolphin free → OpenAI gpt-4.1
+          // forceOpenRouter flag triggers this Venice → OpenRouter → OpenAI fallback chain.
           // CRITICAL: Venice API key is ADMIN-ONLY. Non-admin users NEVER use Venice.
           // Non-admin users who trigger security keywords are blocked by NON_ADMIN_RESTRICTIONS
           // in the system prompt — they do NOT get routed to the uncensored model.
-          const useOpenRouterForSecurity = isSecurityBuild && isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
-          if (isSecurityBuild) {
-            // Security builds (and ALL admin builds): use uncensored model at premium tier
+          const useOpenRouterForSecurity = isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
+          if (isAdmin) {
+            // Admin users always use premium tier — Venice mistral-31-24b handles tools
+            // and venice-uncensored-role-play handles pure chat (no tools).
+            modelTier = "premium";
+          } else if (isSecurityBuild) {
+            // Non-admin security builds: premium tier (will be blocked by NON_ADMIN_RESTRICTIONS)
             modelTier = "premium";
           } else if (isBuildRequest) {
             // ALL other build requests use the stronger model — code quality matters
@@ -2033,13 +2036,14 @@ Do NOT attempt any tool calls or builds.`;
               log.warn(`[Chat] All retries exhausted — making simple fallback call without tools`);
               const fallbackResult = await invokeLLM({
                 priority: "chat",
-                model: "fast", // nano for fallback — no tools, just text
+                model: isAdmin ? "premium" : "fast", // admin: Venice premium; others: nano
                 // Emergency fallback — simple text response, no tools
                 messages: [
                   { role: 'system', content: 'You are Titan — a sharp, friendly AI assistant with a dry British wit. Keep answers brief and to the point. Be warm but professional. Lead with the practical answer. Only go into technical depth if asked. A well-placed quip is welcome. No preamble, no corporate speak.' },
                   { role: 'user', content: input.message },
                 ],
                 ...(userApiKey ? { userApiKey } : {}),
+                ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}),
               });
               finalText = fallbackResult.choices?.[0]?.message?.content as string || '';
             } catch {
@@ -2853,7 +2857,7 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
 
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
-          const fallback = await invokeLLM({ priority: "chat", model: "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}) });
+          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "premium" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}) });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
