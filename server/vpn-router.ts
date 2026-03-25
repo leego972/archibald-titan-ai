@@ -24,8 +24,10 @@ async function getOrCreateSubUser(userId: number) {
     return JSON.parse(row[0].encryptedValue);
   }
 
-  // Generate a unique sub-user name and password
-  const subUserName = `titan_u${userId}_${Math.random().toString(36).substring(2, 8)}`;
+  // Generate a unique sub-user name and password.
+  // Smartproxy requires: lowercase letters + digits only, 6-20 chars, no underscores or special chars.
+  const suffix = Math.random().toString(36).replace(/[^a-z0-9]/g, "").substring(0, 6).padEnd(6, "0");
+  const subUserName = `titu${userId}${suffix}`.substring(0, 20).toLowerCase();
   const subUserPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
   // Attempt to create sub-user via Smartproxy API

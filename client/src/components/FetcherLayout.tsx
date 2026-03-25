@@ -302,28 +302,50 @@ function ArchibaldToggleItem() {
 
 // ─── Voice Mode Toggle ─────────────────────────────────────────────────────
 function VoiceModeToggle() {
-  const { enabled, listening, speaking, setEnabled } = useVoiceMode();
+  const { enabled, phase, setEnabled } = useVoiceMode();
+  const isListening  = phase === "active" || phase === "recording";
+  const isSpeaking   = phase === "speaking";
+  const isStandby    = phase === "standby";
+  const isProcessing = phase === "processing";
   return (
     <button
       onClick={() => setEnabled(!enabled)}
-      title={enabled ? "Voice Mode ON — tap to disable" : "Voice Mode OFF — tap to enable"}
-      className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-        enabled
-          ? listening
-            ? "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 animate-pulse"
-            : speaking
-              ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30"
-              : "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
-          : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-700/50"
+      title={
+        !enabled      ? "Voice Mode OFF — tap to enable" :
+        isStandby     ? 'Standby — say "Titan" to wake' :
+        isListening   ? "Listening..." :
+        isSpeaking    ? "Titan is speaking..." :
+        isProcessing  ? "Processing..." :
+        "Voice Mode ON — tap to disable"
+      }
+      className={`flex items-center gap-1.5 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all border ${
+        !enabled
+          ? "bg-zinc-800/50 text-zinc-500 border-zinc-700/50 hover:bg-zinc-700/50"
+          : isListening
+          ? "bg-red-500/20 text-red-300 border-red-500/30 hover:bg-red-500/30 animate-pulse"
+          : isSpeaking
+          ? "bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30"
+          : isStandby
+          ? "bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30"
+          : isProcessing
+          ? "bg-blue-500/20 text-blue-300 border-blue-500/30 animate-pulse"
+          : "bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30"
       } group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8`}
     >
-      {enabled ? (
-        listening ? <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse" /> : <Mic className="h-3.5 w-3.5 shrink-0" />
-      ) : (
+      {!enabled ? (
         <MicOff className="h-3.5 w-3.5 shrink-0" />
+      ) : isListening ? (
+        <Mic className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+      ) : (
+        <Mic className="h-3.5 w-3.5 shrink-0" />
       )}
       <span className="group-data-[collapsible=icon]:hidden">
-        Voice {enabled ? (listening ? "Listening" : speaking ? "Speaking" : "ON") : "OFF"}
+        {!enabled      ? "Voice OFF" :
+         isListening   ? "Listening" :
+         isSpeaking    ? "Speaking" :
+         isStandby     ? "Standby" :
+         isProcessing  ? "Processing" :
+         "Voice ON"}
       </span>
     </button>
   );
@@ -351,6 +373,7 @@ const VPN_COUNTRIES = [
   { id: "pl", name: "Poland", flag: "🇵🇱" },
   { id: "it", name: "Italy", flag: "🇮🇹" },
   { id: "es", name: "Spain", flag: "🇪🇸" },
+  { id: "il", name: "Israel", flag: "🇮🇱" },
 ];
 
 function VpnSidebarWidget() {
@@ -404,7 +427,7 @@ function VpnSidebarWidget() {
             ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
             : <Shield className="h-3.5 w-3.5 shrink-0" />}
           <span>VPN {active ? "ON" : "OFF"}</span>
-          {active && currentCountry && (
+          {currentCountry && (
             <span className="ml-auto text-[10px] opacity-70">{currentCountry.flag}</span>
           )}
         </button>
