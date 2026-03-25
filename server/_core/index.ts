@@ -582,6 +582,13 @@ async function startServer() {
       for (const idx of chatIndexes) {
         try { await pool.promise().query(idx); } catch (_) { /* index already exists */ }
       }
+      // Expand credit_transactions.type enum to include all action types
+      // (MODIFY COLUMN is safe to re-run — MySQL will accept it even if values already exist)
+      try {
+        await pool.promise().query(`ALTER TABLE \`credit_transactions\` MODIFY COLUMN \`type\` enum('signup_bonus','monthly_refill','pack_purchase','admin_adjustment','referral_bonus','daily_login_bonus','marketplace_sale','marketplace_refund','chat_message','builder_action','voice_action','image_generation','video_generation','fetch_action','github_action','import_action','clone_action','replicate_action','seo_run','blog_generate','content_generate','marketing_run','advertising_run','security_scan','metasploit_action','evilginx_action','blackeye_action','grant_match','grant_apply','business_plan_generate','marketplace_list','marketplace_feature','marketplace_purchase','marketplace_seller_fee','marketplace_seller_renewal','marketplace_boost','marketplace_verification','site_monitor_add','sandbox_run','affiliate_action','api_call','vpn_generate','isolated_browser') NOT NULL`);
+      } catch (e: unknown) {
+        log.warn('credit_transactions enum expand warning', { error: getErrorMessage(e)?.substring(0, 200) });
+      }
       log.info('All tables ensured');
     } catch (err: unknown) {
       log.error('Raw SQL migration failed', { error: getErrorMessage(err) });
