@@ -7,11 +7,39 @@ import { eq, and } from "drizzle-orm";
 import { consumeCredits } from "./credit-service";
 import { getUserPlan } from "./subscription-gate";
 
-// Smartproxy API base URL
-const SMARTPROXY_API_URL = "https://api.smartproxy.com/v1";
-const SMARTPROXY_API_KEY = process.env.SMARTPROXY_API_KEY || "01364bc9ba149865b562098c1d60c027f997ca033f2ea9ac1c88298061875dc51a87c6c0581908572b321020a53a40f18b185b05566df372e1953478218fbf3bcf9cee190cf261c8bb15e95470c07870c65ac4db";
+// Decodo (formerly Smartproxy) API — correct v2 endpoint
+// Docs: https://help.decodo.com/reference/create-sub-user
+const DECODO_API_URL = "https://api.decodo.com/v2";
+const DECODO_API_KEY = process.env.SMARTPROXY_API_KEY || "01364bc9ba149865b562098c1d60c027f997ca033f2ea9ac1c88298061875dc51a87c6c0581908572b321020a53a40f18b185b05566df372e1953478218fbf3bcf9cee190cf261c8bb15e95470c07870c65ac4db";
 
-// Helper to get or create a Smartproxy sub-user for a Titan user
+/**
+ * Generate a Decodo-compliant password.
+ * Requirements: 12+ chars, ≥1 uppercase, ≥1 lowercase, ≥1 digit, ≥1 of _ ~ + =
+ * Forbidden chars: @ and :
+ */
+function generateDecodoPassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // no I/O to avoid confusion
+  const lower = "abcdefghjkmnpqrstuvwxyz";     // no i/l/o
+  const digits = "23456789";                   // no 0/1 to avoid confusion
+  const special = "_~+=";                      // allowed special chars per Decodo docs
+
+  const rand = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+  const randN = (chars: string, n: number) => Array.from({ length: n }, () => rand(chars)).join("");
+
+  // Build a guaranteed-compliant 16-char password
+  const required = rand(upper) + rand(lower) + rand(digits) + rand(special);
+  const fill = randN(upper + lower + digits, 12);
+
+  // Shuffle the combined string
+  const combined = (required + fill).split("");
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [combined[i], combined[j]] = [combined[j], combined[i]];
+  }
+  return combined.join("");
+}
+
+// Helper to get or create a Decodo sub-user for a Titan user
 async function getOrCreateSubUser(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -24,29 +52,29 @@ async function getOrCreateSubUser(userId: number) {
     return JSON.parse(row[0].encryptedValue);
   }
 
-  // Generate a unique sub-user name and password.
-  // Smartproxy username: lowercase letters + digits only, 6-20 chars, no underscores or special chars.
-  const suffix = Math.random().toString(36).replace(/[^a-z0-9]/g, "").substring(0, 6).padEnd(6, "0");
-  const subUserName = `titu${userId}${suffix}`.substring(0, 20).toLowerCase();
-  // Smartproxy password requirements: 8-30 chars, must contain uppercase, lowercase, and digit.
-  // Math.random().toString(36) only produces lowercase + digits, so we inject uppercase chars.
-  const lowerPart = Math.random().toString(36).replace(/[^a-z]/g, "").substring(0, 6).padEnd(6, "a");
-  const digitPart = Math.random().toString(36).replace(/[^0-9]/g, "").substring(0, 4).padEnd(4, "1");
-  const upperPart = lowerPart.substring(0, 4).toUpperCase();
-  const subUserPassword = `${upperPart}${lowerPart}${digitPart}Ax1`;  // guaranteed: upper + lower + digit, 15 chars
+  // Generate a unique sub-user name.
+  // Decodo username: 6–64 chars, letters/numbers/underscores only.
+  const suffix = Math.random().toString(36).replace(/[^a-z0-9]/g, "").substring(0, 8).padEnd(8, "0");
+  const subUserName = `titan_${userId}_${suffix}`.substring(0, 64);
 
-  // Attempt to create sub-user via Smartproxy API
+  // Generate a Decodo-compliant password
+  const subUserPassword = generateDecodoPassword();
+
+  // Attempt to create sub-user via Decodo API
   try {
-    const response = await fetch(`${SMARTPROXY_API_URL}/sub-users`, {
+    const response = await fetch(`${DECODO_API_URL}/sub-users`, {
       method: "POST",
       headers: {
-        "Authorization": `Basic ${Buffer.from(SMARTPROXY_API_KEY + ":").toString("base64")}`,
+        "Authorization": `Basic ${Buffer.from(DECODO_API_KEY + ":").toString("base64")}`,
         "Content-Type": "application/json",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
         username: subUserName,
         password: subUserPassword,
-        traffic_limit: 5, // 5GB default limit per user
+        service_type: "residential_proxies",
+        traffic_limit: 5,   // 5 GB default limit per user
+        auto_disable: false,
       }),
     });
 
@@ -55,13 +83,15 @@ async function getOrCreateSubUser(userId: number) {
       try {
         const errBody = await response.json();
         const apiMsg = errBody?.errors?.[0]?.message || errBody?.message || response.statusText;
-        console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${apiMsg}`);
+        console.warn(`[VPN] Decodo sub-user creation failed (${response.status}): ${apiMsg}`);
       } catch {
-        console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${response.statusText}`);
+        console.warn(`[VPN] Decodo sub-user creation failed (${response.status}): ${response.statusText}`);
       }
+    } else {
+      console.info(`[VPN] Decodo sub-user created: ${subUserName}`);
     }
   } catch (err) {
-    console.warn("[VPN] Smartproxy API unreachable, storing local credentials:", err);
+    console.warn("[VPN] Decodo API unreachable, storing local credentials:", err);
   }
 
   const subUser = { username: subUserName, password: subUserPassword };
@@ -69,7 +99,7 @@ async function getOrCreateSubUser(userId: number) {
   await db.insert(userSecrets).values({
     userId,
     secretType: "__smartproxy_subuser",
-    label: "Smartproxy Sub-User",
+    label: "Decodo Sub-User",
     encryptedValue: JSON.stringify(subUser),
   });
 
@@ -112,19 +142,19 @@ export const vpnRouter = router({
         });
       }
 
-      // If turning on, deduct 150 credits
+      // If turning on, deduct credits
       if (input.active) {
-        const creditCheck = await consumeCredits(ctx.user.id, "vpn_generate", "VPN proxy generation via Smartproxy");
+        const creditCheck = await consumeCredits(ctx.user.id, "vpn_generate", "VPN proxy generation via Decodo");
         if (!creditCheck.success) {
           throw new TRPCError({
             code: "PAYMENT_REQUIRED",
-            message: "Insufficient credits to generate VPN proxy. Each connection costs 150 credits.",
+            message: "Insufficient credits to generate VPN proxy. Each connection costs 300 credits.",
           });
         }
       }
 
       try {
-        // Ensure sub-user exists
+        // Ensure sub-user exists in Decodo
         await getOrCreateSubUser(ctx.user.id);
 
         // Get current status to preserve country if not changing
@@ -132,7 +162,10 @@ export const vpnRouter = router({
           .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "__vpn_status")))
           .limit(1);
 
-        const currentCountry = row.length ? JSON.parse(row[0].encryptedValue).country : "us";
+        const currentCountry = row.length
+          ? (JSON.parse(row[0].encryptedValue).country ?? "us")
+          : "us";
+
         const newStatus = {
           active: input.active,
           country: input.country || currentCountry,
@@ -152,9 +185,10 @@ export const vpnRouter = router({
         }
 
         return { success: true, active: newStatus.active, country: newStatus.country };
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof TRPCError) throw error;
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Failed to configure VPN: ${error.message}` });
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Failed to configure VPN: ${msg}` });
       }
     }),
 
@@ -174,13 +208,13 @@ export const vpnRouter = router({
 
     const subUser = await getOrCreateSubUser(ctx.user.id);
 
-    // Smartproxy endpoint format: gate.smartproxy.com:7000
+    // Decodo endpoint: gate.decodo.com:10000 (residential HTTP)
     // Country targeting via username suffix: username-country-US
-    const proxyUsername = `${subUser.username}-country-${status.country.toUpperCase()}`;
+    const proxyUsername = `${subUser.username}-country-${(status.country as string).toUpperCase()}`;
 
     return {
-      host: "gate.smartproxy.com",
-      port: 7000,
+      host: "gate.decodo.com",
+      port: 10000,
       username: proxyUsername,
       password: subUser.password,
       protocol: "HTTP/SOCKS5",

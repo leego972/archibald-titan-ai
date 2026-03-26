@@ -56,18 +56,24 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
   }
 
   // ─── Referral Titan Unlock: temporary Titan access override ───
-  const [userRecord] = await db
-    .select({ titanUnlockExpiry: users.titanUnlockExpiry })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  // Wrapped in try/catch: titanUnlockExpiry column may not exist on older DB instances
+  // (migration 0047 adds it). If the column is missing, skip the check gracefully.
+  try {
+    const [userRecord] = await db
+      .select({ titanUnlockExpiry: users.titanUnlockExpiry })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
-  if (
-    userRecord?.titanUnlockExpiry &&
-    new Date(userRecord.titanUnlockExpiry) > new Date()
-  ) {
-    // User has an active Titan unlock from referral reward
-    return { planId: "titan", tier: titanTier, status: "active", isActive: true };
+    if (
+      userRecord?.titanUnlockExpiry &&
+      new Date(userRecord.titanUnlockExpiry) > new Date()
+    ) {
+      // User has an active Titan unlock from referral reward
+      return { planId: "titan", tier: titanTier, status: "active", isActive: true };
+    }
+  } catch {
+    // Column doesn't exist yet — migration 0047 pending. Skip the referral check.
   }
 
   const sub = await db
