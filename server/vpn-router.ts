@@ -115,7 +115,7 @@ export const vpnRouter = router({
       // If turning on, deduct 150 credits
       if (input.active) {
         const creditCheck = await consumeCredits(ctx.user.id, "vpn_generate", "VPN proxy generation via Smartproxy");
-        if (!creditCheck) {
+        if (!creditCheck.success) {
           throw new TRPCError({
             code: "PAYMENT_REQUIRED",
             message: "Insufficient credits to generate VPN proxy. Each connection costs 150 credits.",

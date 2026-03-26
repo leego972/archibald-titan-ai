@@ -88,6 +88,24 @@ export const voiceRouter = router({
       return { text: result.text, language: result.language, duration: result.duration };
       }
 
+      // Handle data URLs (base64-encoded audio sent directly from browser MediaRecorder)
+      if (audioUrl.startsWith("data:")) {
+        const commaIdx = audioUrl.indexOf(",");
+        if (commaIdx === -1) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid data URL format" });
+        }
+        const meta = audioUrl.substring(5, commaIdx); // strip leading "data:"
+        const mimeType = meta.split(";")[0] || "audio/webm";
+        const base64Data = audioUrl.substring(commaIdx + 1);
+        const buffer = Buffer.from(base64Data, "base64");
+        const dataResult = await transcribeAudioFromBuffer(buffer, mimeType, input.language, input.prompt);
+        if ("error" in dataResult) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: dataResult.error });
+        }
+        try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
+        return { text: dataResult.text, language: dataResult.language, duration: dataResult.duration };
+      }
+
       // External URL path (S3, etc.)
       const result = await transcribeAudio({
         audioUrl,

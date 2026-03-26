@@ -135,9 +135,14 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
     if (!text.trim()) return;
     try {
       setPhase("speaking");
+      // Read CSRF token from cookie (required by server CSRF middleware)
+      const csrfToken = document.cookie.split("; ").find(c => c.startsWith("csrf_token="))?.split("=")[1] || "";
       const res = await fetch("/api/voice/tts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ text }),
       });
@@ -201,9 +206,14 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
     setPhase("processing");
     try {
       const arrayBuffer = await blob.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), "")
-      );
+      // Convert binary to base64 in chunks to avoid stack overflow on large audio files
+      const uint8 = new Uint8Array(arrayBuffer);
+      let binary = "";
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8.length; i += chunkSize) {
+        binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
       const dataUrl = `data:${blob.type};base64,${base64}`;
       const result  = await transcribeMut.mutateAsync({ audioUrl: dataUrl });
       const text    = result?.text?.trim() ?? "";
@@ -256,7 +266,12 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
 
     const tick = () => {
       const currentPhase = phaseRef.current;
+      // Stop VAD entirely for off/standby; pause (skip frame) during processing/speaking to prevent echo
       if (currentPhase === "off" || currentPhase === "standby") return;
+      if (currentPhase === "processing" || currentPhase === "speaking") {
+        vadFrameRef.current = requestAnimationFrame(tick);
+        return; // don't analyse audio while Titan is responding or speaking
+      }
       vadFrameRef.current = requestAnimationFrame(tick);
 
       analyser.getFloatTimeDomainData(buf);
