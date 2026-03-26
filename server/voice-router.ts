@@ -315,9 +315,11 @@ export function registerVoiceTTSRoute(app: Express) {
         return res.status(400).json({ error: "Missing 'text' field" });
       }
 
-      const trimmedText = text.slice(0, 4096);
+      // eleven_v3 supports up to 5,000 characters; trim to that limit
+      const trimmedText = text.slice(0, 5000);
 
-      // ── ElevenLabs TTS (primary) — deep English male voice "George" ──────────
+      // ── ElevenLabs TTS (primary) — Eleven v3, deep English male voice "George" ──
+      // Model: eleven_v3 — most expressive, 70+ languages, 5,000 char limit (GA Mar 2026)
       // Voice ID: JBFqnCBsd6RMkjVDRZzb = "George" (deep, authoritative British male)
       // Fallback voice ID: pNInz6obpgDQGcFmaJgB = "Adam" (American deep male)
       const elevenLabsKey = ENV.elevenLabsApiKey;
@@ -335,11 +337,11 @@ export function registerVoiceTTSRoute(app: Express) {
               },
               body: JSON.stringify({
                 text: trimmedText,
-                model_id: "eleven_turbo_v2_5", // fastest + highest quality
+                model_id: "eleven_v3",  // Eleven v3 — most expressive, GA March 2026
                 voice_settings: {
-                  stability: 0.55,          // natural variation
+                  stability: 0.50,          // slightly lower = more dramatic delivery
                   similarity_boost: 0.85,   // stay true to voice
-                  style: 0.35,              // expressive but controlled
+                  style: 0.45,              // more expressive with v3's wider range
                   use_speaker_boost: true,  // enhanced presence
                 },
               }),
@@ -352,7 +354,7 @@ export function registerVoiceTTSRoute(app: Express) {
             res.setHeader("Content-Length", audioBuffer.length.toString());
             res.setHeader("Accept-Ranges", "bytes");
             res.setHeader("Cache-Control", "no-cache");
-            res.setHeader("X-TTS-Provider", "elevenlabs");
+            res.setHeader("X-TTS-Provider", "elevenlabs-v3");
             return res.end(audioBuffer);
           } else {
             const errText = await elRes.text().catch(() => "");
