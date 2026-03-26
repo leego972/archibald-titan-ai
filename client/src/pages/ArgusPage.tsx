@@ -61,18 +61,54 @@ function ModuleCard({ module, selected, onSelect }: { module: any; selected: boo
   );
 }
 
+// ─── Severity Detection ───────────────────────────────────────────
+function detectSeverity(output: string): "critical" | "high" | "medium" | "low" | "info" {
+  const t = output.toLowerCase();
+  if (["critical","rce","remote code execution","sql injection","sqli","command injection","xxe","deserialization"].some(p => t.includes(p))) return "critical";
+  if (["high","xss","csrf","open redirect","idor","ssrf","exposed secret","api key found","password found","private key"].some(p => t.includes(p))) return "high";
+  if (["medium","information disclosure","misconfiguration","outdated","deprecated","weak","cors"].some(p => t.includes(p))) return "medium";
+  if (["low","fingerprint","banner","version","header missing"].some(p => t.includes(p))) return "low";
+  return "info";
+}
+const SEVERITY_STYLES: Record<string, { badge: string; dot: string; label: string }> = {
+  critical: { badge: "bg-red-500/20 text-red-400 border-red-500/30",       dot: "bg-red-500",           label: "CRITICAL" },
+  high:     { badge: "bg-orange-500/20 text-orange-400 border-orange-500/30", dot: "bg-orange-500",       label: "HIGH" },
+  medium:   { badge: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", dot: "bg-yellow-500",       label: "MEDIUM" },
+  low:      { badge: "bg-blue-500/20 text-blue-400 border-blue-500/30",     dot: "bg-blue-500",           label: "LOW" },
+  info:     { badge: "bg-muted/50 text-muted-foreground border-border",     dot: "bg-muted-foreground",   label: "INFO" },
+};
+
 // ─── Output Panel ─────────────────────────────────────────────────
 function OutputPanel({ title, output, duration, target }: { title: string; output: string; duration?: number; target?: string }) {
   const [expanded, setExpanded] = useState(true);
+  const sev = detectSeverity(output);
+  const style = SEVERITY_STYLES[sev];
+  const lineCount = (output || "").split("\n").length;
+
+  const exportAs = (type: "txt" | "json") => {
+    const content = type === "json"
+      ? JSON.stringify({ title, target, duration, severity: style.label, timestamp: new Date().toISOString(), lines: lineCount, output }, null, 2)
+      : `# ${title}\n# Target: ${target ?? "N/A"}\n# Severity: ${style.label}\n# Duration: ${duration !== undefined ? (duration/1000).toFixed(1)+"s" : "N/A"}\n\n${output}`;
+    const blob = new Blob([content], { type: type === "json" ? "application/json" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${title.replace(/\s+/g,"_").toLowerCase()}_${Date.now()}.${type}`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported as .${type}`);
+  };
+
   return (
     <Card className="mt-4 border-border/60">
       <CardHeader className="py-3 px-4 cursor-pointer" onClick={() => setExpanded(e => !e)}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-primary" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Terminal className="h-4 w-4 text-primary shrink-0" />
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             {target && <Badge variant="secondary" className="text-[10px] font-mono">{target}</Badge>}
-            {duration !== undefined && <span className="text-[11px] text-muted-foreground">{(duration / 1000).toFixed(1)}s</span>}
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${style.badge}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />{style.label}
+            </span>
+            {duration !== undefined && <span className="text-[11px] text-muted-foreground">{(duration/1000).toFixed(1)}s</span>}
+            <span className="text-[11px] text-muted-foreground">{lineCount} lines</span>
           </div>
           {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
@@ -82,9 +118,17 @@ function OutputPanel({ title, output, duration, target }: { title: string; outpu
           <div className="bg-black/90 rounded-lg p-3">
             <pre className="text-[11px] font-mono text-green-400 whitespace-pre-wrap max-h-80 overflow-auto">{output || "No output"}</pre>
           </div>
-          <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(output); toast.success("Copied to clipboard"); }}>
-            <Copy className="h-3 w-3 mr-1" /> Copy Output
-          </Button>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(output); toast.success("Copied"); }}>
+              <Copy className="h-3 w-3 mr-1" /> Copy
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => exportAs("txt")}>
+              <Download className="h-3 w-3 mr-1" /> .txt
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => exportAs("json")}>
+              <Download className="h-3 w-3 mr-1" /> .json
+            </Button>
+          </div>
         </CardContent>
       )}
     </Card>

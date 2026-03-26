@@ -29,7 +29,7 @@ import {
   Shield, Lock, Zap,
   AlertTriangle, CheckCircle, XCircle, Info,
   Play, RefreshCw, Copy, ChevronDown, ChevronUp,
-  Code, Activity, Eye, Loader2, StopCircle,
+  Code, Activity, Eye, Loader2, StopCircle, Download,
 } from "lucide-react";
 import { useCyberMcpScan, type CheckProgress } from "@/hooks/useCyberMcpScan";
 
@@ -51,6 +51,18 @@ function RiskBadge({ risk }: { risk: string }) {
 function ResultPanel({ title, data, risk }: { title: string; data: any; risk?: string }) {
   const [expanded, setExpanded] = useState(true);
   if (!data) return null;
+
+  const exportAs = (type: "json" | "txt") => {
+    const content = type === "json"
+      ? JSON.stringify(data, null, 2)
+      : `# ${title}\n# Risk: ${risk ?? "N/A"}\n# Exported: ${new Date().toISOString()}\n\n${JSON.stringify(data, null, 2)}`;
+    const blob = new Blob([content], { type: type === "json" ? "application/json" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${title.replace(/\s+/g,"_").toLowerCase()}_${Date.now()}.${type}`; a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported as .${type}`);
+  };
+
   return (
     <Card className="mt-4 border-border/60">
       <CardHeader className="py-3 px-4 cursor-pointer" onClick={() => setExpanded(e => !e)}>
@@ -67,9 +79,17 @@ function ResultPanel({ title, data, risk }: { title: string; data: any; risk?: s
           <pre className="text-xs bg-muted/50 rounded p-3 overflow-auto max-h-80 whitespace-pre-wrap font-mono">
             {JSON.stringify(data, null, 2)}
           </pre>
-          <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(data, null, 2)); toast.success("Copied to clipboard"); }}>
-            <Copy className="h-3 w-3 mr-1" /> Copy JSON
-          </Button>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(data, null, 2)); toast.success("Copied"); }}>
+              <Copy className="h-3 w-3 mr-1" /> Copy
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => exportAs("json")}>
+              <Download className="h-3 w-3 mr-1" /> .json
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => exportAs("txt")}>
+              <Download className="h-3 w-3 mr-1" /> .txt
+            </Button>
+          </div>
         </CardContent>
       )}
     </Card>

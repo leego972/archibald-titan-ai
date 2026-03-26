@@ -446,51 +446,39 @@ function CredentialHealthWidget({ setLocation }: { setLocation: (path: string) =
 }
 
 function QuickActionsWidget({ sub, setLocation }: { sub: any; setLocation: (path: string) => void }) {
+  const tools = [
+    { label: "New Fetch",      desc: sub.fetchesRemaining === -1 ? "Unlimited" : sub.fetchesRemaining > 0 ? `${sub.fetchesRemaining} left` : "Limit reached", icon: Zap,          color: "text-primary",     bg: "bg-primary/10",     path: "/fetcher/new" },
+    { label: "Credentials",   desc: sub.credentialsStored > 0 ? `${sub.credentialsStored} stored` : "Vault empty",                                            icon: KeyRound,     color: "text-emerald-400", bg: "bg-emerald-500/10", path: "/fetcher/credentials" },
+    { label: "Titan Builder", desc: "AI-powered build assistant",                                                                                              icon: Activity,     color: "text-blue-400",   bg: "bg-blue-500/10",    path: "/" },
+    { label: "Argus",         desc: "Deep recon & OSINT",                                                                                                      icon: Eye,          color: "text-violet-400", bg: "bg-violet-500/10", path: "/argus" },
+    { label: "CyberMCP",      desc: "Security tool orchestration",                                                                                             icon: Shield,       color: "text-red-400",    bg: "bg-red-500/10",     path: "/cybermcp" },
+    { label: "Proxy Network", desc: "Rotating residential proxies",                                                                                            icon: Globe,        color: "text-cyan-400",   bg: "bg-cyan-500/10",    path: "/vpn" },
+    { label: "Sandbox",       desc: "Isolated execution environment",                                                                                          icon: Server,       color: "text-amber-400",  bg: "bg-amber-500/10",   path: "/sandbox" },
+    { label: "Fetch Jobs",    desc: "Monitor running jobs",                                                                                                    icon: RefreshCw,    color: "text-orange-400", bg: "bg-orange-500/10",  path: "/fetcher/jobs" },
+  ];
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card
-        className="hover:border-primary/30 transition-colors cursor-pointer"
-        onClick={() => setLocation("/fetcher/new")}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary" />
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">Quick Launch</h3>
+        <span className="text-xs text-muted-foreground">All tools</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {tools.map(tool => (
+          <button
+            key={tool.path + tool.label}
+            onClick={() => setLocation(tool.path)}
+            className="group flex flex-col items-start gap-2.5 p-3.5 rounded-xl border border-border/40 bg-card hover:border-primary/30 hover:bg-accent/30 transition-all text-left"
+          >
+            <div className={`h-9 w-9 rounded-lg ${tool.bg} flex items-center justify-center`}>
+              <tool.icon className={`h-4 w-4 ${tool.color}`} />
             </div>
             <div>
-              <CardTitle className="text-base">Start a New Fetch</CardTitle>
-              <CardDescription className="text-xs">
-                {sub.fetchesRemaining === -1
-                  ? "Unlimited fetches available"
-                  : sub.fetchesRemaining > 0
-                  ? `${sub.fetchesRemaining} fetches remaining this month`
-                  : "Monthly limit reached — upgrade for more"}
-              </CardDescription>
+              <p className="text-xs font-semibold leading-tight">{tool.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{tool.desc}</p>
             </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <Card
-        className="hover:border-primary/30 transition-colors cursor-pointer"
-        onClick={() => setLocation("/fetcher/credentials")}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <KeyRound className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">View Credentials</CardTitle>
-              <CardDescription className="text-xs">
-                {sub.credentialsStored > 0
-                  ? `${sub.credentialsStored} credentials in your encrypted vault`
-                  : "Your encrypted vault is empty — start a fetch to collect keys"}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

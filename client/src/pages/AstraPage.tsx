@@ -381,11 +381,18 @@ function ResultsTab() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-primary" /> Vulnerabilities Found</CardTitle>
               {alerts.data && (
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {alerts.data.bySeverity.critical > 0 && <Badge className="bg-red-600 text-white text-[10px]">{alerts.data.bySeverity.critical} Critical</Badge>}
                   {alerts.data.bySeverity.high > 0 && <Badge className="bg-orange-500 text-white text-[10px]">{alerts.data.bySeverity.high} High</Badge>}
                   {alerts.data.bySeverity.medium > 0 && <Badge className="bg-yellow-500 text-black text-[10px]">{alerts.data.bySeverity.medium} Medium</Badge>}
                   {alerts.data.bySeverity.low > 0 && <Badge className="bg-blue-500 text-white text-[10px]">{alerts.data.bySeverity.low} Low</Badge>}
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => {
+                    const blob = new Blob([JSON.stringify(alerts.data, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = `astra_scan_${selectedScanId}_${Date.now()}.json`; a.click();
+                    URL.revokeObjectURL(url); toast.success("Exported scan results");
+                  }}><Download className="h-3 w-3 mr-1" /> Export</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => { navigator.clipboard.writeText(JSON.stringify(alerts.data, null, 2)); toast.success("Copied"); }}><Copy className="h-3 w-3 mr-1" /> Copy</Button>
                 </div>
               )}
             </div>
