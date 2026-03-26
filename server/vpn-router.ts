@@ -25,10 +25,15 @@ async function getOrCreateSubUser(userId: number) {
   }
 
   // Generate a unique sub-user name and password.
-  // Smartproxy requires: lowercase letters + digits only, 6-20 chars, no underscores or special chars.
+  // Smartproxy username: lowercase letters + digits only, 6-20 chars, no underscores or special chars.
   const suffix = Math.random().toString(36).replace(/[^a-z0-9]/g, "").substring(0, 6).padEnd(6, "0");
   const subUserName = `titu${userId}${suffix}`.substring(0, 20).toLowerCase();
-  const subUserPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  // Smartproxy password requirements: 8-30 chars, must contain uppercase, lowercase, and digit.
+  // Math.random().toString(36) only produces lowercase + digits, so we inject uppercase chars.
+  const lowerPart = Math.random().toString(36).replace(/[^a-z]/g, "").substring(0, 6).padEnd(6, "a");
+  const digitPart = Math.random().toString(36).replace(/[^0-9]/g, "").substring(0, 4).padEnd(4, "1");
+  const upperPart = lowerPart.substring(0, 4).toUpperCase();
+  const subUserPassword = `${upperPart}${lowerPart}${digitPart}Ax1`;  // guaranteed: upper + lower + digit, 15 chars
 
   // Attempt to create sub-user via Smartproxy API
   try {
@@ -46,8 +51,14 @@ async function getOrCreateSubUser(userId: number) {
     });
 
     if (!response.ok) {
-      // Log but don't throw — allow UI to work even if API call fails
-      console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${response.statusText}`);
+      // Read error body for better diagnostics, but don't throw — UI works even if API fails
+      try {
+        const errBody = await response.json();
+        const apiMsg = errBody?.errors?.[0]?.message || errBody?.message || response.statusText;
+        console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${apiMsg}`);
+      } catch {
+        console.warn(`[VPN] Smartproxy sub-user creation failed (${response.status}): ${response.statusText}`);
+      }
     }
   } catch (err) {
     console.warn("[VPN] Smartproxy API unreachable, storing local credentials:", err);
