@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useVoiceMode } from "@/components/VoiceMode";
 import LeegoLogo from "@/components/LeegoLogo";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -953,6 +954,15 @@ export default function ChatPage() {
   const vadRafRef = useRef<number | null>(null);
   const vadHasSpokenRef = useRef(false); // true once volume exceeded threshold
 
+  // ── Sidebar VoiceMode integration ──────────────────────────────────────────
+  const { enabled: sidebarVoiceEnabled, phase: sidebarVoicePhase, setConversationId: setSidebarVoiceConvId } = useVoiceMode();
+  const prevSidebarPhaseRef = useRef(sidebarVoicePhase);
+
+  // Keep VoiceMode context in sync with the active conversation
+  useEffect(() => {
+    setSidebarVoiceConvId(activeConversationId);
+  }, [activeConversationId, setSidebarVoiceConvId]);
+
   // Voice Mode State (full-screen voice assistant)
   const [voiceModeActive, setVoiceModeActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -1373,9 +1383,17 @@ export default function ChatPage() {
       { enabled: !!activeConversationId, refetchOnWindowFocus: false }
     );
 
-  const { data: quickActions } = trpc.chat.quickActions.useQuery(undefined, { refetchOnWindowFocus: false });
+   const { data: quickActions } = trpc.chat.quickActions.useQuery(undefined, { refetchOnWindowFocus: false });
   const sendMutation = trpc.chat.send.useMutation();
   const utils = trpc.useUtils();
+
+  // Auto-refresh messages when sidebar VoiceMode finishes processing (processing → speaking)
+  useEffect(() => {
+    if (prevSidebarPhaseRef.current === "processing" && sidebarVoicePhase === "speaking" && activeConversationId) {
+      utils.chat.getConversation.invalidate({ conversationId: activeConversationId }).catch(() => {});
+    }
+    prevSidebarPhaseRef.current = sidebarVoicePhase;
+  }, [sidebarVoicePhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Custom Instructions ──
   const { data: customInstructionsData } = trpc.customInstructions.get.useQuery(undefined, { refetchOnWindowFocus: false });
@@ -3686,6 +3704,70 @@ export default function ChatPage() {
                 Download
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sidebar Voice Mode Status Bar ──────────────────────────────────────────
+           Shows when the sidebar "Voice ON" toggle is active.
+           Fully hands-free — no buttons, no popup. VAD handles everything. */}
+      {sidebarVoiceEnabled && !voiceModeActive && (
+        <div
+          className={`fixed bottom-0 left-0 right-0 z-[89] flex items-center gap-3 px-4 py-2.5 border-t transition-all duration-300 ${
+            sidebarVoicePhase === 'recording'
+              ? 'bg-cyan-950/90 border-cyan-500/40'
+              : sidebarVoicePhase === 'speaking'
+              ? 'bg-purple-950/90 border-purple-500/40'
+              : sidebarVoicePhase === 'processing'
+              ? 'bg-amber-950/90 border-amber-500/40'
+              : sidebarVoicePhase === 'standby'
+              ? 'bg-zinc-900/90 border-zinc-700/40'
+              : 'bg-background/90 border-border/40'
+          }`}
+          style={{ backdropFilter: 'blur(16px)', paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <img src={AT_ICON_FULL} alt="Titan" className="h-7 w-7 object-contain rounded-full shrink-0" draggable={false} />
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            {sidebarVoicePhase === 'recording' && (
+              <>
+                <div className="flex items-center gap-[3px] shrink-0">
+                  {[0.6, 1.0, 0.75, 1.0, 0.5].map((h, i) => (
+                    <div key={i} className="w-[3px] bg-cyan-400 rounded-full animate-pulse"
+                      style={{ height: `${8 + h * 12}px`, animationDelay: `${i * 0.12}s`, animationDuration: '0.55s' }} />
+                  ))}
+                </div>
+                <span className="text-xs font-medium text-cyan-300">Listening…</span>
+              </>
+            )}
+            {sidebarVoicePhase === 'processing' && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
+                <span className="text-xs font-medium text-amber-300">Titan is thinking…</span>
+              </>
+            )}
+            {sidebarVoicePhase === 'speaking' && (
+              <>
+                <div className="flex items-center gap-[3px] shrink-0">
+                  {[0.5, 0.9, 0.7, 1.0, 0.6].map((h, i) => (
+                    <div key={i} className="w-[3px] bg-purple-400 rounded-full animate-pulse"
+                      style={{ height: `${8 + h * 12}px`, animationDelay: `${i * 0.1}s`, animationDuration: '0.45s' }} />
+                  ))}
+                </div>
+                <span className="text-xs font-medium text-purple-300">Titan is speaking…</span>
+              </>
+            )}
+            {sidebarVoicePhase === 'standby' && (
+              <>
+                <Mic className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                <span className="text-xs text-zinc-500">Standby — say &ldquo;Titan&rdquo; to wake</span>
+              </>
+            )}
+            {sidebarVoicePhase === 'active' && (
+              <>
+                <Mic className="h-3.5 w-3.5 text-blue-400 shrink-0 animate-pulse" />
+                <span className="text-xs text-blue-300">Voice ON — just speak to Titan</span>
+              </>
+            )}
           </div>
         </div>
       )}

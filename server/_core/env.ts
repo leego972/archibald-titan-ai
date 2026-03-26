@@ -43,10 +43,10 @@ export const ENV = {
   snapchatClientSecret: process.env.SNAPCHAT_CLIENT_SECRET ?? "",
   snapchatAccessToken: process.env.SNAPCHAT_ACCESS_TOKEN ?? "",
   snapchatAdAccountId: process.env.SNAPCHAT_AD_ACCOUNT_ID ?? "",
-  // SendGrid / Email Marketing
-  sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
-  sendgridFromEmail: process.env.SENDGRID_FROM_EMAIL ?? "marketing@archibaldtitan.com",
-  sendgridFromName: process.env.SENDGRID_FROM_NAME ?? "Archibald Titan",
+  // Gmail SMTP (free) — replaces SendGrid
+  // Generate an App Password at: https://myaccount.google.com/apppasswords
+  gmailUser: process.env.GMAIL_USER ?? "",
+  gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
   // Reddit
   redditClientId: process.env.REDDIT_CLIENT_ID ?? "",
   redditClientSecret: process.env.REDDIT_CLIENT_SECRET ?? "",

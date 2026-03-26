@@ -47,7 +47,9 @@ interface VoiceModeContextValue {
   enabled: boolean;
   phase: VoicePhase;
   transcript: string;
+  lastReply: string;
   setEnabled: (v: boolean) => void;
+  setConversationId: (id: number | null) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -55,7 +57,9 @@ const VoiceModeContext = createContext<VoiceModeContextValue>({
   enabled: false,
   phase: "off",
   transcript: "",
+  lastReply: "",
   setEnabled: () => {},
+  setConversationId: () => {},
 });
 
 export function useVoiceMode() {
@@ -67,6 +71,7 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledState] = useState(false);
   const [phase, setPhase] = useState<VoicePhase>("off");
   const [transcript, setTranscript] = useState("");
+  const [lastReply, setLastReply] = useState("");
 
   // tRPC mutations
   const sendMessage   = trpc.chat.send.useMutation();
@@ -175,6 +180,7 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
         (result as any)?.response ??
         (result as any)?.content ??
         "Sorry, I didn't catch that.";
+      setLastReply(replyText);
       setTranscript("");
       await speakText(replyText);
     } catch (err) {
@@ -405,8 +411,13 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Allow external callers (e.g. ChatPage) to pin voice to a specific conversation
+  const setConversationId = useCallback((id: number | null) => {
+    conversationIdRef.current = id;
+  }, []);
+
   return (
-    <VoiceModeContext.Provider value={{ enabled, phase, transcript, setEnabled }}>
+    <VoiceModeContext.Provider value={{ enabled, phase, transcript, lastReply, setEnabled, setConversationId }}>
       {children}
     </VoiceModeContext.Provider>
   );

@@ -360,13 +360,13 @@ export async function getAutonomousSystemStatus(): Promise<{
       setupUrl: "https://www.linkedin.com/developers/apps",
     },
     {
-      channel: "SendGrid (Email)",
-      envVars: ["SENDGRID_API_KEY"],
-      configured: !!ENV.sendgridApiKey,
+      channel: "Gmail (Email)",
+      envVars: ["GMAIL_USER", "GMAIL_APP_PASSWORD"],
+      configured: !!(ENV.gmailUser && ENV.gmailAppPassword),
       impact: "high",
       description: "Send email nurture campaigns and newsletters",
       freeToSetup: true,
-      setupUrl: "https://app.sendgrid.com/settings/api_keys",
+      setupUrl: "https://myaccount.google.com/apppasswords",
     },
     {
       channel: "TikTok",

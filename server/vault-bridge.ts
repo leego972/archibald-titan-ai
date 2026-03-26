@@ -44,8 +44,9 @@ const SECRET_TYPE_MAP: Record<string, EnvMapping> = {
   // Discord
   discord_webhook_url:        { envKey: "DISCORD_WEBHOOK_URL",        envProp: "discordWebhookUrl" },
   discord_bot_token:          { envKey: "DISCORD_BOT_TOKEN",          envProp: "discordBotToken" },
-  // SendGrid
-  sendgrid_api_key:           { envKey: "SENDGRID_API_KEY",           envProp: "sendgridApiKey" },
+  // Gmail SMTP (replaces SendGrid — free)
+  gmail_user:                 { envKey: "GMAIL_USER",                 envProp: "gmailUser" },
+  gmail_app_password:         { envKey: "GMAIL_APP_PASSWORD",         envProp: "gmailAppPassword" },
   // Twitter/X
   x_api_key:                  { envKey: "X_API_KEY",                  envProp: "xApiKey" },
   x_api_key_secret:           { envKey: "X_API_KEY_SECRET",           envProp: "xApiSecret" },
@@ -310,7 +311,7 @@ export function getVaultBridgeStatus(): VaultBridgeStatus {
     { name: "Hashnode",   check: () => !!(ENV.hashnodeApiKey && ENV.hashnodePublicationId) },
     { name: "Medium",     check: () => !!(ENV.mediumAccessToken && ENV.mediumAuthorId) },
     { name: "Discord",    check: () => !!ENV.discordWebhookUrl },
-    { name: "SendGrid",   check: () => !!ENV.sendgridApiKey },
+    { name: "Gmail",      check: () => !!(ENV.gmailUser && ENV.gmailAppPassword) },
     { name: "Twitter/X",  check: () => !!(ENV.xApiKey && ENV.xApiSecret && ENV.xAccessToken && ENV.xAccessTokenSecret) },
     { name: "Reddit",     check: () => !!(ENV.redditClientId && ENV.redditClientSecret && ENV.redditRefreshToken) },
     { name: "LinkedIn",   check: () => !!ENV.linkedinAccessToken },
