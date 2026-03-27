@@ -136,6 +136,12 @@ export type InvokeParams = {
    * @internal
    */
   _uncensoredFallbackStep?: number;
+  /**
+   * Internal: set to true when the shared Venice Pro tier has already failed.
+   * Prevents re-routing back to Venice and forces OpenAI fallback.
+   * @internal
+   */
+  _sharedVeniceFailed?: boolean;
 };
 
 export type ToolCall = {
@@ -328,8 +334,10 @@ const getLegacyApiKey = () => {
 };
 
 const assertApiKey = () => {
+  // Venice Pro key counts as a valid provider — no OpenAI key required
+  if (VENICE_API_KEY) return;
   if (!hasKeys() && !getLegacyApiKey()) {
-    throw new Error("No OpenAI API keys configured. Set OPENAI_API_KEY and/or OPENAI_API_KEY_2..N");
+    throw new Error("No API keys configured. Set VENICE_API_KEY, OPENAI_API_KEY, or OPENAI_API_KEY_2..N");
   }
 };
 
@@ -457,10 +465,33 @@ async function _invokeLLMWithRetry(
   const useVenice = forceOpenRouter && uncensoredStep === 0 && !!VENICE_API_KEY;
   const useOpenRouterUncensored = forceOpenRouter && !useVenice && uncensoredStep <= 1 && !!OPENROUTER_API_KEY;
   // Step 2 (or no uncensored keys): fall through to OpenAI
+
+  // ── Shared Venice Free Tier ──────────────────────────────────────────────
+  // When a user has NOT provided their own API key, route through the owner's
+  // Venice Pro key as a shared free tier. Users with their own key bypass this
+  // entirely. This gives every user Venice Pro quality without needing a key.
+  // Venice Pro models used for shared tier:
+  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, best reasoning
+  //   Tools fast:      mistral-31-24b — 128K ctx, fast fn-calling
+  //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call, best value
+  //   Tools premium:   qwen3-235b-a22b-instruct-2507 — max capability
+  const usingUserKey = !!params.userApiKey;
+  // Respect _sharedVeniceFailed flag — if Venice already failed for this request, skip it
+  const sharedVeniceFailed = params._sharedVeniceFailed === true;
+  const useSharedVenice = !usingUserKey && !forceOpenRouter && !forceGemini && !!VENICE_API_KEY && !sharedVeniceFailed;
+  const VENICE_SHARED_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_SHARED_TOOLS_MODEL =
+    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
+    modelPreference === "fast"    ? "mistral-31-24b" :
+                                    "kimi-k2-5";
+  const VENICE_SHARED_MODEL = hasToolsDefined ? VENICE_SHARED_TOOLS_MODEL : VENICE_SHARED_CHAT_MODEL;
+
   const model = useVenice
     ? VENICE_UNCENSORED_MODEL
     : useOpenRouterUncensored
     ? OPENROUTER_UNCENSORED_MODEL
+    : useSharedVenice
+    ? VENICE_SHARED_MODEL
     : forceGemini
     ? "gemini-2.5-flash"
     : useOpenAI
@@ -485,7 +516,7 @@ async function _invokeLLMWithRetry(
 
   // Venice-specific parameters: disable default system prompt so our uncensored
   // instructions are not overridden by Venice's built-in system prompt.
-  if (useVenice) {
+  if (useVenice || useSharedVenice) {
     payload.venice_parameters = {
       include_venice_system_prompt: false,
     };
@@ -521,23 +552,25 @@ async function _invokeLLMWithRetry(
   }
 
   // ── Acquire API key ──
-  // If user provided their own API key, use it directly (bypasses system pool)
-  const usingUserKey = !!params.userApiKey;
   // Determine system tag: explicit tag > priority-based default
   const systemTag = params.systemTag || (priority === "chat" ? "chat" : "misc");
-  // When using Venice/OpenRouter uncensored or Gemini, skip OpenAI key pool entirely
-  const skipOpenAIPool = forceGemini || useVenice || useOpenRouterUncensored;
+  // When using Venice/OpenRouter uncensored, shared Venice, or Gemini — skip OpenAI key pool entirely
+  const skipOpenAIPool = forceGemini || useVenice || useOpenRouterUncensored || useSharedVenice;
   const keyHandle = (!usingUserKey && useOpenAI && !skipOpenAIPool) ? acquireKey(systemTag) : null;
   const apiKey = useVenice
     ? VENICE_API_KEY
     : useOpenRouterUncensored
     ? OPENROUTER_API_KEY
+    : useSharedVenice
+    ? VENICE_API_KEY
     : forceGemini
     ? GEMINI_API_KEY
     : usingUserKey ? params.userApiKey! : (keyHandle ? keyHandle.key : getLegacyApiKey());
 
   if (usingUserKey) {
     log.info("Using user's personal API key", { system: systemTag, model });
+  } else if (useSharedVenice) {
+    log.info(`[LLM] ${systemTag}: Shared Venice Pro tier — ${model}`);
   }
   if (useVenice) {
     log.info(`[LLM] ${systemTag}: Uncensored step 0 — Venice Dolphin: ${model}`);
@@ -554,7 +587,7 @@ async function _invokeLLMWithRetry(
 
   let response: Response;
   try {
-    const apiUrl = useVenice
+    const apiUrl = (useVenice || useSharedVenice)
       ? "https://api.venice.ai/api/v1/chat/completions"
       : useOpenRouterUncensored
       ? "https://openrouter.ai/api/v1/chat/completions"
@@ -593,6 +626,12 @@ async function _invokeLLMWithRetry(
     }
 
     // For Venice/OpenRouter network errors, advance the fallback chain
+    // Shared Venice errors fall back to OpenAI gracefully
+    if (useSharedVenice) {
+      log.warn(`[LLM] ${systemTag}: Shared Venice network error, falling back to OpenAI: ${(err as Error).message}`);
+      const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
+      return _invokeLLMWithRetry(fallbackParams, priority, 0);
+    }
     if (useVenice || useOpenRouterUncensored) {
       const nextStep = uncensoredStep + 1;
       log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} network error, advancing to step ${nextStep}: ${(err as Error).message}`);
@@ -615,6 +654,12 @@ async function _invokeLLMWithRetry(
   }
 
   // ── Handle 429 Rate Limit ──
+  // Shared Venice 429: fall back to OpenAI gracefully
+  if (response.status === 429 && useSharedVenice) {
+    log.warn(`[LLM] ${systemTag}: Shared Venice rate-limited (429), falling back to OpenAI`);
+    const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
+    return _invokeLLMWithRetry(fallbackParams, priority, 0);
+  }
   // For Venice/OpenRouter uncensored: immediately advance to next fallback step on 429
   if (response.status === 429 && (useVenice || useOpenRouterUncensored)) {
     const nextStep = uncensoredStep + 1;
@@ -721,6 +766,12 @@ async function _invokeLLMWithRetry(
   if (!response.ok) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
     const errorText = await response.text();
+    // Shared Venice error: fall back to OpenAI gracefully
+    if (useSharedVenice) {
+      log.warn(`[LLM] ${systemTag}: Shared Venice failed (${response.status}), falling back to OpenAI: ${errorText.slice(0, 200)}`);
+      const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
+      return _invokeLLMWithRetry(fallbackParams, priority, 0);
+    }
     // Uncensored fallback chain: advance to next step on any failure
     if (useVenice || useOpenRouterUncensored) {
       const nextStep = uncensoredStep + 1;

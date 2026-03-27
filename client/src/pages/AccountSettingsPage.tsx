@@ -126,10 +126,12 @@ function OpenAIKeySection() {
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Key className="w-5 h-5 text-amber-400" />
-          OpenAI API Key
+          AI Provider Key
+          <span className="text-xs font-normal text-muted-foreground ml-1">(optional)</span>
         </CardTitle>
         <CardDescription>
-          Add your own OpenAI API key for faster, dedicated AI responses. Your key is encrypted at rest and never shared.
+          All users run on the shared <span className="font-medium text-violet-400">Venice Pro</span> tier by default — uncensored, private, zero data logging.
+          Add your own OpenAI key for a dedicated rate limit that's never shared with other users.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -178,22 +180,14 @@ function OpenAIKeySection() {
             </p>
           </div>
         ) : (
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
               <div className="text-sm">
-                <p className="font-medium text-amber-300">No API key set</p>
+                <p className="font-medium text-violet-300">Running on Shared Venice Pro</p>
                 <p className="text-muted-foreground mt-1">
-                  Without your own key, your chat uses shared system keys which may be slower during peak usage.
-                  Get a key from{" "}
-                  <a
-                    href="https://platform.openai.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline"
-                  >
-                    platform.openai.com/api-keys
-                  </a>
+                  You're already powered by <span className="text-violet-300 font-medium">Venice Pro</span> — uncensored AI with no data logging, no content filtering, and no usage tracking.
+                  Add your own OpenAI key below if you want a dedicated rate limit unaffected by other users.
                 </p>
               </div>
             </div>
