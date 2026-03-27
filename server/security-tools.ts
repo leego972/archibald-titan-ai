@@ -22,18 +22,10 @@ import * as tls from "tls";
 import * as dns from "dns/promises";
 import * as https from "https";
 import * as http from "http";
-import OpenAI from "openai";
+import { invokeLLM } from "./_core/llm.js";
 import { createLogger } from "./_core/logger.js";
 
 const log = createLogger("SecurityTools");
-
-// Lazy-init: only instantiate when actually used so test environments
-// without OPENAI_API_KEY can still import this module without crashing.
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI();
-  return _openai;
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -402,18 +394,20 @@ export async function analyzeCodeSecurity(
   const fileList = files.map((f) => `### File: ${f.filename}\n\`\`\`\n${f.content.slice(0, 8000)}\n\`\`\``).join("\n\n");
 
   try {
-    const response = await getOpenAI().chat.completions.create({
-      model: "gpt-4.1-mini",
+    const response = await invokeLLM({
+      model: "strong",
+      priority: "background",
+      forceOpenRouter: true,
+      temperature: 0.1,
+      max_tokens: 8000,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: `You are a world-class application security engineer. Analyze code for ALL vulnerabilities including: SQL injection, XSS, CSRF, SSRF, XXE, command injection, path traversal, insecure deserialization, broken auth, hardcoded secrets, weak crypto, race conditions, prototype pollution, JWT flaws, OAuth misconfigs, timing attacks, privilege escalation, business logic flaws. For each issue provide accurate CWE, CVSS 3.1 score, OWASP Top 10 2021 category, and specific fix with code example. Be exhaustive — miss nothing.` },
         { role: "user", content: `Perform a comprehensive security audit. Return JSON:\n{\n  "summary": "...",\n  "score": 0-100,\n  "issues": [{"severity":"critical|high|medium|low","title":"...","description":"...","file":"...","line":null,"recommendation":"...","cwe":"CWE-XXX","cvss":0.0,"owaspCategory":"A01:2021 - ..."}],\n  "owaspCoverage": ["A01:2021",...],\n  "strengths": ["..."],\n  "recommendations": ["..."]\n}\n\nCode:\n${fileList}` },
       ],
-      response_format: { type: "json_object" },
-      temperature: 0.1,
-      max_tokens: 8000,
     });
-
-    const raw = JSON.parse(response.choices[0].message.content || "{}");
+    const rawContent = response.choices[0]?.message?.content;
+    const raw = JSON.parse(typeof rawContent === "string" ? rawContent : "{}");
     const issues: CodeReviewIssue[] = (raw.issues || []).map((i: any) => ({
       severity: i.severity || "medium", title: i.title || "Unknown Issue",
       description: i.description || "", file: i.file || files[0]?.filename || "unknown",

@@ -12,16 +12,9 @@
  * - Explanation of what was changed and why
  */
 
-import OpenAI from "openai";
+import { invokeLLM } from "./_core/llm.js";
 import type { CodeReviewIssue, CodeReviewReport } from "./security-tools";
 import { getErrorMessage } from "./_core/errors.js";
-
-// Lazy-init so test environments without OPENAI_API_KEY don't crash on import
-let _openaiInstance: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openaiInstance) _openaiInstance = new OpenAI();
-  return _openaiInstance;
-}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -71,8 +64,13 @@ export async function fixSingleVulnerability(
   const owaspRef = (issue as any).owaspCategory ? `\n**OWASP:** ${(issue as any).owaspCategory}` : "";
   const fixHint = issue.recommendation || (issue as any).suggestion || "";
 
-  const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4.1-mini",
+  const response = await invokeLLM({
+    model: "strong",
+    priority: "background",
+    forceOpenRouter: true,
+    temperature: 0.05,
+    max_tokens: 8000,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -83,9 +81,6 @@ export async function fixSingleVulnerability(
         content: `Fix this vulnerability:\n\n**File:** ${filename}\n**Vulnerability:** [${issue.severity.toUpperCase()}] ${issue.title}${cweRef}${cvssRef}${owaspRef}\n**Description:** ${issue.description}\n**Recommendation:** ${fixHint}\n${issue.line ? `**Line:** ${issue.line}` : ""}\n\n**Code:**\n\`\`\`\n${code.slice(0, 12000)}\n\`\`\`\n\nReturn JSON: {"fixedCode":"...","explanation":"...","diffSummary":"...","confidence":0-100,"breakingChange":true|false,"testSuggestion":"..."}`,
       },
     ],
-    response_format: { type: "json_object" },
-    temperature: 0.05,
-    max_tokens: 8000,
   });
 
   const rawContent = response.choices[0]?.message?.content;
