@@ -56,12 +56,21 @@ async function execSSHCommand(ssh: SSHConfig, command: string, timeoutMs = 60000
 
 // ─── Get SSH Config ───────────────────────────────────────────────
 async function getSshConfig(userId: number): Promise<SSHConfig> {
+  // First try user-specific SSH config, then fall back to shared Titan server
+  const titanConfig = getTitanServerConfig();
   const db = await getDb();
-  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+  if (!db) {
+    if (titanConfig) return { host: titanConfig.host, port: titanConfig.port, username: titanConfig.username, password: titanConfig.password, privateKey: titanConfig.privateKey };
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+  }
   const result = await db.select().from(userSecrets)
     .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "__argus_ssh")))
     .limit(1);
-  if (result.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No Argus server configured. Please set up your SSH connection first." });
+  if (result.length === 0) {
+    // Fall back to shared Titan server if configured
+    if (titanConfig) return { host: titanConfig.host, port: titanConfig.port, username: titanConfig.username, password: titanConfig.password, privateKey: titanConfig.privateKey };
+    throw new TRPCError({ code: "BAD_REQUEST", message: "No Argus server configured. Please set up your SSH connection first." });
+  }
   const cfg = JSON.parse(decrypt(result[0].encryptedValue));
   return { host: cfg.host, port: cfg.port || 22, username: cfg.username, password: cfg.password || undefined, privateKey: cfg.privateKey || undefined };
 }
