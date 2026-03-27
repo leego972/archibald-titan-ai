@@ -26,7 +26,14 @@ import OpenAI from "openai";
 import { createLogger } from "./_core/logger.js";
 
 const log = createLogger("SecurityTools");
-const openai = new OpenAI();
+
+// Lazy-init: only instantiate when actually used so test environments
+// without OPENAI_API_KEY can still import this module without crashing.
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI();
+  return _openai;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -395,7 +402,7 @@ export async function analyzeCodeSecurity(
   const fileList = files.map((f) => `### File: ${f.filename}\n\`\`\`\n${f.content.slice(0, 8000)}\n\`\`\``).join("\n\n");
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         { role: "system", content: `You are a world-class application security engineer. Analyze code for ALL vulnerabilities including: SQL injection, XSS, CSRF, SSRF, XXE, command injection, path traversal, insecure deserialization, broken auth, hardcoded secrets, weak crypto, race conditions, prototype pollution, JWT flaws, OAuth misconfigs, timing attacks, privilege escalation, business logic flaws. For each issue provide accurate CWE, CVSS 3.1 score, OWASP Top 10 2021 category, and specific fix with code example. Be exhaustive — miss nothing.` },

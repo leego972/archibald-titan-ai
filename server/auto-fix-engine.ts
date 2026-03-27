@@ -13,9 +13,15 @@
  */
 
 import OpenAI from "openai";
-const _openai = new OpenAI();
 import type { CodeReviewIssue, CodeReviewReport } from "./security-tools";
 import { getErrorMessage } from "./_core/errors.js";
+
+// Lazy-init so test environments without OPENAI_API_KEY don't crash on import
+let _openaiInstance: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openaiInstance) _openaiInstance = new OpenAI();
+  return _openaiInstance;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -65,7 +71,7 @@ export async function fixSingleVulnerability(
   const owaspRef = (issue as any).owaspCategory ? `\n**OWASP:** ${(issue as any).owaspCategory}` : "";
   const fixHint = issue.recommendation || (issue as any).suggestion || "";
 
-  const response = await _openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4.1-mini",
     messages: [
       {
