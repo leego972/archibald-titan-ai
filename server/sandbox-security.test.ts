@@ -285,8 +285,8 @@ describe("Security Tools", () => {
       expect(result.host).toBe("example.com");
       expect(Array.isArray(result.openPorts)).toBe(true);
       expect(Array.isArray(result.closedPorts)).toBe(true);
-      // Total scanned ports should equal 2
-      expect(result.openPorts.length + result.closedPorts.length).toBe(2);
+      // Total scanned ports should equal 2 (open + closed + filtered)
+      expect(result.openPorts.length + result.closedPorts.length + result.filteredPorts.length).toBe(2);
     });
 
     it("should identify open and closed ports", async () => {
@@ -350,7 +350,7 @@ describe("Security Tools", () => {
       expect(result.overallScore).toBeGreaterThanOrEqual(0);
       expect(result.overallScore).toBeLessThanOrEqual(100);
       expect(Array.isArray(result.issues)).toBe(true);
-    }, 15000);
+    }, 60000); // 60s — LLM call via Venice/OpenAI can take up to 30s in CI
 
     it("should handle empty file list", async () => {
       const { analyzeCodeSecurity } = await import("./security-tools");

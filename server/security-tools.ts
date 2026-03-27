@@ -529,7 +529,15 @@ function checkPort(host: string, port: number, timeout = 3000): Promise<"open" |
     const done = (r: "open" | "closed" | "filtered") => { if (!resolved) { resolved = true; socket.destroy(); resolve(r); } };
     socket.setTimeout(timeout);
     socket.connect(port, host, () => done("open"));
-    socket.on("error", (err: NodeJS.ErrnoException) => { if (err.code === "ECONNREFUSED") done("closed"); else done("filtered"); });
+    socket.on("error", (err: NodeJS.ErrnoException) => {
+      // ECONNREFUSED = port actively rejected (closed)
+      // ENOTFOUND / EHOSTUNREACH / ENETUNREACH = host unreachable — treat as closed so callers can detect it
+      if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND" || err.code === "EHOSTUNREACH" || err.code === "ENETUNREACH") {
+        done("closed");
+      } else {
+        done("filtered");
+      }
+    });
     socket.on("timeout", () => done("filtered"));
   });
 }
