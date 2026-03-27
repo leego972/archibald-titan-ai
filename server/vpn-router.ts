@@ -65,7 +65,7 @@ async function getOrCreateSubUser(userId: number) {
     const response = await fetch(`${DECODO_API_URL}/sub-users`, {
       method: "POST",
       headers: {
-        "Authorization": `Basic ${Buffer.from(DECODO_API_KEY + ":").toString("base64")}`,
+        "Authorization": DECODO_API_KEY,
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
@@ -134,7 +134,8 @@ export const vpnRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Check tier limits — VPN requires Pro or higher
-      const plan = await getUserPlan(ctx.user.id);
+      let plan: { planId: string } = { planId: "free" };
+      try { plan = await getUserPlan(ctx.user.id); } catch { /* treat as free if DB error */ }
       if (plan.planId === "free") {
         throw new TRPCError({
           code: "FORBIDDEN",
