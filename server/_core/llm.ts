@@ -26,9 +26,9 @@ const log = createLogger("LLM");
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || Buffer.from("QUl6YVN5Q1pkaXpQMnVUMlJZUi14UU1reUpVOWhWdlRDck5LZ1NB", "base64").toString("utf-8");
 
 /**
- * Venice API key — PRIMARY uncensored model routing.
- * Model: venice-uncensored-role-play (Dolphin, supports tool calling, dedicated rate limits).
- * Fallback chain: Venice → OpenRouter Dolphin free → OpenAI GPT-4.1.
+ * Venice API key — PRIMARY uncensored model routing (Pro tier).
+ * Models: qwen3-235b (chat), kimi-k2-5 (tools/strong), mistral-31-24b (tools/fast), qwen3-235b (premium).
+ * Fallback chain: Venice Pro → OpenRouter Dolphin free → OpenAI GPT-4.1.
  */
 const VENICE_API_KEY = process.env.VENICE_API_KEY || "";
 
@@ -440,12 +440,16 @@ async function _invokeLLMWithRetry(
   const forceOpenRouter = params.forceOpenRouter === true;
   // Uncensored fallback step: 0=Venice (primary), 1=OpenRouter free (secondary), 2=OpenAI (final)
   const uncensoredStep = params._uncensoredFallbackStep ?? 0;
-  // Venice primary models:
-  //   - venice-uncensored-role-play: fully uncensored, NO tool calling support — chat only
-  //   - mistral-31-24b: Venice-hosted Mistral, supports tool calling, less censored than OpenAI
-  // Use the tool-capable model when tools are present, uncensored chat model otherwise.
-  const VENICE_UNCENSORED_CHAT_MODEL = "venice-uncensored-role-play";
-  const VENICE_UNCENSORED_TOOLS_MODEL = "mistral-31-24b";
+  // Venice Pro models (upgraded to best available on Pro tier):
+  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, 128K ctx, best uncensored reasoning
+  //   Tools fast:      mistral-31-24b — 128K ctx, fn-calling + vision, fast
+  //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call + vision, best value
+  //   Tools premium:   qwen3-235b-a22b-instruct-2507 — 235B, maximum capability
+  const VENICE_UNCENSORED_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_UNCENSORED_TOOLS_MODEL =
+    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
+    modelPreference === "fast"    ? "mistral-31-24b" :
+                                    "kimi-k2-5"; // strong default: 256K ctx, code+vision+fn-call
   const VENICE_UNCENSORED_MODEL = hasToolsDefined ? VENICE_UNCENSORED_TOOLS_MODEL : VENICE_UNCENSORED_CHAT_MODEL;
   // OpenRouter secondary: Dolphin Mistral 24B Venice free tier
   const OPENROUTER_UNCENSORED_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
