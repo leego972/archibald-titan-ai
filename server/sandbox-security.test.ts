@@ -6,6 +6,52 @@ import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 const log = createLogger("SandboxSecurityTest");
 
+// ── Mock invokeLLM so analyzeCodeSecurity never hits the network in CI ──
+vi.mock("./_core/llm.js", () => ({
+  invokeLLM: vi.fn().mockResolvedValue({
+    id: "mock-id",
+    created: Date.now(),
+    model: "mock-model",
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant" as const,
+          content: JSON.stringify({
+            overallScore: 45,
+            grade: "C",
+            totalFiles: 1,
+            totalIssues: 1,
+            criticalCount: 0,
+            highCount: 1,
+            mediumCount: 0,
+            lowCount: 0,
+            summary: "SQL injection vulnerability detected in test.js",
+            issues: [
+              {
+                id: "sql-001",
+                type: "SQL Injection",
+                severity: "high",
+                file: "test.js",
+                line: 2,
+                description: "Unsanitized user input concatenated into SQL query",
+                recommendation: "Use parameterized queries or prepared statements",
+                cwe: "CWE-89",
+                cvss: 8.1,
+                owasp: "A03:2021 – Injection",
+                snippet: 'const query = "SELECT * FROM users WHERE id = " + req.params.id;',
+                testSuggestion: "Test with input: ' OR '1'='1",
+              },
+            ],
+          }),
+        },
+        finish_reason: "stop",
+      },
+    ],
+    usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 },
+  }),
+}));
+
 /** Skip gracefully when no DB is available (CI without MySQL). */
 async function withDb<T>(fn: () => Promise<T>): Promise<T | undefined> {
   try {
