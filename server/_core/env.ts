@@ -102,5 +102,7 @@ export const ENV = {
   titanServerPort: parseInt(process.env.TITAN_SERVER_PORT ?? "22", 10),
   titanServerUser: process.env.TITAN_SERVER_USER ?? "root",
   titanServerPassword: process.env.TITAN_SERVER_PASSWORD ?? "",
-  titanServerKey: process.env.TITAN_SERVER_KEY ?? "",
+  // Support both raw PEM key (TITAN_SERVER_KEY) and base64-encoded key (TITAN_SERVER_KEY_B64)
+  titanServerKey: process.env.TITAN_SERVER_KEY ||
+    (process.env.TITAN_SERVER_KEY_B64 ? Buffer.from(process.env.TITAN_SERVER_KEY_B64, "base64").toString("utf8") : ""),
 };

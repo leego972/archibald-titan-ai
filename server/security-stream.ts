@@ -33,10 +33,10 @@ interface ToolNode {
 }
 
 const SECRET_PREFIXES: Record<string, { nodes: string; active: string }> = {
-  evilginx:   { nodes: "evilginx_nodes",   active: "evilginx_active_node"   },
-  blackeye:   { nodes: "blackeye_nodes",    active: "blackeye_active_node"   },
-  metasploit: { nodes: "metasploit_nodes",  active: "metasploit_active_node" },
-  exploitpack:{ nodes: "exploitpack_nodes", active: "exploitpack_active_node"},
+  evilginx:   { nodes: "__evilginx_nodes",   active: "__evilginx_active"   },
+  blackeye:   { nodes: "__blackeye_nodes",    active: "__blackeye_active"   },
+  metasploit: { nodes: "__msf_nodes",         active: "__msf_active"        },
+  exploitpack:{ nodes: "__exploitpack_nodes", active: "__exploitpack_active"},
 };
 
 async function getActiveNodeForTool(userId: number, tool: string): Promise<ToolNode | null> {
