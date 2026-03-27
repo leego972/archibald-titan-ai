@@ -311,23 +311,22 @@ export const argusRouter = router({
       };
     }),
 
-  // ── Scan: Run multiple modules (batch) ────────────────────────
+  // ── Scan: Run multiple modules (batch, up to 30, optional parallel) ───
   runBatch: protectedProcedure
     .input(z.object({
-      moduleIds: z.array(z.number()).min(1).max(10),
+      moduleIds: z.array(z.number()).min(1).max(30),
       target: z.string().min(1),
       threads: z.number().min(1).max(50).default(10),
+      parallel: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Argus");
       const ssh = await getSshConfig(ctx.user.id);
-
       const results: Array<{ moduleId: number; moduleName: string; output: string; duration: number }> = [];
-
-      for (const moduleId of input.moduleIds) {
+      const runOne = async (moduleId: number) => {
         const moduleMeta = ARGUS_MODULES.find(m => m.id === moduleId);
-        if (!moduleMeta) continue;
+        if (!moduleMeta) return;
         const argusCmd = `cd /opt/argus 2>/dev/null || true && echo -e "use ${moduleId}\\nset target ${input.target}\\nset threads ${input.threads}\\nrun\\nexit" | timeout 60 python3 -m argus 2>&1 || echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 60 argus 2>&1 || echo 'Module failed'`;
         const start = Date.now();
         try {
@@ -336,10 +335,15 @@ export const argusRouter = router({
         } catch (e: any) {
           results.push({ moduleId, moduleName: moduleMeta.name, output: `Error: ${e.message}`, duration: Date.now() - start });
         }
+      };
+      if (input.parallel) {
+        await Promise.allSettled(input.moduleIds.map(runOne));
+      } else {
+        for (const moduleId of input.moduleIds) await runOne(moduleId);
       }
-
       await consumeCredits(ctx.user.id, "security_scan", `Argus batch scan: ${input.moduleIds.length} modules`);
-      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_batch_scan", category: "security", details: { moduleCount: String(input.moduleIds.length), target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_batch_scan", category: "security", details: { moduleCount: String(input.moduleIds.length), target: input.target, parallel: String(input.parallel) }, ipAddress: ctx.req?.ip || "unknown" });
+      results.sort((a, b) => input.moduleIds.indexOf(a.moduleId) - input.moduleIds.indexOf(b.moduleId));
       return { results, target: input.target, totalModules: results.length, scannedAt: new Date().toISOString() };
     }),
 
@@ -364,33 +368,84 @@ export const argusRouter = router({
 
   // ── Scan: Quick recon (top 5 essential modules) ───────────────
   quickRecon: protectedProcedure
-    .input(z.object({ target: z.string().min(1) }))
+    .input(z.object({
+      target: z.string().min(1),
+      depth: z.enum(["fast", "standard", "deep"]).optional().default("standard"),
+    }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Argus");
       const ssh = await getSshConfig(ctx.user.id);
-      // Modules: DNS Records (3), WHOIS (18), SSL Chain (12), Open Ports (9), Subdomain Enum (118)
-      const quickModules = [3, 18, 12, 9, 118];
-      const results: Array<{ moduleId: number; moduleName: string; output: string }> = [];
-
-      for (const moduleId of quickModules) {
+      // fast: 5 modules | standard: 12 modules | deep: 20 modules
+      const fastModules = [3, 18, 12, 9, 118];
+      const standardModules = [3, 18, 12, 9, 118, 4, 17, 20, 21, 27, 10, 13];
+      const deepModules = [3, 18, 12, 9, 118, 4, 17, 20, 21, 27, 10, 13, 14, 16, 19, 6, 5, 8, 28, 2];
+      const moduleList = input.depth === "fast" ? fastModules : input.depth === "deep" ? deepModules : standardModules;
+      const results: Array<{ moduleId: number; moduleName: string; output: string; duration: number }> = [];
+      // Run all modules in parallel for speed
+      const promises = moduleList.map(async (moduleId) => {
         const moduleMeta = ARGUS_MODULES.find(m => m.id === moduleId);
-        if (!moduleMeta) continue;
-        const cmd = `cd /opt/argus 2>/dev/null || true && echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 45 python3 -m argus 2>&1 || echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 45 argus 2>&1 || echo 'Skipped'`;
+        if (!moduleMeta) return;
+        const cmd = `cd /opt/argus 2>/dev/null || true && echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 60 python3 -m argus 2>&1 || echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 60 argus 2>&1 || echo 'Skipped'`;
+        const t = Date.now();
         try {
-          const output = await execSSHCommand(ssh, cmd, 60000);
-          results.push({ moduleId, moduleName: moduleMeta.name, output });
+          const output = await execSSHCommand(ssh, cmd, 75000);
+          results.push({ moduleId, moduleName: moduleMeta.name, output, duration: Date.now() - t });
         } catch {
-          results.push({ moduleId, moduleName: moduleMeta.name, output: "Timed out" });
+          results.push({ moduleId, moduleName: moduleMeta.name, output: "Timed out", duration: Date.now() - t });
         }
-      }
-
-      await consumeCredits(ctx.user.id, "security_scan", "Argus quick recon");
-      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_quick_recon", category: "security", details: { target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
-      return { results, target: input.target, scannedAt: new Date().toISOString() };
+      });
+      await Promise.allSettled(promises);
+      await consumeCredits(ctx.user.id, "security_scan", `Argus quick recon (${input.depth})`);
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_quick_recon", category: "security", details: { target: input.target, depth: input.depth }, ipAddress: ctx.req?.ip || "unknown" });
+      results.sort((a, b) => moduleList.indexOf(a.moduleId) - moduleList.indexOf(b.moduleId));
+      return { results, target: input.target, depth: input.depth, totalModules: results.length, scannedAt: new Date().toISOString() };
     }),
 
-  // ── Status: Check Argus installation ─────────────────────────
+   // ── Scan: Full recon — all 135 modules in parallel batches ───────
+  fullRecon: protectedProcedure
+    .input(z.object({
+      target: z.string().min(1),
+      batchSize: z.number().min(1).max(20).optional().default(10),
+      skipModules: z.array(z.number()).optional().default([]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Argus");
+      const ssh = await getSshConfig(ctx.user.id);
+      const allModuleIds = ARGUS_MODULES
+        .map(m => m.id)
+        .filter(id => !input.skipModules.includes(id));
+      const results: Array<{ moduleId: number; moduleName: string; output: string; duration: number; category: string }> = [];
+      // Process in parallel batches to avoid overwhelming the VPS
+      for (let i = 0; i < allModuleIds.length; i += input.batchSize) {
+        const batch = allModuleIds.slice(i, i + input.batchSize);
+        const batchPromises = batch.map(async (moduleId) => {
+          const moduleMeta = ARGUS_MODULES.find(m => m.id === moduleId);
+          if (!moduleMeta) return;
+          const cmd = `cd /opt/argus 2>/dev/null || true && echo -e "use ${moduleId}\\nset target ${input.target}\\nrun\\nexit" | timeout 60 python3 -m argus 2>&1 || echo 'Skipped'`;
+          const t = Date.now();
+          try {
+            const output = await execSSHCommand(ssh, cmd, 75000);
+            results.push({ moduleId, moduleName: moduleMeta.name, output, duration: Date.now() - t, category: moduleMeta.category });
+          } catch {
+            results.push({ moduleId, moduleName: moduleMeta.name, output: "Timed out", duration: Date.now() - t, category: moduleMeta.category });
+          }
+        });
+        await Promise.allSettled(batchPromises);
+      }
+      await consumeCredits(ctx.user.id, "security_scan", `Argus full recon (${allModuleIds.length} modules)`);
+      await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_full_recon", category: "security", details: { target: input.target, moduleCount: String(allModuleIds.length) }, ipAddress: ctx.req?.ip || "unknown" });
+      results.sort((a, b) => a.moduleId - b.moduleId);
+      const byCategory = results.reduce((acc, r) => {
+        if (!acc[r.category]) acc[r.category] = [];
+        (acc[r.category] as typeof results).push(r);
+        return acc;
+      }, {} as Record<string, typeof results>);
+      return { results, byCategory, target: input.target, totalModules: results.length, scannedAt: new Date().toISOString() };
+    }),
+
+  // ── Status: Check Argus installation ─────────────────────
   getStatus: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Argus");

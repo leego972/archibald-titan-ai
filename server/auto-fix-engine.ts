@@ -1,5 +1,5 @@
 /**
- * Auto-Fix Engine v1.0
+ * Auto-Fix Engine v3.0 (MAXIMUM)
  *
  * LLM-powered vulnerability auto-fixer that takes code + vulnerability report
  * and generates patched code with diffs, explanations, and confidence scores.
@@ -12,7 +12,8 @@
  * - Explanation of what was changed and why
  */
 
-import { invokeLLM } from "./_core/llm";
+import OpenAI from "openai";
+const _openai = new OpenAI();
 import type { CodeReviewIssue, CodeReviewReport } from "./security-tools";
 import { getErrorMessage } from "./_core/errors.js";
 
@@ -59,80 +60,36 @@ export async function fixSingleVulnerability(
   input: SingleFixInput
 ): Promise<VulnerabilityFix> {
   const { code, filename, issue } = input;
+  const cweRef = (issue as any).cwe ? `\n**CWE:** ${(issue as any).cwe}` : "";
+  const cvssRef = (issue as any).cvss ? `\n**CVSS 3.1:** ${(issue as any).cvss}` : "";
+  const owaspRef = (issue as any).owaspCategory ? `\n**OWASP:** ${(issue as any).owaspCategory}` : "";
+  const fixHint = issue.recommendation || (issue as any).suggestion || "";
 
-  const response = await invokeLLM({
-    systemTag: "misc",
-      model: "fast",
+  const response = await _openai.chat.completions.create({
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "system",
-        content: `You are an expert security engineer. Your job is to fix a specific vulnerability in code.
-
-Rules:
-- Fix ONLY the specific vulnerability described — do not refactor or change unrelated code
-- Preserve the original code structure, formatting, and style as much as possible
-- If the fix requires adding imports, include them
-- If the fix could break existing functionality, set breakingChange to true
-- Provide a clear explanation of what was changed and why
-- Suggest a test to verify the fix works
-- Rate your confidence from 0-100 (100 = certain the fix is correct and complete)
-
-Return a JSON object with this exact structure:
-{
-  "fixedCode": "<the entire file with the vulnerability fixed>",
-  "explanation": "<clear explanation of what was changed and why>",
-  "diffSummary": "<brief summary of changes, e.g. 'Added input sanitization on line 42, replaced raw SQL with parameterized query on line 58'>",
-  "confidence": <0-100>,
-  "breakingChange": <true|false>,
-  "testSuggestion": "<suggested test to verify the fix>"
-}`,
+        content: `You are a world-class application security engineer specializing in secure code remediation. Produce production-ready, minimal, correct fixes for specific security vulnerabilities.\n\nRules:\n- Fix ONLY the specific vulnerability described — do not refactor or change unrelated code\n- Preserve the original code structure, formatting, variable names, and style exactly\n- If the fix requires adding imports or helper functions, include them\n- Apply defense-in-depth: fix the root cause, not just the symptom\n- If the fix could break existing functionality, set breakingChange to true\n- Provide a precise technical explanation citing exact lines changed and why\n- Suggest a specific runnable test (unit test or curl command) to verify the fix\n- Rate confidence 0-100: 100 = certain the fix is correct, complete, and won't break anything\n- For SQL injection: always use parameterized queries, never string concatenation\n- For XSS: escape output, use textContent not innerHTML, implement nonces\n- For command injection: use argument arrays, never shell string interpolation\n- For hardcoded secrets: replace with environment variable lookups\n- For broken auth: implement proper JWT validation with algorithm pinning\n- For SSRF: implement allowlist-based URL validation with DNS rebinding protection\n- For path traversal: use path.resolve() and validate against allowed base directory\n- For prototype pollution: use Object.create(null) or freeze prototypes\nReturn JSON only.`,
       },
       {
         role: "user",
-        content: `Fix this vulnerability in the code:
-
-**File:** ${filename}
-**Vulnerability:** [${issue.severity.toUpperCase()}] ${issue.title}
-**Description:** ${issue.description}
-**Suggestion:** ${issue.suggestion}
-${issue.line ? `**Line:** ${issue.line}` : ""}
-
-**Code:**
-\`\`\`
-${code}
-\`\`\``,
+        content: `Fix this vulnerability:\n\n**File:** ${filename}\n**Vulnerability:** [${issue.severity.toUpperCase()}] ${issue.title}${cweRef}${cvssRef}${owaspRef}\n**Description:** ${issue.description}\n**Recommendation:** ${fixHint}\n${issue.line ? `**Line:** ${issue.line}` : ""}\n\n**Code:**\n\`\`\`\n${code.slice(0, 12000)}\n\`\`\`\n\nReturn JSON: {"fixedCode":"...","explanation":"...","diffSummary":"...","confidence":0-100,"breakingChange":true|false,"testSuggestion":"..."}`,
       },
     ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "vulnerability_fix",
-        strict: true,
-        schema: {
-          type: "object",
-          properties: {
-            fixedCode: { type: "string", description: "The entire file with the vulnerability fixed" },
-            explanation: { type: "string", description: "Clear explanation of what was changed" },
-            diffSummary: { type: "string", description: "Brief summary of changes made" },
-            confidence: { type: "integer", description: "Confidence score 0-100" },
-            breakingChange: { type: "boolean", description: "Whether the fix could break existing functionality" },
-            testSuggestion: { type: "string", description: "Suggested test to verify the fix" },
-          },
-          required: ["fixedCode", "explanation", "diffSummary", "confidence", "breakingChange", "testSuggestion"],
-          additionalProperties: false,
-        },
-      },
-    },
+    response_format: { type: "json_object" },
+    temperature: 0.05,
+    max_tokens: 8000,
   });
 
-  const rawContent = response?.choices?.[0]?.message?.content;
+  const rawContent = response.choices[0]?.message?.content;
   const content = typeof rawContent === "string" ? rawContent : null;
 
   if (!content) {
     return {
       issueTitle: issue.title,
       severity: issue.severity,
-      category: issue.category,
+      category: (issue as any).category || "security",
       file: filename,
       line: issue.line ?? null,
       originalCode: code,
@@ -150,7 +107,7 @@ ${code}
     return {
       issueTitle: issue.title,
       severity: issue.severity,
-      category: issue.category,
+      category: (issue as any).category || "security",
       file: filename,
       line: issue.line ?? null,
       originalCode: code,
@@ -165,7 +122,7 @@ ${code}
     return {
       issueTitle: issue.title,
       severity: issue.severity,
-      category: issue.category,
+      category: (issue as any).category || "security",
       file: filename,
       line: issue.line ?? null,
       originalCode: code,

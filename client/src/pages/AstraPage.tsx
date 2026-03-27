@@ -211,7 +211,7 @@ function ScanTab() {
   const [body, setBody] = useState("");
   const [authHeader, setAuthHeader] = useState("");
   const [authUrl, setAuthUrl] = useState("");
-  const [mode, setMode] = useState<"single" | "postman">("single");
+  const [mode, setMode] = useState<"single" | "postman" | "fuzzer" | "wfuzz">("single");
   const [collectionUrl, setCollectionUrl] = useState("");
 
   const startScan = trpc.astra.startScan.useMutation({
@@ -223,8 +223,16 @@ function ScanTab() {
     onSuccess: (data) => toast.success(`Postman scan started! ID: ${data.scanId}`),
     onError: (e) => toast.error(e.message),
   });
+  const startFuzzer = trpc.astra.startFuzzer.useMutation({
+    onSuccess: (data) => toast.success(`Fuzzer started on ${data.target}`),
+    onError: (e) => toast.error(e.message),
+  });
+  const startWfuzz = trpc.astra.startWfuzz.useMutation({
+    onSuccess: (data) => toast.success(`Wfuzz started on ${data.target}`),
+    onError: (e) => toast.error(e.message),
+  });
 
-  const isPending = startScan.isPending || postmanScan.isPending;
+  const isPending = startScan.isPending || postmanScan.isPending || startFuzzer.isPending || startWfuzz.isPending;
 
   return (
     <div className="space-y-4">
@@ -234,9 +242,11 @@ function ScanTab() {
           <CardDescription className="text-xs">Astra will test the target for 12+ vulnerability classes</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant={mode === "single" ? "default" : "outline"} size="sm" onClick={() => setMode("single")} className="h-8 text-xs">Single API</Button>
             <Button variant={mode === "postman" ? "default" : "outline"} size="sm" onClick={() => setMode("postman")} className="h-8 text-xs">Postman Collection</Button>
+            <Button variant={mode === "fuzzer" ? "default" : "outline"} size="sm" onClick={() => setMode("fuzzer" as any)} className="h-8 text-xs">Fuzzer (Astra)</Button>
+            <Button variant={mode === "wfuzz" ? "default" : "outline"} size="sm" onClick={() => setMode("wfuzz" as any)} className="h-8 text-xs">Wfuzz</Button>
           </div>
 
           <div className="space-y-1">
@@ -308,11 +318,11 @@ function ScanTab() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {[
-              "SQL Injection", "Cross-Site Scripting (XSS)", "Information Leakage",
+            {["SQL Injection", "Cross-Site Scripting (XSS)", "Information Leakage",
               "Broken Authentication", "CSRF / Blind CSRF", "Rate Limiting",
               "CORS Misconfiguration", "JWT Attacks", "CRLF Injection",
               "Blind XXE Injection", "Server-Side Request Forgery", "Template Injection",
+              "Path Traversal", "Open Redirect", "Business Logic Flaws",
             ].map(vuln => (
               <div key={vuln} className="flex items-center gap-2 text-xs">
                 <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />

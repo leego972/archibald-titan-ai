@@ -382,9 +382,11 @@ function ModulesTab() {
 // ─── Quick Scan Tab ───────────────────────────────────────────────
 function QuickScanTab() {
   const [target, setTarget] = useState("");
-  const [scanType, setScanType] = useState<"quick" | "category">("quick");
+  const [scanType, setScanType] = useState<"quick" | "category" | "full">("quick");
   const [category, setCategory] = useState<"infra" | "web" | "security">("infra");
   const [threads, setThreads] = useState(10);
+  const [depth, setDepth] = useState<1 | 2 | 3>(1);
+  const [parallel, setParallel] = useState(5);
   const [results, setResults] = useState<any>(null);
 
   const quickRecon = trpc.argus.quickRecon.useMutation({
@@ -395,12 +397,18 @@ function QuickScanTab() {
     onSuccess: d => { setResults(d); toast.success(`${d.category} scan complete`); },
     onError: e => toast.error(e.message),
   });
+  const fullRecon = trpc.argus.fullRecon.useMutation({
+    onSuccess: d => { setResults(d); toast.success(`Full recon complete — ${d.totalModules} modules run`); },
+    onError: e => toast.error(e.message),
+  });
 
-  const isPending = quickRecon.isPending || runCategory.isPending;
+  const isPending = quickRecon.isPending || runCategory.isPending || fullRecon.isPending;
 
+  const depthLabel = depth === 1 ? "fast" : depth === 2 ? "standard" : "deep";
   const run = () => {
     setResults(null);
-    if (scanType === "quick") quickRecon.mutate({ target });
+    if (scanType === "quick") quickRecon.mutate({ target, depth: depthLabel as "fast" | "standard" | "deep" });
+    else if (scanType === "full") fullRecon.mutate({ target, batchSize: parallel });
     else runCategory.mutate({ category, target, threads });
   };
 
@@ -414,10 +422,13 @@ function QuickScanTab() {
         <CardContent className="space-y-3">
           <div className="flex gap-2">
             <Button variant={scanType === "quick" ? "default" : "outline"} size="sm" onClick={() => setScanType("quick")} className="h-8 text-xs">
-              <Zap className="h-3 w-3 mr-1" /> Quick Recon (5 core modules)
+              <Zap className="h-3 w-3 mr-1" /> Quick Recon
             </Button>
             <Button variant={scanType === "category" ? "default" : "outline"} size="sm" onClick={() => setScanType("category")} className="h-8 text-xs">
-              <List className="h-3 w-3 mr-1" /> Full Category Scan
+              <List className="h-3 w-3 mr-1" /> Category Scan
+            </Button>
+            <Button variant={scanType === "full" ? "default" : "outline"} size="sm" onClick={() => setScanType("full")} className="h-8 text-xs">
+              <Shield className="h-3 w-3 mr-1" /> Full Recon (All 135 Modules)
             </Button>
           </div>
 
@@ -447,18 +458,47 @@ function QuickScanTab() {
           )}
 
           {scanType === "quick" && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              {[{ id: 3, name: "DNS Records" }, { id: 18, name: "WHOIS" }, { id: 12, name: "SSL Chain" }, { id: 9, name: "Open Ports" }, { id: 118, name: "Subdomains" }].map(m => (
-                <div key={m.id} className="flex items-center gap-1.5 p-2 rounded bg-muted/30 text-xs">
-                  <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
-                  <span>{m.name}</span>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Depth</Label>
+                <div className="flex gap-2">
+                  {([1, 2, 3] as const).map(d => (
+                    <Button key={d} variant={depth === d ? "default" : "outline"} size="sm" onClick={() => setDepth(d)} className="h-8 text-xs flex-1">
+                      {d === 1 ? "Surface (5 modules)" : d === 2 ? "Standard (12 modules)" : "Deep (20 modules)"}
+                    </Button>
+                  ))}
                 </div>
-              ))}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {(depth === 1
+                  ? [{ id: 3, name: "DNS Records" }, { id: 18, name: "WHOIS" }, { id: 12, name: "SSL Chain" }, { id: 9, name: "Open Ports" }, { id: 118, name: "Subdomains" }]
+                  : depth === 2
+                  ? [{ id: 3, name: "DNS Records" }, { id: 18, name: "WHOIS" }, { id: 12, name: "SSL Chain" }, { id: 9, name: "Open Ports" }, { id: 118, name: "Subdomains" }, { id: 6, name: "GeoIP" }, { id: 21, name: "Shodan" }, { id: 45, name: "HTTP Headers" }, { id: 55, name: "Tech Stack" }, { id: 72, name: "Email Harvest" }, { id: 88, name: "GitHub Recon" }, { id: 101, name: "Threat Intel" }]
+                  : [{ id: 3, name: "DNS Records" }, { id: 18, name: "WHOIS" }, { id: 12, name: "SSL Chain" }, { id: 9, name: "Open Ports" }, { id: 118, name: "Subdomains" }, { id: 6, name: "GeoIP" }, { id: 21, name: "Shodan" }, { id: 45, name: "HTTP Headers" }, { id: 55, name: "Tech Stack" }, { id: 72, name: "Email Harvest" }, { id: 88, name: "GitHub Recon" }, { id: 101, name: "Threat Intel" }, { id: 14, name: "ASN Lookup" }, { id: 29, name: "Reverse DNS" }, { id: 37, name: "Certificate Transparency" }, { id: 63, name: "Web Crawl" }, { id: 79, name: "S3 Buckets" }, { id: 95, name: "Pastebin Leaks" }, { id: 110, name: "Dark Web" }, { id: 125, name: "Social Media" }]
+                ).map(m => (
+                  <div key={m.id} className="flex items-center gap-1.5 p-2 rounded bg-muted/30 text-xs">
+                    <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                    <span>{m.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {scanType === "full" && (
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-600 dark:text-yellow-400">
+                <strong>Warning:</strong> Full Recon runs all 135 Argus modules against the target. This may take 10–30 minutes depending on the target and parallel setting.
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Parallel Workers (1–10)</Label>
+                <Input type="number" min={1} max={10} value={parallel} onChange={e => setParallel(Number(e.target.value))} className="h-9 text-sm" />
+              </div>
             </div>
           )}
 
           <Button onClick={run} disabled={!target || isPending} className="w-full">
-            {isPending ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Scanning...</> : <><Play className="h-4 w-4 mr-2" /> {scanType === "quick" ? "Run Quick Recon" : `Scan ${category} Category`}</>}
+            {isPending ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Scanning...</> : <><Play className="h-4 w-4 mr-2" /> {scanType === "quick" ? `Run Quick Recon (Depth ${depth})` : scanType === "full" ? "Run Full Recon (All 135 Modules)" : `Scan ${category} Category`}</>}
           </Button>
         </CardContent>
       </Card>

@@ -23,6 +23,10 @@ import {
   runPortScan,
   checkSSL,
   analyzeCodeSecurity,
+  auditDNSSecurity,
+  fingerprintTarget,
+  analyzeHeaders,
+  generateSecurityReport,
 } from "./security-tools";
 import {
   fixSingleVulnerability,
@@ -317,7 +321,7 @@ export const sandboxRouter = router({
   // ─── Security Tools ─────────────────────────────────────────────
 
   /**
-   * Run a passive web scan on a target URL
+   * Run a full passive web scan — headers, cookies, CORS, WAF, tech fingerprint
    */
   securityScan: protectedProcedure
     .input(z.object({ url: z.string().url() }))
@@ -327,17 +331,21 @@ export const sandboxRouter = router({
     }),
 
   /**
-   * Run a port scan on a target host
+   * Run a TCP port scan with banner grabbing and OS detection hints
    */
   portScan: protectedProcedure
-    .input(z.object({ host: z.string().min(1) }))
+    .input(z.object({
+      host: z.string().min(1),
+      ports: z.array(z.number().int().min(1).max(65535)).optional(),
+      concurrency: z.number().int().min(1).max(200).optional(),
+    }))
     .mutation(async ({ input, ctx }) => {
       try { await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`); } catch {}
-      return runPortScan(input.host);
+      return runPortScan(input.host, input.ports, input.concurrency);
     }),
 
   /**
-   * Check SSL certificate for a domain
+   * Deep SSL/TLS inspection — protocol, cipher, cert chain, key size, expiry
    */
   sslCheck: protectedProcedure
     .input(z.object({ domain: z.string().min(1) }))
@@ -346,7 +354,7 @@ export const sandboxRouter = router({
     }),
 
   /**
-   * Analyze code for security vulnerabilities
+   * Analyze code for security vulnerabilities — OWASP Top 10, CWE, CVSS
    */
   codeReview: protectedProcedure
     .input(
@@ -359,6 +367,86 @@ export const sandboxRouter = router({
     .mutation(async ({ input, ctx }) => {
       try { await consumeCredits(ctx.user.id, "security_scan", "Code security review"); } catch {}
       return analyzeCodeSecurity([{ filename: input.filename || "code.txt", content: input.code }]);
+    }),
+
+  /**
+   * Multi-file code security review with OWASP Top 10, CWE, CVSS scoring
+   */
+  codeReviewMulti: protectedProcedure
+    .input(
+      z.object({
+        files: z.array(z.object({ filename: z.string(), content: z.string() })).min(1).max(20),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Code review: ${input.files.length} files`); } catch {}
+      return analyzeCodeSecurity(input.files);
+    }),
+
+  /**
+   * DNS security audit — SPF, DMARC, DKIM, DNSSEC, CAA records
+   */
+  dnsAudit: protectedProcedure
+    .input(z.object({ domain: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `DNS audit: ${input.domain}`); } catch {}
+      return auditDNSSecurity(input.domain);
+    }),
+
+  /**
+   * Technology fingerprinting — CMS, framework, WAF, analytics detection
+   */
+  fingerprint: protectedProcedure
+    .input(z.object({ url: z.string().url() }))
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Fingerprint: ${input.url}`); } catch {}
+      return fingerprintTarget(input.url);
+    }),
+
+  /**
+   * HTTP header analysis — full OWASP header checklist with scoring
+   */
+  headerAnalysis: protectedProcedure
+    .input(z.object({ url: z.string().url() }))
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Header analysis: ${input.url}`); } catch {}
+      return analyzeHeaders(input.url);
+    }),
+
+  /**
+   * Full security report — combines web scan + SSL + DNS + port scan into one markdown report
+   */
+  fullSecurityReport: protectedProcedure
+    .input(z.object({
+      target: z.string().min(1),
+      includePorts: z.boolean().optional().default(false),
+      includeDns: z.boolean().optional().default(true),
+      includeSsl: z.boolean().optional().default(true),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "security_scan", `Full report: ${input.target}`); } catch {}
+      const host = input.target.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+      const url = input.target.startsWith("http") ? input.target : `https://${input.target}`;
+      const [scanResult, sslResult, dnsResult, portScanResult] = await Promise.allSettled([
+        runPassiveWebScan(url),
+        input.includeSsl ? checkSSL(host) : Promise.resolve(undefined),
+        input.includeDns ? auditDNSSecurity(host) : Promise.resolve(undefined),
+        input.includePorts ? runPortScan(host) : Promise.resolve(undefined),
+      ]);
+      const report = generateSecurityReport({
+        target: input.target,
+        scanResult: scanResult.status === "fulfilled" ? scanResult.value : undefined,
+        sslResult: sslResult.status === "fulfilled" ? sslResult.value ?? undefined : undefined,
+        dnsResult: dnsResult.status === "fulfilled" ? dnsResult.value ?? undefined : undefined,
+        portScanResult: portScanResult.status === "fulfilled" ? portScanResult.value ?? undefined : undefined,
+      });
+      return {
+        report,
+        scanResult: scanResult.status === "fulfilled" ? scanResult.value : null,
+        sslResult: sslResult.status === "fulfilled" ? sslResult.value : null,
+        dnsResult: dnsResult.status === "fulfilled" ? dnsResult.value : null,
+        portScanResult: portScanResult.status === "fulfilled" ? portScanResult.value : null,
+      };
     }),
 
   // ── Auto-Fix Endpoints ──────────────────────────────────────────
@@ -377,6 +465,7 @@ export const sandboxRouter = router({
           category: z.enum(["security", "performance", "best-practices", "maintainability"]),
           description: z.string(),
           suggestion: z.string(),
+          recommendation: z.string().optional(),
           file: z.string(),
           line: z.number().optional(),
         }),
@@ -386,7 +475,7 @@ export const sandboxRouter = router({
       const fix = await fixSingleVulnerability({
         code: input.code,
         filename: input.filename,
-        issue: input.issue,
+        issue: { ...input.issue, recommendation: input.issue.recommendation ?? input.issue.suggestion },
       });
       return fix;
     }),
@@ -410,6 +499,7 @@ export const sandboxRouter = router({
             category: z.enum(["security", "performance", "best-practices", "maintainability"]),
             description: z.string(),
             suggestion: z.string(),
+            recommendation: z.string().optional(),
             file: z.string(),
             line: z.number().optional(),
           })
@@ -417,11 +507,17 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      const normalizedIssues = input.issues.map(i => ({ ...i, recommendation: i.recommendation ?? i.suggestion }));
       const result = await fixAllVulnerabilities({
         files: input.files,
         report: {
           overallScore: 0,
-          issues: input.issues,
+          score: 0,
+          grade: 'F',
+          totalFiles: input.files.length,
+          totalLines: 0,
+          owaspCoverage: [],
+          issues: normalizedIssues,
           summary: `Batch fix for ${input.issues.length} vulnerabilities`,
           strengths: [],
           recommendations: [],

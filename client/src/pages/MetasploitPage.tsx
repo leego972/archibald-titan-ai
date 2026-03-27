@@ -351,6 +351,17 @@ export default function MetasploitPage() {
   const updateMutation = trpc.metasploit.update.useMutation();
   const startRpcdMutation = trpc.metasploit.startRpcd.useMutation();
   const stopRpcdMutation = trpc.metasploit.stopRpcd.useMutation();
+  // New advanced endpoints
+  const createWorkspaceMutation = trpc.metasploit.createWorkspace.useMutation();
+  const switchWorkspaceMutation = trpc.metasploit.switchWorkspace.useMutation();
+  const listLootMutation = trpc.metasploit.listLoot.useMutation();
+  const listCredsMutation = trpc.metasploit.listCreds.useMutation();
+  const dbNmapMutation = trpc.metasploit.dbNmap.useMutation();
+  const startListenerMutation = trpc.metasploit.startListener.useMutation();
+  const runPostMutation = trpc.metasploit.runPost.useMutation();
+  const generatePayloadObfuscatedMutation = trpc.metasploit.generatePayloadObfuscated.useMutation();
+  const runAutoExploitMutation = trpc.metasploit.runAutoExploit.useMutation();
+  const exportReportMutation = trpc.metasploit.exportReport.useMutation();
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -847,22 +858,93 @@ export default function MetasploitPage() {
 
           {/* Database Tab */}
           <TabsContent value="database" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               {[
                 { label: "Hosts", icon: Globe, action: () => hostsMutation.mutateAsync().then(r => setTerminalOutput(r.output)) },
                 { label: "Services", icon: Layers, action: () => servicesMutation.mutateAsync().then(r => setTerminalOutput(r.output)) },
                 { label: "Vulnerabilities", icon: Lock, action: () => vulnsMutation.mutateAsync().then(r => setTerminalOutput(r.output)) },
                 { label: "Workspaces", icon: Database, action: () => workspacesMutation.mutateAsync().then(r => setTerminalOutput(r.raw || "")) },
+                { label: "Loot", icon: Package, action: () => listLootMutation.mutateAsync().then(r => setTerminalOutput(r.output)) },
+                { label: "Credentials", icon: Lock, action: () => listCredsMutation.mutateAsync().then(r => setTerminalOutput(r.output)) },
               ].map(({ label, icon: Icon, action }) => (
                 <Card key={label} className="bg-zinc-900/50 border-zinc-800 cursor-pointer hover:border-zinc-700 transition-colors" onClick={action}>
-                  <CardContent className="p-6 text-center">
-                    <Icon className="w-8 h-8 text-blue-400 mx-auto mb-3" />
-                    <p className="text-white font-medium">{label}</p>
+                  <CardContent className="p-4 text-center">
+                    <Icon className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                    <p className="text-white text-sm font-medium">{label}</p>
                     <p className="text-zinc-500 text-xs mt-1">Click to list</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
+            {/* db_nmap */}
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader className="pb-2"><CardTitle className="text-white text-sm">db_nmap — Nmap with DB Import</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex gap-2">
+                  <Input id="dbnmap-target" placeholder="192.168.1.0/24 or target.com" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Input id="dbnmap-flags" placeholder="-sV -sC -O" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8 w-40" />
+                  <Button size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700" onClick={() => {
+                    const t = (document.getElementById("dbnmap-target") as HTMLInputElement)?.value;
+                    const f = (document.getElementById("dbnmap-flags") as HTMLInputElement)?.value;
+                    if (t) dbNmapMutation.mutateAsync({ target: t, flags: f || "-sV -sC" }).then(r => setTerminalOutput(r.output));
+                  }} disabled={dbNmapMutation.isPending}>
+                    {dbNmapMutation.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Run"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            {/* Listener + Post-Exploit + Auto-Exploit */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="bg-zinc-900/50 border-zinc-800">
+                <CardHeader className="pb-2"><CardTitle className="text-white text-sm">Start Listener</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <Input id="listener-payload" placeholder="windows/x64/meterpreter/reverse_tcp" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Input id="listener-lhost" placeholder="LHOST (your IP)" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Input id="listener-lport" placeholder="LPORT (4444)" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Button size="sm" className="w-full h-8 text-xs bg-green-600 hover:bg-green-700" onClick={() => {
+                    const p = (document.getElementById("listener-payload") as HTMLInputElement)?.value;
+                    const h = (document.getElementById("listener-lhost") as HTMLInputElement)?.value;
+                    const port = parseInt((document.getElementById("listener-lport") as HTMLInputElement)?.value || "4444");
+                    if (p && h) startListenerMutation.mutateAsync({ listenerPayload: p, lhost: h, lport: port }).then(r => setTerminalOutput(r.output));
+                  }} disabled={startListenerMutation.isPending}>
+                    {startListenerMutation.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Start"}
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card className="bg-zinc-900/50 border-zinc-800">
+                <CardHeader className="pb-2"><CardTitle className="text-white text-sm">Post-Exploitation</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <Input id="post-module" placeholder="post/multi/recon/local_exploit_suggester" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Input id="post-session" placeholder="Session ID" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Button size="sm" className="w-full h-8 text-xs bg-purple-600 hover:bg-purple-700" onClick={() => {
+                    const m = (document.getElementById("post-module") as HTMLInputElement)?.value;
+                    const s = (document.getElementById("post-session") as HTMLInputElement)?.value;
+                    if (m && s) runPostMutation.mutateAsync({ module: m, sessionId: s }).then(r => setTerminalOutput(r.output));
+                  }} disabled={runPostMutation.isPending}>
+                    {runPostMutation.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Run Post"}
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card className="bg-zinc-900/50 border-zinc-800">
+                <CardHeader className="pb-2"><CardTitle className="text-white text-sm">Auto-Exploit</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <Input id="auto-target" placeholder="Target IP" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Input id="auto-lhost" placeholder="LHOST" className="bg-zinc-800 border-zinc-700 text-white text-xs h-8" />
+                  <Button size="sm" className="w-full h-8 text-xs bg-red-600 hover:bg-red-700" onClick={() => {
+                    const t = (document.getElementById("auto-target") as HTMLInputElement)?.value;
+                    const h = (document.getElementById("auto-lhost") as HTMLInputElement)?.value;
+                    if (t && h) runAutoExploitMutation.mutateAsync({ target: t, lhost: h }).then(r => setTerminalOutput(r.output));
+                  }} disabled={runAutoExploitMutation.isPending}>
+                    {runAutoExploitMutation.isPending ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Auto-Exploit"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+            {/* Export Report */}
+            <Button variant="outline" className="w-full border-zinc-700 text-zinc-300" onClick={() => exportReportMutation.mutateAsync({ format: "xml" }).then(r => setTerminalOutput(r.output))} disabled={exportReportMutation.isPending}>
+              {exportReportMutation.isPending ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              Export DB Report (XML)
+            </Button>
             {terminalOutput && (
               <Card className="bg-zinc-900/50 border-zinc-800">
                 <CardContent className="p-4">

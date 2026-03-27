@@ -50,29 +50,68 @@ async function isAdmin(userId: number): Promise<boolean> {
  * prompt, extract system instructions, or make the LLM ignore safety rules.
  */
 const INJECTION_PATTERNS: Array<{ pattern: RegExp; severity: "block" | "warn"; label: string }> = [
-  // Direct system prompt extraction
-  { pattern: /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|directives?)/i, severity: "block", label: "system_prompt_override" },
-  { pattern: /disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)/i, severity: "block", label: "system_prompt_override" },
-  { pattern: /forget\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|training)/i, severity: "block", label: "system_prompt_override" },
-  { pattern: /you\s+are\s+now\s+(a\s+)?(?:new|different|unrestricted|unfiltered|jailbroken)/i, severity: "block", label: "persona_hijack" },
-  { pattern: /enter\s+(DAN|developer|god|sudo|root|admin|unrestricted)\s+mode/i, severity: "block", label: "mode_hijack" },
-  { pattern: /pretend\s+(you\s+are|to\s+be)\s+(a\s+)?(different|new|unrestricted|evil)/i, severity: "block", label: "persona_hijack" },
+  // ── System prompt override ──────────────────────────────────────────────
+  { pattern: /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|directives?|constraints?)/i, severity: "block", label: "system_prompt_override" },
+  { pattern: /disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|constraints?)/i, severity: "block", label: "system_prompt_override" },
+  { pattern: /forget\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|training|context)/i, severity: "block", label: "system_prompt_override" },
+  { pattern: /override\s+(your\s+)?(system\s+)?(prompt|instructions?|rules?|programming|directives?)/i, severity: "block", label: "system_prompt_override" },
+  { pattern: /new\s+(system\s+)?prompt\s*:/i, severity: "block", label: "system_prompt_override" },
+  { pattern: /from\s+now\s+on\s+(you\s+)?(will|must|should|shall)\s+(ignore|forget|disregard)/i, severity: "block", label: "system_prompt_override" },
+  // ── Prompt extraction ───────────────────────────────────────────────────
+  { pattern: /reveal\s+(your|the)\s+(system|initial|original|hidden|actual|real)\s+(prompt|instructions?|message|context)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /what\s+(is|are|were)\s+(your|the)\s+(system|initial|original|hidden|actual)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /print\s+(your|the)\s+(system|initial|original|full)\s+(prompt|instructions?|message|context)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /output\s+(your|the)\s+(system|initial|original|full)\s+(prompt|instructions?|context)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /repeat\s+(your|the)\s+(system|initial|original|above|full)\s+(prompt|instructions?|message|text|context)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /show\s+me\s+(your|the)\s+(system|initial|original|hidden)\s+(prompt|instructions?|message)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /display\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions?|message)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /tell\s+me\s+(your|the)\s+(system|initial|original|hidden)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /summarize\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
+  { pattern: /translate\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
+  // ── Persona hijack & jailbreaks ─────────────────────────────────────────
+  { pattern: /you\s+are\s+now\s+(a\s+)?(?:new|different|unrestricted|unfiltered|jailbroken|uncensored|free)/i, severity: "block", label: "persona_hijack" },
+  { pattern: /act\s+as\s+(if\s+you\s+(are|were)\s+)?(a\s+)?(different|new|unrestricted|evil|uncensored|jailbroken)/i, severity: "block", label: "persona_hijack" },
+  { pattern: /pretend\s+(you\s+are|to\s+be)\s+(a\s+)?(different|new|unrestricted|evil|uncensored)/i, severity: "block", label: "persona_hijack" },
+  { pattern: /roleplay\s+as\s+(a\s+)?(different|new|unrestricted|evil|uncensored|hacker|malicious)/i, severity: "block", label: "persona_hijack" },
+  { pattern: /simulate\s+(being\s+)?(a\s+)?(different|new|unrestricted|evil|uncensored|jailbroken)/i, severity: "block", label: "persona_hijack" },
+  { pattern: /enter\s+(DAN|developer|god|sudo|root|admin|unrestricted|jailbreak|evil|chaos|anarchy)\s+mode/i, severity: "block", label: "mode_hijack" },
+  { pattern: /activate\s+(DAN|developer|god|sudo|jailbreak|unrestricted|evil)\s+mode/i, severity: "block", label: "mode_hijack" },
+  { pattern: /switch\s+to\s+(DAN|developer|god|sudo|jailbreak|unrestricted|evil)\s+mode/i, severity: "block", label: "mode_hijack" },
   { pattern: /\bDAN\b.*\bdo\s+anything\s+now\b/i, severity: "block", label: "dan_jailbreak" },
-  { pattern: /reveal\s+(your|the)\s+(system|initial|original|hidden)\s+(prompt|instructions?|message)/i, severity: "block", label: "prompt_extraction" },
-  { pattern: /what\s+(is|are)\s+(your|the)\s+(system|initial|original|hidden)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
-  { pattern: /print\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions?|message)/i, severity: "block", label: "prompt_extraction" },
-  { pattern: /output\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions?)/i, severity: "block", label: "prompt_extraction" },
-  { pattern: /repeat\s+(your|the)\s+(system|initial|original|above)\s+(prompt|instructions?|message|text)/i, severity: "block", label: "prompt_extraction" },
-  // Role-play based jailbreaks
-  { pattern: /\[system\]|\[SYSTEM\]|<\|system\|>|<<SYS>>|<\|im_start\|>system/i, severity: "block", label: "fake_system_tag" },
-  { pattern: /\{\{system_prompt\}\}|\{\{instructions\}\}/i, severity: "block", label: "template_injection" },
-  // Token smuggling
+  { pattern: /\bDAN\b.*\bno\s+(restrictions?|limits?|rules?|filters?)/i, severity: "block", label: "dan_jailbreak" },
+  { pattern: /jailbreak(ed)?\s+(this\s+)?(AI|LLM|model|assistant|chatbot)/i, severity: "block", label: "jailbreak_attempt" },
+  { pattern: /you\s+(have\s+)?(no\s+)?(restrictions?|limits?|rules?|filters?|guidelines?|constraints?)/i, severity: "block", label: "restriction_removal" },
+  { pattern: /your\s+(safety|ethical|moral)\s+(guidelines?|rules?|filters?|constraints?)\s+(are\s+)?(disabled|removed|off|gone)/i, severity: "block", label: "restriction_removal" },
+  { pattern: /in\s+(this|a)\s+(fictional|hypothetical|imaginary|creative)\s+(scenario|world|universe|story).*?(hack|exploit|attack|malware|weapon)/i, severity: "block", label: "fictional_bypass" },
+  { pattern: /for\s+(educational|research|academic|testing)\s+purposes.*?(hack|exploit|malware|phish|attack)/i, severity: "warn", label: "educational_bypass" },
+  // ── Fake system tags / token injection ──────────────────────────────────
+  { pattern: /\[system\]|\[SYSTEM\]|<\|system\|>|<<SYS>>|<\|im_start\|>\s*system/i, severity: "block", label: "fake_system_tag" },
+  { pattern: /<\|im_end\|>|<\|endoftext\|>|<\|pad\|>|<\|fim_prefix\|>/i, severity: "block", label: "special_token_injection" },
+  { pattern: /\{\{system_prompt\}\}|\{\{instructions\}\}|\{\{context\}\}|\{\{jailbreak\}\}/i, severity: "block", label: "template_injection" },
+  { pattern: /###\s*(system|instruction|context|prompt)\s*###/i, severity: "block", label: "fake_delimiter" },
+  { pattern: /---\s*(system|instruction|context|prompt)\s*---/i, severity: "block", label: "fake_delimiter" },
+  { pattern: /\[INST\]|\[\/INST\]|<<\/?SYS>>/i, severity: "block", label: "llama_token_injection" },
+  // ── Encoded / obfuscated payloads ────────────────────────────────────────
   { pattern: /base64\s*:\s*[A-Za-z0-9+/=]{20,}/i, severity: "warn", label: "encoded_payload" },
-  // Privilege escalation via prompt
-  { pattern: /give\s+me\s+(admin|root|unlimited|free)\s+(access|credits?|privileges?|permissions?)/i, severity: "block", label: "privilege_escalation" },
-  { pattern: /set\s+my\s+(role|tier|plan|credits?)\s+to\s+(admin|unlimited|titan|free)/i, severity: "block", label: "privilege_escalation" },
-  { pattern: /bypass\s+(the\s+)?(subscription|payment|credit|membership|paywall)/i, severity: "block", label: "payment_bypass" },
-  { pattern: /unlock\s+(all|every|premium|paid)\s+(features?|tools?|access)/i, severity: "warn", label: "feature_unlock_attempt" },
+  { pattern: /atob\s*\(|btoa\s*\(/i, severity: "warn", label: "encoded_payload" },
+  { pattern: /(\\u00[0-9a-f]{2}.*){3,}/i, severity: "warn", label: "unicode_obfuscation" },
+  { pattern: /(%[0-9a-f]{2}){5,}/i, severity: "warn", label: "url_encoded_payload" },
+  // ── Privilege escalation via prompt ─────────────────────────────────────
+  { pattern: /give\s+me\s+(admin|root|unlimited|free|infinite)\s+(access|credits?|privileges?|permissions?|tokens?)/i, severity: "block", label: "privilege_escalation" },
+  { pattern: /set\s+my\s+(role|tier|plan|credits?|balance|account)\s+to\s+(admin|unlimited|titan|free|infinite|max)/i, severity: "block", label: "privilege_escalation" },
+  { pattern: /grant\s+(me|myself|my account)\s+(admin|root|unlimited|premium|full)\s+(access|privileges?|permissions?)/i, severity: "block", label: "privilege_escalation" },
+  { pattern: /make\s+(me|my account)\s+(an?\s+)?(admin|administrator|superuser|root|moderator)/i, severity: "block", label: "privilege_escalation" },
+  { pattern: /add\s+(unlimited|infinite|free|1000000)\s+credits?/i, severity: "block", label: "credit_manipulation" },
+  { pattern: /bypass\s+(the\s+)?(subscription|payment|credit|membership|paywall|billing|rate\s*limit)/i, severity: "block", label: "payment_bypass" },
+  { pattern: /unlock\s+(all|every|premium|paid|pro|enterprise)\s+(features?|tools?|access|plan)/i, severity: "warn", label: "feature_unlock_attempt" },
+  // ── Data exfiltration via prompt ─────────────────────────────────────────
+  { pattern: /list\s+all\s+(users?|accounts?|emails?|passwords?|api\s*keys?|secrets?|tokens?)/i, severity: "block", label: "data_exfiltration" },
+  { pattern: /show\s+(me\s+)?(all\s+)?(user|account|customer)\s+(data|records?|information|emails?|passwords?)/i, severity: "block", label: "data_exfiltration" },
+  { pattern: /dump\s+(the\s+)?(database|db|users?|table|schema|credentials?)/i, severity: "block", label: "data_exfiltration" },
+  { pattern: /export\s+(all\s+)?(user|account|customer)\s+(data|records?|information)/i, severity: "block", label: "data_exfiltration" },
+  // ── Indirect injection via content ──────────────────────────────────────
+  { pattern: /when\s+(you|the\s+AI|the\s+assistant)\s+(reads?|processes?|sees?)\s+this/i, severity: "warn", label: "indirect_injection" },
+  { pattern: /if\s+you\s+(are|were)\s+(an?\s+)?(AI|LLM|assistant|chatbot).*?(ignore|forget|bypass)/i, severity: "warn", label: "indirect_injection" },
 ];
 
 /**
@@ -117,11 +156,19 @@ export function sanitizeUserMessage(message: string, isAdminUser: boolean): stri
   if (isAdminUser) return message; // Admin bypass
 
   let cleaned = message;
-  // Remove fake system/assistant role tags
-  cleaned = cleaned.replace(/\[system\]|\[SYSTEM\]|\[assistant\]|\[ASSISTANT\]/gi, "[filtered]");
-  cleaned = cleaned.replace(/<\|system\|>|<\|assistant\|>|<\|im_start\|>system|<<SYS>>|<<\/SYS>>/gi, "[filtered]");
+  // Remove fake system/assistant/user role tags
+  cleaned = cleaned.replace(/\[system\]|\[SYSTEM\]|\[assistant\]|\[ASSISTANT\]|\[user\]|\[USER\]/gi, "[filtered]");
+  // Remove LLM special tokens (OpenAI, Llama, Mistral, Gemma formats)
+  cleaned = cleaned.replace(/<\|system\|>|<\|assistant\|>|<\|user\|>|<\|im_start\|>\s*(system|assistant|user)|<\|im_end\|>/gi, "[filtered]");
+  cleaned = cleaned.replace(/<<SYS>>|<<\/SYS>>|\[INST\]|\[\/INST\]/gi, "[filtered]");
+  cleaned = cleaned.replace(/<\|endoftext\|>|<\|pad\|>|<\|fim_prefix\|>|<\|fim_middle\|>|<\|fim_suffix\|>/gi, "[filtered]");
   // Remove template injection attempts
-  cleaned = cleaned.replace(/\{\{system_prompt\}\}|\{\{instructions\}\}|\{\{config\}\}/gi, "[filtered]");
+  cleaned = cleaned.replace(/\{\{system_prompt\}\}|\{\{instructions\}\}|\{\{config\}\}|\{\{context\}\}|\{\{jailbreak\}\}/gi, "[filtered]");
+  // Remove fake markdown delimiters used as system separators
+  cleaned = cleaned.replace(/###\s*(system|instruction|context|prompt)\s*###/gi, "[filtered]");
+  cleaned = cleaned.replace(/---\s*(system|instruction|context|prompt)\s*---/gi, "[filtered]");
+  // Truncate excessively long messages (prevent token flooding attacks)
+  if (cleaned.length > 32_000) cleaned = cleaned.slice(0, 32_000) + "\n[Message truncated for security]";
   return cleaned;
 }
 

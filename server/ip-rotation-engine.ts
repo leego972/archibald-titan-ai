@@ -258,10 +258,12 @@ export async function getNewTorCircuit(): Promise<boolean> {
 export interface ScrapedProxy {
   host: string;
   port: number;
-  protocol: "http" | "socks5";
+  protocol: "http" | "socks4" | "socks5";
   healthy: boolean;
   latencyMs?: number;
   externalIp?: string;
+  country?: string;
+  anonymity?: "transparent" | "anonymous" | "elite";
   lastTested: string;
 }
 
@@ -269,18 +271,43 @@ let proxyPool: ScrapedProxy[] = [];
 let lastScrapeTime = 0;
 let scrapeInterval: ReturnType<typeof setInterval> | null = null;
 
-const PROXY_SOURCES = [
-  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
-  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
-  "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
-  "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt",
-  "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
-  "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt",
-  "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
-  "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+const PROXY_SOURCES: Array<{ url: string; protocol: "http" | "socks4" | "socks5" }> = [
+  // ─── HTTP/HTTPS Proxies ─────────────────────────────────────────────────────────────
+  { url: "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/almroot/proxylist/master/list.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/zloi-user/hideip.me/main/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/http/http.txt", protocol: "http" },
+  { url: "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/http/data.txt", protocol: "http" },
+  // ─── SOCKS5 Proxies ─────────────────────────────────────────────────────────────
+  { url: "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/zloi-user/hideip.me/main/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/socks5/socks5.txt", protocol: "socks5" },
+  { url: "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/socks5/data.txt", protocol: "socks5" },
+  // ─── SOCKS4 Proxies ─────────────────────────────────────────────────────────────
+  { url: "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies-socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/rdavydov/proxy-list/main/proxies/socks4.txt", protocol: "socks4" },
+  { url: "https://raw.githubusercontent.com/zloi-user/hideip.me/main/socks4.txt", protocol: "socks4" },
 ];
 
-async function scrapeProxiesFromSource(url: string, defaultProtocol: "http" | "socks5"): Promise<Array<{ host: string; port: number; protocol: "http" | "socks5" }>> {
+async function scrapeProxiesFromSource(url: string, protocol: "http" | "socks4" | "socks5"): Promise<Array<{ host: string; port: number; protocol: "http" | "socks4" | "socks5" }>> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -288,7 +315,7 @@ async function scrapeProxiesFromSource(url: string, defaultProtocol: "http" | "s
     clearTimeout(timeout);
     if (!res.ok) return [];
     const text = await res.text();
-    const results: Array<{ host: string; port: number; protocol: "http" | "socks5" }> = [];
+    const results: Array<{ host: string; port: number; protocol: "http" | "socks4" | "socks5" }> = [];
     for (const line of text.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
@@ -298,7 +325,6 @@ async function scrapeProxiesFromSource(url: string, defaultProtocol: "http" | "s
       if (!match) continue;
       const port = parseInt(match[2]);
       if (port < 1 || port > 65535) continue;
-      const protocol = url.includes("socks5") ? "socks5" : defaultProtocol;
       results.push({ host: match[1], port, protocol });
     }
     return results;
@@ -307,12 +333,14 @@ async function scrapeProxiesFromSource(url: string, defaultProtocol: "http" | "s
   }
 }
 
-async function testScrapedProxy(proxy: { host: string; port: number; protocol: "http" | "socks5" }): Promise<ScrapedProxy> {
+async function testScrapedProxy(proxy: { host: string; port: number; protocol: "http" | "socks4" | "socks5" }): Promise<ScrapedProxy> {
   const start = Date.now();
   try {
-    const proxyUrl = `${proxy.protocol}://${proxy.host}:${proxy.port}`;
+    const proxyUrl = proxy.protocol === "socks4"
+      ? `socks4://${proxy.host}:${proxy.port}`
+      : `${proxy.protocol}://${proxy.host}:${proxy.port}`;
     let agent: any;
-    if (proxy.protocol === "socks5") {
+    if (proxy.protocol === "socks5" || proxy.protocol === "socks4") {
       const { SocksProxyAgent } = await import("socks-proxy-agent");
       agent = new SocksProxyAgent(proxyUrl);
     } else {
@@ -338,17 +366,17 @@ async function testScrapedProxy(proxy: { host: string; port: number; protocol: "
 
 export async function scrapeAndRefreshProxies(): Promise<{ scraped: number; tested: number; live: number }> {
   log.info("Starting proxy scrape...");
-  const allRaw: Array<{ host: string; port: number; protocol: "http" | "socks5" }> = [];
+  const allRaw: Array<{ host: string; port: number; protocol: "http" | "socks4" | "socks5" }> = [];
 
-  // Scrape all sources concurrently
+  // Scrape all sources concurrently using the new object format
   const results = await Promise.allSettled(
-    PROXY_SOURCES.map(url => scrapeProxiesFromSource(url, url.includes("socks5") ? "socks5" : "http"))
+    PROXY_SOURCES.map(src => scrapeProxiesFromSource(src.url, src.protocol))
   );
   for (const r of results) {
     if (r.status === "fulfilled") allRaw.push(...r.value);
   }
 
-  // Deduplicate
+  // Deduplicate by host:port
   const seen = new Set<string>();
   const unique = allRaw.filter(p => {
     const key = `${p.host}:${p.port}`;
@@ -357,23 +385,25 @@ export async function scrapeAndRefreshProxies(): Promise<{ scraped: number; test
     return true;
   });
 
-  log.info(`Scraped ${unique.length} unique proxies, testing up to 200...`);
+  log.info(`Scraped ${unique.length} unique proxies, testing up to 300...`);
 
-  // Test a random sample of up to 200 (testing all would take too long)
-  const shuffled = unique.sort(() => Math.random() - 0.5).slice(0, 200);
-  const BATCH = 20;
+  // Test a random sample of up to 300 (increased from 200)
+  const shuffled = unique.sort(() => Math.random() - 0.5).slice(0, 300);
+  const BATCH = 30; // Increased batch size for faster testing
   const tested: ScrapedProxy[] = [];
 
   for (let i = 0; i < shuffled.length; i += BATCH) {
     const batch = shuffled.slice(i, i + BATCH);
     const batchResults = await Promise.all(batch.map(testScrapedProxy));
     tested.push(...batchResults);
-    // Stop early if we have 30+ live proxies
+    // Stop early if we have 50+ live proxies (increased from 30)
     const liveCount = tested.filter(p => p.healthy).length;
-    if (liveCount >= 30) break;
+    if (liveCount >= 50) break;
   }
 
   const live = tested.filter(p => p.healthy);
+  // Sort by latency — fastest proxies first
+  live.sort((a, b) => (a.latencyMs ?? 9999) - (b.latencyMs ?? 9999));
   proxyPool = live;
   lastScrapeTime = Date.now();
 

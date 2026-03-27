@@ -353,7 +353,7 @@ export const astraRouter = router({
     };
   }),
 
-  // ── Update: Pull latest Astra from GitHub ─────────────────────
+  //  // ── Update: Pull latest Astra from GitHub ─────────────────
   update: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
@@ -361,4 +361,104 @@ export const astraRouter = router({
     const output = await execSSHCommand(ssh, "cd /opt/Astra && git pull origin master 2>&1 && pip3 install -r requirements.txt 2>&1 | tail -5 && echo 'Update complete'", 120000);
     return { success: output.includes("Update complete"), output };
   }),
+
+  // ── Scan: Delete a scan by ID ───────────────────────────────────
+  deleteScan: protectedProcedure
+    .input(z.object({ scanId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Astra");
+      const ssh = await getSshConfig(ctx.user.id);
+      const result = await astraApiCall(ssh, `/scan/${input.scanId}/`, "GET", undefined, 15000);
+      return { success: true, data: result.data };
+    }),
+
+  // ── Scan: Get vulnerability summary across all scans ─────────────────
+  getVulnSummary: protectedProcedure.query(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "security_tools", "Astra");
+    const ssh = await getSshConfig(ctx.user.id);
+    const scansResult = await astraApiCall(ssh, "/scan/", "GET", undefined, 15000);
+    const scans = scansResult.data?.scans ?? [];
+    let critical = 0, high = 0, medium = 0, low = 0, info = 0;
+    for (const scan of scans.slice(0, 10)) {
+      try {
+        const alertsResult = await astraApiCall(ssh, `/scan/${scan.id}/alerts/`, "GET", undefined, 10000);
+        const alerts = alertsResult.data?.alerts ?? [];
+        for (const a of alerts) {
+          const sev = (a.severity ?? a.risk ?? '').toLowerCase();
+          if (sev === 'critical') critical++;
+          else if (sev === 'high') high++;
+          else if (sev === 'medium') medium++;
+          else if (sev === 'low') low++;
+          else info++;
+        }
+      } catch {}
+    }
+    return { critical, high, medium, low, info, totalScans: scans.length };
+  }),
+
+  // ── Scan: Run Gobuster directory fuzzer on target ───────────────────
+  startFuzzer: protectedProcedure
+    .input(z.object({
+      targetUrl: z.string().url(),
+      wordlist: z.string().optional().default("/usr/share/wordlists/dirb/common.txt"),
+      extensions: z.string().optional().default("php,html,js,json"),
+      threads: z.number().min(1).max(50).optional().default(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Astra");
+      const ssh = await getSshConfig(ctx.user.id);
+      try { await consumeCredits(ctx.user.id, "astra_scan", `Fuzzer: ${input.targetUrl}`); } catch {}
+      const cmd = `gobuster dir -u '${input.targetUrl}' -w '${input.wordlist}' -x '${input.extensions}' -t ${input.threads} --no-error 2>&1 | head -200`;
+      const output = await execSSHCommand(ssh, cmd, 120000);
+      return { success: true, output, target: input.targetUrl };
+    }),
+
+  // ── Scan: Run Wfuzz parameter fuzzer on target ─────────────────────
+  startWfuzz: protectedProcedure
+    .input(z.object({
+      targetUrl: z.string().url(),
+      wordlist: z.string().optional().default("/usr/share/wordlists/dirb/common.txt"),
+      filterCode: z.string().optional().default("404"),
+      threads: z.number().min(1).max(50).optional().default(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Astra");
+      const ssh = await getSshConfig(ctx.user.id);
+      try { await consumeCredits(ctx.user.id, "astra_scan", `Wfuzz: ${input.targetUrl}`); } catch {}
+      const cmd = `wfuzz -c -w '${input.wordlist}' --hc ${input.filterCode} -t ${input.threads} '${input.targetUrl}/FUZZ' 2>&1 | head -200`;
+      const output = await execSSHCommand(ssh, cmd, 120000);
+      return { success: true, output, target: input.targetUrl };
+    }),
+
+  // ── Scan: Export scan report as structured text ───────────────────
+  exportReport: protectedProcedure
+    .input(z.object({ scanId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Astra");
+      const ssh = await getSshConfig(ctx.user.id);
+      const result = await astraApiCall(ssh, `/scan/${input.scanId}/alerts/`, "GET", undefined, 15000);
+      const alerts = result.data?.alerts ?? [];
+      const lines = [
+        `=== Astra API Security Report ===`,
+        `Scan ID: ${input.scanId}`,
+        `Generated: ${new Date().toISOString()}`,
+        `Total Vulnerabilities: ${alerts.length}`,
+        ``,
+        ...alerts.map((a: any, i: number) => [
+          `[${i + 1}] ${a.title ?? a.name ?? 'Unknown'}`,
+          `  Severity: ${a.severity ?? a.risk ?? 'Unknown'}`,
+          `  URL: ${a.url ?? 'N/A'}`,
+          `  Description: ${a.description ?? 'N/A'}`,
+          `  Solution: ${a.solution ?? 'N/A'}`,
+          ``,
+        ].join('\n')),
+      ];
+      return { report: lines.join('\n'), count: alerts.length, scanId: input.scanId };
+    }),
 });
+

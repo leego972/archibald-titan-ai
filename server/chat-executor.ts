@@ -3341,6 +3341,7 @@ async function execAutoFixVulnerability(
     category: ((args.issueCategory as string) || "security") as "security" | "performance" | "best-practices" | "maintainability",
     description: (args.issueDescription as string) || "",
     suggestion: (args.issueSuggestion as string) || "",
+    recommendation: (args.issueSuggestion as string) || "",
     file: filename,
     line: args.issueLine as number | undefined,
   };
@@ -3385,12 +3386,18 @@ async function execAutoFixAll(
     ...i,
     severity: i.severity as "critical" | "high" | "medium" | "low",
     category: (i.category || "security") as "security" | "performance" | "best-practices" | "maintainability",
+    recommendation: i.suggestion || "",
   }));
 
   const result = await fixAllVulnerabilities({
     files,
     report: {
       overallScore: 0,
+      score: 0,
+      grade: 'F',
+      totalFiles: files.length,
+      totalLines: 0,
+      owaspCoverage: [],
       issues: typedIssues,
       summary: `Batch fix for ${typedIssues.length} vulnerabilities`,
       strengths: [],

