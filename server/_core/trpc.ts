@@ -1,3 +1,4 @@
+import { Sentry } from "./sentry.js";
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG, isAdminRole } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
@@ -6,6 +7,12 @@ import { createLogger } from "./logger.js";
 
 const log = createLogger("tRPC");
 const isProd = process.env.NODE_ENV === "production";
+    if (error.code !== "UNAUTHORIZED" && error.code !== "FORBIDDEN") {
+      Sentry.captureException(error.cause ?? error, {
+        tags: { trpc_code: error.code, trpc_path: shape.data?.path ?? "unknown" },
+        extra: { message: error.message },
+      });
+    }
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
