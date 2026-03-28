@@ -3,6 +3,16 @@ name: Sync to Architabot
 on:
   push:
     branches: [main]
+    paths:
+      # Server code that architabot depends on
+      - 'server/**'
+      - 'shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'drizzle.config.ts'
+      - 'drizzle/**'
+      # This workflow file itself
+      - '.github/workflows/sync-to-architabot.yml'
 
 concurrency:
   group: sync-architabot

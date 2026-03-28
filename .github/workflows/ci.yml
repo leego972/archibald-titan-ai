@@ -2,8 +2,38 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'tsconfig.node.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'eslint.config.js'
+      - 'drizzle.config.ts'
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, master]
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'tsconfig.node.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'eslint.config.js'
+      - 'drizzle.config.ts'
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/ci.yml'
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
