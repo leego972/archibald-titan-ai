@@ -7,12 +7,6 @@ import { createLogger } from "./logger.js";
 
 const log = createLogger("tRPC");
 const isProd = process.env.NODE_ENV === "production";
-    if (error.code !== "UNAUTHORIZED" && error.code !== "FORBIDDEN") {
-      Sentry.captureException(error.cause ?? error, {
-        tags: { trpc_code: error.code, trpc_path: shape.data?.path ?? "unknown" },
-        extra: { message: error.message },
-      });
-    }
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -24,6 +18,12 @@ const t = initTRPC.context<TrpcContext>().create({
         path: shape.data?.path,
         message: error.message,
         ...(error.cause ? { cause: String(error.cause) } : {}),
+      });
+
+      // Capture unexpected errors in Sentry
+      Sentry.captureException(error.cause ?? error, {
+        tags: { trpc_code: error.code, trpc_path: shape.data?.path ?? "unknown" },
+        extra: { message: error.message },
       });
     }
 
