@@ -45,19 +45,28 @@ const execAsync = promisify(exec);
 // ─── Constants ───────────────────────────────────────────────────────
 
 const SANDBOX_BASE_DIR = path.join(os.tmpdir(), "titan-sandboxes");
-const MAX_OUTPUT_SIZE = 100 * 1024; // 100KB max output per command
-const DEFAULT_TIMEOUT_MS = 120_000; // 120 seconds default — npm install and pip install need more time
-const MAX_TIMEOUT_MS = 300_000; // 5 minutes max
+const MAX_OUTPUT_SIZE = 512 * 1024; // 512KB max output per command (upgraded from 100KB)
+const DEFAULT_TIMEOUT_MS = 180_000; // 3 minutes default — large installs need more time
+const MAX_TIMEOUT_MS = 600_000; // 10 minutes max (upgraded from 5)
 
 // Blocked commands that could damage the host system
 const BLOCKED_COMMANDS = [
-  /^\s*rm\s+-rf\s+\/\s*$/,     // rm -rf /
-  /^\s*mkfs\./,                  // format disk
-  /^\s*dd\s+.*of=\/dev\//,      // write to raw device
-  /^\s*shutdown/,                // shutdown host
-  /^\s*reboot/,                  // reboot host
-  /^\s*halt/,                    // halt host
-  /:\(\)\s*\{\s*:\|:\s*&\s*\}/, // fork bomb
+  /^\s*rm\s+-rf\s+\/\s*$/,              // rm -rf /
+  /^\s*rm\s+-rf\s+\/\*/,               // rm -rf /*
+  /^\s*mkfs\./,                          // format disk
+  /^\s*dd\s+.*of=\/dev\//,             // write to raw device
+  /^\s*shutdown/,                        // shutdown host
+  /^\s*reboot/,                          // reboot host
+  /^\s*halt/,                            // halt host
+  /^\s*poweroff/,                        // power off
+  /:\(\)\s*\{\s*:\|:\s*&\s*\}/,        // fork bomb
+  /^\s*chmod\s+[0-9]+\s+\/etc\//,      // chmod /etc/
+  /^\s*chown\s+.*\s+\/etc\//,          // chown /etc/
+  /^\s*>\s*\/etc\/passwd/,             // overwrite /etc/passwd
+  /^\s*>\s*\/etc\/shadow/,             // overwrite /etc/shadow
+  /^\s*crontab\s+-r/,                   // delete all crontabs
+  /^\s*iptables\s+-F/,                  // flush all firewall rules
+  /^\s*systemctl\s+(stop|disable)\s+ssh/, // disable SSH
 ];
 
 // ─── Sandbox Manager ─────────────────────────────────────────────────

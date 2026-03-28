@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { checkVeniceLimit, recordVeniceRequest } from "../venice-usage-limiter";
 import {
   initKeyPool,
   acquireKey,
@@ -142,6 +143,18 @@ export type InvokeParams = {
    * @internal
    */
   _sharedVeniceFailed?: boolean;
+  /**
+   * The numeric ID of the user making this call.
+   * Required for Venice shared-tier daily usage tracking.
+   * If omitted, usage is not tracked (system/background calls).
+   */
+  userId?: number;
+  /**
+   * The user's current plan ID (e.g. "free", "pro", "titan").
+   * Required for Venice shared-tier daily limit enforcement.
+   * If omitted, "free" limits apply.
+   */
+  planId?: string;
 };
 
 export type ToolCall = {
@@ -479,6 +492,18 @@ async function _invokeLLMWithRetry(
   // Respect _sharedVeniceFailed flag — if Venice already failed for this request, skip it
   const sharedVeniceFailed = params._sharedVeniceFailed === true;
   const useSharedVenice = !usingUserKey && !forceOpenRouter && !forceGemini && !!VENICE_API_KEY && !sharedVeniceFailed;
+
+  // ── Venice shared-tier daily budget check ──────────────────────────────────
+  // Only enforce when: (a) we're about to use the shared Venice key, AND
+  // (b) a userId is provided (user-initiated calls). System/background calls
+  // without a userId bypass the limit to avoid breaking internal pipelines.
+  if (useSharedVenice && params.userId) {
+    const planId = params.planId || "free";
+    const veniceCheck = checkVeniceLimit(params.userId, planId);
+    if (!veniceCheck.allowed) {
+      throw new Error(veniceCheck.message || "Daily Venice AI limit reached. Please try again tomorrow or add your own API key.");
+    }
+  }
   const VENICE_SHARED_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
   const VENICE_SHARED_TOOLS_MODEL =
     modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
@@ -786,6 +811,11 @@ async function _invokeLLMWithRetry(
 
   // ── Success — release key back to pool ──
   if (keyHandle) releaseKey(keyHandle.index, keyHandle.envVar);
+
+  // ── Record Venice shared-tier usage ──
+  if (useSharedVenice && params.userId) {
+    recordVeniceRequest(params.userId);
+  }
 
   // Parse JSON response with error handling — malformed responses under load
   // can cause unhandled exceptions that bypass all retry logic

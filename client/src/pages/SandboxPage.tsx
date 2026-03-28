@@ -55,6 +55,14 @@ import {
   FolderPlus,
   FilePlus,
   MoreVertical,
+  GitBranch,
+  FlaskConical,
+  Diff,
+  SearchCode,
+  Wand2,
+  Gauge,
+  Cpu as CpuIcon,
+  StopCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -66,7 +74,7 @@ type OutputLine = {
   timestamp?: number;
 };
 
-type SidePanel = "files" | "editor" | "packages" | "env" | "security" | "history" | "processes" | "settings";
+type SidePanel = "files" | "editor" | "packages" | "env" | "security" | "history" | "processes" | "git" | "tests" | "search" | "settings";
 
 // ─── Web Terminal Component ─────────────────────────────────────────
 
@@ -1638,7 +1646,394 @@ function SecurityScanner({ sandboxId }: { sandboxId: number }) {
   );
 }
 
-// ─── Sandbox Settings Component ─────────────────────────────────────
+// ─── Git Panel Component ─────────────────────────────────────────────────────────────
+
+function GitPanel({ sandboxId }: { sandboxId: number }) {
+  const [output, setOutput] = useState("");
+  const [args, setArgs] = useState("");
+  const [commitMsg, setCommitMsg] = useState("");
+  const [workDir, setWorkDir] = useState("/home/sandbox");
+  const [running, setRunning] = useState(false);
+
+  const gitMutation = trpc.sandbox.git.useMutation({
+    onSuccess: (data) => {
+      setOutput(data.output || "");
+      setRunning(false);
+    },
+    onError: (err) => {
+      setOutput(err.message);
+      setRunning(false);
+    },
+  });
+
+  const run = (op: "init" | "status" | "add" | "commit" | "push" | "pull" | "log" | "branch" | "diff" | "stash" | "fetch") => {
+    setRunning(true);
+    setOutput("");
+    gitMutation.mutate({ sandboxId, operation: op, args, commitMessage: commitMsg || undefined, workingDirectory: workDir });
+  };
+
+  const GIT_ACTIONS: Array<{ op: "init" | "status" | "add" | "commit" | "push" | "pull" | "log" | "branch" | "diff" | "stash" | "fetch"; label: string; color: string }> = [
+    { op: "status", label: "Status", color: "text-cyan-400" },
+    { op: "log", label: "Log", color: "text-blue-400" },
+    { op: "branch", label: "Branches", color: "text-purple-400" },
+    { op: "diff", label: "Diff", color: "text-yellow-400" },
+    { op: "add", label: "Add All", color: "text-green-400" },
+    { op: "commit", label: "Commit", color: "text-emerald-400" },
+    { op: "push", label: "Push", color: "text-orange-400" },
+    { op: "pull", label: "Pull", color: "text-sky-400" },
+    { op: "stash", label: "Stash", color: "text-amber-400" },
+    { op: "fetch", label: "Fetch", color: "text-indigo-400" },
+    { op: "init", label: "Init", color: "text-zinc-400" },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#161b22] border-b border-zinc-800">
+        <GitBranch className="w-4 h-4 text-amber-400" />
+        <span className="text-zinc-300 text-xs font-medium">Git</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Working Directory</label>
+          <input
+            value={workDir}
+            onChange={(e) => setWorkDir(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Extra Args (optional)</label>
+          <input
+            value={args}
+            onChange={(e) => setArgs(e.target.value)}
+            placeholder="e.g. origin main"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Commit Message</label>
+          <input
+            value={commitMsg}
+            onChange={(e) => setCommitMsg(e.target.value)}
+            placeholder="Update"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200"
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {GIT_ACTIONS.map(({ op, label, color }) => (
+            <button
+              key={op}
+              onClick={() => run(op)}
+              disabled={running}
+              className={`px-2 py-1.5 rounded text-[10px] font-medium border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 transition-colors ${color} disabled:opacity-50`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {running && (
+          <div className="flex items-center gap-2 text-zinc-500 text-xs">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Running...
+          </div>
+        )}
+        {output && (
+          <div className="bg-zinc-950 rounded border border-zinc-800 p-2 font-mono text-[10px] text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+            {output}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tests Panel Component ─────────────────────────────────────────────────────────────
+
+function TestsPanel({ sandboxId }: { sandboxId: number }) {
+  const [output, setOutput] = useState("");
+  const [workDir, setWorkDir] = useState("/home/sandbox");
+  const [customCmd, setCustomCmd] = useState("");
+  const [running, setRunning] = useState(false);
+  const [passed, setPassed] = useState<boolean | null>(null);
+  const [duration, setDuration] = useState<number | null>(null);
+
+  const testsMutation = trpc.sandbox.runTests.useMutation({
+    onSuccess: (data) => {
+      setOutput(data.output || "");
+      setPassed(data.passed);
+      setDuration(data.durationMs ?? null);
+      setRunning(false);
+    },
+    onError: (err) => {
+      setOutput(err.message);
+      setPassed(false);
+      setRunning(false);
+    },
+  });
+
+  const lintMutation = trpc.sandbox.lintFile.useMutation({
+    onSuccess: (data) => {
+      setOutput(data.output || "");
+      setPassed(data.passed);
+      setRunning(false);
+    },
+    onError: (err) => {
+      setOutput(err.message);
+      setPassed(false);
+      setRunning(false);
+    },
+  });
+
+  const formatMutation = trpc.sandbox.formatFile.useMutation({
+    onSuccess: (data) => {
+      setOutput(data.output || "");
+      setPassed(data.success);
+      setRunning(false);
+    },
+    onError: (err) => {
+      setOutput(err.message);
+      setPassed(false);
+      setRunning(false);
+    },
+  });
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#161b22] border-b border-zinc-800">
+        <FlaskConical className="w-4 h-4 text-emerald-400" />
+        <span className="text-zinc-300 text-xs font-medium">Tests &amp; Quality</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Working Directory</label>
+          <input
+            value={workDir}
+            onChange={(e) => setWorkDir(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Custom Test Command (optional)</label>
+          <input
+            value={customCmd}
+            onChange={(e) => setCustomCmd(e.target.value)}
+            placeholder="e.g. npm run test:unit"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            onClick={() => {
+              setRunning(true); setOutput(""); setPassed(null); setDuration(null);
+              testsMutation.mutate({ sandboxId, workingDirectory: workDir, testCommand: customCmd || undefined });
+            }}
+            disabled={running}
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-medium bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+          >
+            {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+            Run Tests (Auto-detect)
+          </button>
+          <button
+            onClick={() => {
+              const path = prompt("File path to lint:", "/home/sandbox/index.ts");
+              if (!path) return;
+              setRunning(true); setOutput(""); setPassed(null);
+              lintMutation.mutate({ sandboxId, path });
+            }}
+            disabled={running}
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-medium bg-blue-900/30 border border-blue-700/50 text-blue-400 hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            Lint File
+          </button>
+          <button
+            onClick={() => {
+              const path = prompt("File path to format:", "/home/sandbox/index.ts");
+              if (!path) return;
+              setRunning(true); setOutput(""); setPassed(null);
+              formatMutation.mutate({ sandboxId, path });
+            }}
+            disabled={running}
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-medium bg-purple-900/30 border border-purple-700/50 text-purple-400 hover:bg-purple-900/50 transition-colors disabled:opacity-50"
+          >
+            <Wand2 className="w-3 h-3" />
+            Format File (Prettier/Black)
+          </button>
+        </div>
+        {passed !== null && (
+          <div className={`flex items-center gap-2 text-xs font-medium ${passed ? 'text-emerald-400' : 'text-red-400'}`}>
+            {passed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+            {passed ? 'Passed' : 'Failed'}
+            {duration !== null && <span className="text-zinc-500 font-normal ml-1">{(duration / 1000).toFixed(1)}s</span>}
+          </div>
+        )}
+        {output && (
+          <div className="bg-zinc-950 rounded border border-zinc-800 p-2 font-mono text-[10px] text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto">
+            {output}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Search Panel Component ─────────────────────────────────────────────────────────────
+
+function SearchPanel({ sandboxId }: { sandboxId: number }) {
+  const [pattern, setPattern] = useState("");
+  const [directory, setDirectory] = useState("/home/sandbox");
+  const [glob, setGlob] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const { data, isFetching, refetch } = trpc.sandbox.searchFiles.useQuery(
+    { sandboxId, pattern, directory, includeGlob: glob || undefined, caseSensitive },
+    { enabled: false }
+  );
+
+  const handleSearch = () => {
+    if (!pattern.trim()) return;
+    setSubmitted(true);
+    refetch();
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#161b22] border-b border-zinc-800">
+        <SearchCode className="w-4 h-4 text-sky-400" />
+        <span className="text-zinc-300 text-xs font-medium">Search Files</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Search Pattern</label>
+          <input
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="e.g. TODO, console.log, import React"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">Directory</label>
+          <input
+            value={directory}
+            onChange={(e) => setDirectory(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-[10px] mb-1 block">File Filter (glob, optional)</label>
+          <input
+            value={glob}
+            onChange={(e) => setGlob(e.target.value)}
+            placeholder="e.g. *.ts, *.py"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 font-mono"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="checkbox" id="cs" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} className="accent-sky-500" />
+          <label htmlFor="cs" className="text-zinc-400 text-xs">Case sensitive</label>
+        </div>
+        <button
+          onClick={handleSearch}
+          disabled={!pattern.trim() || isFetching}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-medium bg-sky-900/30 border border-sky-700/50 text-sky-400 hover:bg-sky-900/50 transition-colors disabled:opacity-50"
+        >
+          {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+          Search
+        </button>
+        {submitted && data && (
+          <div className="space-y-2">
+            <p className="text-zinc-500 text-[10px]">{data.totalFiles} file(s) matched</p>
+            {data.matches.slice(0, 50).map((m, i) => (
+              <div key={i} className="bg-zinc-950 rounded border border-zinc-800 p-2">
+                <p className="text-sky-400 text-[10px] font-mono truncate">{m.file}:{m.line}</p>
+                <p className="text-zinc-300 text-[10px] font-mono truncate mt-0.5">{m.text}</p>
+              </div>
+            ))}
+            {data.matches.length === 0 && data.totalFiles > 0 && (
+              <p className="text-zinc-500 text-[10px]">Files matched but no line details available.</p>
+            )}
+            {data.totalFiles === 0 && (
+              <p className="text-zinc-500 text-[10px]">No matches found.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Processes Panel Component ─────────────────────────────────────────────────────────────
+
+function ProcessesPanel({ sandboxId }: { sandboxId: number }) {
+  const { data, isLoading, refetch, isFetching } = trpc.sandbox.getProcesses.useQuery(
+    { sandboxId },
+    { refetchInterval: 10_000 }
+  );
+
+  const killMutation = trpc.sandbox.killProcess.useMutation({
+    onSuccess: () => { toast.success("Process killed"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1117] rounded-lg border border-zinc-800 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-pink-400" />
+          <span className="text-zinc-300 text-xs font-medium">Processes</span>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-zinc-500 hover:text-zinc-300 p-0.5"
+          title="Refresh"
+        >
+          {isFetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-16">
+            <Loader2 className="w-4 h-4 animate-spin text-zinc-600" />
+          </div>
+        ) : !data?.processes?.length ? (
+          <p className="text-zinc-600 text-xs text-center mt-4">No processes found</p>
+        ) : (
+          <div className="space-y-1">
+            <div className="grid grid-cols-[40px_40px_40px_1fr_24px] gap-1 px-2 py-1 text-[9px] text-zinc-600 font-medium uppercase">
+              <span>PID</span><span>CPU%</span><span>MEM%</span><span>Command</span><span></span>
+            </div>
+            {data.processes.map((proc, i) => (
+              <div key={i} className="grid grid-cols-[40px_40px_40px_1fr_24px] gap-1 px-2 py-1 rounded hover:bg-zinc-800/50 items-center">
+                <span className="text-zinc-400 text-[10px] font-mono">{proc.pid}</span>
+                <span className="text-zinc-400 text-[10px]">{proc.cpu}</span>
+                <span className="text-zinc-400 text-[10px]">{proc.mem}</span>
+                <span className="text-zinc-300 text-[10px] font-mono truncate" title={proc.command}>{proc.command}</span>
+                <button
+                  onClick={() => {
+                    const pid = parseInt(proc.pid, 10);
+                    if (!isNaN(pid) && confirm(`Kill PID ${pid}?`)) {
+                      killMutation.mutate({ sandboxId, pid });
+                    }
+                  }}
+                  className="text-zinc-600 hover:text-red-400 transition-colors"
+                  title="Kill process"
+                >
+                  <StopCircle className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Sandbox Settings Component ─────────────────────────────────────────────────────────
 
 function SandboxSettings({
   sandboxId,
@@ -1849,8 +2244,12 @@ export default function SandboxPage() {
   const sidePanels: Array<{ id: SidePanel; icon: any; label: string; color: string }> = [
     { id: "files", icon: FolderTree, label: "Files", color: "text-cyan-400" },
     { id: "editor", icon: FileCode, label: "Editor", color: "text-blue-400" },
+    { id: "search", icon: SearchCode, label: "Search", color: "text-sky-400" },
+    { id: "git", icon: GitBranch, label: "Git", color: "text-amber-400" },
+    { id: "tests", icon: FlaskConical, label: "Tests", color: "text-emerald-400" },
     { id: "packages", icon: Package, label: "Packages", color: "text-green-400" },
     { id: "env", icon: Variable, label: "Env Vars", color: "text-purple-400" },
+    { id: "processes", icon: Activity, label: "Processes", color: "text-pink-400" },
     { id: "history", icon: Clock, label: "History", color: "text-orange-400" },
     { id: "security", icon: Shield, label: "Security", color: "text-red-400" },
     { id: "settings", icon: Settings, label: "Settings", color: "text-zinc-400" },
@@ -2043,6 +2442,27 @@ export default function SandboxPage() {
                   <CommandHistory sandboxId={activeSandboxId} />
                 )}
                 {activePanel === "security" && <SecurityScanner sandboxId={activeSandboxId} />}
+
+                {/* ── Git Panel ── */}
+                {activePanel === "git" && (
+                  <GitPanel sandboxId={activeSandboxId} />
+                )}
+
+                {/* ── Tests Panel ── */}
+                {activePanel === "tests" && (
+                  <TestsPanel sandboxId={activeSandboxId} />
+                )}
+
+                {/* ── Search Panel ── */}
+                {activePanel === "search" && (
+                  <SearchPanel sandboxId={activeSandboxId} />
+                )}
+
+                {/* ── Processes Panel ── */}
+                {activePanel === "processes" && (
+                  <ProcessesPanel sandboxId={activeSandboxId} />
+                )}
+
                 {activePanel === "settings" && (
                   <SandboxSettings
                     sandboxId={activeSandboxId}

@@ -17,6 +17,9 @@ import {
   persistWorkspace,
   updateEnvVars,
   installPackage,
+  restoreWorkspace,
+  writeBinaryFile,
+  deleteFile as deleteFileFromSandbox,
 } from "./sandbox-engine";
 import {
   runPassiveWebScan,
@@ -806,6 +809,317 @@ export const sandboxRouter = router({
         const msg = err instanceof Error ? err.message : String(err);
         return { success: false, deleted: 0, error: msg };
       }
+    }),
+
+  // ── Developer Tools — Advanced File & Workspace Operations ──────────
+
+  /**
+   * Restore a sandbox workspace from S3 (e.g. after server restart or migration)
+   */
+  restoreWorkspace: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .mutation(async ({ input, ctx }) => {
+      const success = await restoreWorkspace(input.sandboxId, ctx.user.id);
+      if (!success) throw new Error("Failed to restore workspace — no saved snapshot found");
+      return { success: true };
+    }),
+
+  /**
+   * Write a binary file to the sandbox (base64-encoded content)
+   * Useful for uploading images, archives, compiled binaries, etc.
+   */
+  writeBinaryFile: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      path: z.string().min(1),
+      base64Content: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const buffer = Buffer.from(input.base64Content, "base64");
+      const success = await writeBinaryFile(input.sandboxId, ctx.user.id, input.path, buffer);
+      if (!success) throw new Error("Failed to write binary file");
+      return { success: true, sizeBytes: buffer.length };
+    }),
+
+  /**
+   * Move or rename a file/directory within the sandbox
+   */
+  moveFile: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      fromPath: z.string().min(1),
+      toPath: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `mv "${input.fromPath}" "${input.toPath}"`,
+        { triggeredBy: "user" }
+      );
+      return { success: result.exitCode === 0, output: result.output };
+    }),
+
+  /**
+   * Copy a file or directory within the sandbox
+   */
+  copyFile: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      fromPath: z.string().min(1),
+      toPath: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `cp -r "${input.fromPath}" "${input.toPath}"`,
+        { triggeredBy: "user" }
+      );
+      return { success: result.exitCode === 0, output: result.output };
+    }),
+
+  /**
+   * Diff two files in the sandbox — returns unified diff output
+   */
+  diffFiles: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      pathA: z.string().min(1),
+      pathB: z.string().min(1),
+      contextLines: z.number().int().min(0).max(20).optional().default(3),
+    }))
+    .query(async ({ input, ctx }) => {
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `diff -u${input.contextLines} "${input.pathA}" "${input.pathB}" || true`,
+        { triggeredBy: "user" }
+      );
+      return { diff: result.output, identical: result.output.trim() === "" };
+    }),
+
+  /**
+   * Search for text inside files in the sandbox (grep)
+   */
+  searchFiles: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      pattern: z.string().min(1).max(500),
+      directory: z.string().optional().default("/home/sandbox"),
+      caseSensitive: z.boolean().optional().default(false),
+      includeGlob: z.string().optional(),
+      maxResults: z.number().int().min(1).max(500).optional().default(100),
+    }))
+    .query(async ({ input, ctx }) => {
+      const flags = input.caseSensitive ? "" : "-i";
+      const include = input.includeGlob ? `--include="${input.includeGlob}"` : "";
+      const cmd = `grep -rn ${flags} ${include} --max-count=1 -l "${input.pattern.replace(/"/g, '\\"')}" "${input.directory}" 2>/dev/null | head -${input.maxResults} || true`;
+      const listResult = await executeCommand(input.sandboxId, ctx.user.id, cmd, { triggeredBy: "user" });
+      const files = listResult.output.trim().split("\n").filter(Boolean);
+      // Get line-level matches for each file (up to 20 files)
+      const matches: Array<{ file: string; line: number; text: string }> = [];
+      for (const file of files.slice(0, 20)) {
+        const grepCmd = `grep -n ${flags} "${input.pattern.replace(/"/g, '\\"')}" "${file}" 2>/dev/null | head -20 || true`;
+        const grepResult = await executeCommand(input.sandboxId, ctx.user.id, grepCmd, { triggeredBy: "user" });
+        for (const line of grepResult.output.trim().split("\n").filter(Boolean)) {
+          const colonIdx = line.indexOf(":");
+          if (colonIdx > 0) {
+            const lineNum = parseInt(line.slice(0, colonIdx), 10);
+            const text = line.slice(colonIdx + 1);
+            if (!isNaN(lineNum)) matches.push({ file, line: lineNum, text });
+          }
+        }
+      }
+      return { files, matches, totalFiles: files.length };
+    }),
+
+  /**
+   * Get disk usage stats for the sandbox workspace
+   */
+  diskUsage: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `du -sh /home/sandbox 2>/dev/null && df -h /tmp 2>/dev/null | tail -1 || true`,
+        { triggeredBy: "user" }
+      );
+      return { output: result.output };
+    }),
+
+  /**
+   * Run a quick lint/syntax check on a file using the appropriate tool
+   * Supports: .ts/.tsx (tsc --noEmit), .js/.jsx (node --check), .py (python3 -m py_compile),
+   *           .json (python3 -m json.tool), .sh (bash -n)
+   */
+  lintFile: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      path: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const ext = input.path.split(".").pop()?.toLowerCase() ?? "";
+      let cmd: string;
+      if (ext === "ts" || ext === "tsx") {
+        cmd = `cd /home/sandbox && npx tsc --noEmit --allowJs --checkJs false --skipLibCheck 2>&1 || true`;
+      } else if (ext === "js" || ext === "jsx" || ext === "mjs") {
+        cmd = `node --check "${input.path}" 2>&1 || true`;
+      } else if (ext === "py") {
+        cmd = `python3 -m py_compile "${input.path}" 2>&1 && echo "OK" || true`;
+      } else if (ext === "json") {
+        cmd = `python3 -m json.tool "${input.path}" > /dev/null 2>&1 && echo "Valid JSON" || echo "Invalid JSON"` ;
+      } else if (ext === "sh" || ext === "bash") {
+        cmd = `bash -n "${input.path}" 2>&1 && echo "OK" || true`;
+      } else {
+        cmd = `echo "No linter available for .${ext} files"`;
+      }
+      const result = await executeCommand(input.sandboxId, ctx.user.id, cmd, { triggeredBy: "user" });
+      const passed = result.exitCode === 0 && !result.output.toLowerCase().includes("error");
+      return { passed, output: result.output, exitCode: result.exitCode };
+    }),
+
+  /**
+   * Format a file using prettier (if available) or black (for Python)
+   */
+  formatFile: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      path: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const ext = input.path.split(".").pop()?.toLowerCase() ?? "";
+      let cmd: string;
+      if (["ts", "tsx", "js", "jsx", "json", "css", "html", "md"].includes(ext)) {
+        cmd = `cd /home/sandbox && (npx prettier --write "${input.path}" 2>&1 || echo "prettier not available")`;
+      } else if (ext === "py") {
+        cmd = `(black "${input.path}" 2>&1 || python3 -m black "${input.path}" 2>&1 || echo "black not available")`;
+      } else {
+        cmd = `echo "No formatter available for .${ext} files"`;
+      }
+      const result = await executeCommand(input.sandboxId, ctx.user.id, cmd, { triggeredBy: "user" });
+      return { success: result.exitCode === 0, output: result.output };
+    }),
+
+  /**
+   * Run project tests (npm test / pytest / go test)
+   * Auto-detects test runner from project files
+   */
+  runTests: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      workingDirectory: z.string().optional().default("/home/sandbox"),
+      testCommand: z.string().optional(), // override auto-detection
+      timeoutMs: z.number().int().min(5000).max(300_000).optional().default(120_000),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try { await consumeCredits(ctx.user.id, "sandbox_run", "Run tests"); } catch {}
+      let cmd = input.testCommand;
+      if (!cmd) {
+        // Auto-detect test runner
+        const detectCmd = `cd "${input.workingDirectory}" && \
+          if [ -f package.json ] && grep -q '"test"' package.json; then echo "npm"; \
+          elif [ -f pytest.ini ] || [ -f setup.py ] || [ -f pyproject.toml ]; then echo "pytest"; \
+          elif [ -f go.mod ]; then echo "go"; \
+          else echo "none"; fi`;
+        const detect = await executeCommand(input.sandboxId, ctx.user.id, detectCmd, { triggeredBy: "user" });
+        const runner = detect.output.trim();
+        if (runner === "npm") cmd = `cd "${input.workingDirectory}" && npm test -- --watchAll=false 2>&1`;
+        else if (runner === "pytest") cmd = `cd "${input.workingDirectory}" && python3 -m pytest -v 2>&1`;
+        else if (runner === "go") cmd = `cd "${input.workingDirectory}" && go test ./... 2>&1`;
+        else cmd = `echo "No test runner detected. Add a test script to package.json or install pytest."`;
+      }
+      const result = await executeCommand(input.sandboxId, ctx.user.id, cmd, {
+        triggeredBy: "user",
+        timeoutMs: input.timeoutMs,
+      });
+      const passed = result.exitCode === 0;
+      return { passed, output: result.output, exitCode: result.exitCode, durationMs: result.durationMs };
+    }),
+
+  /**
+   * Git operations — init, status, add, commit, push, pull, log, branch, diff
+   * All operations run inside the sandbox workspace
+   */
+  git: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      operation: z.enum(["init", "status", "add", "commit", "push", "pull", "log", "branch", "diff", "clone", "stash", "fetch", "checkout", "merge", "reset"]),
+      args: z.string().optional().default(""),
+      workingDirectory: z.string().optional().default("/home/sandbox"),
+      commitMessage: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      let cmd: string;
+      const wd = input.workingDirectory;
+      switch (input.operation) {
+        case "init": cmd = `cd "${wd}" && git init ${input.args}`; break;
+        case "status": cmd = `cd "${wd}" && git status ${input.args}`; break;
+        case "add": cmd = `cd "${wd}" && git add ${input.args || "."}` ; break;
+        case "commit": cmd = `cd "${wd}" && git commit -m "${(input.commitMessage || input.args || "Update").replace(/"/g, "'")}"`; break;
+        case "push": cmd = `cd "${wd}" && git push ${input.args}`; break;
+        case "pull": cmd = `cd "${wd}" && git pull ${input.args}`; break;
+        case "log": cmd = `cd "${wd}" && git log --oneline -20 ${input.args}`; break;
+        case "branch": cmd = `cd "${wd}" && git branch ${input.args}`; break;
+        case "diff": cmd = `cd "${wd}" && git diff ${input.args}`; break;
+        case "clone": cmd = `cd "${wd}" && git clone ${input.args}`; break;
+        case "stash": cmd = `cd "${wd}" && git stash ${input.args}`; break;
+        case "fetch": cmd = `cd "${wd}" && git fetch ${input.args}`; break;
+        case "checkout": cmd = `cd "${wd}" && git checkout ${input.args}`; break;
+        case "merge": cmd = `cd "${wd}" && git merge ${input.args}`; break;
+        case "reset": cmd = `cd "${wd}" && git reset ${input.args}`; break;
+        default: cmd = `echo "Unknown git operation"`;
+      }
+      const result = await executeCommand(input.sandboxId, ctx.user.id, cmd, {
+        triggeredBy: "user",
+        timeoutMs: 60_000,
+      });
+      return { success: result.exitCode === 0, output: result.output, exitCode: result.exitCode };
+    }),
+
+  /**
+   * Get process list running in the sandbox
+   */
+  getProcesses: protectedProcedure
+    .input(z.object({ sandboxId: z.number().int() }))
+    .query(async ({ input, ctx }) => {
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `ps aux --no-headers 2>/dev/null | head -50 || true`,
+        { triggeredBy: "user" }
+      );
+      const processes = result.output.trim().split("\n").filter(Boolean).map(line => {
+        const parts = line.trim().split(/\s+/);
+        return {
+          pid: parts[1] || "",
+          cpu: parts[2] || "0",
+          mem: parts[3] || "0",
+          command: parts.slice(10).join(" ") || parts[10] || "",
+        };
+      });
+      return { processes };
+    }),
+
+  /**
+   * Kill a process in the sandbox by PID
+   */
+  killProcess: protectedProcedure
+    .input(z.object({
+      sandboxId: z.number().int(),
+      pid: z.number().int().min(1),
+      signal: z.enum(["SIGTERM", "SIGKILL", "SIGHUP"]).optional().default("SIGTERM"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const sig = input.signal === "SIGKILL" ? "-9" : input.signal === "SIGHUP" ? "-1" : "-15";
+      const result = await executeCommand(
+        input.sandboxId,
+        ctx.user.id,
+        `kill ${sig} ${input.pid} 2>&1 || true`,
+        { triggeredBy: "user" }
+      );
+      return { success: result.exitCode === 0, output: result.output };
     }),
 
   // ── Delete ALL project files for the current user ──

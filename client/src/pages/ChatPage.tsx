@@ -1387,6 +1387,13 @@ export default function ChatPage() {
   const sendMutation = trpc.chat.send.useMutation();
   const utils = trpc.useUtils();
 
+  // Venice AI shared-tier daily quota — shown in chat footer
+  const { data: veniceQuota } = trpc.chat.getVeniceQuota.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchInterval: 60_000, // refresh every 60s
+    staleTime: 30_000,
+  });
+
   // Auto-refresh messages when sidebar VoiceMode finishes processing (processing → speaking)
   useEffect(() => {
     if (prevSidebarPhaseRef.current === "processing" && sidebarVoicePhase === "speaking" && activeConversationId) {
@@ -3147,6 +3154,36 @@ export default function ChatPage() {
               <span className="text-[10px] text-amber-400">
                 Titan is working — type a message and he’ll read it mid-task without stopping
               </span>
+            </div>
+          )}
+
+          {/* Venice AI quota indicator — shown when user is on shared tier and has limited quota */}
+          {veniceQuota && !veniceQuota.isUnlimited && veniceQuota.percentUsed !== undefined && veniceQuota.percentUsed >= 50 && (
+            <div className="mt-1.5 flex items-center gap-1.5 px-1">
+              <div className="flex items-center gap-1.5 flex-1">
+                <span className={`text-[10px] font-medium ${
+                  veniceQuota.percentUsed >= 90 ? 'text-red-400' :
+                  veniceQuota.percentUsed >= 70 ? 'text-amber-400' :
+                  'text-muted-foreground'
+                }`}>
+                  Venice AI: {veniceQuota.remaining}/{veniceQuota.limit} requests remaining today
+                </span>
+                <div className="flex-1 max-w-[80px] h-1 rounded-full bg-border/50 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      veniceQuota.percentUsed >= 90 ? 'bg-red-500' :
+                      veniceQuota.percentUsed >= 70 ? 'bg-amber-500' :
+                      'bg-violet-500'
+                    }`}
+                    style={{ width: `${veniceQuota.percentUsed}%` }}
+                  />
+                </div>
+              </div>
+              {veniceQuota.percentUsed >= 90 && (
+                <span className="text-[9px] text-red-400">
+                  Add your own API key in Settings to bypass limits
+                </span>
+              )}
             </div>
           )}
 

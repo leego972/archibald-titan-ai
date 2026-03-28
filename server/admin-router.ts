@@ -31,6 +31,7 @@ import { addCredits } from "./credit-service";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { isAdminRole } from '@shared/const';
+import { getAllVeniceUsage, resetVeniceUsage, VENICE_DAILY_LIMITS } from "./venice-usage-limiter";
 
 export const adminRouter = router({
   /**
@@ -738,5 +739,40 @@ export const adminRouter = router({
         page: input.page,
         limit: input.limit,
       };
+    }),
+
+  // ─── Venice Shared-Key Usage Dashboard ──────────────────────────────────────
+
+  /**
+   * Get all active Venice shared-key usage (today's requests per user).
+   * Useful for monitoring cost exposure.
+   */
+  getVeniceUsage: adminProcedure.query(async () => {
+    const usage = getAllVeniceUsage();
+    const limits = VENICE_DAILY_LIMITS;
+    return {
+      usage,
+      limits,
+      totalRequestsToday: usage.reduce((sum, u) => sum + u.count, 0),
+      activeUsers: usage.length,
+    };
+  }),
+
+  /**
+   * Reset a specific user's daily Venice usage (e.g. after support ticket).
+   */
+  resetUserVeniceUsage: adminProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      resetVeniceUsage(input.userId);
+      await logAdminAction({
+        adminId: ctx.user.id,
+        adminRole: ctx.user.role,
+        action: "reset_venice_usage",
+        category: "system" as const,
+        targetUserId: input.userId,
+        details: { action: "venice_usage_reset" },
+      });
+      return { success: true };
     }),
 });

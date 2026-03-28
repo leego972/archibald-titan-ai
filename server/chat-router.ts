@@ -13,6 +13,7 @@ import { getUserOpenAIKey } from "./user-secrets-router";
 import { checkCredits, consumeCredits, getCreditBalance } from "./credit-service";
 import { checkRateLimit, recordRequest, buildStarted, buildFinished } from "./rate-limiter";
 import { getUserPlan } from "./subscription-gate";
+import { getVeniceUsage, VENICE_DAILY_LIMITS } from "./venice-usage-limiter";
 import { getDb } from "./db";
 import {
   chatConversations,
@@ -1405,6 +1406,18 @@ export const chatRouter = router({
       if (userApiKey) {
         log.info(`[Chat] User ${userId} has personal API key — using it for this session`);
       }
+
+      // ── Fetch user plan for Venice rate limiting ──────────────────
+      // Loaded once here and passed to all invokeLLM calls so the shared
+      // Venice Pro tier can enforce per-tier daily limits.
+      let userPlanId = "free";
+      try {
+        const planInfo = await getUserPlan(userId);
+        userPlanId = planInfo.planId || "free";
+      } catch (_planErr) {
+        // Non-fatal: default to "free" limits
+      }
+
       // ── Role-Based Content Restrictions ──────────────────────────
       // Admin users get the full unrestricted SYSTEM_PROMPT.
       // Non-admin users get strict safety guardrails injected.
@@ -2016,6 +2029,9 @@ Do NOT attempt any tool calls or builds.`;
                 // Security builds: route through OpenRouter uncensored model (Dolphin Mistral 24B Venice)
                 // This bypasses OpenAI's safety training entirely. Falls back to OpenAI if OpenRouter fails.
                 ...(useOpenRouterForSecurity ? { forceOpenRouter: true } : {}),
+                // Venice shared-tier rate limiting: pass userId + planId so daily limits are enforced
+                userId,
+                planId: userPlanId,
               });
               break; // success
             } catch (llmErr: unknown) {
@@ -2119,6 +2135,8 @@ Do NOT attempt any tool calls or builds.`;
                 ],
                 ...(userApiKey ? { userApiKey } : {}),
                 ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}),
+                userId,
+                planId: userPlanId,
               });
               finalText = fallbackResult.choices?.[0]?.message?.content as string || '';
             } catch {
@@ -2932,7 +2950,7 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
 
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
-          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "premium" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}) });
+          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "premium" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}), userId, planId: userPlanId });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
@@ -3394,4 +3412,31 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
         .orderBy(desc(builderActivityLog.createdAt))
         .limit(limit);
     }),
+
+  /**
+   * Get the current user's Venice AI shared-tier daily usage quota.
+   * Returns: used, limit, remaining, resetAt (midnight UTC), planId.
+   * Used by the chat UI to show a quota indicator.
+   */
+  getVeniceQuota: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    let planId = "free";
+    try {
+      const plan = await getUserPlan(userId);
+      planId = plan.planId || "free";
+    } catch {
+      // Non-fatal: default to free
+    }
+    const usage = getVeniceUsage(userId, planId);
+    const isUnlimited = usage.limit === -1;
+    return {
+      planId,
+      used: usage.used,
+      limit: isUnlimited ? null : usage.limit,
+      remaining: isUnlimited ? null : usage.remaining,
+      isUnlimited,
+      resetAt: usage.resetAt,
+      percentUsed: isUnlimited ? 0 : Math.min(100, Math.round((usage.used / usage.limit) * 100)),
+    };
+  }),
 });
