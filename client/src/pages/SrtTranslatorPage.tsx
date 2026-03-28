@@ -17,7 +17,7 @@ function parseSrt(srt: string) {
       time,
       text: textLines.join(" ").replace(/\r/g, ""),
     };
-  }).filter(Boolean);
+  }).filter((b): b is { index: number; time: string; text: string } => b !== null);
 }
 
 function buildSrt(blocks: { index: number; time: string; text: string }[]) {
