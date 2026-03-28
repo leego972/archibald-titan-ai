@@ -39,6 +39,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import DesktopLoginPage from "./pages/DesktopLoginPage";
+import DesktopBillingCallbackPage from "./pages/DesktopBillingCallbackPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
@@ -282,6 +283,8 @@ function Router() {
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/desktop-login" component={DesktopLoginPage} />
+      {/* Desktop billing callback — handles titandesktop:// deep links from Stripe */}
+      <Route path="/desktop-billing-callback" component={DesktopBillingCallbackPage} />
 
       {/* Public pages */}
       <Route path="/builder" component={BuilderPage} />

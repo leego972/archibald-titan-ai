@@ -191,6 +191,9 @@ export const stripeRouter = router({
       z.object({
         planId: z.enum(["pro", "enterprise", "cyber", "cyber_plus", "titan"]),
         interval: z.enum(["month", "year"]),
+        // source: "web" | "desktop" — controls the Stripe return URL
+        // Desktop uses the titandesktop:// deep-link scheme so the app reopens after checkout
+        source: z.enum(["web", "desktop"]).optional().default("web"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -272,8 +275,12 @@ export const stripeRouter = router({
         allow_promotion_codes: discounts.length === 0, // Don't allow promo codes if referral discount already applied
         ...(discounts.length > 0 ? { discounts } : {}),
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/pricing?canceled=true`,
+        success_url: input.source === "desktop"
+          ? `titandesktop://billing/success?subscription=success&session_id={CHECKOUT_SESSION_ID}`
+          : `${origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: input.source === "desktop"
+          ? `titandesktop://billing/cancel?subscription=canceled`
+          : `${origin}/pricing?canceled=true`,
         metadata: {
           user_id: ctx.user.id.toString(),
           plan_id: input.planId,
@@ -296,6 +303,7 @@ export const stripeRouter = router({
     .input(
       z.object({
         packId: z.enum(["pack_500", "pack_2500", "pack_5000", "pack_10000"]),
+        source: z.enum(["web", "desktop"]).optional().default("web"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -330,8 +338,12 @@ export const stripeRouter = router({
             quantity: 1,
           },
         ],
-        success_url: `${origin}/pricing?pack_success=true&pack=${input.packId}`,
-        cancel_url: `${origin}/pricing?canceled=true`,
+        success_url: input.source === "desktop"
+          ? `titandesktop://billing/success?credits=success&pack=${input.packId}`
+          : `${origin}/pricing?pack_success=true&pack=${input.packId}`,
+        cancel_url: input.source === "desktop"
+          ? `titandesktop://billing/cancel?credits=canceled`
+          : `${origin}/pricing?canceled=true`,
         metadata: {
           type: "credit_pack",
           user_id: ctx.user.id.toString(),

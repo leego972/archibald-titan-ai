@@ -38,9 +38,22 @@
       "target": "nsis",
       "icon": "icon.ico"
     },
+    "protocols": [
+      {
+        "name": "Archibald Titan",
+        "schemes": ["titandesktop"],
+        "role": "Viewer"
+      }
+    ],
     "mac": {
       "target": "zip",
-      "icon": "icon.png"
+      "icon": "icon.png",
+      "protocols": [
+        {
+          "name": "Archibald Titan",
+          "schemes": ["titandesktop"]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,

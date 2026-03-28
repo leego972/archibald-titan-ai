@@ -110,10 +110,54 @@ function saveMode(mode) {
   fs.writeFileSync(MODE_PATH, JSON.stringify({ mode }, null, 2));
 }
 
+// ─── Deep Link Protocol (titandesktop://) ────────────────────────
+// Registers the titandesktop:// URL scheme so Stripe can redirect back to
+// the desktop app after a checkout session completes or is canceled.
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient("titandesktop", process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient("titandesktop");
+}
+
+function handleDeepLink(url) {
+  if (!url || !url.startsWith("titandesktop://")) return;
+  try {
+    const parsed = new URL(url);
+    const route = `${parsed.hostname}${parsed.pathname}`; // e.g. "billing/success"
+    const query = parsed.search.slice(1); // e.g. "subscription=success&session_id=..."
+    console.log("[DeepLink] Handling:", url, "→ route:", route);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      const port = getPort();
+      if (port) {
+        // Navigate to the billing callback page in the local web app
+        const callbackUrl = `http://127.0.0.1:${port}/desktop-billing-callback${query ? "?" + query : ""}`;
+        mainWindow.loadURL(callbackUrl);
+      }
+    }
+  } catch (e) {
+    console.error("[DeepLink] Failed to handle URL:", url, e.message);
+  }
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) { app.quit(); } else {
-  app.on("second-instance", () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); } });
+  app.on("second-instance", (_event, commandLine) => {
+    // On Windows/Linux, the deep link URL arrives as a command-line argument
+    const deepLinkUrl = commandLine.find((arg) => arg.startsWith("titandesktop://"));
+    if (deepLinkUrl) handleDeepLink(deepLinkUrl);
+    if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+  });
 }
+
+// On macOS, deep links arrive via the open-url event
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
 
 async function createWindow() {
   loadMode();
