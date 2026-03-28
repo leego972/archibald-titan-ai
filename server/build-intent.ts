@@ -144,8 +144,8 @@ const EXTERNAL_BUILD_KEYWORDS = [
   'compile', 'cross-compile', 'cross compile', '.exe', 'windows exe',
   'native binary', 'native executable', 'go build', 'cargo build',
   'mingw', 'gcc', 'g++', 'make install', 'apt install', 'apt-get install',
-  'pip install', 'npm install', 'run the', 'execute the', 'run it',
-  'compile it', 'build it', 'test it', 'run this',
+  'pip install', 'npm install',
+  'compile it', 'build it',
 ];
 
 // ── General Build Keywords (fallback — used for ongoing build detection) ──
@@ -153,13 +153,13 @@ const EXTERNAL_BUILD_KEYWORDS = [
 // are too common in normal conversation and cause false-positive build detection.
 // Words that strongly imply the user wants to CREATE something new (fire on any length message).
 const STRONG_BUILD_KEYWORDS = [
-  'build', 'create', 'make', 'develop', 'implement', 'code', 'program',
-  'write a', 'construct', 'architect', 'engineer', 'deploy',
-  'refactor', 'setup', 'configure', 'integrate',
+  'build', 'create', 'develop', 'program',
 ];
 // Words that imply a build action but are too common in casual conversation.
 // These only trigger the builder when the message has >= 4 words (enough context).
 const CONTEXT_BUILD_KEYWORDS = [
+  'make', 'implement', 'code', 'write a', 'construct', 'architect', 'engineer', 'deploy',
+  'refactor', 'setup', 'configure', 'integrate',
   'fix', 'update', 'add', 'remove', 'delete', 'change', 'modify',
   'install', 'upgrade', 'patch', 'debug', 'rewrite',
 ];
@@ -1165,12 +1165,9 @@ export function detectBuildIntent(
   if (detectSelfBuildIntent(message, previousMessages)) return true;
   if (detectExternalBuildIntent(message, previousMessages)) return true;
   // Fallback: strong build keyword alone is enough (no previous context needed)
-  // Context build keywords (fix, update, add, etc.) require >= 4 words
   const msgLower = message.toLowerCase();
-  const msgWords = msgLower.trim().split(/\s+/).length;
   const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  const hasContext = msgWords >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  return hasStrong || hasContext;
+  return hasStrong;
 }
 
 /**
@@ -1194,15 +1191,11 @@ export async function detectBuildIntentAsync(
   }
 
   // CONSERVATIVE FALLBACK: Only trigger external build when there is a clear
-  // build-specific keyword AND the message is a reasonable length.
-  // STRONG keywords (build, create, make, ...) fire on any length.
-  // CONTEXT keywords (fix, update, add, ...) require >= 4 words to avoid
-  // false positives from short conversational messages.
+  // STRONG build keyword. We no longer fallback on CONTEXT keywords (like "fix" or "update")
+  // because that causes false-positive external builds for general chat requests.
   const msgLower = message.toLowerCase();
-  const msgWords = msgLower.trim().split(/\s+/).length;
   const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  const hasContext = msgWords >= 4 && CONTEXT_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  if ((hasStrong || hasContext) && !isSelfBuild && !isExternalBuild) {
+  if (hasStrong && !isSelfBuild && !isExternalBuild) {
     return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
   }
   return { isSelfBuild, isExternalBuild, needsClarification: false };
