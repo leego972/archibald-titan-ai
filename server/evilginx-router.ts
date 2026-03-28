@@ -226,7 +226,16 @@ async function execOnNode(node: EvilginxNode, command: string, timeoutMs = 20000
     `timeout ${Math.floor(timeoutMs / 1000)} /usr/local/bin/evilginx -p /opt/evilginx/phishlets -c /opt/evilginx -developer < ${tmpFile} 2>&1 || echo "EVILGINX_CMD_DONE"`,
     `rm -f ${tmpFile}`,
   ].join("\n");
-  return execSSHCommand(nodeToSSH(node), script, timeoutMs + 5000, userId);
+  try {
+    return await execSSHCommand(nodeToSSH(node), script, timeoutMs + 5000, userId);
+  } catch (err: any) {
+    const msg = err?.message ?? String(err);
+    // Classify the error so tRPC sends a proper HTTP status (not 500)
+    if (msg.includes("timed out") || msg.includes("ETIMEDOUT")) {
+      throw new TRPCError({ code: "TIMEOUT", message: `Evilginx SSH timed out on "${node.label}": ${msg}` });
+    }
+    throw new TRPCError({ code: "BAD_REQUEST", message: `Evilginx SSH error on "${node.label}": ${msg}` });
+  }
 }
 
 /** Public export for Titan AI chat executor */
@@ -412,10 +421,9 @@ export const evilginxRouter = router({
     } catch (err: any) {
       nodes[idx].status = "error"; nodes[idx].errorMessage = err.message;
       await saveNodes(ctx.user.id, nodes);
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `SSH error: ${err.message}` });
+      throw new TRPCError({ code: "BAD_REQUEST", message: `SSH error on "${nodes[idx]?.label ?? "node"}": ${err.message}` });
     }
   }),
-
   /** Stop the Evilginx service on the active node */
   stopServer: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
@@ -433,10 +441,9 @@ export const evilginxRouter = router({
       await saveNodes(ctx.user.id, nodes);
       return { success: true, message: `Evilginx stopped on "${node.label}"` };
     } catch (err: any) {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `SSH error: ${err.message}` });
+      throw new TRPCError({ code: "BAD_REQUEST", message: `SSH error stopping Evilginx on "${node.label}": ${err.message}` });
     }
   }),
-
   /** Check if Evilginx is installed and running on a node */
   checkNode: protectedProcedure
     .input(z.object({ nodeId: z.string() }))

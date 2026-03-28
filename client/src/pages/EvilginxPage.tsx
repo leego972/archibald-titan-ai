@@ -1686,8 +1686,15 @@ export default function EvilginxPage() {
 
   const execCommand = useCallback(
     async (command: string): Promise<string> => {
-      const result = await execMutation.mutateAsync({ command });
-      return result.output;
+      try {
+        const result = await execMutation.mutateAsync({ command });
+        return result.output;
+      } catch (err: any) {
+        // Return the error message as output so tabs can display it inline
+        // rather than letting it bubble up as a generic "internal error" toast.
+        const msg: string = err?.message ?? err?.data?.message ?? String(err);
+        return `[SSH Error] ${msg}`;
+      }
     },
     [execMutation]
   );
