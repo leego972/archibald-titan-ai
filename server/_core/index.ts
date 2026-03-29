@@ -258,6 +258,52 @@ async function startServer() {
       health.status = 'degraded';
       health.dbError = getErrorMessage(dbErr);
     }
+    // Check new builder tools are loadable
+    const toolChecks: Record<string, string> = {};
+
+    // pdfkit (generate_pdf)
+    try {
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument({ autoFirstPage: false });
+      doc.addPage();
+      doc.end();
+      toolChecks.pdfkit = 'ok';
+    } catch (e: unknown) {
+      toolChecks.pdfkit = `error: ${getErrorMessage(e)}`;
+      health.status = 'degraded';
+    }
+
+    // exceljs (generate_spreadsheet)
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      wb.addWorksheet('test');
+      toolChecks.exceljs = 'ok';
+    } catch (e: unknown) {
+      toolChecks.exceljs = `error: ${getErrorMessage(e)}`;
+      health.status = 'degraded';
+    }
+
+    // playwright (web_screenshot)
+    try {
+      const { chromium } = await import('playwright');
+      // Just check the module loads — don't launch a browser in health check
+      if (chromium) toolChecks.playwright = 'ok';
+    } catch (e: unknown) {
+      // Playwright not installed — non-fatal, web_screenshot will fall back gracefully
+      toolChecks.playwright = `unavailable: ${getErrorMessage(e)}`;
+    }
+
+    // sharp / canvas (generate_diagram)
+    try {
+      const { execSync } = await import('child_process');
+      execSync('node -e "require(\"canvas\")"', { timeout: 3000, stdio: 'ignore' });
+      toolChecks.canvas = 'ok';
+    } catch (_e: unknown) {
+      toolChecks.canvas = 'unavailable (diagram fallback active)';
+    }
+
+    health.builderTools = toolChecks;
     const statusCode = health.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(health);
   });

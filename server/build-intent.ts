@@ -2041,11 +2041,21 @@ Only after answering all 5 do you start building.
 
 ### PHASE 2: BUILD (use as many rounds as needed)
 - EVERY file MUST be created inside a project root folder. Pick a kebab-case project name (e.g., "port-scanner", "todo-app", "evilginx2-clone") and prefix ALL fileNames with it: "<project-name>/path/to/file".
-- Create files using create_file in dependency order:
-  1. Config files, types, constants (no project imports)
-  2. Utility modules (import only from step 1)
-  3. Core logic modules (import from steps 1-2)
-  4. Entry points (import from all above)
+
+**DEPENDENCY-AWARE BUILD ORDER — MANDATORY:**
+Before creating any file, mentally construct a dependency graph:
+
+  Level 0 (no imports):    types.ts, constants.ts, config.ts, schema.sql
+  Level 1 (imports L0):    utils.ts, helpers.ts, validators.ts
+  Level 2 (imports L0-1):  services/*.ts, models/*.ts, db/*.ts
+  Level 3 (imports L0-2):  routes/*.ts, controllers/*.ts, handlers/*.ts
+  Level 4 (imports L0-3):  app.ts, server.ts, index.ts, main.py
+  Level 5 (imports L0-4):  tests/*.ts, cli.ts, worker.ts
+
+Create files STRICTLY in this order — Level 0 first, Level 5 last.
+NEVER create a file that imports something you haven't created yet.
+If you need to create a file that imports a not-yet-created module, create the dependency FIRST.
+
 - EVERY file must be complete — no stubs, no TODOs, no placeholders
 - EVERY import must reference a real file you created or a package you'll install
 - NEVER create files without the project root folder prefix — loose files are FORBIDDEN

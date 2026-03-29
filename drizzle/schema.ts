@@ -700,6 +700,16 @@ export const chatConversations = mysqlTable("chat_conversations", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   contextSummary: text("contextSummary"),
   summarizedUpToId: int("summarizedUpToId"),
+  buildContext: json("buildContext").$type<{
+    lastBuildType?: string;
+    lastDeliverables?: Array<{ name: string; url?: string; type?: string }>;
+    lastFilesCreated?: number;
+    lastBuildAt?: string;
+    projectStack?: string;
+    projectDescription?: string;
+    repoUrl?: string;
+    sandboxFiles?: string[];
+  }>(),
 });
 export type ChatConversation = typeof chatConversations.$inferSelect;
 export type InsertChatConversation = typeof chatConversations.$inferInsert;

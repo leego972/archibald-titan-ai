@@ -102,6 +102,7 @@ import {
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { DeliverablesShelf } from "@/components/DeliverablesShelf";
 import { BuildProgressBar, type BuildPhase } from "@/components/BuildProgressBar";
 import { BuildReportCard, type BuildDeliverable } from "@/components/BuildReportCard";
 import {
@@ -893,6 +894,7 @@ export default function ChatPage() {
   // Build report card state — driven by build_complete SSE event
   const [buildReport, setBuildReport] = useState<{ totalRounds: number; successCount: number; failedCount: number; filesCreated: number; deliverables: BuildDeliverable[]; buildType?: string; durationMs?: number } | null>(null);
   const buildStartTimeRef = useRef<number | null>(null);
+  const [shelfDismissed, setShelfDismissed] = useState(false);
   const SECURITY_TOOLS = ['install_security_toolkit', 'network_scan', 'generate_yara_rule', 'generate_sigma_rule',
     'hash_crack', 'generate_payload', 'osint_lookup', 'cve_lookup', 'run_exploit', 'decompile_binary', 'fuzzer_run',
     'sandbox_exec', 'sandbox_write_file', 'create_file', 'provide_project_zip', 'eas_build'];
@@ -1777,6 +1779,7 @@ export default function ChatPage() {
     // Reset build progress state for each new message
     setBuildProgress(null);
     setBuildReport(null);
+    setShelfDismissed(false);
     buildStartTimeRef.current = null;
 
     // Capture files before clearing state
@@ -1908,8 +1911,17 @@ export default function ChatPage() {
         es.addEventListener('build_complete', (e) => {
           try {
             const data = JSON.parse(e.data);
-            setBuildReport({ totalRounds: data.totalRounds, successCount: data.successCount, failedCount: data.failedCount, filesCreated: data.filesCreated, deliverables: data.deliverables || [], buildType: data.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined });
+            const durationMs = buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined;
+            setBuildReport({ totalRounds: data.totalRounds, successCount: data.successCount, failedCount: data.failedCount, filesCreated: data.filesCreated, deliverables: data.deliverables || [], buildType: data.buildType, durationMs });
             setBuildProgress(null);
+            // Toast notification — useful when user has scrolled away or switched tabs
+            const durationStr = durationMs ? (durationMs < 60000 ? ` in ${(durationMs/1000).toFixed(1)}s` : ` in ${Math.floor(durationMs/60000)}m ${Math.round((durationMs%60000)/1000)}s`) : '';
+            const deliverableCount = (data.deliverables || []).length;
+            if (data.failedCount === 0) {
+              toast.success(`Build complete${durationStr}${deliverableCount > 0 ? ` — ${deliverableCount} deliverable${deliverableCount !== 1 ? 's' : ''} ready` : ''}`, { duration: 6000 });
+            } else {
+              toast.warning(`Build finished with ${data.failedCount} error${data.failedCount !== 1 ? 's' : ''}${durationStr}`, { duration: 6000 });
+            }
           } catch {}
         });
         es.addEventListener('done', () => { es.close(); eventSourceRef.current = null; });
@@ -2746,6 +2758,7 @@ export default function ChatPage() {
                           deliverables={buildReport.deliverables}
                           buildType={buildReport.buildType}
                           durationMs={buildReport.durationMs}
+                          isMobile={isMobile}
                         />
                       </div>
                     </div>
@@ -2822,6 +2835,7 @@ export default function ChatPage() {
                               filesCreated={buildProgress.filesCreated}
                               buildType={buildProgress.buildType}
                               round={buildProgress.round}
+                              isMobile={isMobile}
                             />
                           </div>
                         ) : (
@@ -2944,6 +2958,15 @@ export default function ChatPage() {
           {/* Scroll to bottom button */}
           <ScrollToBottomButton scrollRef={scrollRef as React.RefObject<HTMLDivElement>} isUserScrolledUpRef={isUserScrolledUpRef} />
         </div>
+
+        {/* Deliverables Shelf — persistent row of download buttons above the input */}
+        {!shelfDismissed && buildReport && buildReport.deliverables.length > 0 && (
+          <DeliverablesShelf
+            deliverables={buildReport.deliverables}
+            onDismiss={() => setShelfDismissed(true)}
+            isMobile={isMobile}
+          />
+        )}
 
         {/* Input area */}
         <div

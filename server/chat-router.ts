@@ -1598,10 +1598,40 @@ Do NOT attempt any tool calls or builds.`;
         ? `\n\n${longTermMemory}`
         : "";
 
+      // ── Build Context Memory — inject what was built in this conversation ──
+      let buildContextBlock = "";
+      if (conversationId) {
+        try {
+          const db = await getDb();
+          const [convRow] = await db!.select({ buildContext: chatConversations.buildContext })
+            .from(chatConversations)
+            .where(eq(chatConversations.id, conversationId))
+            .limit(1);
+          if (convRow?.buildContext) {
+            const bc = convRow.buildContext;
+            const parts: string[] = [`\n\n--- PREVIOUS BUILD CONTEXT (this conversation) ---`];
+            if (bc.lastBuildType) parts.push(`Last build type: ${bc.lastBuildType}`);
+            if (bc.lastBuildAt) parts.push(`Last build completed: ${bc.lastBuildAt}`);
+            if (bc.lastFilesCreated) parts.push(`Files created: ${bc.lastFilesCreated}`);
+            if (bc.projectStack) parts.push(`Project stack: ${bc.projectStack}`);
+            if (bc.projectDescription) parts.push(`Project description: ${bc.projectDescription}`);
+            if (bc.repoUrl) parts.push(`Repository: ${bc.repoUrl}`);
+            if (bc.lastDeliverables?.length) {
+              parts.push(`Deliverables produced:\n${(bc.lastDeliverables as Array<{name:string;url?:string}>).map((d) => `  - ${d.name}${d.url ? ` (${d.url})` : ''}`).join('\n')}`);
+            }
+            if (bc.sandboxFiles?.length) {
+              parts.push(`Sandbox files from last build:\n${(bc.sandboxFiles as string[]).slice(0, 20).map((f) => `  - ${f}`).join('\n')}`);
+            }
+            parts.push(`--- END BUILD CONTEXT ---`);
+            buildContextBlock = parts.join('\n');
+          }
+        } catch (_) { /* non-fatal */ }
+      }
+
       const llmMessages: Message[] = [
         {
           role: "system",
-          content: `${effectivePrompt}${expertKnowledge}${affiliateContext}${creditUrgencyContext}\n\n--- Current User Context ---\n${userContext}${longTermMemoryBlock}${customInstructionsBlock}${languageDirective}`,
+          content: `${effectivePrompt}${expertKnowledge}${affiliateContext}${creditUrgencyContext}\n\n--- Current User Context ---\n${userContext}${longTermMemoryBlock}${buildContextBlock}${customInstructionsBlock}${languageDirective}`,
         },
         ...previousMessages,
       ];
@@ -2586,9 +2616,52 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
                   verifyResults.push(`**JS Syntax Check (${jsFile}):** ${jsResult.output.trim() || (jsResult.exitCode === 0 ? 'OK' : 'FAILED')}`);
                 }
 
-                // Check HTML files
-                if (htmlFiles.length > 0 && pyFiles.length === 0 && jsFiles.length === 0) {
-                  verifyResults.push(`**HTML Files:** ${htmlFiles.length} HTML file(s) created — valid static files`);
+                // Check HTML files — and auto-screenshot for web apps
+                if (htmlFiles.length > 0) {
+                  verifyResults.push(`**HTML Files:** ${htmlFiles.length} HTML file(s) created \u2014 valid static files`);
+
+                  // AUTO-SCREENSHOT VERIFICATION: Take a screenshot of the HTML app to visually confirm it renders
+                  try {
+                    emitChatEvent(conversationId!, { type: 'status', data: { message: 'Taking screenshot of web app for visual verification...' } });
+                    const mainHtml = htmlFiles[0].args?.fileName as string;
+                    const htmlContent = htmlFiles[0].args?.content as string;
+                    // Write a minimal server to serve the HTML, screenshot it, then kill it
+                    const screenshotScript = [
+                      `import http.server, threading, time, subprocess, os, sys`,
+                      `html = open('${mainHtml}').read() if os.path.exists('${mainHtml}') else '${htmlContent?.slice(0, 500).replace(/'/g, "\\'") || '<h1>App</h1>'}'`,
+                      `class H(http.server.BaseHTTPRequestHandler):`,
+                      `  def do_GET(self):`,
+                      `    self.send_response(200)`,
+                      `    self.send_header('Content-type','text/html')`,
+                      `    self.end_headers()`,
+                      `    self.wfile.write(html.encode())`,
+                      `  def log_message(self, *a): pass`,
+                      `srv = http.server.HTTPServer(('0.0.0.0', 9876), H)`,
+                      `t = threading.Thread(target=srv.serve_forever)`,
+                      `t.daemon = True`,
+                      `t.start()`,
+                      `time.sleep(1)`,
+                      `print('SERVER_READY')`,
+                      `time.sleep(5)`,
+                      `srv.shutdown()`,
+                    ].join('\n');
+                    await sbWriteFile(sbId, userId, '__screenshot_server.py', screenshotScript);
+                    const serverResult = await sbExecuteCommand(sbId, userId, 'timeout 8 python3 __screenshot_server.py 2>&1 || echo SERVER_DONE', { timeoutMs: 12000, triggeredBy: 'system' });
+                    if (serverResult.output.includes('SERVER_READY') || serverResult.exitCode === 0) {
+                      // Use web_screenshot tool to capture the running app
+                      const { takeWebScreenshot } = await import('./web-screenshot');
+                      const screenshotResult = await takeWebScreenshot(userId, { url: 'http://localhost:9876', fullPage: true, width: 1280, height: 900 }, conversationId ?? undefined);
+                      if (screenshotResult?.url) {
+                        verifyResults.push(`**Visual Screenshot:** App renders correctly\n![App Preview](${screenshotResult.url})`);
+                        // Also emit as a build event so the frontend can show it
+                        emitChatEvent(conversationId!, { type: 'status', data: { message: 'Visual verification complete', screenshotUrl: screenshotResult.url } });
+                      }
+                    }
+                    // Clean up
+                    await sbExecuteCommand(sbId, userId, 'rm -f __screenshot_server.py', { timeoutMs: 5000, triggeredBy: 'system' }).catch(() => {});
+                  } catch (_ssErr) {
+                    // Non-fatal — screenshot verification is best-effort
+                  }
                 }
 
                 // Append verification results to the response AND stream them to client
@@ -3405,6 +3478,17 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
         // Run asynchronously — do NOT await, so they don't delay the response.
         // 1. Extract and save long-term memory facts from this conversation
         // 2. Summarize old messages if the conversation is getting long
+        // 3. Save build context to the conversation for cross-session memory
+        // Capture build summary vars before setImmediate (they are block-scoped above)
+        const _bgDeliveryActions = isBuildRequest ? executedActions.filter(a =>
+          (a.tool === 'provide_project_zip' || a.tool === 'generate_pdf' || a.tool === 'generate_spreadsheet' ||
+           a.tool === 'generate_image' || a.tool === 'generate_markdown_report' || a.tool === 'generate_diagram' ||
+           a.tool === 'web_screenshot') && a.success
+        ) : [];
+        const _bgFilesCreated = isBuildRequest ? executedActions.filter(a =>
+          (a.tool === 'create_file' || a.tool === 'self_modify_file' || a.tool === 'self_multi_file_modify') && a.success
+        ) : [];
+
         setImmediate(async () => {
           const apiKey = userApiKey ?? undefined;
           try {
@@ -3413,6 +3497,26 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
           try {
             await maybeCreateConversationSummary(conversationId!, userId, apiKey);
           } catch (_) { /* non-fatal */ }
+          // Save build context so future conversations can reference what was built
+          if (conversationId && (isSelfBuild || isExternalBuild || isGitHubRepoModify)) {
+            try {
+              const db = await getDb();
+              const buildCtx = {
+                lastBuildType: isSelfBuild ? 'self' : isExternalBuild ? 'external' : 'github',
+                lastDeliverables: _bgDeliveryActions.map((a) => ({
+                  name: (a.result as any)?.fileName || a.tool,
+                  url: (a.result as any)?.url || (a.result as any)?.downloadUrl || undefined,
+                  type: a.tool === 'generate_pdf' ? 'pdf' : a.tool === 'generate_spreadsheet' ? 'spreadsheet' : a.tool === 'generate_image' ? 'image' : a.tool === 'generate_diagram' ? 'image' : a.tool === 'provide_project_zip' ? 'zip' : 'file',
+                })),
+                lastFilesCreated: _bgFilesCreated.length,
+                lastBuildAt: new Date().toISOString(),
+                sandboxFiles: _bgFilesCreated.map((f) => (f.args as any)?.fileName || String(f)).slice(0, 50),
+              };
+              await db!.update(chatConversations)
+                .set({ buildContext: buildCtx })
+                .where(eq(chatConversations.id, conversationId));
+            } catch (_) { /* non-fatal */ }
+          }
         });
 
         // ── Mark Background Build Complete ─────────────────────────
