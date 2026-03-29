@@ -97,16 +97,37 @@ async function r2Get(relKey: string): Promise<{ key: string; url: string }> {
 }
 
 // ---- Public API ----
+
+/**
+ * Upload data to S3 or R2 with automatic retry (exponential backoff, 3 attempts).
+ * Handles transient network errors, rate limits, and temporary S3/R2 outages.
+ */
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
   originalFileName?: string
 ): Promise<{ key: string; url: string }> {
-  if (isS3Mode()) {
-    return s3Put(relKey, data, contentType, originalFileName);
+  const MAX_ATTEMPTS = 3;
+  const BASE_DELAY_MS = 500;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      if (isS3Mode()) {
+        return await s3Put(relKey, data, contentType, originalFileName);
+      }
+      return await r2Put(relKey, data, contentType, originalFileName);
+    } catch (err: unknown) {
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) {
+        // Exponential backoff: 500ms, 1000ms, 2000ms
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
-  return r2Put(relKey, data, contentType, originalFileName);
+  throw lastError;
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {

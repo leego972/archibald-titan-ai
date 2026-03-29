@@ -49,6 +49,18 @@ const MAX_OUTPUT_SIZE = 512 * 1024; // 512KB max output per command (upgraded fr
 const DEFAULT_TIMEOUT_MS = 180_000; // 3 minutes default — large installs need more time
 const MAX_TIMEOUT_MS = 600_000; // 10 minutes max (upgraded from 5)
 
+// Timeout recovery: commands that time out return a structured error with partial output
+// instead of throwing an unhandled exception. This lets the LLM retry or adjust.
+const TIMEOUT_RECOVERY_MESSAGE = (
+  cmd: string,
+  timeoutMs: number,
+  partialOutput: string
+): string => [
+  `[SANDBOX TIMEOUT] Command exceeded ${Math.round(timeoutMs / 1000)}s limit: ${cmd.slice(0, 120)}`,
+  partialOutput ? `[PARTIAL OUTPUT]\n${partialOutput.slice(-2000)}` : "[NO OUTPUT CAPTURED]",
+  "[RECOVERY HINT] Try: (1) break the command into smaller steps, (2) increase timeout, (3) run in background with &",
+].join("\n");
+
 // Blocked commands that could damage the host system
 const BLOCKED_COMMANDS = [
   /^\s*rm\s+-rf\s+\/\s*$/,              // rm -rf /
@@ -394,7 +406,7 @@ export async function executeCommand(
               if (error && "killed" in error && error.killed) {
                 resolve({
                   stdout: stdout || "",
-                  stderr: `Command timed out after ${timeoutMs}ms\n`,
+                  stderr: TIMEOUT_RECOVERY_MESSAGE(rewrittenCommand, timeoutMs, stdout || ""),
                   exitCode: 124,
                 });
               } else {
