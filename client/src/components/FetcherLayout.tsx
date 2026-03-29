@@ -153,6 +153,9 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_38_r5c6"), label: t("nav.cyberMcp"), path: "/cybermcp", isCyber: true, isNew: true },
       { icon: featureIcon("icon_18_r3c2"), label: t("nav.astraScanner"), path: "/astra", isCyber: true, isNew: true },
       { icon: featureIcon("icon_15_r2c7"), label: t("nav.argusOsint"), path: "/argus", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Attack Graph", path: "/attack-graph", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "Proxy Interceptor", path: "/proxy-interceptor", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_15_r2c7"), label: "Red Team Playbooks", path: "/red-team-playbooks", isCyber: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

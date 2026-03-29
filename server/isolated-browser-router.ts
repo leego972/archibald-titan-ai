@@ -66,6 +66,21 @@ export interface IsolatedSession {
   lastScreenshotAt?: number;
   // Screenshot gallery (S3 keys)
   screenshots: Array<{ key: string; url: string; takenAt: string; label?: string }>;
+  // Traffic capture
+  trafficCapture: boolean;
+  trafficLog: Array<{
+    id: string;
+    timestamp: string;
+    method: string;
+    url: string;
+    status?: number;
+    contentType?: string;
+    requestHeaders?: Record<string, string>;
+    responseHeaders?: Record<string, string>;
+    requestBody?: string;
+    responseBody?: string;
+    duration?: number;
+  }>;
 }
 
 // ─── In-memory session store ──────────────────────────────────────────────────
@@ -358,6 +373,8 @@ export const isolatedBrowserRouter = router({
         context,
         page,
         screenshots: [],
+        trafficCapture: false,
+        trafficLog: [],
       };
       sessions.set(sessionId, session);
 
@@ -770,6 +787,106 @@ export const isolatedBrowserRouter = router({
       })),
     };
   }),
+
+  // ── Enable / disable traffic capture for a session ────────────────────────
+  enableTrafficCapture: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      enabled: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = sessions.get(input.sessionId);
+      if (!session || session.userId !== ctx.user!.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      }
+      if (session.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Session is not active" });
+      }
+      session.trafficCapture = input.enabled;
+      if (input.enabled && session.page) {
+        // Hook into Playwright network events
+        const requestTimes = new Map<string, number>();
+        session.page.on("request", (req) => {
+          if (!session.trafficCapture) return;
+          const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          requestTimes.set(req.url(), Date.now());
+          const entry = {
+            id,
+            timestamp: new Date().toISOString(),
+            method: req.method(),
+            url: req.url(),
+            requestHeaders: req.headers() as Record<string, string>,
+            requestBody: req.postData() || undefined,
+          };
+          session.trafficLog.push(entry as typeof session.trafficLog[0]);
+          // Cap log at 500 entries
+          if (session.trafficLog.length > 500) session.trafficLog.shift();
+        });
+        session.page.on("response", async (res) => {
+          if (!session.trafficCapture) return;
+          const startTime = requestTimes.get(res.url());
+          const duration = startTime ? Date.now() - startTime : undefined;
+          requestTimes.delete(res.url());
+          // Find matching request entry
+          const entry = [...session.trafficLog].reverse().find(
+            (e) => e.url === res.url() && !e.status
+          );
+          if (entry) {
+            entry.status = res.status();
+            entry.contentType = res.headers()["content-type"];
+            entry.responseHeaders = res.headers() as Record<string, string>;
+            entry.duration = duration;
+            // Only capture response body for text content types (skip images/binary)
+            const ct = res.headers()["content-type"] || "";
+            if (ct.includes("json") || ct.includes("text") || ct.includes("xml")) {
+              try {
+                const body = await res.text();
+                entry.responseBody = body.slice(0, 4096); // cap at 4KB
+              } catch { /* ignore */ }
+            }
+          }
+        });
+      }
+      return { enabled: input.enabled, sessionId: input.sessionId };
+    }),
+
+  // ── Get captured traffic log for a session ───────────────────────────────
+  getTrafficLog: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      method: z.string().optional(),
+      urlFilter: z.string().optional(),
+      statusFilter: z.number().optional(),
+      limit: z.number().min(1).max(500).optional().default(100),
+    }))
+    .query(async ({ ctx, input }) => {
+      const session = sessions.get(input.sessionId);
+      if (!session || session.userId !== ctx.user!.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      }
+      let log = [...session.trafficLog];
+      if (input.method) log = log.filter((e) => e.method === input.method);
+      if (input.urlFilter) log = log.filter((e) => e.url.includes(input.urlFilter!));
+      if (input.statusFilter) log = log.filter((e) => e.status === input.statusFilter);
+      return {
+        entries: log.slice(-input.limit).reverse(),
+        total: session.trafficLog.length,
+        capturing: session.trafficCapture,
+        sessionId: input.sessionId,
+      };
+    }),
+
+  // ── Clear traffic log ────────────────────────────────────────────────────
+  clearTrafficLog: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = sessions.get(input.sessionId);
+      if (!session || session.userId !== ctx.user!.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      }
+      session.trafficLog = [];
+      return { cleared: true };
+    }),
 
   // ── Get credit cost info for current plan ────────────────────────────────
   getCostInfo: protectedProcedure.query(async ({ ctx }) => {

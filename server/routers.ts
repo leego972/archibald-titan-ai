@@ -70,6 +70,7 @@ import { vpnRouter } from "./vpn-router";
 import { escalationRouter } from "./escalation-router";
 import { isolatedBrowserRouter } from "./isolated-browser-router";
 import { linkenSphereRouter } from "./linken-sphere-router";
+import { redTeamPlaybooksRouter } from "./red-team-playbooks-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -171,6 +172,8 @@ export const appRouter = router({
   isolatedBrowser: isolatedBrowserRouter,
   // ── Linken Sphere Proxy ─────────────────────────────────────────────────────────────────────
   linkenSphere: linkenSphereRouter,
+  // ── Red Team Playbooks Engine ─────────────────────────────────────────────────────────────────────
+  redTeamPlaybooks: redTeamPlaybooksRouter,
 });
 
 export type AppRouter = typeof appRouter;

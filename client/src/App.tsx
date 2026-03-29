@@ -42,6 +42,7 @@ import DesktopLoginPage from "./pages/DesktopLoginPage";
 import DesktopBillingCallbackPage from "./pages/DesktopBillingCallbackPage";
 import DesktopSettingsPage from "./pages/DesktopSettingsPage";
 import BuilderTemplatesPage from "./pages/BuilderTemplatesPage";
+import AttackGraphPage from "./pages/AttackGraphPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
@@ -150,6 +151,8 @@ import ProxyRotationPage from "./pages/ProxyRotationPage";
 import IPRotationPage from "./pages/IPRotationPage";
 import BinCheckerPage from "./pages/BinCheckerPage";
 import WebAgentPage from "./pages/WebAgentPage";
+import ProxyInterceptorPage from "./pages/ProxyInterceptorPage";
+import RedTeamPlaybooksPage from "./pages/RedTeamPlaybooksPage";
 
 
 function DashboardRouter() {
@@ -270,6 +273,15 @@ function DashboardRouter() {
 
         {/* Builder Templates */}
         <Route path="/builder-templates" component={BuilderTemplatesPage} />
+
+        {/* Attack Graph */}
+        <Route path="/attack-graph" component={AttackGraphPage} />
+
+        {/* Proxy Interceptor */}
+        <Route path="/proxy-interceptor" component={ProxyInterceptorPage} />
+
+        {/* Red Team Playbooks */}
+        <Route path="/red-team-playbooks" component={RedTeamPlaybooksPage} />
 
         <Route component={NotFound} />
       </Switch>
