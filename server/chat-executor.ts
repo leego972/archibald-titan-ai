@@ -112,6 +112,8 @@ import { getAutonomousSystemStatus } from "./autonomous-sync";
 import { getBusinessModuleGeneratorStatus, getBusinessVerticals, runBusinessModuleGenerationCycle } from "./business-module-generator";
 import { checkCard, checkBin } from "./card-checker";
 import { generatePdf } from "./pdf-generator";
+import { generateSpreadsheet } from "./spreadsheet-generator";
+import { generateImage } from "./_core/imageGeneration";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -616,6 +618,12 @@ export async function executeToolCall(
       // ── Project Builder Tools ─────────────────────────────────
       case "generate_pdf":
         return await execGeneratePdf(userId, args, conversationId);
+      case "generate_spreadsheet":
+        return await execGenerateSpreadsheet(userId, args, conversationId);
+      case "generate_image":
+        return await execGenerateImage(userId, args);
+      case "generate_markdown_report":
+        return await execGenerateMarkdownReport(userId, args, conversationId);
       case "create_file":
         return await execCreateFile(userId, args, conversationId);
       case "create_github_repo":
@@ -3900,6 +3908,152 @@ async function execGeneratePdf(
   };
 }
 
+/**
+ * Generate a real binary XLSX or CSV spreadsheet from structured data and upload to S3/R2.
+ * Returns a direct public download URL.
+ *
+ * Use this instead of create_file for any spreadsheet/table/data deliverable.
+ * create_file cannot produce valid binary XLSX files.
+ */
+async function execGenerateSpreadsheet(
+  userId: number,
+  args: Record<string, unknown>,
+  conversationId?: number
+): Promise<ToolExecutionResult> {
+  const title = (args.title as string) || "Spreadsheet";
+  const format = ((args.format as string) || "xlsx") as "xlsx" | "csv";
+  const fileName = args.fileName as string | undefined;
+
+  // sheets can be passed as an array of { name, columns, rows } objects
+  // OR as a convenience shorthand with top-level columns + rows for a single sheet
+  type SheetRow = Record<string, string | number | boolean | null | undefined>;
+  type SheetDef = { name: string; columns: Array<{ header: string; key: string; width?: number }>; rows: SheetRow[] };
+  let sheets: SheetDef[];
+
+  if (Array.isArray(args.sheets)) {
+    sheets = (args.sheets as SheetDef[]);
+  } else if (Array.isArray(args.columns) && Array.isArray(args.rows)) {
+    // Single-sheet convenience: columns + rows at top level
+    sheets = [{
+      name: title,
+      columns: args.columns as Array<{ header: string; key: string; width?: number }>,
+      rows: (args.rows as SheetRow[]),
+    }];
+  } else {
+    return { success: false, error: "generate_spreadsheet requires either 'sheets' array or top-level 'columns' + 'rows' arrays" };
+  }
+
+  if (sheets.length === 0 || sheets[0].rows.length === 0) {
+    return { success: false, error: "No data provided for spreadsheet generation" };
+  }
+
+  log.info(`[GenerateSpreadsheet] Generating ${format.toUpperCase()}: "${title}" (${sheets.length} sheet(s)) for user ${userId}`);
+
+  const result = await generateSpreadsheet({
+    title,
+    sheets,
+    format,
+    fileName,
+    userId,
+    conversationId,
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error || "Spreadsheet generation failed" };
+  }
+
+  const ext = format === "csv" ? "csv" : "xlsx";
+  return {
+    success: true,
+    data: {
+      downloadUrl: result.url,
+      fileName: fileName || `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.${ext}`,
+      format,
+      size: result.size,
+      rowCount: sheets.reduce((sum, s) => sum + s.rows.length, 0),
+      message: `Spreadsheet ready — click to download: ${result.url}`,
+    },
+  };
+}
+
+/**
+ * Generate an image using DALL-E or Forge and return a hosted URL.
+ * Use this instead of asking the LLM to describe an image — it produces a real image file.
+ */
+async function execGenerateImage(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const prompt = args.prompt as string;
+  if (!prompt) return { success: false, error: "'prompt' is required for generate_image" };
+
+  const originalImages: Array<{ url?: string; b64Json?: string; mimeType?: string }> = [];
+  if (Array.isArray(args.referenceImages)) {
+    for (const img of args.referenceImages as Array<{ url?: string }>) {
+      if (img.url) originalImages.push({ url: img.url });
+    }
+  }
+
+  log.info(`[GenerateImage] Generating image for user ${userId}: "${prompt.slice(0, 80)}"`);
+
+  try {
+    const result = await generateImage({ prompt, originalImages });
+    if (!result.url) return { success: false, error: "Image generation returned no URL" };
+    return {
+      success: true,
+      data: {
+        imageUrl: result.url,
+        prompt,
+        message: `Image generated — view/download: ${result.url}`,
+      },
+    };
+  } catch (err: unknown) {
+    log.error("[GenerateImage] Error:", { error: String(err) });
+    return { success: false, error: `Image generation failed: ${String(err)}` };
+  }
+}
+
+/**
+ * Generate a styled Markdown report and store it as a .md file in S3/R2.
+ * Use this when the user wants a report, analysis, or document in Markdown format
+ * (not PDF). Returns a direct download URL for the .md file.
+ */
+async function execGenerateMarkdownReport(
+  userId: number,
+  args: Record<string, unknown>,
+  conversationId?: number
+): Promise<ToolExecutionResult> {
+  const title = (args.title as string) || "Report";
+  const content = args.content as string;
+  if (!content) return { success: false, error: "'content' is required for generate_markdown_report" };
+
+  const rawFileName = (args.fileName as string) || `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
+  const fileName = rawFileName.endsWith(".md") ? rawFileName : `${rawFileName}.md`;
+
+  // Prepend a title heading if not already present
+  const fullContent = content.trimStart().startsWith("#") ? content : `# ${title}\n\n${content}`;
+  const fileBuffer = Buffer.from(fullContent, "utf-8");
+
+  try {
+    const timestamp = Date.now();
+    const s3Key = `projects/${userId}/${conversationId || "general"}/${timestamp}-${fileName}`;
+    const result = await storagePut(s3Key, fileBuffer, "text/markdown", fileName);
+    log.info(`[GenerateMarkdownReport] Uploaded: ${s3Key} (${fileBuffer.length} bytes)`);
+    return {
+      success: true,
+      data: {
+        downloadUrl: result.url,
+        fileName,
+        size: fileBuffer.length,
+        message: `Markdown report ready — download: ${result.url}`,
+      },
+    };
+  } catch (err: unknown) {
+    log.error("[GenerateMarkdownReport] Error:", { error: String(err) });
+    return { success: false, error: `Markdown report generation failed: ${String(err)}` };
+  }
+}
+
 async function execCreateFile(
   userId: number,
   args: Record<string, unknown>,
@@ -3911,6 +4065,39 @@ async function execCreateFile(
 
   if (!fileName || content === undefined) {
     return { success: false, error: "fileName and content are required" };
+  }
+
+  // ── FILE SIZE GUARD: reject files over 5MB ──────────────────────────────
+  // Large files cause memory pressure, S3 upload timeouts, and DB blob overflow.
+  // If the content is too large, the LLM should split it into multiple files.
+  const contentBytes = Buffer.byteLength(content, "utf-8");
+  if (contentBytes > 5 * 1024 * 1024) {
+    return {
+      success: false,
+      error: `File too large: ${(contentBytes / 1024 / 1024).toFixed(1)}MB exceeds the 5MB per-file limit. ` +
+        `Split the content into multiple smaller files and call create_file once per file.`,
+    };
+  }
+
+  // ── BINARY FORMAT GUARD: reject binary file types that must use dedicated tools ──
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  const BINARY_FORMATS = ["pdf", "xlsx", "xls", "docx", "doc", "pptx", "ppt", "zip", "png", "jpg", "jpeg", "gif", "webp", "mp4", "mp3", "wav"];
+  if (BINARY_FORMATS.includes(ext)) {
+    const toolMap: Record<string, string> = {
+      pdf: "generate_pdf",
+      xlsx: "generate_spreadsheet", xls: "generate_spreadsheet",
+      docx: "generate_pdf", doc: "generate_pdf",
+      pptx: "generate_pdf", ppt: "generate_pdf",
+      zip: "provide_project_zip",
+      png: "generate_image", jpg: "generate_image", jpeg: "generate_image",
+      gif: "generate_image", webp: "generate_image",
+    };
+    const correctTool = toolMap[ext] || "the appropriate binary generation tool";
+    return {
+      success: false,
+      error: `Cannot use create_file for .${ext} files — binary formats will be corrupted. ` +
+        `Use '${correctTool}' instead, which produces a real binary file and returns a direct download URL.`,
+    };
   }
 
   // ── SERVER-SIDE ENFORCEMENT: Ensure fileName has a project root folder ──

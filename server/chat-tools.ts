@@ -2199,6 +2199,143 @@ const generatePdfTool: Tool = {
   },
 };
 
+const generateSpreadsheetTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_spreadsheet",
+    description:
+      "Generate a real, downloadable XLSX or CSV spreadsheet from structured data. " +
+      "Use this tool whenever the user asks for a spreadsheet, Excel file, CSV export, data table, or any tabular data deliverable. " +
+      "This produces a properly formatted, styled XLSX file (or plain CSV) and returns a direct download URL. " +
+      "IMPORTANT: Use this tool instead of create_file for spreadsheet deliverables — " +
+      "create_file cannot produce valid binary XLSX files and will corrupt them. " +
+      "For CSV, this tool handles proper escaping and encoding. " +
+      "You can pass a single sheet via top-level 'columns' + 'rows', or multiple sheets via the 'sheets' array.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Title of the spreadsheet, used as the default sheet name and filename. Example: 'Virelle Competitor Analysis'",
+        },
+        format: {
+          type: "string",
+          enum: ["xlsx", "csv"],
+          description: "Output format. Use 'xlsx' for styled multi-sheet workbooks (default). Use 'csv' for simple plain-text tables.",
+        },
+        fileName: {
+          type: "string",
+          description: "Desired filename (without path). Example: 'competitor-analysis.xlsx'. Defaults to slugified title + extension.",
+        },
+        columns: {
+          type: "array",
+          description: "Column definitions for a single-sheet spreadsheet. Use this with 'rows' for simple single-sheet output.",
+          items: {
+            type: "object",
+            properties: {
+              header: { type: "string", description: "Column header label shown in row 1" },
+              key: { type: "string", description: "Key name used to look up the value in each row object" },
+              width: { type: "number", description: "Optional column width in characters" },
+            },
+            required: ["header", "key"],
+          },
+        },
+        rows: {
+          type: "array",
+          description: "Array of row objects for a single-sheet spreadsheet. Each object's keys must match the column 'key' values.",
+          items: { type: "object" },
+        },
+        sheets: {
+          type: "array",
+          description: "Array of sheet definitions for multi-sheet workbooks. Each sheet has a name, columns, and rows.",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Sheet tab name" },
+              columns: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    header: { type: "string" },
+                    key: { type: "string" },
+                    width: { type: "number" },
+                  },
+                  required: ["header", "key"],
+                },
+              },
+              rows: { type: "array", items: { type: "object" } },
+            },
+            required: ["name", "columns", "rows"],
+          },
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
+const generateImageTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_image",
+    description:
+      "Generate an image using AI (DALL-E 3 or Forge) from a text prompt. " +
+      "Use this when the user asks for an image, logo, diagram, illustration, banner, icon, or any visual asset. " +
+      "Returns a hosted image URL that the user can view and download. " +
+      "You can optionally pass reference images via 'referenceImages' for style or content guidance.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Detailed description of the image to generate. Be specific about style, colours, composition, and content. Example: 'A minimalist dark-mode logo for a cybersecurity company called Archibald Titan, featuring a geometric crown and circuit board patterns, deep navy and electric blue palette'",
+        },
+        referenceImages: {
+          type: "array",
+          description: "Optional array of reference image URLs to guide the style or content of the generated image.",
+          items: {
+            type: "object",
+            properties: { url: { type: "string", description: "URL of the reference image" } },
+            required: ["url"],
+          },
+        },
+      },
+      required: ["prompt"],
+    },
+  },
+};
+
+const generateMarkdownReportTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_markdown_report",
+    description:
+      "Generate a Markdown (.md) report or document and upload it to cloud storage, returning a direct download URL. " +
+      "Use this when the user wants a report, analysis, or document in Markdown format (not PDF). " +
+      "Unlike create_file, this tool uploads the file to S3/R2 and provides a direct download link. " +
+      "For PDF output use generate_pdf instead. For spreadsheets use generate_spreadsheet.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Document title. Used as the H1 heading and filename. Example: 'Virelle Website Analysis'",
+        },
+        content: {
+          type: "string",
+          description: "Full Markdown content of the report. Include headings (##), bullet points, tables, and code blocks as needed.",
+        },
+        fileName: {
+          type: "string",
+          description: "Optional filename. Defaults to slugified title + .md. Example: 'virelle-analysis.md'",
+        },
+      },
+      required: ["title", "content"],
+    },
+  },
+};
+
 const provideProjectZip: Tool = {
   type: "function",
   function: {
@@ -3225,6 +3362,9 @@ export const TITAN_TOOLS: Tool[] = [
   websiteReplicate,
   // Project Builder (create real downloadable files)
   generatePdfTool,
+  generateSpreadsheetTool,
+  generateImageTool,
+  generateMarkdownReportTool,
   createProjectFile,
   createGithubRepo,
   pushToGithubRepo,
@@ -3377,6 +3517,9 @@ export const BUILDER_TOOLS: Tool[] = [
 export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // Core builder tools — create real files
   generatePdfTool,
+  generateSpreadsheetTool,
+  generateImageTool,
+  generateMarkdownReportTool,
   createProjectFile,
   readUploadedFile,
   provideProjectZip,
