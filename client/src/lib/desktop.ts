@@ -8,10 +8,11 @@ declare global {
       getPort: () => Promise<number>;
       getRemoteUrl: () => Promise<string>;
       navigateTo: (path: string) => Promise<void>;
-      openExternal?: (url: string) => void;
+      openExternal: (url: string) => Promise<void>;
       // Online/Offline mode
       getMode: () => Promise<"online" | "offline">;
       setMode: (mode: "online" | "offline") => Promise<string>;
+      isOffline: () => Promise<boolean>;
       onModeChange: (callback: (mode: string) => void) => () => void;
       // Bundle sync
       checkBundleSync: () => Promise<{ checking: boolean }>;
@@ -22,6 +23,9 @@ declare global {
       downloadUpdate: () => Promise<{ downloading: boolean }>;
       installUpdate: () => Promise<void>;
       onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
+      // Native dialogs
+      showSaveDialog: (options: Record<string, unknown>) => Promise<{ canceled: boolean; filePath?: string }>;
+      showMessageBox: (options: Record<string, unknown>) => Promise<{ response: number }>;
     };
   }
 }
@@ -53,4 +57,23 @@ export function getDesktopVersion(): string | null {
 
 export function getDesktopPlatform(): string | null {
   return window.titanDesktop?.platform || null;
+}
+
+/** Returns true if running in the Electron desktop app AND offline mode is active */
+export async function isDesktopOffline(): Promise<boolean> {
+  if (!isDesktop()) return false;
+  try {
+    return await window.titanDesktop!.isOffline();
+  } catch {
+    return false;
+  }
+}
+
+/** Open a URL in the user's default system browser (desktop only, falls back to window.open) */
+export function openExternalUrl(url: string): void {
+  if (isDesktop() && window.titanDesktop?.openExternal) {
+    window.titanDesktop.openExternal(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 }

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("titanDesktop", {
   // Online/Offline mode
   getMode: () => ipcRenderer.invoke("get-mode"),
   setMode: (mode) => ipcRenderer.invoke("set-mode", mode),
+  isOffline: () => ipcRenderer.invoke("get-mode").then(m => m === "offline"),
   onModeChange: (callback) => {
     ipcRenderer.on("mode-changed", (_event, mode) => callback(mode));
     return () => ipcRenderer.removeAllListeners("mode-changed");
@@ -29,4 +30,10 @@ contextBridge.exposeInMainWorld("titanDesktop", {
     ipcRenderer.on("update-status", (_event, status) => callback(status));
     return () => ipcRenderer.removeAllListeners("update-status");
   },
+  // Open URL in default system browser
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  // Show native save dialog
+  showSaveDialog: (options) => ipcRenderer.invoke("show-save-dialog", options),
+  // Show native message box
+  showMessageBox: (options) => ipcRenderer.invoke("show-message-box", options),
 });

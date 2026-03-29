@@ -40,6 +40,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import DesktopLoginPage from "./pages/DesktopLoginPage";
 import DesktopBillingCallbackPage from "./pages/DesktopBillingCallbackPage";
+import DesktopSettingsPage from "./pages/DesktopSettingsPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
@@ -263,6 +264,9 @@ function DashboardRouter() {
         <Route path="/admin/titan-server" component={TitanServerAdminPage} />
         <Route path="/fetcher/self-improvement" component={SelfImprovementDashboard} />
 
+        {/* Desktop App Settings */}
+        <Route path="/desktop-settings" component={DesktopSettingsPage} />
+
         <Route component={NotFound} />
       </Switch>
     </FetcherLayout>
@@ -285,6 +289,8 @@ function Router() {
       <Route path="/desktop-login" component={DesktopLoginPage} />
       {/* Desktop billing callback — handles titandesktop:// deep links from Stripe */}
       <Route path="/desktop-billing-callback" component={DesktopBillingCallbackPage} />
+      {/* Desktop settings hub */}
+      <Route path="/desktop-settings" component={DashboardRouter} />
 
       {/* Public pages */}
       <Route path="/builder" component={BuilderPage} />

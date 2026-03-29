@@ -87,6 +87,7 @@ import OnboardingWizard from "./OnboardingWizard";
 import HelpBotWidget from "./HelpBotWidget";
 import TrialBanner from "./TrialBanner";
 import DesktopStatusBar from "./DesktopStatusBar";
+import DesktopOfflineGuard from "./DesktopOfflineGuard";
 import { isDesktop } from "@/lib/desktop";
 import { useArchibald } from "@/contexts/ArchibaldContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -214,6 +215,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_36_r5c4"), label: t("nav.teamManagement"), path: "/fetcher/team" },
       { icon: featureIcon("icon_22_r3c6"), label: t("nav.teamVault"), path: "/fetcher/team-vault", isNew: true },
       { icon: featureIcon("icon_44_r6c4"), label: t("nav.settings"), path: "/fetcher/settings" },
+      { icon: featureIcon("icon_31_r4c7"), label: "Desktop Settings", path: "/desktop-settings", isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════
@@ -918,6 +920,7 @@ function FetcherLayoutContent({
           </div>
         )}
         <TrialBanner />
+        <DesktopOfflineGuard />
         <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden max-md:[&:has(.chat-page-root)]:p-0 [&:has(.chat-page-root)]:overflow-hidden">{children}</main>
       </SidebarInset>
     </>

@@ -704,6 +704,93 @@ function startServer() {
       }
     });
 
+    // ── Offline mode: graceful degradation for all feature tRPC calls ──
+    // When offline, intercept feature calls and return structured offline responses
+    // instead of proxying to remote (which would fail with 503).
+    const OFFLINE_FEATURE_PATTERNS = [
+      /^advertising\./,
+      /^affiliate\./,
+      /^marketing\./,
+      /^contentCreator\./,
+      /^grantFinder\./,
+      /^siteMonitor\./,
+      /^seo\./,
+      /^storage\./,
+      /^marketplace\./,
+      /^security\./,
+      /^vpnChain\./,
+      /^ipRotation\./,
+      /^proxyMaker\./,
+      /^masterGrowth\./,
+      /^fetcher\./,
+      /^builder\./,
+      /^self_improvement\./,
+    ];
+
+    function isOfflineFeatureCall(procedure) {
+      return OFFLINE_FEATURE_PATTERNS.some(p => p.test(procedure));
+    }
+
+    function getOfflineMessage(procedure) {
+      const feature = procedure.split(".")[0];
+      const featureNames = {
+        advertising: "Advertising Engine",
+        affiliate: "Affiliate Engine",
+        marketing: "Marketing Engine",
+        contentCreator: "Content Creator",
+        grantFinder: "Grant Finder",
+        siteMonitor: "Site Monitor",
+        seo: "SEO Engine",
+        storage: "Storage",
+        marketplace: "Marketplace",
+        security: "Security Dashboard",
+        vpnChain: "VPN Chain",
+        ipRotation: "IP Rotation",
+        proxyMaker: "Proxy Maker",
+        masterGrowth: "Master Growth",
+        fetcher: "Fetcher",
+        builder: "Builder",
+        self_improvement: "Self-Improvement Engine",
+      };
+      const name = featureNames[feature] || feature;
+      return {
+        offline: true,
+        feature: name,
+        message: `${name} requires an internet connection. Switch to Online mode in the status bar to use this feature.`,
+        availableOffline: ["Credentials", "Projects", "Chat History", "Activity Log"],
+      };
+    }
+
+    app.all("/api/trpc/:procedure", async (req, res, next) => {
+      const procedure = req.params.procedure;
+      // Check offline mode for feature calls
+      const modePath = require("path").join(DATA_DIR, "mode.json");
+      let isOfflineMode = false;
+      try {
+        if (require("fs").existsSync(modePath)) {
+          const mdata = JSON.parse(require("fs").readFileSync(modePath, "utf8"));
+          if (mdata.mode === "offline") isOfflineMode = true;
+        }
+      } catch {}
+
+      if (isOfflineMode && isOfflineFeatureCall(procedure)) {
+        const procedures = procedure.split(",");
+        if (procedures.length > 1) {
+          // Batch request
+          return res.json(procedures.map(p => ({
+            error: { message: getOfflineMessage(p).message, data: getOfflineMessage(p) }
+          })));
+        }
+        return res.status(503).json({
+          error: {
+            message: getOfflineMessage(procedure).message,
+            data: getOfflineMessage(procedure),
+          }
+        });
+      }
+      next();
+    });
+
     // ── Generic tRPC proxy for all other endpoints ──
     // This ensures desktop has full parity with the web version
     // by forwarding any unhandled tRPC calls to the remote server.

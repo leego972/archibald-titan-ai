@@ -247,6 +247,25 @@ async function createWindow() {
   // Check for updates 5 seconds after window loads, then every 4 hours
   setTimeout(() => checkForUpdates(), 5000);
   setInterval(() => checkForUpdates(), 4 * 60 * 60 * 1000);
+
+  // Open external URL in default browser
+  ipcMain.handle("open-external", (_, url) => {
+    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+      shell.openExternal(url);
+    }
+  });
+
+  // Native save dialog
+  ipcMain.handle("show-save-dialog", async (_, options) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { canceled: true };
+    return dialog.showSaveDialog(mainWindow, options || {});
+  });
+
+  // Native message box
+  ipcMain.handle("show-message-box", async (_, options) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return { response: 0 };
+    return dialog.showMessageBox(mainWindow, options || { message: "" });
+  });
 }
 
 function updateTrayMenu() {
