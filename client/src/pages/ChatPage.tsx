@@ -290,6 +290,7 @@ const TOOL_LABELS: Record<string, string> = {
   self_run_tests: "Ran tests",
   self_multi_file_modify: "Modified multiple files",
   navigate_to_page: "Navigated to page",
+  perform_page_action: "Performed action",
   web_search: "Searched the web",
   web_page_read: "Read web page",
 };
@@ -2062,12 +2063,36 @@ export default function ChatPage() {
         }
       }
       if (result.actions && result.actions.length > 0) {
+        let hasSpecificToast = false;
+        for (const a of result.actions as ExecutedAction[]) {
+          // navigate_to_page — actually navigate the user to the requested page
+          if (a.tool === 'navigate_to_page' && a.success) {
+            const d = a.result as any;
+            if (d?.action === 'navigate' && d?.path) {
+              setTimeout(() => setLocation(d.path), 800);
+              toast.info(`Navigating to ${d.path}`, { duration: 2500 });
+              hasSpecificToast = true;
+            }
+          }
+          // perform_page_action — show the result message from Titan
+          if (a.tool === 'perform_page_action' && a.success) {
+            const d = a.result as any;
+            if (d?.message) {
+              toast.success(d.message, { duration: 4000 });
+              hasSpecificToast = true;
+            }
+          }
+        }
         const successCount = result.actions.filter((a: ExecutedAction) => a.success).length;
         const failCount = result.actions.length - successCount;
-        if (failCount === 0) {
-          toast.success(`${successCount} action${successCount > 1 ? "s" : ""} completed`);
-        } else {
-          toast.warning(`${successCount} succeeded, ${failCount} failed`);
+        if (!hasSpecificToast) {
+          if (failCount === 0) {
+            toast.success(`${successCount} action${successCount > 1 ? 's' : ''} completed`);
+          } else {
+            toast.warning(`${successCount} succeeded, ${failCount} failed`);
+          }
+        } else if (failCount > 0) {
+          toast.warning(`${failCount} action${failCount > 1 ? 's' : ''} failed`);
         }
       }
 

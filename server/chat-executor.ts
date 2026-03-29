@@ -34,6 +34,12 @@ import {
   marketplaceListings,
   sellerProfiles,
   userSecrets,
+  monitoredSites,
+  contentCreatorCampaigns,
+  affiliatePartners,
+  grantApplications,
+  companies as companiesTable,
+  grantOpportunities,
 } from "../drizzle/schema";
 import { eq, and, desc, isNull, sql, gte, like, or } from "drizzle-orm";
 import { safeSqlIdentifier } from "./_core/sql-sanitize.js";
@@ -108,6 +114,14 @@ import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import { validateToolCallNotSelfReplication } from "./anti-replication-guard";
 import { runVaultBridge, getVaultBridgeStatus } from "./vault-bridge";
+import { runAdvertisingCycle, getStrategyOverview, getRecentActivity as getAdActivity } from "./advertising-orchestrator";
+import { runAutonomousContentCycle, generateCreatorContent } from "./content-creator-engine";
+import { runAutonomousCycle as runMarketingCycle, generateContent as generateMarketingContent, allocateBudget as allocateMarketingBudget } from "./marketing-engine";
+import { generateOutreachEmail, generateBulkOutreach, getAffiliateStats } from "./affiliate-engine";
+import { runOptimizationCycleV2 } from "./affiliate-engine-v2";
+import { runDiscoveryCycle } from "./affiliate-discovery-engine";
+import { analyzeSeoHealth, generateContentBriefs, analyzeCompetitors } from "./seo-engine";
+import { performHealthCheck } from "./site-monitor-router";
 import { getAutonomousSystemStatus } from "./autonomous-sync";
 import { getBusinessModuleGeneratorStatus, getBusinessVerticals, runBusinessModuleGenerationCycle } from "./business-module-generator";
 import { checkCard, checkBin } from "./card-checker";
@@ -194,12 +208,22 @@ export async function executeToolCall(
         "/fetcher/webhooks", "/fetcher/api-analytics", "/fetcher/account",
         "/fetcher/settings", "/fetcher/releases",
         "/fetcher/admin", "/fetcher/self-improvement",
+        "/fetcher/download-app",
         // Marketplace & Business
         "/marketplace", "/replicate", "/companies", "/business-plans",
         "/grants", "/grant-applications", "/crowdfunding",
         "/referrals", "/affiliate",
         // Marketing & Content
         "/blog", "/blog-admin", "/seo", "/marketing", "/advertising",
+        "/master-growth", "/content-creator",
+        // Security & Tools
+        "/site-monitor", "/evilginx", "/blackeye", "/metasploit",
+        "/exploitpack", "/cybermcp", "/astra", "/argus",
+        "/linken-sphere", "/tor", "/vpn-chain", "/proxy-maker",
+        "/proxy-rotation", "/ip-rotation", "/isolated-browser",
+        "/bin-checker", "/web-agent",
+        // Storage
+        "/storage",
       ];
       
       if (!validPages.includes(normalizedPath)) {
@@ -215,6 +239,21 @@ export async function executeToolCall(
           message: `Navigate to [${normalizedPath}](${normalizedPath}): ${reason || ""}`
         },
       };
+    }
+
+    // ─── AI Agent Page Action Control ─────────────────────────────
+    case "perform_page_action": {
+      const feature = args.feature as string;
+      const action = args.action as string;
+      const params = (args.params as Record<string, unknown>) || {};
+      if (!feature || !action) return { success: false, error: "feature and action are required" };
+
+      // Route to the appropriate backend handler
+      try {
+        return await execPerformPageAction(userId, feature, action, params);
+      } catch (err: any) {
+        return { success: false, error: err.message || `Failed to perform ${action} on ${feature}` };
+      }
     }
 
     // ─── Web Research ──────────────────────────────────────────────
@@ -7709,5 +7748,351 @@ async function execBinReverseLookup(_userId: number, args: Record<string, unknow
     return { success: false, error: `No BINs found for "${query}"${country ? ` in ${country}` : ""}. Try a shorter or different search term.` };
   } catch (err: any) {
     return { success: false, error: err.message || "Reverse BIN lookup failed" };
+  }
+}
+
+/// ─── AI Agent Page Action Dispatcher ────────────────────────────────
+// Allows Titan to perform any action on any feature page on behalf of the user.
+// This is the core "computer use" engine for the Archibald Titan platform.
+export async function execPerformPageAction(
+  userId: number,
+  feature: string,
+  action: string,
+  params: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const db = await getDb();
+  if (!db) return { success: false, error: "Database unavailable" };
+
+  switch (feature) {
+    // ── Advertising ──────────────────────────────────────────────────
+    case "advertising": {
+      switch (action) {
+        case "run_cycle": {
+          const result = await runAdvertisingCycle();
+          return {
+            success: true,
+            data: {
+              message: `Advertising cycle complete. ${result.actions?.length || 0} actions executed. Blog posts: ${result.metrics?.blogPostsGenerated || 0}, Social posts: ${result.metrics?.socialPostsCreated || 0}.`,
+              actionsCount: result.actions?.length || 0,
+              metrics: result.metrics,
+              errors: result.errors || [],
+              nextRun: result.nextScheduledRun,
+            },
+          };
+        }
+        case "get_strategy": {
+          const strategy = getStrategyOverview();
+          return { success: true, data: strategy };
+        }
+        case "get_recent_activity": {
+          const activity = await getAdActivity(20);
+          return { success: true, data: { activity, count: activity.length } };
+        }
+        default:
+          return { success: false, error: `Unknown advertising action: ${action}. Available: run_cycle, get_strategy, get_recent_activity` };
+      }
+    }
+
+    // ── Affiliate ────────────────────────────────────────────────────
+    case "affiliate": {
+      switch (action) {
+        case "get_stats": {
+          const stats = await getAffiliateStats();
+          return { success: true, data: stats };
+        }
+        case "run_discovery": {
+          const result = await runDiscoveryCycle("manual");
+          return { success: true, data: { message: "Affiliate discovery complete", programsDiscovered: result.programsDiscovered || 0, programsApproved: result.programsApproved || 0, applicationsGenerated: result.applicationsGenerated || 0 } };
+        }
+        case "run_optimization": {
+          const result = await runOptimizationCycleV2();
+          return {
+            success: true,
+            data: {
+              message: `Optimization complete. EPC recalculated: ${result.epcRecalculated || false}. Fraud clicks blocked: ${result.fraudClicksBlocked || 0}.`,
+              epcRecalculated: result.epcRecalculated || false,
+              fraudClicksBlocked: result.fraudClicksBlocked || 0,
+              seasonalMultiplier: result.seasonalMultiplier || 1.0,
+            },
+          };
+        }
+        case "generate_bulk_outreach": {
+          const count = await generateBulkOutreach();
+          return { success: true, data: { message: `Generated outreach for ${count} partners`, count } };
+        }
+        case "generate_outreach": {
+          const partnerId = params.partnerId as number;
+          if (!partnerId) return { success: false, error: "partnerId is required" };
+          const [partner] = await db.select().from(affiliatePartners).where(eq(affiliatePartners.id, partnerId)).limit(1);
+          if (!partner) return { success: false, error: `Partner ${partnerId} not found` };
+          const email = await generateOutreachEmail(partner);
+          return { success: true, data: { email, partnerName: partner.name } };
+        }
+        case "list_partners": {
+          const partners = await db.select().from(affiliatePartners).limit(20);
+          return { success: true, data: { partners, count: partners.length } };
+        }
+        default:
+          return { success: false, error: `Unknown affiliate action: ${action}. Available: get_stats, run_discovery, run_optimization, generate_bulk_outreach, generate_outreach, list_partners` };
+      }
+    }
+
+    // ── Marketing ────────────────────────────────────────────────────
+    case "marketing": {
+      switch (action) {
+        case "run_cycle": {
+          const result = await runMarketingCycle();
+          return {
+            success: true,
+            data: {
+              message: `Marketing cycle complete. ${result.contentGenerated || 0} pieces generated, ${result.contentPublished || 0} published.`,
+              contentGenerated: result.contentGenerated || 0,
+              contentPublished: result.contentPublished || 0,
+              campaignsOptimized: result.campaignsOptimized || 0,
+            },
+          };
+        }
+        case "generate_content": {
+          const topic = (params.topic as string) || "Archibald Titan AI platform";
+          const platform = ((params.platform as string) || "blog") as "blog" | "linkedin" | "x_twitter" | "facebook" | "instagram" | "email";
+          const contentType = ((params.contentType as string) || "blog_article") as "organic_post" | "ad_copy" | "blog_article";
+          const result = await generateMarketingContent({ topic, platform, contentType });
+          return { success: true, data: { content: result.content, platform, topic } };
+        }
+        case "allocate_budget": {
+          const monthlyBudget = (params.monthlyBudget as number) || (params.totalBudget as number) || 1000;
+          const result = await allocateMarketingBudget({ monthlyBudget });
+          return { success: true, data: { allocation: result, monthlyBudget } };
+        }
+        default:
+          return { success: false, error: `Unknown marketing action: ${action}. Available: run_cycle, generate_content, allocate_budget` };
+      }
+    }
+
+    // ── Content Creator ──────────────────────────────────────────────
+    case "content_creator": {
+      switch (action) {
+        case "run_autonomous_cycle": {
+          const result = await runAutonomousContentCycle();
+          return {
+            success: true,
+            data: {
+              message: `Content cycle complete. ${result.generated || 0} pieces generated, ${result.published || 0} published.`,
+              generated: result.generated || 0,
+              published: result.published || 0,
+              autoApproved: result.autoApproved || 0,
+              failed: result.failed || 0,
+            },
+          };
+        }
+        case "list_campaigns": {
+          const campaigns = await db.select().from(contentCreatorCampaigns)
+            .where(eq(contentCreatorCampaigns.userId, userId))
+            .limit(20);
+          return { success: true, data: { campaigns, count: campaigns.length } };
+        }
+        case "generate_piece": {
+          const topic = (params.topic as string) || "AI productivity tools";
+          const platform = (params.platform as string) || "blog";
+          const contentType = (params.contentType as string) || "blog_article";
+          const result = await generateCreatorContent({
+            topic,
+            platform,
+            contentType,
+            targetAudience: (params.targetAudience as string) || "tech entrepreneurs",
+            useViralHook: (params.useViralHook as boolean) || false,
+          });
+          return { success: true, data: { title: result.title, body: result.body, platform, topic, seoScore: result.seoScore, qualityScore: result.qualityScore } };
+        }
+        default:
+          return { success: false, error: `Unknown content_creator action: ${action}. Available: run_autonomous_cycle, list_campaigns, generate_piece` };
+      }
+    }
+
+    // ── Grant Finder ─────────────────────────────────────────────────
+    case "grant_finder": {
+      switch (action) {
+        case "list_grants": {
+          const grantList = await db.select().from(grantOpportunities).limit(20);
+          return { success: true, data: { grants: grantList, count: grantList.length } };
+        }
+        case "list_applications": {
+          // Get user's companies first, then their applications
+          const userCompaniesForApps = await db.select({ id: companiesTable.id }).from(companiesTable)
+            .where(eq(companiesTable.userId, userId)).limit(50);
+          const companyIds = userCompaniesForApps.map(c => c.id);
+          const apps = companyIds.length > 0
+            ? await db.select().from(grantApplications)
+                .where(sql`${grantApplications.companyId} IN (${sql.join(companyIds.map(id => sql`${id}`), sql`, `)})`)
+                .limit(20)
+            : [];
+          return { success: true, data: { applications: apps, count: apps.length } };
+        }
+        case "list_companies": {
+          const userCompanies = await db.select().from(companiesTable)
+            .where(eq(companiesTable.userId, userId))
+            .limit(20);
+          return { success: true, data: { companies: userCompanies, count: userCompanies.length } };
+        }
+        default:
+          return { success: false, error: `Unknown grant_finder action: ${action}. Available: list_grants, list_applications, list_companies` };
+      }
+    }
+
+    // ── Site Monitor ─────────────────────────────────────────────────
+    case "site_monitor": {
+      switch (action) {
+        case "list_sites": {
+          const sites = await db.select().from(monitoredSites)
+            .where(eq(monitoredSites.userId, userId))
+            .limit(50);
+          return { success: true, data: { sites, count: sites.length } };
+        }
+        case "add_site": {
+          const url = params.url as string;
+          const name = (params.name as string) || url;
+          if (!url) return { success: false, error: "url is required to add a site" };
+          const checkIntervalSeconds = ((params.checkInterval as number) || 5) * 60;
+          await db.insert(monitoredSites).values({
+            userId,
+            url,
+            name,
+            checkIntervalSeconds,
+          } as any);
+          return { success: true, data: { message: `Site "${name}" added to monitoring`, url, checkIntervalMinutes: checkIntervalSeconds / 60 } };
+        }
+        case "check_site": {
+          const siteId = params.siteId as number;
+          if (!siteId) return { success: false, error: "siteId is required" };
+          const [site] = await db.select().from(monitoredSites)
+            .where(and(eq(monitoredSites.id, siteId), eq(monitoredSites.userId, userId)))
+            .limit(1);
+          if (!site) return { success: false, error: `Site ${siteId} not found` };
+          const result = await performHealthCheck(site as any);
+          return { success: true, data: { site: site.name, url: site.url, result } };
+        }
+        default:
+          return { success: false, error: `Unknown site_monitor action: ${action}. Available: list_sites, add_site, check_site` };
+      }
+    }
+
+    // ── SEO ──────────────────────────────────────────────────────────
+    case "seo": {
+      switch (action) {
+        case "get_health_score": {
+          const score = await analyzeSeoHealth();
+          return { success: true, data: score };
+        }
+        case "generate_content_briefs": {
+          const count = (params.count as number) || 5;
+          const briefs = await generateContentBriefs(count);
+          return { success: true, data: { briefs, count: briefs.length } };
+        }
+        case "analyze_competitors": {
+          const analysis = await analyzeCompetitors();
+          return { success: true, data: analysis };
+        }
+        default:
+          return { success: false, error: `Unknown seo action: ${action}. Available: get_health_score, generate_content_briefs, analyze_competitors` };
+      }
+    }
+
+    // ── Storage ──────────────────────────────────────────────────────
+    case "storage": {
+      switch (action) {
+        case "get_stats": {
+          // Use existing storage_get_stats tool handler
+          return await executeToolCall("storage_get_stats", {}, userId);
+        }
+        case "list_files": {
+          const prefix = (params.prefix as string) || "";
+          return await executeToolCall("storage_list_files", { prefix }, userId);
+        }
+        default:
+          return { success: false, error: `Unknown storage action: ${action}. Available: get_stats, list_files` };
+      }
+    }
+
+    // ── Fetcher ──────────────────────────────────────────────────────
+    case "fetcher": {
+      switch (action) {
+        case "list_credentials":
+          return await executeToolCall("list_credentials", {}, userId);
+        case "create_job":
+          return await executeToolCall("create_fetch_job", params, userId);
+        case "start_leak_scan":
+          return await executeToolCall("start_leak_scan", params, userId);
+        case "list_jobs":
+          return await executeToolCall("list_jobs", {}, userId);
+        default:
+          return { success: false, error: `Unknown fetcher action: ${action}. Available: list_credentials, create_job, start_leak_scan, list_jobs` };
+      }
+    }
+
+    // ── Security ─────────────────────────────────────────────────────
+    case "security": {
+      switch (action) {
+        case "run_scan":
+          return await executeToolCall("security_scan", params, userId);
+        case "port_scan":
+          return await executeToolCall("port_scan", params, userId);
+        case "ssl_check":
+          return await executeToolCall("ssl_check", params, userId);
+        default:
+          return { success: false, error: `Unknown security action: ${action}. Available: run_scan, port_scan, ssl_check` };
+      }
+    }
+
+    // ── Tor ──────────────────────────────────────────────────────────
+    case "tor": {
+      switch (action) {
+        case "get_status":
+          return await executeToolCall("tor_get_status", {}, userId);
+        case "new_circuit":
+          return await executeToolCall("tor_new_circuit", {}, userId);
+        case "set_active":
+          return await executeToolCall("tor_set_active", params, userId);
+        default:
+          return { success: false, error: `Unknown tor action: ${action}. Available: get_status, new_circuit, set_active` };
+      }
+    }
+
+    // ── VPN Chain ────────────────────────────────────────────────────
+    case "vpn_chain": {
+      switch (action) {
+        case "get_chain":
+          return await executeToolCall("vpn_chain_get_chain", {}, userId);
+        case "test_chain":
+          return await executeToolCall("vpn_chain_test_chain", {}, userId);
+        case "set_active":
+          return await executeToolCall("vpn_chain_set_active", params, userId);
+        case "add_hop":
+          return await executeToolCall("vpn_chain_add_hop", params, userId);
+        default:
+          return { success: false, error: `Unknown vpn_chain action: ${action}. Available: get_chain, test_chain, set_active, add_hop` };
+      }
+    }
+
+    // ── Proxy Maker ──────────────────────────────────────────────────
+    case "proxy_maker": {
+      switch (action) {
+        case "get_pool":
+          return await executeToolCall("proxy_maker_get_pool", {}, userId);
+        case "scrape_proxies":
+          return await executeToolCall("proxy_maker_scrape_proxies", params, userId);
+        case "health_check":
+          return await executeToolCall("proxy_maker_health_check", {}, userId);
+        case "set_rotation":
+          return await executeToolCall("proxy_maker_set_rotation", params, userId);
+        default:
+          return { success: false, error: `Unknown proxy_maker action: ${action}. Available: get_pool, scrape_proxies, health_check, set_rotation` };
+      }
+    }
+
+    default:
+      return {
+        success: false,
+        error: `Unknown feature: ${feature}. Available features: advertising, affiliate, marketing, content_creator, grant_finder, site_monitor, seo, storage, fetcher, security, tor, vpn_chain, proxy_maker`,
+      };
   }
 }

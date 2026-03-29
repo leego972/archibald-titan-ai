@@ -884,7 +884,7 @@ const navigateToPage: Tool = {
   function: {
     name: "navigate_to_page",
     description:
-      "Navigate the user to a specific page within the Archibald Titan app. Use this when the user asks about a feature, wants to set something up, or needs to go somewhere. Returns a clickable link. Available pages: CORE: dashboard, dashboard/credits, dashboard/subscription, project-files, sandbox, pricing, contact. FETCHER: fetcher/new, fetcher/jobs, fetcher/credentials, fetcher/export, fetcher/import, fetcher/api-access, fetcher/smart-fetch, fetcher/cli, fetcher/watchdog, fetcher/provider-health, fetcher/health-trends, fetcher/credential-health, fetcher/leak-scanner, fetcher/bulk-sync, fetcher/auto-sync, fetcher/onboarding, fetcher/team, fetcher/team-vault, fetcher/totp-vault, fetcher/notifications, fetcher/history, fetcher/audit-logs, fetcher/developer-docs, fetcher/webhooks, fetcher/api-analytics, fetcher/account, fetcher/settings, fetcher/releases, fetcher/admin, fetcher/self-improvement. BUSINESS: marketplace, replicate, companies, business-plans, grants, grant-applications, crowdfunding, referrals, affiliate. MARKETING: blog, blog-admin, seo, marketing, advertising.",
+      "Navigate the user to a specific page within the Archibald Titan app. Use this when the user asks about a feature, wants to go somewhere, or when you need to perform an action on a feature page. ALWAYS navigate first, then use perform_page_action to execute actions. Available pages — CORE: dashboard, dashboard/credits, dashboard/subscription, project-files, sandbox, pricing, contact. FETCHER: fetcher/new, fetcher/jobs, fetcher/credentials, fetcher/export, fetcher/import, fetcher/api-access, fetcher/smart-fetch, fetcher/cli, fetcher/watchdog, fetcher/provider-health, fetcher/health-trends, fetcher/credential-health, fetcher/leak-scanner, fetcher/bulk-sync, fetcher/auto-sync, fetcher/onboarding, fetcher/team, fetcher/team-vault, fetcher/totp-vault, fetcher/notifications, fetcher/history, fetcher/audit-logs, fetcher/developer-docs, fetcher/webhooks, fetcher/api-analytics, fetcher/account, fetcher/settings, fetcher/releases, fetcher/admin, fetcher/self-improvement. BUSINESS: marketplace, replicate, companies, business-plans, grants, grant-applications, crowdfunding, referrals, affiliate. MARKETING: blog, blog-admin, seo, marketing, advertising, master-growth, content-creator. SECURITY: site-monitor, evilginx, blackeye, metasploit, exploitpack, cybermcp, astra, argus, linken-sphere, tor, vpn-chain, proxy-maker, proxy-rotation, ip-rotation, isolated-browser, bin-checker, web-agent. STORAGE: storage. DOWNLOAD: fetcher/download-app.",
     parameters: {
       type: "object",
       properties: {
@@ -3364,9 +3364,73 @@ export const binReverseLookupTool: Tool = {
 };
 
 
+// ─── AI Agent Page Action Control ─────────────────────────────────────────
+// Allows Titan to perform any action on any feature page on behalf of the user.
+// Use navigate_to_page first to show the user the page, then call this tool.
+
+const performPageAction: Tool = {
+  type: "function",
+  function: {
+    name: "perform_page_action",
+    description:
+      "Execute an action on a specific feature page within Archibald Titan. Use this to perform tasks on behalf of the user — create campaigns, add sites to monitor, generate content, run scans, manage affiliates, apply for grants, etc. ALWAYS call navigate_to_page first so the user can see what's happening, then call this tool to execute the action. Returns the result of the action.",
+    parameters: {
+      type: "object",
+      properties: {
+        feature: {
+          type: "string",
+          enum: [
+            "advertising", "affiliate", "marketing", "content_creator",
+            "grant_finder", "site_monitor", "seo", "crowdfunding",
+            "marketplace", "replicate", "companies", "storage",
+            "fetcher", "security", "tor", "vpn_chain", "proxy_maker"
+          ],
+          description: "The feature/module to act on",
+        },
+        action: {
+          type: "string",
+          description: "The specific action to perform. Examples by feature:\n" +
+            "advertising: run_cycle, generate_content, create_ab_test\n" +
+            "affiliate: run_discovery, generate_outreach, analyze_partner, run_optimization\n" +
+            "marketing: run_cycle, generate_content, launch_campaign, allocate_budget\n" +
+            "content_creator: create_campaign, generate_piece, bulk_generate\n" +
+            "grant_finder: match_grants, apply_grant, generate_story, search_grants\n" +
+            "site_monitor: add_site, check_site, pause_site, remove_site\n" +
+            "seo: run_audit, get_health_score, analyze_keywords\n" +
+            "crowdfunding: create_campaign, update_campaign, generate_rewards\n" +
+            "marketplace: browse_listings, create_listing, purchase_item\n" +
+            "replicate: create_project, start_research, generate_build_plan\n" +
+            "companies: create_company, update_company, generate_business_plan\n" +
+            "storage: list_files, upload_file, delete_file, get_stats\n" +
+            "fetcher: create_job, list_credentials, start_leak_scan\n" +
+            "security: run_scan, port_scan, ssl_check\n" +
+            "tor: get_status, new_circuit, set_active\n" +
+            "vpn_chain: get_chain, add_hop, test_chain, set_active\n" +
+            "proxy_maker: get_pool, scrape_proxies, health_check, set_rotation",
+        },
+        params: {
+          type: "object",
+          description: "Parameters for the action. Varies by action. Examples:\n" +
+            "add_site: { url: 'https://example.com', name: 'My Site', checkInterval: 5 }\n" +
+            "create_campaign: { name: 'Campaign Name', topic: 'AI tools', platforms: ['twitter', 'linkedin'] }\n" +
+            "generate_outreach: { partnerId: 123 }\n" +
+            "match_grants: { companyId: 456 }\n" +
+            "apply_grant: { grantId: 789, companyId: 456 }\n" +
+            "run_cycle: {} (no params needed)\n" +
+            "run_discovery: {} (no params needed)",
+          additionalProperties: true,
+        },
+      },
+      required: ["feature", "action"],
+    },
+  },
+};
+
 export const TITAN_TOOLS: Tool[] = [
   // Navigation
   navigateToPage,
+  // AI Agent Control
+  performPageAction,
   // Web Research
   webSearch,
   webPageRead,
@@ -3537,6 +3601,8 @@ export const TITAN_TOOLS: Tool[] = [
 export const BUILDER_TOOLS: Tool[] = [
   // Navigation
   navigateToPage,
+  // AI Agent Control
+  performPageAction,
   // Web Research
   webSearch,
   webPageRead,
