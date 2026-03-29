@@ -4,8 +4,10 @@ export const ENV = {
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  ownerEmails: (process.env.OWNER_EMAILS ?? "ptyltd555@gmail.com,leego972@gmail.com,mark.goldbourt@gmail.com,archibaldtitan@gmail.com,brobroplzcheck@gmail.com,sisteror555@gmail.com").split(",").map(e => e.trim().toLowerCase()),
-  headAdminEmail: (process.env.HEAD_ADMIN_EMAIL ?? "leego972@gmail.com").trim().toLowerCase(),
+  // OWNER_EMAILS: comma-separated list of owner email addresses — set via environment variable only
+  ownerEmails: (process.env.OWNER_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
+  // HEAD_ADMIN_EMAIL: the primary admin account — set via environment variable only
+  headAdminEmail: (process.env.HEAD_ADMIN_EMAIL ?? "").trim().toLowerCase(),
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
@@ -86,15 +88,15 @@ export const ENV = {
   // Mastodon
   mastodonAccessToken: process.env.MASTODON_ACCESS_TOKEN ?? "",
   mastodonInstanceUrl: process.env.MASTODON_INSTANCE_URL ?? "https://infosec.exchange",
-  // Telegram
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "8573259002:AAGPqrYpry2yduwZ9-J2cTOe3Y0H_9lhVEQ",
-  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? "-1003892437233",
+  // Telegram — set TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID via environment variable
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? "",
   // WhatsApp Business Cloud API
   whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
   whatsappBusinessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? "",
-  // Pollinations.ai - Free AI Video Generation
-  pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "sk_KZ0EBVOHXycDd8YnvEZAvLDGnvhK33SP",
+  // Pollinations.ai - Free AI Video Generation — set POLLINATIONS_API_KEY via environment variable
+  pollinationsApiKey: process.env.POLLINATIONS_API_KEY ?? "",
   // ElevenLabs TTS — deep English male voice for Titan AI
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   // Titan Server (Shared infrastructure for Metasploit, Argus, Astra, BlackEye, Evilginx)

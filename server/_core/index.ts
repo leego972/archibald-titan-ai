@@ -108,8 +108,12 @@ async function startServer() {
     // Content-Security-Policy: restrict resource loading to trusted origins
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com",
+      // 'unsafe-eval' removed — no longer required by the Vite production bundle.
+      // 'unsafe-inline' retained for Stripe.js and GTM inline event handlers; replace with nonces in a future hardening pass.
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https: http:",
       "connect-src 'self' https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://files.manuscdn.com wss: ws:",
@@ -309,7 +313,19 @@ async function startServer() {
   });
   // ── Deep Diagnostic Endpoint ─────────────────────────────────
   // Tests database, LLM API, key pool, and environment config
-  app.get('/api/diagnose', async (_req, res) => {
+  // SECURITY: restricted to admin and head_admin roles only
+  app.get('/api/diagnose', async (req, res) => {
+    try {
+      const { sdk } = await import('./sdk.js');
+      const user = await sdk.authenticateRequest(req);
+      if (user.role !== 'admin' && user.role !== 'head_admin') {
+        res.status(403).json({ error: 'Forbidden: admin access required' });
+        return;
+      }
+    } catch {
+      res.status(401).json({ error: 'Unauthorized: valid session required' });
+      return;
+    }
     const diag: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),

@@ -29,7 +29,7 @@ Archibald Titan AI is an advanced, unified DevSecOps and AI agent platform. It c
 
 - **Frontend**: React, TypeScript, Tailwind CSS, Vite, wouter, React Flow
 - **Backend**: Node.js, Express, tRPC
-- **Database**: PostgreSQL (via Drizzle ORM)
+- **Database**: MySQL / TiDB (via Drizzle ORM)
 - **Desktop**: Electron
 - **Security Engines**: Python, Go, Playwright
 - **AI Integration**: OpenAI-compatible LLM engine
@@ -37,9 +37,9 @@ Archibald Titan AI is an advanced, unified DevSecOps and AI agent platform. It c
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v20+)
+- Node.js (v22+)
 - pnpm
-- PostgreSQL database
+- MySQL database
 - Stripe account (for billing)
 - OpenAI API key (or compatible endpoint)
 
@@ -87,7 +87,7 @@ The platform is designed to be deployed on modern PaaS providers like Railway, R
 
 ### Railway Deployment
 1. Connect your GitHub repository to Railway.
-2. Provision a PostgreSQL database in Railway.
+2. Provision a MySQL database in Railway.
 3. Add all required environment variables from your \`.\env\` file.
 4. The provided \`railway.toml\` and \`Dockerfile\` will automatically handle the build and deployment process.
 
@@ -100,4 +100,4 @@ Archibald Titan AI includes powerful offensive security tools. These tools are p
 
 ## 📄 License
 
-Proprietary. All rights reserved.
+MIT License. See LICENSE for details.
