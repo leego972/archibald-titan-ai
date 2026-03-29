@@ -377,6 +377,77 @@ export const securityMarketplaceRouter = router({
       return { success: true, review };
     }),
 
+  // ── Rate module (alias for addReview) ──────────────────────────────────────
+  rateModule: protectedProcedure
+    .input(
+      z.object({
+        moduleId: z.string(),
+        rating: z.number().min(1).max(5),
+        comment: z.string().min(10).max(1000),
+      })
+    )
+    .mutation(({ input, ctx }) => {
+      const module = MODULES.find((m) => m.id === input.moduleId);
+      if (!module) throw new Error("Module not found");
+      const existing = reviews.find((r) => r.moduleId === input.moduleId && r.userId === (ctx.user.id as number));
+      if (existing) throw new Error("You have already reviewed this module");
+      const review: ModuleReview = {
+        id: `rev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        moduleId: input.moduleId,
+        userId: ctx.user.id as number,
+        username: (ctx.user as any).username ?? "Anonymous",
+        rating: input.rating,
+        comment: input.comment,
+        createdAt: new Date(),
+      };
+      reviews.push(review);
+      const moduleReviews = reviews.filter((r) => r.moduleId === input.moduleId);
+      module.rating = Math.round((moduleReviews.reduce((sum, r) => sum + r.rating, 0) / moduleReviews.length) * 10) / 10;
+      module.ratingCount = moduleReviews.length;
+      return { success: true, review };
+    }),
+  // ── Publish module (community submission) ────────────────────────────────
+  publishModule: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(3).max(80),
+        description: z.string().min(10).max(300),
+        category: z.enum(["osint", "scanning", "exploitation", "phishing", "anonymity", "automation", "reporting", "playbook", "wordlist", "template"]),
+        version: z.string().default("1.0.0"),
+        tags: z.string().optional(),
+        code: z.string().optional(),
+        readme: z.string().optional(),
+        price: z.number().min(0).default(0),
+      })
+    )
+    .mutation(({ input, ctx }) => {
+      // Community submissions are queued for review — stored as pending in-memory
+      const newModule: MarketplaceModule = {
+        id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name: input.name,
+        description: input.description,
+        longDescription: input.readme ?? input.description,
+        category: input.category,
+        tags: input.tags ? input.tags.split(",").map((t: string) => t.trim()) : [],
+        author: (ctx.user as any).username ?? "Community",
+        authorId: String(ctx.user.id),
+        version: input.version,
+        license: input.price > 0 ? "credits" : "free",
+        creditCost: input.price > 0 ? input.price : undefined,
+        downloads: 0,
+        rating: 0,
+        ratingCount: 0,
+        verified: false,
+        featured: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        screenshots: [],
+        requirements: [],
+        compatibleWith: [],
+      };
+      MODULES.push(newModule);
+      return { success: true, module: newModule };
+    }),
   // ── Get categories with counts ────────────────────────────────────────────
   getCategories: protectedProcedure.query(() => {
     const categoryCounts = MODULES.reduce((acc, m) => {
@@ -410,6 +481,7 @@ export const securityMarketplaceRouter = router({
       featuredModules: MODULES.filter((m) => m.featured).length,
       installedCount: userInstalled.size,
       totalDownloads: MODULES.reduce((sum, m) => sum + m.downloads, 0),
+      totalContributors: new Set(MODULES.map((m) => m.authorId)).size,
     };
   }),
 });

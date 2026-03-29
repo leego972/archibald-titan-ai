@@ -687,13 +687,13 @@ export default function RedTeamPlaybooksPage() {
                               Error: {step.error}
                             </div>
                           )}
-                          {step.result && (
+                          {step.result != null && (
                             <details className="mt-2">
                               <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                                 View raw result
                               </summary>
                               <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto max-h-48">
-                                {JSON.stringify(step.result, null, 2)}
+                                {JSON.stringify(step.result as Record<string, unknown>, null, 2)}
                               </pre>
                             </details>
                           )}

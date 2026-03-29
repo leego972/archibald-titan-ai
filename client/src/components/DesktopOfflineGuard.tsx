@@ -69,7 +69,14 @@ const FEATURE_NAMES: Record<string, string> = {
   "/web-agent": "Web Agent",
   "/referrals": "Referrals",
   "/project-files": "Project Files",
-  "/replicate": "Clone Website",
+  "/attack-graph": "Attack Graph",
+  "/proxy-interceptor": "Proxy Interceptor",
+  "/red-team-playbooks": "Red Team Playbooks",
+  "/command-centre": "Command Centre",
+  "/event-bus": "Event Bus",
+  "/compliance-reports": "Compliance Reports",
+  "/siem-integration": "SIEM Integration",
+  "/security-marketplace": "Security Marketplace",
 };
 
 function getFeatureName(path: string): string | null {

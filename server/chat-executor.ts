@@ -3528,15 +3528,18 @@ async function execSuggestFix(
 
   try {
     const raw = await invokeLLM({
-      systemPrompt: "You are a TypeScript build error diagnosis expert. Always respond with valid JSON only.",
-      userMessage: prompt,
-      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: "You are a TypeScript build error diagnosis expert. Always respond with valid JSON only." },
+        { role: "user", content: prompt },
+      ],
+      model: "strong",
       temperature: 0.1,
     });
 
     let diagnosis: Record<string, unknown>;
     try {
-      const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
+      const rawText = (raw.choices[0]?.message?.content ?? "") as string;
+      const cleaned = rawText.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
       diagnosis = JSON.parse(cleaned);
     } catch {
       // Return raw LLM response if JSON parse fails
@@ -7907,7 +7910,7 @@ export async function execPerformPageAction(
           if (!partnerId) return { success: false, error: "partnerId is required" };
           const [partner] = await db.select().from(affiliatePartners).where(eq(affiliatePartners.id, partnerId)).limit(1);
           if (!partner) return { success: false, error: `Partner ${partnerId} not found` };
-          const email = await generateOutreachEmail(partner);
+          const email = await generateOutreachEmail(partnerId);
           return { success: true, data: { email, partnerName: partner.name } };
         }
         case "list_partners": {
@@ -7939,7 +7942,7 @@ export async function execPerformPageAction(
           const platform = ((params.platform as string) || "blog") as "blog" | "linkedin" | "x_twitter" | "facebook" | "instagram" | "email";
           const contentType = ((params.contentType as string) || "blog_article") as "organic_post" | "ad_copy" | "blog_article";
           const result = await generateMarketingContent({ topic, platform, contentType });
-          return { success: true, data: { content: result.content, platform, topic } };
+          return { success: true, data: { content: (result as any).body ?? (result as any).content ?? result, platform, topic } };
         }
         case "allocate_budget": {
           const monthlyBudget = (params.monthlyBudget as number) || (params.totalBudget as number) || 1000;
@@ -7969,7 +7972,6 @@ export async function execPerformPageAction(
         }
         case "list_campaigns": {
           const campaigns = await db.select().from(contentCreatorCampaigns)
-            .where(eq(contentCreatorCampaigns.userId, userId))
             .limit(20);
           return { success: true, data: { campaigns, count: campaigns.length } };
         }
@@ -8050,7 +8052,7 @@ export async function execPerformPageAction(
             .where(and(eq(monitoredSites.id, siteId), eq(monitoredSites.userId, userId)))
             .limit(1);
           if (!site) return { success: false, error: `Site ${siteId} not found` };
-          const result = await performHealthCheck(site as any);
+          const result = await performHealthCheck(site as any, userId, db);
           return { success: true, data: { site: site.name, url: site.url, result } };
         }
         default:

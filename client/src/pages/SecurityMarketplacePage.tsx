@@ -40,8 +40,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function SecurityMarketplacePage() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [sortBy, setSortBy] = useState<"popular" | "newest" | "rating">("popular");
+  const [category, setCategory] = useState<"osint" | "scanning" | "exploitation" | "phishing" | "anonymity" | "automation" | "reporting" | "playbook" | "wordlist" | "template" | "all">("all");
+  const [sortBy, setSortBy] = useState<"downloads" | "rating" | "newest" | "name">("downloads");
   const [selectedModule, setSelectedModule] = useState<any>(null);
   const [showPublish, setShowPublish] = useState(false);
   const [publishForm, setPublishForm] = useState({
@@ -84,7 +84,7 @@ export default function SecurityMarketplacePage() {
       setShowPublish(false);
       toast.success("Module submitted");
     },
-    onError: (e) => toast.error("Publish failed", { description: e.message }),
+    onError: (e: any) => toast.error("Publish failed", { description: e.message }),
   });
 
   const modules = modulesData?.modules ?? [];
@@ -149,7 +149,7 @@ export default function SecurityMarketplacePage() {
                   className="pl-9 bg-slate-900 border-slate-700 text-white"
                 />
               </div>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={(v) => setCategory(v as any)}>
                 <SelectTrigger className="w-40 bg-slate-900 border-slate-700 text-white">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -165,7 +165,7 @@ export default function SecurityMarketplacePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="popular" className="text-white">Most Popular</SelectItem>
+                  <SelectItem value="downloads" className="text-white">Most Popular</SelectItem>
                   <SelectItem value="newest" className="text-white">Newest</SelectItem>
                   <SelectItem value="rating" className="text-white">Top Rated</SelectItem>
                 </SelectContent>
@@ -309,7 +309,7 @@ export default function SecurityMarketplacePage() {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
-                      onClick={() => rateModule.mutate({ moduleId: selectedModule.id, rating: star })}
+                      onClick={() => rateModule.mutate({ moduleId: selectedModule.id, rating: star, comment: "" })}
                       className="text-slate-600 hover:text-yellow-400 transition-colors"
                     >
                       <Star className="h-5 w-5" />

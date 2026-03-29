@@ -115,13 +115,16 @@ export default function ProxyInterceptorPage() {
     {
       enabled: !!sessionId,
       refetchInterval: autoRefresh ? 2000 : false,
-      onSuccess: (data) => {
-        setEntries(data.entries);
-        setTotal(data.total);
-        setCapturing(data.capturing);
-      },
     }
   );
+
+  useEffect(() => {
+    if (trafficLog.data) {
+      setEntries(trafficLog.data.entries as TrafficEntry[]);
+      setTotal(trafficLog.data.total);
+      setCapturing(trafficLog.data.capturing);
+    }
+  }, [trafficLog.data]);
 
   const clearLog = trpc.isolatedBrowser.clearTrafficLog.useMutation({
     onSuccess: () => {
