@@ -6,6 +6,7 @@
  * This prevents "build me a dashboard page" from going to sandbox when the user means "add a page to Titan".
  */
 import type { Message } from "./_core/llm";
+import { invokeLLM } from "./_core/llm";
 
 // ── Self-Improvement Keywords ──────────────────────────────────────────
 // These indicate the user wants to modify Titan's OWN codebase
@@ -1190,6 +1191,74 @@ export function detectBuildIntent(
  * PRIORITY: Self-build > External-build > Clarification
  * If BOTH self-build and external-build keywords match, self-build wins.
  */
+/**
+ * LLM-based intent classifier — used when keyword matching is uncertain.
+ * Calls a fast LLM (gpt-4.1-nano) with a structured prompt to classify the intent
+ * into one of four categories with a confidence score.
+ *
+ * Returns null if the LLM call fails (caller falls back to keyword result).
+ */
+async function classifyIntentWithLLM(
+  message: string,
+  recentContext: string
+): Promise<{
+  intent: "self_build" | "external_build" | "research" | "chat";
+  confidence: number;
+  reasoning: string;
+} | null> {
+  try {
+    const systemPrompt = `You are an intent classifier for an AI assistant called Titan.
+Classify the user's message into exactly ONE of these intents:
+
+- self_build: User wants to modify Titan's own codebase, add features to Titan, fix Titan's UI, or improve Titan itself.
+- external_build: User wants to build a NEW standalone project, app, script, tool, or file in a sandbox environment.
+- research: User wants information, analysis, comparison, a report, a PDF, or research on a topic. No code to build.
+- chat: General conversation, question, or request that doesn't fit the above.
+
+Rules:
+- If the message mentions comparing websites, auditing a site, or generating a PDF/report → research
+- If the message mentions building something FOR Titan or improving Titan → self_build
+- If the message mentions building a new standalone app/script/tool → external_build
+- If unsure between research and external_build, prefer research
+- confidence: 0.0 to 1.0 (how certain you are)
+
+Respond with ONLY valid JSON: {"intent": "...", "confidence": 0.0, "reasoning": "one sentence"}`;
+
+    const userPrompt = recentContext
+      ? `Recent context:\n${recentContext}\n\nCurrent message: ${message}`
+      : `Message: ${message}`;
+
+    const result = await invokeLLM({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      model: "fast",
+      maxTokens: 120,
+      temperature: 0,
+      priority: "chat",
+      systemTag: "chat",
+    });
+
+    const text = result.choices[0]?.message?.content || "";
+    // Extract JSON from the response (may have markdown fences)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      intent: "self_build" | "external_build" | "research" | "chat";
+      confidence: number;
+      reasoning: string;
+    };
+
+    if (!parsed.intent || typeof parsed.confidence !== "number") return null;
+    return parsed;
+  } catch {
+    // LLM classifier failed — caller will use keyword result
+    return null;
+  }
+}
+
 export async function detectBuildIntentAsync(
   message: string,
   previousMessages: Message[]
@@ -1203,26 +1272,53 @@ export async function detectBuildIntentAsync(
     return { isSelfBuild: true, isExternalBuild: false, needsClarification: false };
   }
 
-  // CONSERVATIVE FALLBACK: Only trigger external build when there is a clear
-  // STRONG build keyword. We no longer fallback on CONTEXT keywords (like "fix" or "update")
-  // because that causes false-positive external builds for general chat requests.
-  const msgLower = message.toLowerCase();
+  // If keyword matching gave a clear, unambiguous result — use it immediately
+  // (no need to spend an LLM call when we're already certain)
+  if (isSelfBuild) return { isSelfBuild: true, isExternalBuild: false, needsClarification: false };
+  if (isExternalBuild) return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
 
-  // RESEARCH/REPORT GUARD: Never route research, comparison, or PDF-generation tasks
-  // to the external sandbox builder. These are pure chat/research tasks that should
-  // use web_search + web_page_read and respond in chat — not spin up a sandbox.
-  // Example: "research website A, compare to website B, give me a PDF of improvements"
-  // must NEVER become isExternalBuild=true.
+  // ── UNCERTAIN ZONE: keyword matching returned false for both ──────────────
+  // Use the LLM classifier to make a smarter decision.
+  // This handles edge cases like:
+  //   - "build me a tool to scrape prices" (external_build, but no strong keyword)
+  //   - "research virelle.life and compare to competitor" (research, not build)
+  //   - "create a flowchart of our system" (research/diagram, not sandbox build)
+  const recentContext = previousMessages
+    .slice(-4)
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => `${m.role}: ${typeof m.content === "string" ? m.content.slice(0, 200) : ""}`)
+    .join("\n");
+
+  const llmResult = await classifyIntentWithLLM(message, recentContext);
+
+  if (llmResult && llmResult.confidence >= 0.75) {
+    // High-confidence LLM classification — trust it
+    switch (llmResult.intent) {
+      case "self_build":
+        return { isSelfBuild: true, isExternalBuild: false, needsClarification: false };
+      case "external_build":
+        return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
+      case "research":
+      case "chat":
+        return { isSelfBuild: false, isExternalBuild: false, needsClarification: false };
+    }
+  }
+
+  // Low-confidence LLM result or LLM failed — fall back to conservative keyword check
+  // RESEARCH/REPORT GUARD: Never route research/PDF tasks to the external sandbox builder
+  const msgLower = message.toLowerCase();
   const isResearchOrReport = /\b(research|compare|analyse|analyze|look at|check out|review|audit|read|study|summarize|summarise|scrape|crawl|visit|inspect|examine|report on|write a report|generate a pdf|create a pdf|pdf of|document|overview|breakdown|how to improve|improvement suggestions|recommendations for|give me a report|provide a report|provide a pdf|make a pdf|write a pdf|make a report)\b/.test(msgLower);
   if (isResearchOrReport) {
     return { isSelfBuild: false, isExternalBuild: false, needsClarification: false };
   }
 
+  // Only trigger external build on the 4 unambiguous strong keywords
   const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
-  if (hasStrong && !isSelfBuild && !isExternalBuild) {
+  if (hasStrong) {
     return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
   }
-  return { isSelfBuild, isExternalBuild, needsClarification: false };
+
+  return { isSelfBuild: false, isExternalBuild: false, needsClarification: false };
 }
 
 /**
