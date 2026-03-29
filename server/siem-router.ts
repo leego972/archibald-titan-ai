@@ -9,6 +9,7 @@
 import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import axios from "axios";
+import { getUserPlan, enforceFeature } from "./subscription-gate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SiemProvider = "splunk" | "elastic" | "datadog" | "sentinel" | "qradar" | "generic_webhook";
@@ -16,7 +17,7 @@ type EventSeverity = "critical" | "high" | "medium" | "low" | "info";
 
 interface SiemConfig {
   id: string;
-  userId: string;
+  userId: number;
   name: string;
   provider: SiemProvider;
   webhookUrl: string;
@@ -33,7 +34,7 @@ interface SiemConfig {
 interface SiemEvent {
   id: string;
   configId: string;
-  userId: string;
+  userId: number;
   eventType: string;
   severity: EventSeverity;
   source: string;
@@ -99,13 +100,13 @@ function formatForSentinel(event: Omit<SiemEvent, "id" | "configId" | "userId" |
 
 // ─── Event dispatcher (exported for other engines to use) ─────────────────────
 export async function dispatchSiemEvent(
-  userId: string,
+  userId: number,
   eventType: string,
   severity: EventSeverity,
   source: string,
   payload: Record<string, unknown>
 ): Promise<void> {
-  const userConfigs = siemConfigs.filter((c) => c.userId === userId && c.enabled && c.eventTypes.includes(eventType));
+  const userConfigs = siemConfigs.filter((c) => c.userId === (userId as number) && c.enabled && c.eventTypes.includes(eventType));
 
   for (const config of userConfigs) {
     let body: unknown;
@@ -162,7 +163,7 @@ export async function dispatchSiemEvent(
 export const siemRouter = router({
   // ── List configs ──────────────────────────────────────────────────────────
   getConfigs: protectedProcedure.query(({ ctx }) => {
-    const configs = siemConfigs.filter((c) => c.userId === ctx.user.id).map((c) => ({
+    const configs = siemConfigs.filter((c) => c.userId === (ctx.user.id as number)).map((c) => ({
       ...c,
       apiKey: c.apiKey ? "••••••••" : undefined, // mask key
     }));
@@ -181,7 +182,10 @@ export const siemRouter = router({
         eventTypes: z.array(z.string()).min(1),
       })
     )
-    .mutation(({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ── Plan gate: SIEM Integration requires Enterprise tier or above ──
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "siem_integration", "SIEM Integration");
       const config: SiemConfig = {
         id: `siem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         userId: ctx.user.id,
@@ -213,7 +217,7 @@ export const siemRouter = router({
       })
     )
     .mutation(({ input, ctx }) => {
-      const config = siemConfigs.find((c) => c.id === input.configId && c.userId === ctx.user.id);
+      const config = siemConfigs.find((c) => c.id === input.configId && c.userId === (ctx.user.id as number));
       if (!config) throw new Error("Config not found");
       if (input.name !== undefined) config.name = input.name;
       if (input.webhookUrl !== undefined) config.webhookUrl = input.webhookUrl;
@@ -228,7 +232,7 @@ export const siemRouter = router({
   deleteConfig: protectedProcedure
     .input(z.object({ configId: z.string() }))
     .mutation(({ input, ctx }) => {
-      const idx = siemConfigs.findIndex((c) => c.id === input.configId && c.userId === ctx.user.id);
+      const idx = siemConfigs.findIndex((c) => c.id === input.configId && c.userId === (ctx.user.id as number));
       if (idx === -1) throw new Error("Config not found");
       siemConfigs.splice(idx, 1);
       return { success: true };
@@ -238,7 +242,10 @@ export const siemRouter = router({
   testConfig: protectedProcedure
     .input(z.object({ configId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const config = siemConfigs.find((c) => c.id === input.configId && c.userId === ctx.user.id);
+      // ── Plan gate ──
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "siem_integration", "SIEM Integration");
+      const config = siemConfigs.find((c) => c.id === input.configId && c.userId === (ctx.user.id as number));
       if (!config) throw new Error("Config not found");
 
       try {
@@ -260,7 +267,7 @@ export const siemRouter = router({
   getEventLog: protectedProcedure
     .input(z.object({ limit: z.number().min(1).max(200).default(50), configId: z.string().optional() }))
     .query(({ ctx, input }) => {
-      let events = siemEventLog.filter((e) => e.userId === ctx.user.id);
+      let events = siemEventLog.filter((e) => e.userId === (ctx.user.id as number));
       if (input.configId) events = events.filter((e) => e.configId === input.configId);
       return { events: events.slice(0, input.limit) };
     }),
@@ -289,8 +296,8 @@ export const siemRouter = router({
 
   // ── Get stats ─────────────────────────────────────────────────────────────
   getStats: protectedProcedure.query(({ ctx }) => {
-    const userConfigs = siemConfigs.filter((c) => c.userId === ctx.user.id);
-    const userEvents = siemEventLog.filter((e) => e.userId === ctx.user.id);
+    const userConfigs = siemConfigs.filter((c) => c.userId === (ctx.user.id as number));
+    const userEvents = siemEventLog.filter((e) => e.userId === (ctx.user.id as number));
     const totalSent = userEvents.filter((e) => e.status === "sent").length;
     const totalFailed = userEvents.filter((e) => e.status === "failed").length;
     return {

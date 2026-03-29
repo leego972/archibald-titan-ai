@@ -12,6 +12,7 @@ import { getDb } from "./db";
 import { eq, desc, count, and, gte } from "drizzle-orm";
 import { users, fetcherCredentials, monitoredSites } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
+import { getUserPlan, enforceFeature } from "./subscription-gate";
 
 // ─── Report Types ─────────────────────────────────────────────────────────────
 type ReportType = "soc2" | "iso27001" | "gdpr" | "red_team_summary" | "security_posture";
@@ -32,7 +33,7 @@ interface ComplianceReport {
   id: string;
   type: ReportType;
   generatedAt: Date;
-  userId: string;
+  userId: number;
   overallScore: number;
   passCount: number;
   failCount: number;
@@ -60,12 +61,14 @@ function scoreReport(controls: ComplianceControl[]): number {
 }
 
 // ─── Control Evaluators ───────────────────────────────────────────────────────
-async function evaluateSOC2Controls(userId: string): Promise<ComplianceControl[]> {
+async function evaluateSOC2Controls(userId: number): Promise<ComplianceControl[]> {
   const controls: ComplianceControl[] = [];
 
   // CC6.1 — Logical and Physical Access Controls
   try {
-    const [userRow] = await getDb().select().from(users).where(eq(users.id, userId)).limit(1);
+    const _db1 = await getDb();
+    if (!_db1) throw new Error("db unavailable");
+    const [userRow] = await _db1.select().from(users).where(eq(users.id, userId)).limit(1);
     const hasTwoFactor = !!(userRow as any)?.twoFactorEnabled;
     controls.push({
       id: "CC6.1",
@@ -83,7 +86,9 @@ async function evaluateSOC2Controls(userId: string): Promise<ComplianceControl[]
 
   // CC6.2 — Credential Management
   try {
-    const credCount = await getDb().select({ count: count() }).from(fetcherCredentials).where(eq(fetcherCredentials.userId, userId));
+    const _db2 = await getDb();
+    if (!_db2) throw new Error("db unavailable");
+    const credCount = await _db2.select({ count: count() }).from(fetcherCredentials).where(eq(fetcherCredentials.userId, userId));
     const total = credCount[0]?.count ?? 0;
     controls.push({
       id: "CC6.2",
@@ -122,7 +127,9 @@ async function evaluateSOC2Controls(userId: string): Promise<ComplianceControl[]
 
   // CC9.1 — Risk Mitigation
   try {
-    const siteCount = await getDb().select({ count: count() }).from(monitoredSites).where(eq((monitoredSites as any).userId, userId));
+    const _db3 = await getDb();
+    if (!_db3) throw new Error("db unavailable");
+    const siteCount = await _db3.select({ count: count() }).from(monitoredSites).where(eq((monitoredSites as any).userId, userId));
     const monitored = siteCount[0]?.count ?? 0;
     controls.push({
       id: "CC9.1",
@@ -174,11 +181,12 @@ async function evaluateSOC2Controls(userId: string): Promise<ComplianceControl[]
   return controls;
 }
 
-async function evaluateISO27001Controls(userId: string): Promise<ComplianceControl[]> {
+async function evaluateISO27001Controls(userId: number): Promise<ComplianceControl[]> {
   const controls: ComplianceControl[] = [];
 
   // A.9 — Access Control
-  const [userRow] = await getDb().select().from(users).where(eq(users.id, userId)).limit(1).catch(() => [null]);
+  const _db4 = await getDb();
+  const [userRow] = _db4 ? await _db4.select().from(users).where(eq(users.id, userId)).limit(1).catch(() => [null]) : [null];
   const hasTwoFactor = !!(userRow as any)?.twoFactorEnabled;
 
   controls.push({
@@ -282,7 +290,7 @@ async function evaluateISO27001Controls(userId: string): Promise<ComplianceContr
   return controls;
 }
 
-async function evaluateGDPRControls(userId: string): Promise<ComplianceControl[]> {
+async function evaluateGDPRControls(userId: number): Promise<ComplianceControl[]> {
   return [
     {
       id: "Art.5",
@@ -364,6 +372,9 @@ export const complianceRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.user.id;
+      // ── Plan gate: Compliance Reports require Enterprise tier or above ──
+      const plan = await getUserPlan(userId);
+      enforceFeature(plan.planId, "compliance_reports", "Compliance Report Generator");
       let controls: ComplianceControl[] = [];
 
       switch (input.type) {
@@ -421,7 +432,8 @@ export const complianceRouter = router({
 
 Write in professional compliance language suitable for a board-level audience. Be factual and constructive.`;
 
-        executiveSummary = await invokeLLM(summaryPrompt, "gpt-4.1-mini");
+        const llmResult = await invokeLLM({ messages: [{ role: "user", content: summaryPrompt }], model: "fast", priority: "background" });
+        executiveSummary = (llmResult.choices[0]?.message?.content as string) ?? "";
       } catch {
         executiveSummary = `This ${input.type.toUpperCase()} assessment evaluated ${controls.length} controls and achieved an overall compliance score of ${overallScore}%. ${passCount} controls passed, ${failCount} failed, and ${partialCount} require partial remediation. ${recommendations.length > 0 ? `Priority recommendations include: ${recommendations.slice(0, 3).join("; ")}.` : "No critical remediation actions are required at this time."}`;
       }
@@ -452,7 +464,7 @@ Write in professional compliance language suitable for a board-level audience. B
     .input(z.object({ limit: z.number().min(1).max(50).default(20) }))
     .query(({ ctx, input }) => {
       const userReports = reportStore
-        .filter((r) => r.userId === ctx.user.id)
+        .filter((r) => r.userId === (ctx.user.id as number))
         .slice(0, input.limit);
       return { reports: userReports };
     }),
@@ -461,7 +473,7 @@ Write in professional compliance language suitable for a board-level audience. B
   getReport: protectedProcedure
     .input(z.object({ reportId: z.string() }))
     .query(({ ctx, input }) => {
-      const report = reportStore.find((r) => r.id === input.reportId && r.userId === ctx.user.id);
+      const report = reportStore.find((r) => r.id === input.reportId && r.userId === (ctx.user.id as number));
       if (!report) throw new Error("Report not found");
       return { report };
     }),
@@ -470,7 +482,7 @@ Write in professional compliance language suitable for a board-level audience. B
   deleteReport: protectedProcedure
     .input(z.object({ reportId: z.string() }))
     .mutation(({ ctx, input }) => {
-      const idx = reportStore.findIndex((r) => r.id === input.reportId && r.userId === ctx.user.id);
+      const idx = reportStore.findIndex((r) => r.id === input.reportId && r.userId === (ctx.user.id as number));
       if (idx === -1) throw new Error("Report not found");
       reportStore.splice(idx, 1);
       return { success: true };

@@ -12,11 +12,10 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getDb } from "./db";
 import { createLogger } from "./_core/logger";
 import { getErrorMessage } from "./_core/errors";
 import { checkCredits, consumeCredits } from "./credit-service";
-import { invokeLLM } from "./llm-engine";
+import { invokeLLM } from "./_core/llm";
 
 const log = createLogger("RedTeamPlaybooks");
 
@@ -219,7 +218,7 @@ export const redTeamPlaybooksRouter = router({
     .input(z.object({
       playbookId: z.string(),
       target: z.string().min(1).max(500),
-      options: z.record(z.unknown()).optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const user = ctx.user!;
@@ -241,7 +240,7 @@ export const redTeamPlaybooksRouter = router({
 
       // Credit check — 50 credits per playbook run
       if (!isAdmin) {
-        await checkCredits(user.id, "advertising_run", 50);
+        await checkCredits(user.id, "advertising_run");
       }
 
       const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -400,13 +399,13 @@ Write a professional security assessment report with:
 
 Format as clean Markdown.`;
 
-      const report = await invokeLLM({
-        model: "gpt-4.1-mini",
+      const reportResult = await invokeLLM({
+        model: "strong",
         messages: [{ role: "user", content: reportPrompt }],
         maxTokens: 2000,
+        priority: "background",
       });
-
-      run.report = report;
+      run.report = (reportResult.choices[0]?.message?.content as string) ?? "Report generation failed";
     } catch (err) {
       run.report = `# Report Generation Failed\n\nError: ${getErrorMessage(err)}\n\n## Raw Findings\n\n${JSON.stringify(allFindings, null, 2)}`;
     }
@@ -419,7 +418,7 @@ Format as clean Markdown.`;
   // Consume credits
   if (!isAdmin) {
     try {
-      await consumeCredits(userId, "advertising_run", 50, `Red team playbook: ${run.playbookName}`);
+      await consumeCredits(userId, "advertising_run", `Red team playbook: ${run.playbookName}`);
     } catch { /* ignore credit errors after completion */ }
   }
 }
@@ -445,15 +444,16 @@ Return a JSON object with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await invokeLLM({
-    model: "gpt-4.1-mini",
+  const llmResult = await invokeLLM({
+    model: "fast",
     messages: [{ role: "user", content: prompt }],
     maxTokens: 800,
+    priority: "background",
   });
-
+  const text = (llmResult.choices[0]?.message?.content as string) ?? "{}";
   try {
-    return JSON.parse(response);
+    return JSON.parse(text);
   } catch {
-    return { summary: response, data: {}, findings: [], raw: response };
+    return { summary: text, data: {}, findings: [], raw: text };
   }
 }

@@ -8,8 +8,6 @@
 
 import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { db } from "./_core/db";
-import { sql } from "drizzle-orm";
 
 // ─── In-memory event log (per-process, resets on restart) ────────────────────
 interface EventLogEntry {
@@ -119,7 +117,7 @@ export async function emitEvent(
   sourceEngine: string,
   eventType: string,
   payload: Record<string, unknown>,
-  userId?: string
+  userId?: number
 ): Promise<void> {
   const entry: EventLogEntry = {
     id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -209,7 +207,7 @@ export const eventBusRouter = router({
           z.object({
             targetEngine: z.string(),
             actionType: z.string(),
-            params: z.record(z.unknown()).default({}),
+            params: z.record(z.string(), z.unknown()).default({}),
             delaySeconds: z.number().min(0).max(3600).optional(),
           })
         ).min(1),
@@ -294,11 +292,11 @@ export const eventBusRouter = router({
       z.object({
         sourceEngine: z.string(),
         eventType: z.string(),
-        payload: z.record(z.unknown()).default({}),
+        payload: z.record(z.string(), z.unknown()).default({}),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await emitEvent(input.sourceEngine, input.eventType, input.payload, ctx.user.id);
+      await emitEvent(input.sourceEngine, input.eventType, input.payload, ctx.user.id as number);
       return { success: true, message: "Test event emitted" };
     }),
 

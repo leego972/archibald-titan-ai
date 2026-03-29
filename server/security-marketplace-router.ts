@@ -8,6 +8,7 @@
 
 import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
+import { getUserPlan, enforceFeature } from "./subscription-gate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ModuleCategory = "osint" | "scanning" | "exploitation" | "phishing" | "anonymity" | "automation" | "reporting" | "playbook" | "wordlist" | "template";
@@ -42,7 +43,7 @@ interface MarketplaceModule {
 interface ModuleReview {
   id: string;
   moduleId: string;
-  userId: string;
+  userId: number;
   username: string;
   rating: number;
   comment: string;
@@ -233,7 +234,7 @@ const MODULES: MarketplaceModule[] = [
 ];
 
 const reviews: ModuleReview[] = [];
-const installedModules: Map<string, Set<string>> = new Map(); // userId → Set<moduleId>
+const installedModules: Map<number, Set<string>> = new Map(); // userId → Set<moduleId>
 
 // ─── tRPC Router ─────────────────────────────────────────────────────────────
 export const securityMarketplaceRouter = router({
@@ -279,7 +280,7 @@ export const securityMarketplaceRouter = router({
         default: modules.sort((a, b) => b.downloads - a.downloads);
       }
 
-      const userInstalled = installedModules.get(ctx.user.id) ?? new Set();
+      const userInstalled = installedModules.get(ctx.user.id as number) ?? new Set();
       const paginated = modules.slice(input.offset, input.offset + input.limit);
 
       return {
@@ -295,7 +296,7 @@ export const securityMarketplaceRouter = router({
     .query(({ input, ctx }) => {
       const module = MODULES.find((m) => m.id === input.moduleId);
       if (!module) throw new Error("Module not found");
-      const userInstalled = installedModules.get(ctx.user.id) ?? new Set();
+      const userInstalled = installedModules.get(ctx.user.id as number) ?? new Set();
       const moduleReviews = reviews.filter((r) => r.moduleId === input.moduleId);
       return { module: { ...module, installed: userInstalled.has(module.id) }, reviews: moduleReviews };
     }),
@@ -303,14 +304,17 @@ export const securityMarketplaceRouter = router({
   // ── Install module ────────────────────────────────────────────────────────
   installModule: protectedProcedure
     .input(z.object({ moduleId: z.string() }))
-    .mutation(({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ── Plan gate: Security Marketplace requires Cyber tier or above ──
+      const plan = await getUserPlan(ctx.user.id);
+      enforceFeature(plan.planId, "security_tools", "Security Module Marketplace");
       const module = MODULES.find((m) => m.id === input.moduleId);
       if (!module) throw new Error("Module not found");
 
-      if (!installedModules.has(ctx.user.id)) {
-        installedModules.set(ctx.user.id, new Set());
+      if (!installedModules.has(ctx.user.id as number)) {
+        installedModules.set(ctx.user.id as number, new Set());
       }
-      installedModules.get(ctx.user.id)!.add(input.moduleId);
+      installedModules.get(ctx.user.id as number)!.add(input.moduleId);
       module.downloads++;
 
       return { success: true, message: `${module.name} installed successfully` };
@@ -320,13 +324,13 @@ export const securityMarketplaceRouter = router({
   uninstallModule: protectedProcedure
     .input(z.object({ moduleId: z.string() }))
     .mutation(({ input, ctx }) => {
-      installedModules.get(ctx.user.id)?.delete(input.moduleId);
+      installedModules.get(ctx.user.id as number)?.delete(input.moduleId);
       return { success: true };
     }),
 
   // ── Get installed modules ─────────────────────────────────────────────────
   getInstalled: protectedProcedure.query(({ ctx }) => {
-    const userInstalled = installedModules.get(ctx.user.id) ?? new Set();
+    const userInstalled = installedModules.get(ctx.user.id as number) ?? new Set();
     const modules = MODULES.filter((m) => userInstalled.has(m.id)).map((m) => ({ ...m, installed: true }));
     return { modules };
   }),
@@ -344,13 +348,13 @@ export const securityMarketplaceRouter = router({
       const module = MODULES.find((m) => m.id === input.moduleId);
       if (!module) throw new Error("Module not found");
 
-      const existing = reviews.find((r) => r.moduleId === input.moduleId && r.userId === ctx.user.id);
+      const existing = reviews.find((r) => r.moduleId === input.moduleId && r.userId === (ctx.user.id as number));
       if (existing) throw new Error("You have already reviewed this module");
 
       const review: ModuleReview = {
         id: `rev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         moduleId: input.moduleId,
-        userId: ctx.user.id,
+        userId: ctx.user.id as number,
         username: (ctx.user as any).username ?? "Anonymous",
         rating: input.rating,
         comment: input.comment,
@@ -392,7 +396,7 @@ export const securityMarketplaceRouter = router({
 
   // ── Get stats ─────────────────────────────────────────────────────────────
   getStats: protectedProcedure.query(({ ctx }) => {
-    const userInstalled = installedModules.get(ctx.user.id) ?? new Set();
+    const userInstalled = installedModules.get(ctx.user.id as number) ?? new Set();
     return {
       totalModules: MODULES.length,
       freeModules: MODULES.filter((m) => m.license === "free").length,
