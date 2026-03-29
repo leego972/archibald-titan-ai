@@ -638,7 +638,7 @@ function FetcherLayoutContent({
           className="border-r-0"
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-16 justify-center">
+          <SidebarHeader className="h-[60px] justify-center border-b border-white/[0.05]">
             <div className="flex items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
@@ -657,7 +657,7 @@ function FetcherLayoutContent({
                   title="Go to home"
                 >
                   <TitanLogo size="sm" />
-                  <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-400 to-blue-200 bg-clip-text text-transparent">
+                  <span className="font-bold tracking-tight truncate bg-gradient-to-r from-blue-300 via-blue-400 to-blue-200 bg-clip-text text-transparent text-[13px]">
                     Archibald Titan
                   </span>
                 </div>
@@ -704,10 +704,10 @@ function FetcherLayoutContent({
                             isActive={isActive}
                             onClick={() => { setLocation(item.path); if (isMobile) toggleSidebar(); }}
                             tooltip={item.label}
-                            className={`h-12 sm:h-9 transition-all font-normal ${
+                            className={`h-12 sm:h-9 transition-all font-normal relative ${
                               isActive
-                                ? "bg-blue-500/10 text-blue-400 font-medium"
-                                : "hover:bg-white/[0.04]"
+                                ? "bg-blue-500/[0.12] text-blue-300 font-medium ring-0 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-0.5 before:rounded-full before:bg-blue-400"
+                                : "hover:bg-white/[0.05] text-muted-foreground hover:text-foreground"
                             }`}
                           >
                             <item.icon
@@ -757,7 +757,7 @@ function FetcherLayoutContent({
             )}
           </SidebarContent>
 
-          <SidebarFooter className="p-3 border-t border-white/5">
+          <SidebarFooter className="p-3 border-t border-white/[0.07]">
             {!isCollapsed && (
               <div className="flex items-center justify-between px-2 pb-2">
                 <LanguageSelector forceUp />
@@ -909,7 +909,7 @@ function FetcherLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b border-white/10 h-14 items-center justify-between bg-background px-3 sticky top-0 z-50 safe-area-top" id="mobile-nav-header">
+          <div className="flex border-b border-white/[0.08] h-14 items-center justify-between bg-background/95 backdrop-blur-md px-3 sticky top-0 z-50 safe-area-top" id="mobile-nav-header">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="h-10 w-10 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-foreground [&_svg]:!h-5 [&_svg]:!w-5" />
               <div

@@ -121,9 +121,9 @@ export default function LandingPage() {
       <ArchibaldWizard />
 
       {/* NAV */}
-      <nav aria-label="Navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
+      <nav aria-label="Navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.07] bg-[#060611]/85 backdrop-blur-2xl shadow-[0_1px_0_rgba(255,255,255,0.04)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-[60px]">
             <div className="flex items-center gap-3">
               <img loading="eager" src={AT_ICON_64} alt="AT" className="h-9 w-9 object-contain" />
               <span className="text-lg font-black tracking-tight">Archibald Titan</span>
@@ -176,7 +176,7 @@ export default function LandingPage() {
       {/* ═══════════════════════════════════════════════════════════
           HERO — Titan Builder is the command center
       ═══════════════════════════════════════════════════════════ */}
-      <section className="relative pt-28 pb-20 sm:pt-36 sm:pb-28">
+      <section className="relative pt-[100px] pb-20 sm:pt-[120px] sm:pb-28">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] bg-red-700/10 rounded-full blur-[140px]" />
           <div className="absolute top-1/2 left-1/4 w-[500px] h-[400px] bg-orange-600/5 rounded-full blur-[100px]" />
@@ -231,6 +231,21 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-4 text-sm text-white/25">Free tier available. No credit card required to start.</p>
+
+          {/* Trust signal strip */}
+          <div className="mt-12 pt-10 border-t border-white/[0.06] grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto">
+            {[
+              { value: "15+", label: "Cloud Providers" },
+              { value: "6", label: "Subscription Tiers" },
+              { value: "AES-256", label: "Encrypted Vault" },
+              { value: "MIT", label: "Open Source" },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-2xl font-black text-white tracking-tight">{stat.value}</div>
+                <div className="text-xs text-white/35 mt-0.5 font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -355,7 +370,7 @@ export default function LandingPage() {
                 color: "text-pink-400", bg: "bg-pink-500/10",
               },
             ].map((item) => (
-              <div key={item.title} className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-red-500/20 transition-all duration-200 group">
+              <div key={item.title} className="p-6 rounded-2xl border border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.045] hover:border-red-500/25 hover:-translate-y-0.5 transition-all duration-200 group">
                 <div className={`inline-flex p-2.5 rounded-xl ${item.bg} mb-4`}>
                   <item.icon className={`h-5 w-5 ${item.color}`} />
                 </div>
@@ -673,7 +688,7 @@ export default function LandingPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="relative border-t border-white/5 py-12">
+      <footer className="relative border-t border-white/[0.08] py-14">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
             <div className="md:col-span-2">
@@ -721,8 +736,24 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Security trust badges */}
+          <div className="mt-10 pt-8 border-t border-white/[0.06] flex flex-wrap items-center justify-center gap-4 mb-8">
+            {[
+              { icon: Lock, label: "AES-256 Encrypted" },
+              { icon: Shield, label: "SOC2 Aligned" },
+              { icon: Eye, label: "Local-First AI" },
+              { icon: RefreshCw, label: "99.9% Uptime SLA" },
+              { icon: GitBranch, label: "Open Source" },
+            ].map((badge) => (
+              <div key={badge.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 font-medium">
+                <badge.icon className="h-3 w-3 text-white/30" />
+                {badge.label}
+              </div>
+            ))}
+          </div>
+
           {/* LEEGO LOGO — click to enlarge, auto-shrinks after 1.8s */}
-          <div className="mt-10 pt-6 border-t border-white/5 flex flex-col items-center">
+          <div className="flex flex-col items-center">
             <button
               onClick={handleLeegoClick}
               className="focus:outline-none group"
@@ -739,7 +770,7 @@ export default function LandingPage() {
             </button>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-8 pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-white/20">&copy; {new Date().getFullYear()} Archibald Titan. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <Link href="/terms" className="text-xs text-white/20 hover:text-white/40 transition-colors">Terms</Link>

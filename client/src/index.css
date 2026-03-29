@@ -132,6 +132,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  p {
+    line-height: 1.65;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -143,6 +152,25 @@
   input[type="checkbox"]:not(:disabled),
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
+  }
+}
+
+/* ─── Enterprise Shadow System ───────────────────────────────────── */
+@layer utilities {
+  .shadow-card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .shadow-card-hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .shadow-panel {
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.2);
+  }
+  .shadow-inset-top {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .ring-subtle {
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
   }
 }
 
@@ -267,6 +295,23 @@ body {
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+}
+
+/* ─── Page Section Spacing ───────────────────────────────────────── */
+.page-header {
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 1.5rem;
+}
+.section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: oklch(0.55 0.015 286);
+}
+.dark .section-label {
+  color: oklch(0.55 0.015 286);
 }
 
 /* ─── Button Variants ────────────────────────────────────────────── */
