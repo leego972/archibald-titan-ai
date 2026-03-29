@@ -114,6 +114,8 @@ import { checkCard, checkBin } from "./card-checker";
 import { generatePdf } from "./pdf-generator";
 import { generateSpreadsheet } from "./spreadsheet-generator";
 import { generateImage } from "./_core/imageGeneration";
+import { takeWebScreenshot } from "./web-screenshot";
+import { generateDiagram } from "./diagram-generator";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -624,6 +626,10 @@ export async function executeToolCall(
         return await execGenerateImage(userId, args);
       case "generate_markdown_report":
         return await execGenerateMarkdownReport(userId, args, conversationId);
+      case "web_screenshot":
+        return await execWebScreenshot(userId, args, conversationId);
+      case "generate_diagram":
+        return await execGenerateDiagram(userId, args, conversationId);
       case "create_file":
         return await execCreateFile(userId, args, conversationId);
       case "create_github_repo":
@@ -4051,6 +4057,80 @@ async function execGenerateMarkdownReport(
   } catch (err: unknown) {
     log.error("[GenerateMarkdownReport] Error:", { error: String(err) });
     return { success: false, error: `Markdown report generation failed: ${String(err)}` };
+  }
+}
+
+/**
+ * Take a full-page screenshot of a URL and upload it to S3/R2.
+ * Returns a direct public image URL. Use for visual website comparisons,
+ * UI audits, and including rendered page screenshots in reports.
+ */
+async function execWebScreenshot(
+  userId: number,
+  args: Record<string, unknown>,
+  conversationId?: number
+): Promise<ToolExecutionResult> {
+  const url = args.url as string;
+  if (!url) return { success: false, error: "'url' is required for web_screenshot" };
+
+  const width = typeof args.width === "number" ? args.width : 1440;
+  const height = typeof args.height === "number" ? args.height : 900;
+  const fullPage = args.fullPage !== false;
+
+  log.info(`[WebScreenshot] User ${userId} requesting screenshot of: ${url}`);
+
+  try {
+    const result = await takeWebScreenshot(userId, { url, width, height, fullPage }, conversationId);
+    return {
+      success: true,
+      data: {
+        screenshotUrl: result.url,
+        pageTitle: result.title,
+        size: result.size,
+        viewport: result.viewport,
+        message: `Screenshot captured — view/download: ${result.url}`,
+      },
+    };
+  } catch (err: unknown) {
+    log.error("[WebScreenshot] Error:", { error: String(err) });
+    return { success: false, error: `Screenshot failed: ${String(err)}` };
+  }
+}
+
+/**
+ * Render a Mermaid diagram to a PNG image and upload it to S3/R2.
+ * Supports flowcharts, sequence diagrams, ER diagrams, Gantt charts,
+ * class diagrams, state diagrams, and pie charts.
+ * Returns a direct public image URL.
+ */
+async function execGenerateDiagram(
+  userId: number,
+  args: Record<string, unknown>,
+  conversationId?: number
+): Promise<ToolExecutionResult> {
+  const definition = args.definition as string;
+  if (!definition) return { success: false, error: "'definition' is required — provide a Mermaid diagram definition" };
+
+  const title = args.title as string | undefined;
+  const theme = (args.theme as "default" | "dark" | "forest" | "neutral") || "default";
+  const backgroundColor = (args.backgroundColor as string) || "#ffffff";
+  const width = typeof args.width === "number" ? args.width : 1200;
+
+  log.info(`[GenerateDiagram] User ${userId} requesting diagram: ${(title || "untitled").slice(0, 60)}`);
+
+  try {
+    const result = await generateDiagram(userId, { definition, title, theme, backgroundColor, width }, conversationId);
+    return {
+      success: true,
+      data: {
+        diagramUrl: result.url,
+        size: result.size,
+        message: `Diagram rendered — view/download: ${result.url}`,
+      },
+    };
+  } catch (err: unknown) {
+    log.error("[GenerateDiagram] Error:", { error: String(err) });
+    return { success: false, error: `Diagram generation failed: ${String(err)}` };
   }
 }
 

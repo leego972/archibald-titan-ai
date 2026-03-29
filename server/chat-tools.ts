@@ -2336,6 +2336,79 @@ const generateMarkdownReportTool: Tool = {
   },
 };
 
+const webScreenshotTool: Tool = {
+  type: "function",
+  function: {
+    name: "web_screenshot",
+    description:
+      "Take a full-page screenshot of any URL using a real headless browser (Playwright/Chromium) and return a direct image URL. " +
+      "Use this when the user wants to visually compare two websites, audit a UI, capture a rendered page, or include a screenshot in a report. " +
+      "Unlike web_page_read (which only reads text), this tool renders the actual page including CSS, images, and JavaScript. " +
+      "Returns a hosted PNG image URL that can be embedded in PDFs or reports.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "Full URL to screenshot. Must start with https:// or http://. Example: 'https://virelle.life'",
+        },
+        width: {
+          type: "number",
+          description: "Viewport width in pixels. Default: 1440 (desktop). Use 375 for mobile view.",
+        },
+        height: {
+          type: "number",
+          description: "Viewport height in pixels. Default: 900.",
+        },
+        fullPage: {
+          type: "boolean",
+          description: "Capture the full scrollable page height. Default: true. Set false for above-the-fold only.",
+        },
+      },
+      required: ["url"],
+    },
+  },
+};
+
+const generateDiagramTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_diagram",
+    description:
+      "Render a Mermaid diagram to a PNG image and return a direct image URL. " +
+      "Use this for architecture diagrams, flowcharts, sequence diagrams, ER diagrams, Gantt charts, class diagrams, state diagrams, and pie charts. " +
+      "Write the Mermaid definition and this tool renders it to a professional PNG. " +
+      "Do NOT use create_file for diagrams — use this tool instead.",
+    parameters: {
+      type: "object",
+      properties: {
+        definition: {
+          type: "string",
+          description: "Mermaid diagram definition string. Example: 'flowchart TD\\n  A[Start] --> B{Decision}\\n  B -->|Yes| C[End]'",
+        },
+        title: {
+          type: "string",
+          description: "Optional title displayed above the diagram.",
+        },
+        theme: {
+          type: "string",
+          enum: ["default", "dark", "forest", "neutral"],
+          description: "Mermaid theme. Default: 'default'. Use 'dark' for dark backgrounds.",
+        },
+        backgroundColor: {
+          type: "string",
+          description: "Background colour as a CSS colour string. Default: '#ffffff'.",
+        },
+        width: {
+          type: "number",
+          description: "Output width in pixels. Default: 1200.",
+        },
+      },
+      required: ["definition"],
+    },
+  },
+};
+
 const provideProjectZip: Tool = {
   type: "function",
   function: {
@@ -3365,6 +3438,8 @@ export const TITAN_TOOLS: Tool[] = [
   generateSpreadsheetTool,
   generateImageTool,
   generateMarkdownReportTool,
+  webScreenshotTool,
+  generateDiagramTool,
   createProjectFile,
   createGithubRepo,
   pushToGithubRepo,
@@ -3520,6 +3595,8 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   generateSpreadsheetTool,
   generateImageTool,
   generateMarkdownReportTool,
+  webScreenshotTool,
+  generateDiagramTool,
   createProjectFile,
   readUploadedFile,
   provideProjectZip,

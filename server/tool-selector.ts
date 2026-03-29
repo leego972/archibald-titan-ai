@@ -24,6 +24,7 @@ const ALWAYS_INCLUDE = new Set([
   "create_file", "read_uploaded_file", "provide_project_zip",
   // Binary/rich file generation — ALWAYS available, never filtered
   "generate_pdf", "generate_spreadsheet", "generate_image", "generate_markdown_report",
+  "web_screenshot", "generate_diagram",
   // Sandbox — full access: exec, write, read, list, delete, download
   "sandbox_exec", "sandbox_write_file", "sandbox_read_file", "sandbox_list_files",
   "sandbox_delete_file", "sandbox_download_url",
