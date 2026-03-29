@@ -158,6 +158,9 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       { icon: featureIcon("icon_16_r2c8"), label: "Attack Graph", path: "/attack-graph", isCyber: true, isNew: true },
       { icon: featureIcon("icon_38_r5c6"), label: "Proxy Interceptor", path: "/proxy-interceptor", isCyber: true, isNew: true },
       { icon: featureIcon("icon_15_r2c7"), label: "Red Team Playbooks", path: "/red-team-playbooks", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_16_r2c8"), label: "Compliance Reports", path: "/compliance-reports", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_38_r5c6"), label: "SIEM Integration", path: "/siem-integration", isCyber: true, isNew: true },
+      { icon: featureIcon("icon_31_r4c7"), label: "Security Marketplace", path: "/security-marketplace", isCyber: true, isNew: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════

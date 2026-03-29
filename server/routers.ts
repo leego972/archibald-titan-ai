@@ -72,6 +72,9 @@ import { isolatedBrowserRouter } from "./isolated-browser-router";
 import { linkenSphereRouter } from "./linken-sphere-router";
 import { redTeamPlaybooksRouter } from "./red-team-playbooks-router";
 import { eventBusRouter } from "./event-bus-router";
+import { complianceRouter } from "./compliance-router";
+import { siemRouter } from "./siem-router";
+import { securityMarketplaceRouter } from "./security-marketplace-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -177,6 +180,12 @@ export const appRouter = router({
   redTeamPlaybooks: redTeamPlaybooksRouter,
   // ── Cross-Engine Event Bus ────────────────────────────────────────────────────────────────────────
   eventBus: eventBusRouter,
+  // ── Enterprise Compliance Reports ────────────────────────────────────────────────────────────────
+  compliance: complianceRouter,
+  // ── SIEM Integration ─────────────────────────────────────────────────────────────────────────────
+  siem: siemRouter,
+  // ── Security Module Marketplace ──────────────────────────────────────────────────────────────────
+  securityMarketplace: securityMarketplaceRouter,
 });
 
 export type AppRouter = typeof appRouter;

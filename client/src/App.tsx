@@ -155,6 +155,9 @@ import ProxyInterceptorPage from "./pages/ProxyInterceptorPage";
 import RedTeamPlaybooksPage from "./pages/RedTeamPlaybooksPage";
 import CommandCentrePage from "./pages/CommandCentrePage";
 import EventBusPage from "./pages/EventBusPage";
+import ComplianceReportsPage from "./pages/ComplianceReportsPage";
+import SiemIntegrationPage from "./pages/SiemIntegrationPage";
+import SecurityMarketplacePage from "./pages/SecurityMarketplacePage";
 
 
 function DashboardRouter() {
@@ -290,6 +293,15 @@ function DashboardRouter() {
 
         {/* Event Bus */}
         <Route path="/event-bus" component={EventBusPage} />
+
+        {/* Compliance Reports */}
+        <Route path="/compliance-reports" component={ComplianceReportsPage} />
+
+        {/* SIEM Integration */}
+        <Route path="/siem-integration" component={SiemIntegrationPage} />
+
+        {/* Security Marketplace */}
+        <Route path="/security-marketplace" component={SecurityMarketplacePage} />
 
         <Route component={NotFound} />
       </Switch>
