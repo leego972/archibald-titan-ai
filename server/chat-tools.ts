@@ -1699,6 +1699,34 @@ const autoFixVulnerability: Tool = {
   },
 };
 
+// ── Build Error Recovery: suggest_fix ──────────────────────────────────────
+const suggestFix: Tool = {
+  type: "function",
+  function: {
+    name: "suggest_fix",
+    description:
+      "Diagnose a TypeScript/build error and suggest a targeted fix. Use this whenever a build, type-check, or test run fails. Provide the error message and the relevant file path; the tool returns a structured diagnosis with the root cause, the exact code change needed, and a confidence score.",
+    parameters: {
+      type: "object",
+      properties: {
+        error_message: {
+          type: "string",
+          description: "The full error output from tsc, vitest, or the build process",
+        },
+        file_path: {
+          type: "string",
+          description: "Path to the file where the error occurred (e.g. server/chat-router.ts)",
+        },
+        code_context: {
+          type: "string",
+          description: "Optional: the relevant lines of code around the error (10-30 lines)",
+        },
+      },
+      required: ["error_message", "file_path"],
+    },
+  },
+};
+
 const autoFixAll: Tool = {
   type: "function",
   function: {
@@ -3491,6 +3519,7 @@ export const TITAN_TOOLS: Tool[] = [
   // Auto-Fix
   autoFixVulnerability,
   autoFixAll,
+  suggestFix,
   // Grand Bazaar — search before building
   searchBazaar,
   // App Research & Clone
@@ -3647,6 +3676,10 @@ export const BUILDER_TOOLS: Tool[] = [
   codeSecurityReview,
   portScan,
   sslCheck,
+  // Auto-Fix & Error Recovery
+  autoFixVulnerability,
+  autoFixAll,
+  suggestFix,
   // System
   getSystemStatus,
   // File uploads — allows builder to read user-uploaded files (e.g. ZIP archives of projects to analyse/improve)
@@ -3812,7 +3845,8 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   appResearch,
   appClone,
   websiteReplicate,
-  // Auto-Fix
+  // Auto-Fix & Error Recovery
   autoFixVulnerability,
   autoFixAll,
+  suggestFix,
 ];

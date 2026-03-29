@@ -41,6 +41,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import DesktopLoginPage from "./pages/DesktopLoginPage";
 import DesktopBillingCallbackPage from "./pages/DesktopBillingCallbackPage";
 import DesktopSettingsPage from "./pages/DesktopSettingsPage";
+import BuilderTemplatesPage from "./pages/BuilderTemplatesPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
@@ -266,6 +267,9 @@ function DashboardRouter() {
 
         {/* Desktop App Settings */}
         <Route path="/desktop-settings" component={DesktopSettingsPage} />
+
+        {/* Builder Templates */}
+        <Route path="/builder-templates" component={BuilderTemplatesPage} />
 
         <Route component={NotFound} />
       </Switch>

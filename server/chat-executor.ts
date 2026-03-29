@@ -643,6 +643,9 @@ export async function executeToolCall(
         if (gate) return gate;
         return await execAutoFixAll(args);
       }
+      case "suggest_fix": {
+        return await execSuggestFix(userId, args);
+      }
 
       // ── App Research & Clone ───────────────────────────────────
       case "app_research":
@@ -3488,6 +3491,81 @@ async function execAutoFixAll(
       report,
     },
   };
+}
+
+// ─── Build Error Recovery Executor ─────────────────────────────────
+
+async function execSuggestFix(
+  userId: number,
+  args: Record<string, unknown>
+): Promise<ToolExecutionResult> {
+  const errorMessage = args.error_message as string;
+  const filePath = args.file_path as string;
+  const codeContext = args.code_context as string | undefined;
+
+  if (!errorMessage) return { success: false, error: "error_message is required" };
+  if (!filePath) return { success: false, error: "file_path is required" };
+
+  const prompt = [
+    `You are an expert TypeScript/React engineer. A build error occurred in the Archibald Titan codebase.`,
+    ``,
+    `FILE: ${filePath}`,
+    ``,
+    `ERROR:`,
+    errorMessage,
+    codeContext ? `\nCODE CONTEXT:\n${codeContext}` : "",
+    ``,
+    `Respond with a JSON object (no markdown fences) with these fields:`,
+    `{`,
+    `  "root_cause": "one-sentence explanation of why this error occurs",`,
+    `  "fix_description": "plain English description of what to change",`,
+    `  "code_before": "the exact line(s) to replace (copy from context if available)",`,
+    `  "code_after": "the corrected replacement code",`,
+    `  "confidence": 0.0-1.0,`,
+    `  "breaking_change": true/false`,
+    `}`,
+  ].join("\n");
+
+  try {
+    const raw = await invokeLLM({
+      systemPrompt: "You are a TypeScript build error diagnosis expert. Always respond with valid JSON only.",
+      userMessage: prompt,
+      model: "gpt-4.1-mini",
+      temperature: 0.1,
+    });
+
+    let diagnosis: Record<string, unknown>;
+    try {
+      const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
+      diagnosis = JSON.parse(cleaned);
+    } catch {
+      // Return raw LLM response if JSON parse fails
+      return {
+        success: true,
+        data: {
+          file_path: filePath,
+          diagnosis: raw,
+          confidence: 0.5,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        file_path: filePath,
+        root_cause: diagnosis.root_cause,
+        fix_description: diagnosis.fix_description,
+        code_before: diagnosis.code_before,
+        code_after: diagnosis.code_after,
+        confidence: diagnosis.confidence,
+        breaking_change: diagnosis.breaking_change,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `suggest_fix failed: ${msg}` };
+  }
 }
 
 // ─── App Research & Clone Executor Functions ────────────────────────

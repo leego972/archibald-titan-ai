@@ -996,6 +996,22 @@ export default function ChatPage() {
 
   // Keep voiceModeRef in sync
   useEffect(() => { voiceModeRef.current = voiceModeActive; }, [voiceModeActive]);
+  // ── Template URL param: pre-fill input when navigating from Builder Templates page ──
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const templatePrompt = params.get('template');
+      const templateName = params.get('templateName');
+      if (templatePrompt) {
+        setInput(decodeURIComponent(templatePrompt));
+        window.history.replaceState({}, '', window.location.pathname);
+        if (templateName) {
+          toast.success(`Template loaded: ${decodeURIComponent(templateName)}`, { duration: 3000 });
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Strip markdown for TTS (remove links, bold, code blocks, etc.)
   const stripMarkdown = (text: string): string => {
