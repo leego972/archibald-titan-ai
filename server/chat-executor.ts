@@ -213,6 +213,7 @@ export async function executeToolCall(
         "/marketplace", "/replicate", "/companies", "/business-plans",
         "/grants", "/grant-applications", "/crowdfunding",
         "/referrals", "/affiliate",
+        "/grant-finder", "/business-modules",
         // Marketing & Content
         "/blog", "/blog-admin", "/seo", "/marketing", "/advertising",
         "/master-growth", "/content-creator",
@@ -222,8 +223,11 @@ export async function executeToolCall(
         "/linken-sphere", "/tor", "/vpn-chain", "/proxy-maker",
         "/proxy-rotation", "/ip-rotation", "/isolated-browser",
         "/bin-checker", "/web-agent",
+        "/security", "/security-dashboard",
         // Storage
         "/storage",
+        // Desktop
+        "/desktop-settings", "/download-app",
       ];
       
       if (!validPages.includes(normalizedPath)) {
