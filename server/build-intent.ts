@@ -2067,8 +2067,9 @@ The #1 reason builds fail is DISCONNECTED FILES. Before delivering:
 ## AVAILABLE TOOLS
 
 **File Creation (user-downloadable + auto-synced to sandbox):**
-- **create_file** — Create a file (cloud + sandbox automatically)
-- **provide_project_zip** — Package all files into downloadable ZIP
+- **generate_pdf** — Generate a real, properly formatted PDF document from structured content. **USE THIS for any PDF report, comparison, analysis, or document the user wants to download as a PDF.** Do NOT use create_file for PDFs — PDFs are binary and create_file will corrupt them. Do NOT use provide_project_zip for PDFs — it wraps the file in a ZIP the user must unzip. generate_pdf returns a direct download URL.
+- **create_file** — Create a source code or text file (cloud + sandbox automatically). Do NOT use for PDF files.
+- **provide_project_zip** — Package all project source code files into downloadable ZIP. Use for code projects, NOT for PDF reports.
 - **read_uploaded_file** — Read user-uploaded files (text, source code, and ZIP archives). **MANDATORY: Call this FIRST if the user's message contains [Attached file: ...]**. For ZIP files it returns the full file manifest plus extracted source code contents. Never skip this step.
 
 **Sandbox (testing environment):**

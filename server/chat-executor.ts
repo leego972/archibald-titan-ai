@@ -111,6 +111,7 @@ import { runVaultBridge, getVaultBridgeStatus } from "./vault-bridge";
 import { getAutonomousSystemStatus } from "./autonomous-sync";
 import { getBusinessModuleGeneratorStatus, getBusinessVerticals, runBusinessModuleGenerationCycle } from "./business-module-generator";
 import { checkCard, checkBin } from "./card-checker";
+import { generatePdf } from "./pdf-generator";
 const log = createLogger("ChatExecutor");
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -613,6 +614,8 @@ export async function executeToolCall(
       }
 
       // ── Project Builder Tools ─────────────────────────────────
+      case "generate_pdf":
+        return await execGeneratePdf(userId, args, conversationId);
       case "create_file":
         return await execCreateFile(userId, args, conversationId);
       case "create_github_repo":
@@ -3827,9 +3830,76 @@ async function execWebsiteReplicate(
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Create a file in the user's project — stored in S3 with a downloadable URL.
- * This is the core builder tool that replaces sandbox_write_file for user-facing projects.
+ * Generate a real binary PDF from structured content and upload it to S3/R2.
+ * Returns a direct public download URL — NOT a ZIP, NOT a base64 string.
+ *
+ * This is the CORRECT way to deliver PDF reports to users.
+ * The LLM must call this tool instead of create_file + provide_project_zip.
  */
+async function execGeneratePdf(
+  userId: number,
+  args: Record<string, unknown>,
+  conversationId?: number
+): Promise<ToolExecutionResult> {
+  const title = (args.title as string) || "Report";
+  const subtitle = args.subtitle as string | undefined;
+  const fileName = (args.fileName as string) || `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.pdf`;
+
+  // sections can be passed as an array of { heading?, body } objects
+  // OR as a single markdown string in args.content for convenience
+  let sections: Array<{ heading?: string; body: string }>;
+
+  if (Array.isArray(args.sections)) {
+    sections = (args.sections as Array<{ heading?: string; body: string }>).map(s => ({
+      heading: s.heading,
+      body: String(s.body || ""),
+    }));
+  } else if (typeof args.content === "string") {
+    // Convenience: single markdown string — split on ## headings
+    const content = args.content as string;
+    const parts = content.split(/(?=^## )/m);
+    sections = parts.map(part => {
+      const lines = part.split("\n");
+      const firstLine = lines[0].trim();
+      if (firstLine.startsWith("## ")) {
+        return { heading: firstLine.replace(/^## /, ""), body: lines.slice(1).join("\n").trim() };
+      }
+      return { body: part.trim() };
+    }).filter(s => s.body || s.heading);
+  } else {
+    return { success: false, error: "generate_pdf requires either 'sections' array or 'content' string" };
+  }
+
+  if (sections.length === 0) {
+    return { success: false, error: "No content provided for PDF generation" };
+  }
+
+  log.info(`[GeneratePdf] Generating PDF: "${title}" (${sections.length} sections) for user ${userId}`);
+
+  const result = await generatePdf({
+    title,
+    subtitle,
+    sections,
+    userId,
+    conversationId,
+    fileName: fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
+  });
+
+  if (!result.success) {
+    return { success: false, error: result.error || "PDF generation failed" };
+  }
+
+  return {
+    success: true,
+    data: {
+      downloadUrl: result.url,
+      fileName: fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`,
+      size: result.size,
+      message: `PDF ready — click to download: ${result.url}`,
+    },
+  };
+}
+
 async function execCreateFile(
   userId: number,
   args: Record<string, unknown>,
@@ -4367,6 +4437,11 @@ function getContentType(fileName: string): string {
     py: "text/x-python", md: "text/markdown", svg: "image/svg+xml",
     xml: "application/xml", yaml: "text/yaml", yml: "text/yaml",
     txt: "text/plain", sh: "text/x-shellscript",
+    // Binary / document formats
+    pdf: "application/pdf",
+    zip: "application/zip",
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+    gif: "image/gif", webp: "image/webp",
   };
   return map[ext] || "text/plain";
 }

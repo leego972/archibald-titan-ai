@@ -94,6 +94,10 @@ function getMimeType(fileName: string): string {
     // Images
     svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
     gif: "image/gif", webp: "image/webp", ico: "image/x-icon",
+    // Documents — must be served with correct MIME type so the browser opens them directly
+    pdf: "application/pdf",
+    // Archives
+    zip: "application/zip",
   };
   return map[ext] || "application/octet-stream";
 }

@@ -2136,6 +2136,69 @@ const pushToGithubRepo: Tool = {
     },
   },
 };
+const generatePdfTool: Tool = {
+  type: "function",
+  function: {
+    name: "generate_pdf",
+    description:
+      "Generate a real, downloadable PDF document from structured content. " +
+      "Use this tool whenever the user asks for a PDF report, comparison document, analysis, or any deliverable in PDF format. " +
+      "This produces a properly formatted, styled PDF file and returns a direct download URL. " +
+      "IMPORTANT: Use this tool instead of create_file + provide_project_zip for PDF deliverables — " +
+      "create_file cannot produce valid binary PDFs and provide_project_zip wraps files in a ZIP which the user must unzip. " +
+      "This tool generates a real PDF the user can open directly. " +
+      "You can pass content either as a 'sections' array (preferred for structured reports) or as a single 'content' markdown string.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "The main title of the PDF document, shown prominently at the top. Example: 'Virelle vs Competitors — Website Analysis Report'",
+        },
+        subtitle: {
+          type: "string",
+          description: "Optional subtitle shown below the title. Example: 'Competitive Analysis & Improvement Recommendations'",
+        },
+        fileName: {
+          type: "string",
+          description: "Desired filename for the PDF (without path). Example: 'virelle-competitor-analysis.pdf'. Defaults to a slugified version of the title.",
+        },
+        content: {
+          type: "string",
+          description:
+            "The full report content as a markdown string. Use ## headings to create sections, " +
+            "- bullet points for lists, and plain paragraphs for body text. " +
+            "Use this when you want to pass the entire document as one markdown block. " +
+            "Alternatively, use the 'sections' array for more structured control.",
+        },
+        sections: {
+          type: "array",
+          description:
+            "Ordered list of sections to render in the PDF. Each section has an optional heading and a body. " +
+            "Use this for structured reports where you want explicit control over each section.",
+          items: {
+            type: "object",
+            properties: {
+              heading: {
+                type: "string",
+                description: "Section heading (rendered as a bold H2 with an accent underline). Optional.",
+              },
+              body: {
+                type: "string",
+                description:
+                  "Section body text. Supports markdown-style formatting: " +
+                  "## sub-headings, - bullet points, 1. numbered lists, **bold** text, and --- horizontal rules.",
+              },
+            },
+            required: ["body"],
+          },
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
 const provideProjectZip: Tool = {
   type: "function",
   function: {
@@ -3161,6 +3224,7 @@ export const TITAN_TOOLS: Tool[] = [
   appClone,
   websiteReplicate,
   // Project Builder (create real downloadable files)
+  generatePdfTool,
   createProjectFile,
   createGithubRepo,
   pushToGithubRepo,
@@ -3312,6 +3376,7 @@ export const BUILDER_TOOLS: Tool[] = [
 // Python3 and Node.js are available in the sandbox for verification
 export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   // Core builder tools — create real files
+  generatePdfTool,
   createProjectFile,
   readUploadedFile,
   provideProjectZip,
