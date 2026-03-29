@@ -149,7 +149,11 @@ export const marketingRouter = router({
   /** AI-allocate the monthly budget across channels */
   allocateBudget: adminProcedure
     .input(z.object({ monthlyBudget: z.number().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "marketing_run");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for budget allocation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -173,6 +177,7 @@ export const marketingRouter = router({
         status: "success",
       });
 
+      await consumeCredits(ctx.user.id, "marketing_run", `Budget allocated: $${input.monthlyBudget}/month`);
       return { allocations, month };
     }),
 
@@ -340,7 +345,11 @@ export const marketingRouter = router({
   /** Launch a campaign (execute it across platforms) */
   launchCampaign: adminProcedure
     .input(z.object({ campaignId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "marketing_run");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for campaign launch. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -378,6 +387,7 @@ export const marketingRouter = router({
         status: results.contentPublished > 0 || results.adsCreated > 0 ? "success" : "failed",
       });
 
+      await consumeCredits(ctx.user.id, "marketing_run", `Campaign #${input.campaignId} launched`);
       return results;
     }),
 

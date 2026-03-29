@@ -642,6 +642,10 @@ Be realistic — most first-time applications score 40-65. Strong applications w
   regenerateMissing: protectedProcedure.input(z.object({
     applicationId: z.number(),
   })).mutation(async ({ input, ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "grant_match");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits for grant section regeneration. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const app = await db.getGrantApplicationById(input.applicationId);
     if (!app) throw new TRPCError({ code: "NOT_FOUND", message: "Application not found" });
     const company = await db.getCompanyById(app.companyId);
@@ -736,6 +740,7 @@ Be realistic — most first-time applications score 40-65. Strong applications w
     if (regenerated > 0) {
       await db.updateGrantApplication(input.applicationId, updates as any);
       log.info(`[GrantRegen] Regenerated ${regenerated} sections for application ${input.applicationId}`);
+      try { await consumeCredits(ctx.user.id, "grant_match", `Grant sections regenerated: ${regenerated}/9 for application #${input.applicationId}`); } catch {}
     }
 
     return { success: true, regenerated, total: 9 };
@@ -1258,6 +1263,10 @@ export const crowdfundingRouter = router({
     category: z.string(),
     goalAmount: z.number(),
   })).mutation(async ({ ctx, input }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "grant_match");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits for story generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
     const prompt = `Write a compelling crowdfunding campaign story for the following project. Make it emotional, specific, and persuasive. Include sections for: The Problem, Our Solution, How Funds Will Be Used, Our Team, and Why Now.
 
@@ -1273,6 +1282,7 @@ Write in first person plural ("we"). Keep it under 800 words. Use markdown forma
       model: "fast",
       messages: [{ role: "user", content: prompt }],
     });
+    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`); } catch {}
     return { story: String(response.choices[0]?.message?.content || "") };
   }),
 
@@ -1282,6 +1292,10 @@ Write in first person plural ("we"). Keep it under 800 words. Use markdown forma
     category: z.string(),
     goalAmount: z.number(),
   })).mutation(async ({ ctx, input }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "grant_match");
+    if (!creditCheck.allowed) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits for reward suggestions. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+    }
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
     const prompt = `Suggest 5 reward tiers for a crowdfunding campaign. Return as JSON array.
 
@@ -1298,8 +1312,9 @@ Example: [{"title":"Early Bird","description":"Get early access","minAmount":25,
       messages: [{ role: "user", content: prompt }],
     });
     const content = String(response.choices[0]?.message?.content || "[]");
+    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding reward tiers suggested: ${input.title}`); } catch {}
     try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const jsonMatch = content.match(/\[\s\S\]*\]/);
       return { rewards: jsonMatch ? JSON.parse(jsonMatch[0]) : [] };
     } catch {
       return { rewards: [] };

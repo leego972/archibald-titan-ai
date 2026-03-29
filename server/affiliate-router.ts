@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "./_core/trpc";
+import { checkCredits, consumeCredits } from "./credit-service";
 import {
   seedAffiliatePrograms,
   generateReferralCode,
@@ -137,13 +138,23 @@ export const affiliateRouter = router({
   // ─── Admin: AI Outreach ─────────────────────────────────────────
   generateOutreach: adminProcedure
     .input(z.object({ partnerId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for outreach generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
       const email = await generateOutreachEmail(input.partnerId);
+      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate outreach generated for partner #${input.partnerId}`);
       return { ...email, success: true };
     }),
 
-  generateBulkOutreach: adminProcedure.mutation(async () => {
+  generateBulkOutreach: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for bulk outreach. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
     const count = await generateBulkOutreach();
+    await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate bulk outreach generated: ${count} emails`);
     return { generated: count, success: true };
   }),
 
@@ -153,16 +164,28 @@ export const affiliateRouter = router({
       return await getPartnerOutreach(input.partnerId);
     }),
 
-  // ─── Admin: Performance Analysis ────────────────────────────────
+  // ─── Admin: Performance Analysis ────────────────────────────────────
   analyzePartner: adminProcedure
     .input(z.object({ partnerId: z.number() }))
-    .mutation(async ({ input }) => {
-      return await analyzePartnerPerformance(input.partnerId);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for partner analysis. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await analyzePartnerPerformance(input.partnerId);
+      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate partner #${input.partnerId} performance analysis`);
+      return result;
     }),
 
-  // ─── Admin: Autonomous Optimization ─────────────────────────────
-  runOptimization: adminProcedure.mutation(async () => {
-    return await runAffiliateOptimizationCycle();
+  // ─── Admin: Autonomous Optimization ─────────────────────────────────
+  runOptimization: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for optimization cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await runAffiliateOptimizationCycle();
+    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate optimization cycle run");
+    return result;
   }),
 
   // ─── Admin: Payouts ─────────────────────────────────────────────
@@ -193,8 +216,14 @@ export const affiliateRouter = router({
   }),
 
   // ─── Admin: Run Discovery Manually ──────────────────────────────
-  runDiscovery: adminProcedure.mutation(async () => {
-    return await runDiscoveryCycle("manual");
+  runDiscovery: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for discovery cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await runDiscoveryCycle("manual");
+    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate discovery cycle run");
+    return result;
   }),
 
   // ─── Admin: List Discoveries ────────────────────────────────────
@@ -259,18 +288,24 @@ export const affiliateRouter = router({
   // ─── AUTONOMOUS SIGNUP ENGINE ─────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════
 
-  // ─── Admin: Run Signup Batch ───────────────────────────────────
+  // ─── Admin: Run Signup Batch ─────────────────────────────────────
   runSignupBatch: adminProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).default(10),
       discoveryIds: z.array(z.number()).optional(),
     }).optional())
     .mutation(async ({ input, ctx }) => {
-      return await runSignupBatch({
+      const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for signup batch. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await runSignupBatch({
         limit: input?.limit,
         discoveryIds: input?.discoveryIds,
         adminUserId: ctx.user.id,
       });
+      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate signup batch run (limit: ${input?.limit ?? 10})`);
+      return result;
     }),
 
   // ─── Admin: Signup Stats ───────────────────────────────────────
@@ -414,7 +449,7 @@ export const affiliateRouter = router({
     return await generateRevenueForecast();
   }),
 
-  // ─── Admin: AI Score Partner ──────────────────────────────────────
+  // ─── Admin: AI Score Partner ──────────────────────────────────────────
   aiScorePartner: adminProcedure
     .input(z.object({
       name: z.string(),
@@ -424,16 +459,28 @@ export const affiliateRouter = router({
       commissionRate: z.number(),
       description: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
-      return await aiScorePartner(input);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for AI partner scoring. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await aiScorePartner(input);
+      await consumeCredits(ctx.user.id, "affiliate_action", `AI scored affiliate partner: ${input.name}`);
+      return result;
     }),
 
-  // ─── Admin: Run v2 Optimization Cycle ─────────────────────────────
-  runOptimizationV2: adminProcedure.mutation(async () => {
-    return await runOptimizationCycleV2();
+  // ─── Admin: Run v2 Optimization Cycle ─────────────────────────────────
+  runOptimizationV2: adminProcedure.mutation(async ({ ctx }) => {
+    const creditCheck = await checkCredits(ctx.user.id, "affiliate_action");
+    if (!creditCheck.allowed) {
+      throw new Error(`Insufficient credits for v2 optimization cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+    }
+    const result = await runOptimizationCycleV2();
+    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate v2 optimization cycle run");
+    return result;
   }),
 
-  // ─── Admin: v2 System Info ────────────────────────────────────────
+  // ─── Admin: v2 System Info ────────────────────────────────────────────
   getV2Info: adminProcedure.query(() => {
     const seasonal = getSeasonalMultiplier();
     return {

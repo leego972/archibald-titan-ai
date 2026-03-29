@@ -731,8 +731,14 @@ export const advertisingRouter = router({
       platform: z.string(),
       topic: z.string().min(3).max(500),
     }))
-    .mutation(async ({ input }) => {
-      return generateViralPost(input.platform, input.topic);
+    .mutation(async ({ ctx, input }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits for viral content generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      const result = await generateViralPost(input.platform, input.topic);
+      await consumeCredits(ctx.user.id, "advertising_run", `Viral content generated for ${input.platform}: ${input.topic.substring(0, 50)}`);
+      return result;
     }),
 
   /** Get channel health statuses with pause/resume controls */
