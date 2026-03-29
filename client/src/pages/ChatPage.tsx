@@ -102,6 +102,8 @@ import {
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { BuildProgressBar, type BuildPhase } from "@/components/BuildProgressBar";
+import { BuildReportCard, type BuildDeliverable } from "@/components/BuildReportCard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -868,14 +870,29 @@ export default function ChatPage() {
     block?: string;
     error?: string;
     reasoning?: boolean;  // true when this is Titan's actual LLM reasoning content
-    phase?: string;       // 'build' | 'github' | 'chat'
+    phase?: string;       // 'build' | 'github' | 'chat' | BuildPhase
     timestamp: number;
+    // build_progress fields
+    detail?: string;
+    filesCreated?: number;
+    buildType?: string;
+    // build_complete fields
+    totalRounds?: number;
+    successCount?: number;
+    failedCount?: number;
+    deliverables?: BuildDeliverable[];
+    durationMs?: number;
   }
   const [streamEvents, setStreamEvents] = useState<StreamEvent[]>([]);
   const [showStreamPanel, setShowStreamPanel] = useState(true);
   const [buildLog, setBuildLog] = useState<StreamEvent[]>([]); // persistent log of all events for the current message
   const [isBuildMode, setIsBuildMode] = useState(false); // true when Titan is using security/builder tools
   const [showBuilderHistory, setShowBuilderHistory] = useState(false); // toggle builder history panel
+  // Build progress bar state — driven by build_progress SSE events
+  const [buildProgress, setBuildProgress] = useState<{ phase: BuildPhase; detail?: string; filesCreated?: number; buildType?: string; round?: number } | null>(null);
+  // Build report card state — driven by build_complete SSE event
+  const [buildReport, setBuildReport] = useState<{ totalRounds: number; successCount: number; failedCount: number; filesCreated: number; deliverables: BuildDeliverable[]; buildType?: string; durationMs?: number } | null>(null);
+  const buildStartTimeRef = useRef<number | null>(null);
   const SECURITY_TOOLS = ['install_security_toolkit', 'network_scan', 'generate_yara_rule', 'generate_sigma_rule',
     'hash_crack', 'generate_payload', 'osint_lookup', 'cve_lookup', 'run_exploit', 'decompile_binary', 'fuzzer_run',
     'sandbox_exec', 'sandbox_write_file', 'create_file', 'provide_project_zip', 'eas_build'];
@@ -1531,13 +1548,15 @@ export default function ChatPage() {
           es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description, timestamp: Date.now() }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
           es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary, timestamp: Date.now() }]); } catch {} });
           es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
+          es.addEventListener('build_progress', (e) => { try { const d = JSON.parse(e.data); setBuildProgress({ phase: d.phase as BuildPhase, detail: d.detail, filesCreated: d.filesCreated, buildType: d.buildType, round: d.round }); setLoadingPhase(d.detail || d.phase || 'Building...'); } catch {} });
+          es.addEventListener('build_complete', (e) => { try { const d = JSON.parse(e.data); setBuildReport({ totalRounds: d.totalRounds, successCount: d.successCount, failedCount: d.failedCount, filesCreated: d.filesCreated, deliverables: d.deliverables || [], buildType: d.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined }); setBuildProgress(null); } catch {} });
           es.addEventListener('done', () => {
             es.close(); eventSourceRef.current = null;
             setIsLoading(false); setStreamEvents([]);
             utils.chat.getConversation.invalidate({ conversationId: activeConversationId });
           });
-          es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
-          es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); });
+          es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); setBuildProgress(null); });
+          es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setIsLoading(false); setStreamEvents([]); setBuildProgress(null); });
         } else if (status.status === 'completed' && status.response) {
           // Build finished while we were away — refresh messages
           utils.chat.getConversation.invalidate({ conversationId: activeConversationId });
@@ -1755,6 +1774,10 @@ export default function ChatPage() {
     }
 
     setShowHelp(false);
+    // Reset build progress state for each new message
+    setBuildProgress(null);
+    setBuildReport(null);
+    buildStartTimeRef.current = null;
 
     // Capture files before clearing state
     const filesToUpload = [...selectedFiles];
@@ -1874,9 +1897,24 @@ export default function ChatPage() {
           setBuildLog(prev => [...prev, evt]);
           setLoadingPhase(data.message || 'Verification complete');
         });
+        es.addEventListener('build_progress', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setBuildProgress({ phase: data.phase as BuildPhase, detail: data.detail, filesCreated: data.filesCreated, buildType: data.buildType, round: data.round });
+            setLoadingPhase(data.detail || data.phase || 'Building...');
+            if (buildStartTimeRef.current === null) buildStartTimeRef.current = Date.now();
+          } catch {}
+        });
+        es.addEventListener('build_complete', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setBuildReport({ totalRounds: data.totalRounds, successCount: data.successCount, failedCount: data.failedCount, filesCreated: data.filesCreated, deliverables: data.deliverables || [], buildType: data.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined });
+            setBuildProgress(null);
+          } catch {}
+        });
         es.addEventListener('done', () => { es.close(); eventSourceRef.current = null; });
-        es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; });
-        es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; });
+        es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setBuildProgress(null); });
+        es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setBuildProgress(null); });
       } catch {
         // SSE connection failed — continue without streaming
       }
@@ -2695,6 +2733,24 @@ export default function ChatPage() {
                     </div>
                   ))}
 
+                  {/* Build Report Card — shows after build completes with build_complete event */}
+                  {!isLoading && buildReport && (
+                    <div className="flex gap-2 sm:gap-3 justify-start">
+                      <div className="w-7 sm:w-8 shrink-0" />
+                      <div className="max-w-[90%] sm:max-w-[80%] w-full">
+                        <BuildReportCard
+                          totalRounds={buildReport.totalRounds}
+                          successCount={buildReport.successCount}
+                          failedCount={buildReport.failedCount}
+                          filesCreated={buildReport.filesCreated}
+                          deliverables={buildReport.deliverables}
+                          buildType={buildReport.buildType}
+                          durationMs={buildReport.durationMs}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Persistent Build Log — shows after build completes */}
                   {!isLoading && buildLog.length > 2 && (
                     <div className="flex gap-2 sm:gap-3 justify-start">
@@ -2757,11 +2813,24 @@ export default function ChatPage() {
                         <TitanLogo size="sm" />
                       </div>
                       <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-3.5 py-2.5 sm:px-4 sm:py-3 min-w-0 sm:min-w-[300px] max-w-[90%] sm:max-w-[92%]">
-                        {/* Status line */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-                          <span className="font-medium text-xs sm:text-sm text-muted-foreground">{loadingPhase}</span>
-                        </div>
+                        {/* Build Phase Progress Bar — shown when build_progress events arrive */}
+                        {buildProgress ? (
+                          <div className="mb-3">
+                            <BuildProgressBar
+                              currentPhase={buildProgress.phase}
+                              detail={buildProgress.detail}
+                              filesCreated={buildProgress.filesCreated}
+                              buildType={buildProgress.buildType}
+                              round={buildProgress.round}
+                            />
+                          </div>
+                        ) : (
+                          /* Status line — shown when no build_progress events yet */
+                          <div className="flex items-center gap-2 mb-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                            <span className="font-medium text-xs sm:text-sm text-muted-foreground">{loadingPhase}</span>
+                          </div>
+                        )}
                         {/* ── Titan's Inner Monologue ── always visible when reasoning events arrive */}
                         {streamEvents.filter(e => e.reasoning).length > 0 && (
                           <div className="mb-3 rounded-xl border border-purple-500/40 bg-gradient-to-b from-purple-950/50 to-purple-900/20 px-3 py-2.5">
