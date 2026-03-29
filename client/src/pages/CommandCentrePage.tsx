@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import {
   Activity, Shield, Globe, TrendingUp, Users, Server, Database,
@@ -70,7 +70,6 @@ const COLOR_MAP: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function CommandCentrePage() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   // ── Data Queries ───────────────────────────────────────────────────────────

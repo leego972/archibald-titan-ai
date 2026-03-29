@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Zap, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle,
   Clock, AlertTriangle, ArrowRight, Activity, Settings, List
@@ -18,7 +18,6 @@ import {
 type Tab = "rules" | "log" | "stats";
 
 export default function EventBusPage() {
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("rules");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newRule, setNewRule] = useState({
@@ -44,7 +43,7 @@ export default function EventBusPage() {
   const deleteRule = trpc.eventBus.deleteRule.useMutation({
     onSuccess: () => {
       refetchRules();
-      toast({ title: "Rule deleted" });
+      toast.success("Rule deleted");
     },
   });
 
@@ -53,15 +52,15 @@ export default function EventBusPage() {
       refetchRules();
       setShowCreateDialog(false);
       setNewRule({ name: "", description: "", sourceEngine: "", eventType: "", targetEngine: "", actionType: "" });
-      toast({ title: "Rule created", description: "The automation rule is now active" });
+      toast.success("Rule created");
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Error", { description: e.message }),
   });
 
   const emitTest = trpc.eventBus.emitTestEvent.useMutation({
     onSuccess: () => {
       refetchLog();
-      toast({ title: "Test event emitted", description: "Check the event log for results" });
+      toast.success("Test event emitted");
     },
   });
 
@@ -72,7 +71,7 @@ export default function EventBusPage() {
 
   const handleCreateRule = () => {
     if (!newRule.name || !newRule.sourceEngine || !newRule.eventType || !newRule.targetEngine || !newRule.actionType) {
-      toast({ title: "Missing fields", description: "Please fill in all required fields", variant: "destructive" });
+      toast.error("Missing fields", { description: "Please fill in all required fields" });
       return;
     }
     createRule.mutate({

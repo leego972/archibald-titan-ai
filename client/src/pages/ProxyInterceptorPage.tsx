@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -82,7 +82,6 @@ function formatBytes(bytes: number): string {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ProxyInterceptorPage() {
-  const { toast } = useToast();
   const [sessionId, setSessionId] = useState("");
   const [capturing, setCapturing] = useState(false);
   const [entries, setEntries] = useState<TrafficEntry[]>([]);
@@ -100,9 +99,9 @@ export default function ProxyInterceptorPage() {
   const enableCapture = trpc.isolatedBrowser.enableTrafficCapture.useMutation({
     onSuccess: (data) => {
       setCapturing(data.enabled);
-      toast({ title: data.enabled ? "Traffic capture started" : "Traffic capture stopped" });
+      toast.success("Notice");
     },
-    onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err) => toast.error("Error", { description: err.message }),
   });
 
   const trafficLog = trpc.isolatedBrowser.getTrafficLog.useQuery(
@@ -129,9 +128,9 @@ export default function ProxyInterceptorPage() {
       setEntries([]);
       setTotal(0);
       setSelected(null);
-      toast({ title: "Traffic log cleared" });
+      toast.success("Traffic log cleared");
     },
-    onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err) => toast.error("Error", { description: err.message }),
   });
 
   // ── Auto-refresh ──────────────────────────────────────────────────────────
@@ -146,7 +145,7 @@ export default function ProxyInterceptorPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleToggleCapture = () => {
-    if (!sessionId) return toast({ title: "Select a session first", variant: "destructive" });
+    if (!sessionId) return toast.error("Select a session first");
     enableCapture.mutate({ sessionId, enabled: !capturing });
   };
 
@@ -183,7 +182,7 @@ export default function ProxyInterceptorPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied to clipboard" });
+    toast.success("Copied to clipboard");
   };
 
   const activeSessions = (sessions.data?.sessions || []).filter((s: { status: string }) => s.status === "active");

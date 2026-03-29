@@ -14,7 +14,7 @@ import {
   Shield, Zap, Eye, Code, Globe, Lock, RefreshCw, Plus,
   CheckCircle, AlertTriangle, Package, Users
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   osint: <Eye className="h-4 w-4" />,
@@ -39,7 +39,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function SecurityMarketplacePage() {
-  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [sortBy, setSortBy] = useState<"popular" | "newest" | "rating">("popular");
@@ -62,30 +61,30 @@ export default function SecurityMarketplacePage() {
   const installModule = trpc.securityMarketplace.installModule.useMutation({
     onSuccess: () => {
       refetchInstalled();
-      toast({ title: "Module installed", description: `${selectedModule?.name} is ready to use` });
+      toast.success("Module installed", { description: `${selectedModule?.name} is ready to use` });
       setSelectedModule(null);
     },
-    onError: (e) => toast({ title: "Install failed", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Install failed", { description: e.message }),
   });
 
   const uninstallModule = trpc.securityMarketplace.uninstallModule.useMutation({
     onSuccess: () => {
       refetchInstalled();
-      toast({ title: "Module uninstalled" });
+      toast.success("Module uninstalled");
     },
   });
 
   const rateModule = trpc.securityMarketplace.rateModule.useMutation({
-    onSuccess: () => { refetch(); toast({ title: "Rating submitted" }); },
+    onSuccess: () => { refetch(); toast.success("Rating submitted"); },
   });
 
   const publishModule = trpc.securityMarketplace.publishModule.useMutation({
     onSuccess: () => {
       refetch();
       setShowPublish(false);
-      toast({ title: "Module submitted", description: "Your module is under review" });
+      toast.success("Module submitted");
     },
-    onError: (e) => toast({ title: "Publish failed", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Publish failed", { description: e.message }),
   });
 
   const modules = modulesData?.modules ?? [];

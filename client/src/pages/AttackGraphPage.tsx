@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Network,
   Shield,
@@ -277,7 +277,6 @@ function buildAstraGraph(
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function AttackGraphPage() {
-  const { toast } = useToast();
   const [target, setTarget] = useState("");
   const [activeTab, setActiveTab] = useState<"argus" | "astra">("argus");
   const [scanId, setScanId] = useState("");
@@ -299,9 +298,9 @@ export default function AttackGraphPage() {
       setNodes(n);
       setEdges(e);
       setGraphSource("argus");
-      toast({ title: "Attack graph built", description: `${n.length} nodes from Argus recon on ${data.target || target}` });
+      toast.success("Attack graph built", { description: `${n.length} nodes from Argus recon on ${data.target || target}` });
     },
-    onError: (err) => toast({ title: "Argus recon failed", description: err.message, variant: "destructive" }),
+    onError: (err) => toast.error("Argus recon failed", { description: err.message }),
   });
 
   // ── Astra alerts ─────────────────────────────────────────────────────────
@@ -311,12 +310,12 @@ export default function AttackGraphPage() {
   );
 
   const handleArgusRun = () => {
-    if (!target.trim()) return toast({ title: "Enter a target", variant: "destructive" });
+    if (!target.trim()) return toast.error("Enter a target");
     argusRecon.mutate({ target: target.trim() });
   };
 
   const handleAstraLoad = async () => {
-    if (!scanId.trim()) return toast({ title: "Enter a scan ID", variant: "destructive" });
+    if (!scanId.trim()) return toast.error("Enter a scan ID");
     try {
       const result = await astraAlerts.refetch();
       if (result.data) {
@@ -324,11 +323,11 @@ export default function AttackGraphPage() {
         setNodes(n);
         setEdges(e);
         setGraphSource("astra");
-        toast({ title: "Attack graph built", description: `${result.data.total} alerts visualised from Astra scan` });
+        toast.success("Attack graph built", { description: `${result.data.total} alerts visualised from Astra scan` });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast({ title: "Astra fetch failed", description: msg, variant: "destructive" });
+      toast.error("Astra fetch failed", { description: msg });
     }
   };
 

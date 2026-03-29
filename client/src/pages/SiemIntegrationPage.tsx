@@ -13,7 +13,7 @@ import {
   Activity, Plus, Trash2, TestTube, CheckCircle, XCircle,
   AlertTriangle, RefreshCw, Send, Server, Zap, Shield
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const PROVIDER_ICONS: Record<string, string> = {
   splunk: "🔴",
@@ -34,7 +34,6 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export default function SiemIntegrationPage() {
-  const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -56,17 +55,17 @@ export default function SiemIntegrationPage() {
       refetchConfigs();
       setShowAdd(false);
       setForm({ name: "", provider: "splunk", webhookUrl: "", apiKey: "", indexName: "", eventTypes: [] });
-      toast({ title: "SIEM integration created", description: "Webhook configured successfully" });
+      toast.success("SIEM integration created");
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Error", { description: e.message }),
   });
 
   const updateConfig = trpc.siem.updateConfig.useMutation({
-    onSuccess: () => { refetchConfigs(); toast({ title: "Updated" }); },
+    onSuccess: () => { refetchConfigs(); toast.success("Updated"); },
   });
 
   const deleteConfig = trpc.siem.deleteConfig.useMutation({
-    onSuccess: () => { refetchConfigs(); toast({ title: "Integration deleted" }); },
+    onSuccess: () => { refetchConfigs(); toast.success("Integration deleted"); },
   });
 
   const testConfig = trpc.siem.testConfig.useMutation({
@@ -74,9 +73,9 @@ export default function SiemIntegrationPage() {
       setTesting(null);
       refetchConfigs();
       refetchLog();
-      toast({ title: "Test successful", description: "Test event sent to SIEM" });
+      toast.success("Test successful");
     },
-    onError: (e) => { setTesting(null); toast({ title: "Test failed", description: e.message, variant: "destructive" }); },
+    onError: (e) => { setTesting(null); toast.error("Test failed", { description: e.message }); },
   });
 
   const handleTest = (configId: string) => {

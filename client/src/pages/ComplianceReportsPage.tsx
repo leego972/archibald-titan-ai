@@ -11,7 +11,7 @@ import {
   Download, RefreshCw, Clock, Award, Lock, Eye, Database,
   Server, Users, Key, Activity
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 type ReportType = "soc2" | "iso27001" | "gdpr" | "pci_dss" | "hipaa";
 
@@ -139,7 +139,6 @@ function generateReport(type: ReportType): ComplianceReport {
 }
 
 export default function ComplianceReportsPage() {
-  const { toast } = useToast();
   const [selectedType, setSelectedType] = useState<ReportType>("soc2");
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -152,7 +151,7 @@ export default function ComplianceReportsPage() {
     setReport(r);
     setGenerating(false);
     setActiveTab("overview");
-    toast({ title: "Report generated", description: `${REPORT_TYPES.find((t) => t.id === selectedType)?.label} assessment complete` });
+    toast.success("Report generated", { description: `${REPORT_TYPES.find((t) => t.id === selectedType)?.label} assessment complete` });
   };
 
   const handleExport = () => {
@@ -183,7 +182,7 @@ export default function ComplianceReportsPage() {
     a.download = `${report.type}_compliance_report_${new Date().toISOString().split("T")[0]}.md`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Report exported", description: "Markdown report downloaded" });
+    toast.success("Report exported");
   };
 
   const statusColor = (status: string) => {

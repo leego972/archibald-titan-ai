@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Shield, Play, Square, Trash2, ChevronRight, Clock, CheckCircle2,
   XCircle, AlertTriangle, Loader2, Target, FileText, RefreshCw,
@@ -83,7 +83,6 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function RedTeamPlaybooksPage() {
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"library" | "runs" | "run-detail">("library");
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -116,19 +115,19 @@ export default function RedTeamPlaybooksPage() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const startRun = trpc.redTeamPlaybooks.startRun.useMutation({
     onSuccess: (data) => {
-      toast({ title: "Playbook started", description: `Run ID: ${data.runId}` });
+      toast.success("Playbook started", { description: `Run ID: ${data.runId}` });
       setSelectedRunId(data.runId);
       setActiveTab("run-detail");
       refetchRuns();
     },
     onError: (err) => {
-      toast({ title: "Failed to start playbook", description: err.message, variant: "destructive" });
+      toast.error("Failed to start playbook", { description: err.message });
     },
   });
 
   const cancelRun = trpc.redTeamPlaybooks.cancelRun.useMutation({
     onSuccess: () => {
-      toast({ title: "Run cancelled" });
+      toast.success("Run cancelled");
       refetchRuns();
       refetchRunDetail();
     },
@@ -136,7 +135,7 @@ export default function RedTeamPlaybooksPage() {
 
   const deleteRun = trpc.redTeamPlaybooks.deleteRun.useMutation({
     onSuccess: () => {
-      toast({ title: "Run deleted" });
+      toast.success("Run deleted");
       setSelectedRunId(null);
       setActiveTab("runs");
       refetchRuns();
@@ -171,11 +170,11 @@ export default function RedTeamPlaybooksPage() {
 
   const handleStartRun = () => {
     if (!selectedPlaybookId) {
-      toast({ title: "Select a playbook first", variant: "destructive" });
+      toast.error("Select a playbook first");
       return;
     }
     if (!target.trim()) {
-      toast({ title: "Enter a target", description: "e.g. example.com or 192.168.1.1", variant: "destructive" });
+      toast.error("Enter a target", { description: "e.g. example.com or 192.168.1.1" });
       return;
     }
     startRun.mutate({ playbookId: selectedPlaybookId, target: target.trim() });
@@ -184,7 +183,7 @@ export default function RedTeamPlaybooksPage() {
   const copyReport = () => {
     if (runDetail?.run.report) {
       navigator.clipboard.writeText(runDetail.run.report);
-      toast({ title: "Report copied to clipboard" });
+      toast.success("Report copied to clipboard");
     }
   };
 
