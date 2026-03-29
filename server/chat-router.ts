@@ -1915,6 +1915,46 @@ Do NOT attempt any tool calls or builds.`;
             data: { message: thinkingMsg, round: rounds, phase: isBuildRequest ? 'build' : isGitHubTask ? 'github' : 'chat' },
           });
 
+          // ── BUILD PHASE PROGRESS STREAMING ──────────────────────────────────
+          // Emit a structured build_progress event for build requests so the
+          // frontend can show a live phase indicator (e.g. Planning → Building → Verifying → Delivering)
+          if (isBuildRequest && conversationId) {
+            const filesCreatedSoFar = executedActions.filter(a =>
+              (a.tool === 'create_file' || a.tool === 'self_modify_file' || a.tool === 'self_multi_file_modify') && a.success
+            ).length;
+
+            let buildPhase: string;
+            let buildPhaseDetail: string;
+
+            if (rounds === 1) {
+              buildPhase = 'planning';
+              buildPhaseDetail = isSelfBuild ? 'Reading codebase to plan changes' : 'Scoping the project requirements';
+            } else if (rounds <= 3 && filesCreatedSoFar === 0) {
+              buildPhase = 'researching';
+              buildPhaseDetail = 'Gathering context and dependencies';
+            } else if (filesCreatedSoFar > 0 && rounds <= 8) {
+              buildPhase = 'building';
+              buildPhaseDetail = `${filesCreatedSoFar} file${filesCreatedSoFar === 1 ? '' : 's'} created so far`;
+            } else if (rounds >= 4 && filesCreatedSoFar > 0) {
+              buildPhase = 'verifying';
+              buildPhaseDetail = 'Running checks and fixing issues';
+            } else {
+              buildPhase = 'working';
+              buildPhaseDetail = `Round ${rounds}`;
+            }
+
+            emitChatEvent(conversationId, {
+              type: 'build_progress',
+              data: {
+                phase: buildPhase,
+                detail: buildPhaseDetail,
+                round: rounds,
+                filesCreated: filesCreatedSoFar,
+                buildType: isSelfBuild ? 'self' : isExternalBuild ? 'external' : 'github',
+              },
+            });
+          }
+
           // ── Smart Cost-Effective Model Routing ──────────────────────
           // nano ($0.10/1M) for exploration & simple tasks
           // mini ($0.40/1M) for code generation and complex reasoning
@@ -2838,6 +2878,28 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
                   : `Sandbox commands have failed ${consecutiveSandboxFails} times in a row.`;
                 deferredSystemHints.push(`${reason} The files you created (${createdFiles.length}) are complete and correct. STOP trying to verify. Call provide_project_zip NOW and tell the user the build is ready for download. Explain compilation instructions in your response.`);
                 log.info(`[Chat] Forced delivery: ${isEnvLimitation ? 'env limitation' : `${consecutiveSandboxFails} consecutive failures`}`);
+              } else if (consecutiveSandboxFails === 3) {
+                // ── SELF-HEAL: ALTERNATIVE APPROACH INJECTION ───────────────────────────────────
+                // After 3 consecutive failures, stop retrying the same approach and try something fundamentally different.
+                // This prevents the LLM from looping on the same broken command 10+ times.
+                const failedTool = tc.function.name;
+                const failedCmd = typeof args.command === 'string' ? args.command.slice(0, 120) : '';
+                const alternativeHint = [
+                  `SELF-HEAL TRIGGERED: The same approach has failed 3 times in a row. Do NOT retry the same command.`,
+                  `Failed tool: ${failedTool}${failedCmd ? ` | Command: ${failedCmd}` : ''}`,
+                  `Error: ${errorStr.slice(0, 300)}`,
+                  ``,
+                  `MANDATORY: Try a COMPLETELY DIFFERENT approach. Options:`,
+                  `1. If installing a package failed → use a different package manager (pip3 instead of pip, pnpm instead of npm) or skip the install and use a stdlib alternative`,
+                  `2. If compiling failed → switch to a different language (Python instead of C, Node.js instead of Rust)`,
+                  `3. If a file path failed → use sandbox_list_files to verify the actual directory structure first`,
+                  `4. If a command failed → break it into smaller atomic steps`,
+                  `5. If the sandbox environment is blocking you → create the files with create_file and deliver via provide_project_zip`,
+                  ``,
+                  `Do NOT explain the failure to the user yet. Fix it silently with a different approach.`,
+                ].join('\n');
+                deferredSystemHints.push(alternativeHint);
+                log.info(`[Chat] Self-heal triggered at ${consecutiveSandboxFails} consecutive failures — injecting alternative approach hint`);
               } else {
                 let sandboxHint = '';
                 if (errorStr.includes('not found') || errorStr.includes('No such file')) {
@@ -2848,6 +2910,12 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
                   sandboxHint = 'RECOVERY: Command timed out. Break the operation into smaller steps, or use a simpler command.';
                 } else if (errorStr.includes('syntax error') || errorStr.includes('SyntaxError')) {
                   sandboxHint = 'RECOVERY: Syntax error in the code. Review the file content and fix the syntax issue before retrying.';
+                } else if (errorStr.includes('ModuleNotFoundError') || errorStr.includes('Cannot find module') || errorStr.includes('ImportError')) {
+                  sandboxHint = 'RECOVERY: Missing module/package. Run sandbox_exec with the correct install command first (pip3 install <package> or pnpm add <package>).';
+                } else if (errorStr.includes('ENOENT') || errorStr.includes('EACCES')) {
+                  sandboxHint = 'RECOVERY: File system error. Use sandbox_list_files to verify the path exists, then retry with the correct absolute path.';
+                } else if (errorStr.includes('command not found') || errorStr.includes('not found: ')) {
+                  sandboxHint = 'RECOVERY: Command not found. Install the required tool first with sandbox_exec (apt-get install / pip3 install / pnpm add), or use an alternative command that is already available.';
                 } else {
                   sandboxHint = `RECOVERY: Sandbox operation failed: ${errorStr.slice(0, 200)}. Try a different approach or check the sandbox state with sandbox_list_files.`;
                 }
@@ -2986,6 +3054,45 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
+        }
+
+        // ── POST-DELIVERY FOLLOW-UP PROMPT ────────────────────────────────────
+        // After a successful build delivery, append a context-aware follow-up question
+        // so the user knows they can iterate. Only fires when:
+        //   - It was a build request
+        //   - At least one file was created or a deliverable was produced
+        //   - The LLM didn't already end with a question mark (it already asked)
+        if (isBuildRequest && finalText && !finalText.trimEnd().endsWith('?')) {
+          const deliverables = executedActions.filter(a =>
+            a.success && (
+              a.tool === 'provide_project_zip' || a.tool === 'generate_pdf' ||
+              a.tool === 'generate_spreadsheet' || a.tool === 'generate_image' ||
+              a.tool === 'generate_markdown_report' || a.tool === 'generate_diagram' ||
+              a.tool === 'web_screenshot'
+            )
+          );
+          const filesCreated = executedActions.filter(a =>
+            a.success && (a.tool === 'create_file' || a.tool === 'self_modify_file' || a.tool === 'self_multi_file_modify')
+          );
+
+          if (deliverables.length > 0 || filesCreated.length > 0) {
+            let followUp = '';
+            if (isSelfBuild) {
+              followUp = '\n\nDoes everything look right? Let me know if you want any adjustments.';
+            } else if (deliverables.some(a => a.tool === 'generate_pdf')) {
+              followUp = '\n\nDoes the PDF cover everything you needed? I can add more sections, charts, or a different format if you\'d like.';
+            } else if (deliverables.some(a => a.tool === 'generate_spreadsheet')) {
+              followUp = '\n\nDoes the spreadsheet have the right columns and data? Let me know if you need extra sheets or different formatting.';
+            } else if (isExternalBuild && filesCreated.length > 0) {
+              followUp = '\n\nWant me to add any features, fix anything, or explain how to run it?';
+            } else if (isGitHubRepoModify) {
+              followUp = '\n\nChanges are live in the repo. Want me to review anything else or open a PR?';
+            }
+
+            if (followUp) {
+              finalText = finalText + followUp;
+            }
+          }
         }
 
         // If tool(s) executed but LLM returned no text, generate a smart fallback
@@ -3260,6 +3367,39 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
           type: "done",
           data: { response: (finalText || '').slice(0, 200), actionCount: executedActions.length },
         });
+
+        // ── POST-DELIVERY BUILD SUMMARY EVENT ─────────────────────────────────
+        // After every build, emit a structured summary so the frontend can display
+        // a build report card: files created, tools used, rounds taken, success/fail breakdown.
+        if (isBuildRequest && conversationId) {
+          const successActions = executedActions.filter(a => a.success);
+          const failedActions = executedActions.filter(a => !a.success);
+          const filesCreated = executedActions.filter(a =>
+            (a.tool === 'create_file' || a.tool === 'self_modify_file' || a.tool === 'self_multi_file_modify') && a.success
+          );
+          const deliveryActions = executedActions.filter(a =>
+            (a.tool === 'provide_project_zip' || a.tool === 'generate_pdf' || a.tool === 'generate_spreadsheet' ||
+             a.tool === 'generate_image' || a.tool === 'generate_markdown_report' || a.tool === 'generate_diagram' ||
+             a.tool === 'web_screenshot') && a.success
+          );
+
+          emitChatEvent(conversationId, {
+            type: 'build_complete',
+            data: {
+              buildType: isSelfBuild ? 'self' : isExternalBuild ? 'external' : isGitHubRepoModify ? 'github' : 'general',
+              totalRounds: rounds,
+              totalActions: executedActions.length,
+              successCount: successActions.length,
+              failedCount: failedActions.length,
+              filesCreated: filesCreated.length,
+              deliverables: deliveryActions.map(a => ({
+                tool: a.tool,
+                url: (a.result as any)?.url || (a.result as any)?.downloadUrl || null,
+                fileName: (a.result as any)?.fileName || null,
+              })),
+            },
+          });
+        }
 
         // ── Background Memory Operations ──────────────────────────────
         // Run asynchronously — do NOT await, so they don't delay the response.

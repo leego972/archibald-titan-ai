@@ -1240,7 +1240,8 @@ Respond with ONLY valid JSON: {"intent": "...", "confidence": 0.0, "reasoning": 
       systemTag: "chat",
     });
 
-    const text = result.choices[0]?.message?.content || "";
+    const rawContent = result.choices[0]?.message?.content || "";
+    const text = typeof rawContent === 'string' ? rawContent : Array.isArray(rawContent) ? rawContent.map((c: any) => c.text || '').join('') : '';
     // Extract JSON from the response (may have markdown fences)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
