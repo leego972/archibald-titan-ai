@@ -7,6 +7,7 @@ import { desc, eq, sql, and } from "drizzle-orm";
 import { improvementTasks } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
 import { invokeLLM } from "./_core/llm";
+import { checkCredits, consumeCredits } from "./credit-service";
 import {
   createSnapshot,
   applyModifications,
@@ -441,7 +442,11 @@ export const improvementBacklogRouter = router({
    */
   analyzeTask: adminProcedure
     .input(z.object({ id: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
+      if (!creditCheck.allowed) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits for task analysis. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
@@ -528,6 +533,7 @@ ${task.description}`,
       }
 
       log.info(`[analyzeTask] Analysis complete for task #${task.id}. canAutoApply=${analysis.canAutoApply}`);
+      try { await consumeCredits(ctx.user.id, "advertising_run", `Self-improvement task analysis: #${task.id} ${task.title}`); } catch {}
       return { taskId: task.id, title: task.title, ...analysis };
     }),
 
@@ -548,6 +554,10 @@ ${task.description}`,
       dryRun: z.boolean().optional().default(false),
     }))
     .mutation(async ({ input, ctx }) => {
+      const creditCheck = await checkCredits(ctx.user.id, "marketing_run");
+      if (!creditCheck.allowed) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits for task execution. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const [task] = await db.select().from(improvementTasks).where(eq(improvementTasks.id, input.id));
@@ -761,6 +771,7 @@ Generate the code changes needed to implement this task. Read any relevant exist
         }).where(eq(improvementTasks.id, task.id));
 
         log.info(`[executeTask] Task #${task.id} completed successfully. Pushed=${pushed}`);
+        try { await consumeCredits(ctx.user.id, "marketing_run", `Self-improvement task executed: #${task.id} ${task.title}`); } catch {}
 
         return {
           success: true,
