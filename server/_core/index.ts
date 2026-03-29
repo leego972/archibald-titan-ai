@@ -545,6 +545,8 @@ async function startServer() {
         // sandbox_files: track which conversation/project each file belongs to
         "ALTER TABLE `sandbox_files` ADD COLUMN `conversationId` int NULL",
         "ALTER TABLE `sandbox_files` ADD COLUMN `projectName` varchar(255) NULL",
+        // chatConversations: cross-conversation build memory (build context)
+        "ALTER TABLE `chatConversations` ADD COLUMN `buildContext` JSON NULL",
       ];
       for (const sql of missingColumns) {
         try {
