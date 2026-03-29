@@ -71,6 +71,7 @@ import { escalationRouter } from "./escalation-router";
 import { isolatedBrowserRouter } from "./isolated-browser-router";
 import { linkenSphereRouter } from "./linken-sphere-router";
 import { redTeamPlaybooksRouter } from "./red-team-playbooks-router";
+import { eventBusRouter } from "./event-bus-router";
 
 export const appRouter = router({
   files: filesRouter,
@@ -174,6 +175,8 @@ export const appRouter = router({
   linkenSphere: linkenSphereRouter,
   // ── Red Team Playbooks Engine ─────────────────────────────────────────────────────────────────────
   redTeamPlaybooks: redTeamPlaybooksRouter,
+  // ── Cross-Engine Event Bus ────────────────────────────────────────────────────────────────────────
+  eventBus: eventBusRouter,
 });
 
 export type AppRouter = typeof appRouter;

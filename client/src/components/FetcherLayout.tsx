@@ -124,6 +124,8 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
     title: t("group.developerTools"),
     items: [
       { icon: () => <TitanLogo size="sm" />, label: t("nav.titanBuilder"), path: "/dashboard" },
+      { icon: featureIcon("icon_01_r1c1"), label: "Command Centre", path: "/command-centre", isNew: true },
+      { icon: featureIcon("icon_01_r1c1"), label: "Event Bus", path: "/event-bus", isNew: true },
       { icon: featureIcon("icon_01_r1c1"), label: "Builder Templates", path: "/builder-templates", isNew: true },
       { icon: featureIcon("icon_41_r6c1"), label: t("nav.sandbox"), path: "/sandbox", isNew: true },
       { icon: featureIcon("icon_04_r1c4"), label: t("nav.myProjects"), path: "/project-files", isNew: true },

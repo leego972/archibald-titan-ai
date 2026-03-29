@@ -153,6 +153,8 @@ import BinCheckerPage from "./pages/BinCheckerPage";
 import WebAgentPage from "./pages/WebAgentPage";
 import ProxyInterceptorPage from "./pages/ProxyInterceptorPage";
 import RedTeamPlaybooksPage from "./pages/RedTeamPlaybooksPage";
+import CommandCentrePage from "./pages/CommandCentrePage";
+import EventBusPage from "./pages/EventBusPage";
 
 
 function DashboardRouter() {
@@ -282,6 +284,12 @@ function DashboardRouter() {
 
         {/* Red Team Playbooks */}
         <Route path="/red-team-playbooks" component={RedTeamPlaybooksPage} />
+
+        {/* Command Centre */}
+        <Route path="/command-centre" component={CommandCentrePage} />
+
+        {/* Event Bus */}
+        <Route path="/event-bus" component={EventBusPage} />
 
         <Route component={NotFound} />
       </Switch>
