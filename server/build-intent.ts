@@ -1087,7 +1087,15 @@ export function detectExternalBuildIntent(
 ): boolean {
   const msgLower = message.toLowerCase();
 
-  // PRIORITY RULE: If self-context phrases are present, this is NOT an external build
+  // PRIORITY RULE 1: Research/analysis/report tasks are NEVER external builds.
+  // If the user asks to research, compare, analyse, generate a PDF report, or
+  // scrape/visit a website for information — that is a chat/research task, not a build.
+  // This prevents "research website X and compare it to Y, give me a PDF" from
+  // triggering the sandbox builder.
+  const isResearchOrReportTask = /\b(research|compare|analyse|analyze|look at|check out|review|audit|read|study|summarize|summarise|scrape|crawl|visit|inspect|examine|report on|write a report|generate a pdf|create a pdf|pdf of|document|overview|breakdown|how to improve|improvement suggestions|recommendations for|give me a report|provide a report|provide a pdf|make a pdf|write a pdf|make a report)\b/.test(msgLower);
+  if (isResearchOrReportTask) return false;
+
+  // PRIORITY RULE 2: If self-context phrases are present, this is NOT an external build
   // even if external keywords match. "Build me a dashboard page" with "sidebar" context = self-build.
   const hasSelfContext = SELF_CONTEXT_PHRASES.some(p => msgLower.includes(p));
   if (hasSelfContext) return false;
@@ -1136,20 +1144,25 @@ export function detectGitHubRepoModifyIntent(
     return true;
   }
 
-  // Check if a GitHub URL is present AND the message implies modification
+  // Check if a GitHub URL is present AND the message explicitly asks to modify the repo.
+  // IMPORTANT: Generic verbs like "improve", "compare", "analyse", "research", "look at"
+  // must NOT trigger repo-modify mode — the user may simply be sharing a URL for reference.
+  // Only trigger when the message contains a clear repo-action verb AND a direct object
+  // that points at the repo (e.g. "fix the bug in my repo", "push this to github.com/...").
   const hasGitHubUrl = /github\.com\/[\w-]+\/[\w-]+/.test(msgLower);
-  const hasModifyVerb = /\b(fix|update|add|remove|delete|change|modify|edit|refactor|patch|push|commit|improve|upgrade)\b/.test(msgLower);
-  if (hasGitHubUrl && hasModifyVerb) {
+  // Strict repo-action verbs: only verbs that unambiguously mean "change the repo contents"
+  const hasRepoActionVerb = /\b(fix|update|add|remove|delete|change|modify|edit|refactor|patch|push|commit|deploy to|merge into|open a pr|open a pull request|create a pr|create a pull request)\b/.test(msgLower);
+  // Exclude research/comparison/analysis intent — these use the URL as a reference, not a target
+  const isResearchIntent = /\b(research|compare|analyse|analyze|look at|check out|review|audit|read|study|summarize|summarise|scrape|crawl|visit|open|inspect|examine|report on|write a report|generate a pdf|create a pdf|pdf of|document|overview|breakdown)\b/.test(msgLower);
+  if (hasGitHubUrl && hasRepoActionVerb && !isResearchIntent) {
     return true;
   }
 
-  // Check conversation history — if user previously shared a GitHub URL and is now asking to modify
-  const prevHasGitHubUrl = previousMessages.some(m =>
-    typeof m.content === 'string' && /github\.com\/[\w-]+\/[\w-]+/.test(m.content)
-  );
-  if (prevHasGitHubUrl && hasModifyVerb && msgLower.split(/\s+/).length >= 3) {
-    return true;
-  }
+  // NOTE: We intentionally do NOT check conversation history for GitHub URLs.
+  // If a GitHub URL was mentioned earlier in the conversation for a DIFFERENT reason
+  // (e.g. the user asked Titan to research or compare a GitHub-hosted website),
+  // that must NOT cause subsequent unrelated messages to trigger repo-modify mode.
+  // The user must explicitly ask to modify/push/fix the repo in the CURRENT message.
 
   return false;
 }
@@ -1194,6 +1207,17 @@ export async function detectBuildIntentAsync(
   // STRONG build keyword. We no longer fallback on CONTEXT keywords (like "fix" or "update")
   // because that causes false-positive external builds for general chat requests.
   const msgLower = message.toLowerCase();
+
+  // RESEARCH/REPORT GUARD: Never route research, comparison, or PDF-generation tasks
+  // to the external sandbox builder. These are pure chat/research tasks that should
+  // use web_search + web_page_read and respond in chat — not spin up a sandbox.
+  // Example: "research website A, compare to website B, give me a PDF of improvements"
+  // must NEVER become isExternalBuild=true.
+  const isResearchOrReport = /\b(research|compare|analyse|analyze|look at|check out|review|audit|read|study|summarize|summarise|scrape|crawl|visit|inspect|examine|report on|write a report|generate a pdf|create a pdf|pdf of|document|overview|breakdown|how to improve|improvement suggestions|recommendations for|give me a report|provide a report|provide a pdf|make a pdf|write a pdf|make a report)\b/.test(msgLower);
+  if (isResearchOrReport) {
+    return { isSelfBuild: false, isExternalBuild: false, needsClarification: false };
+  }
+
   const hasStrong = STRONG_BUILD_KEYWORDS.some(kw => msgLower.includes(kw));
   if (hasStrong && !isSelfBuild && !isExternalBuild) {
     return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
