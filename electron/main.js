@@ -248,9 +248,9 @@ async function createWindow() {
   setTimeout(() => checkForUpdates(), 5000);
   setInterval(() => checkForUpdates(), 4 * 60 * 60 * 1000);
 
-  // Open external URL in default browser
+  // Open external URL in default browser or file manager
   ipcMain.handle("open-external", (_, url) => {
-    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+    if (url && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://"))) {
       shell.openExternal(url);
     }
   });
@@ -284,6 +284,7 @@ function updateTrayMenu() {
     },
     { type: "separator" },
     { label: "Check for Updates", click: () => checkForUpdates() },
+    { label: "Desktop Settings", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); mainWindow.loadURL("http://127.0.0.1:" + getPort() + "/desktop-settings"); } } },
     { label: "Open in Browser", click: () => shell.openExternal(REMOTE_URL) },
     { type: "separator" },
     { label: "Quit", click: () => { isQuitting = true; app.quit(); } },
