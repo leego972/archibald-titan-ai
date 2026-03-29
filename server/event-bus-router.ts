@@ -8,6 +8,7 @@
 
 import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
+import { consumeCredits } from "./credit-service";
 
 // ─── In-memory event log (per-process, resets on restart) ────────────────────
 interface EventLogEntry {
@@ -213,7 +214,8 @@ export const eventBusRouter = router({
         ).min(1),
       })
     )
-    .mutation(({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
       const id = `rule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const rule: EventRule = {
         id,
@@ -228,6 +230,9 @@ export const eventBusRouter = router({
         triggerCount: 0,
       };
       ruleStore.set(id, rule);
+      if (!isAdmin) {
+        try { await consumeCredits(ctx.user.id as number, "event_bus_rule", `Event bus rule: ${input.name}`); } catch { /* ignore */ }
+      }
       return { success: true, rule };
     }),
 

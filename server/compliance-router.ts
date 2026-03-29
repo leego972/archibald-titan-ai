@@ -13,6 +13,7 @@ import { eq, desc, count, and, gte } from "drizzle-orm";
 import { users, fetcherCredentials, monitoredSites } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { checkCredits, consumeCredits } from "./credit-service";
 
 // ─── Report Types ─────────────────────────────────────────────────────────────
 type ReportType = "soc2" | "iso27001" | "gdpr" | "red_team_summary" | "security_posture";
@@ -375,6 +376,8 @@ export const complianceRouter = router({
       // ── Plan gate: Compliance Reports require Enterprise tier or above ──
       const plan = await getUserPlan(userId);
       enforceFeature(plan.planId, "compliance_reports", "Compliance Report Generator");
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
+      if (!isAdmin) await checkCredits(userId, "compliance_report");
       let controls: ComplianceControl[] = [];
 
       switch (input.type) {
@@ -455,6 +458,12 @@ Write in professional compliance language suitable for a board-level audience. B
 
       reportStore.unshift(report);
       if (reportStore.length > MAX_REPORTS) reportStore.splice(MAX_REPORTS);
+
+      if (!isAdmin) {
+        try {
+          await consumeCredits(userId, "compliance_report", `Compliance report: ${input.type.toUpperCase()}`);
+        } catch { /* ignore credit errors after generation */ }
+      }
 
       return { success: true, report };
     }),

@@ -9,6 +9,7 @@
 import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { checkCredits, consumeCredits } from "./credit-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ModuleCategory = "osint" | "scanning" | "exploitation" | "phishing" | "anonymity" | "automation" | "reporting" | "playbook" | "wordlist" | "template";
@@ -308,15 +309,21 @@ export const securityMarketplaceRouter = router({
       // ── Plan gate: Security Marketplace requires Cyber tier or above ──
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Security Module Marketplace");
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
       const module = MODULES.find((m) => m.id === input.moduleId);
       if (!module) throw new Error("Module not found");
-
+      // Credits required for non-free modules
+      if (!isAdmin && module.license !== "free") {
+        await checkCredits(ctx.user.id, "security_module_install");
+      }
       if (!installedModules.has(ctx.user.id as number)) {
         installedModules.set(ctx.user.id as number, new Set());
       }
       installedModules.get(ctx.user.id as number)!.add(input.moduleId);
       module.downloads++;
-
+      if (!isAdmin && module.license !== "free") {
+        try { await consumeCredits(ctx.user.id, "security_module_install", `Marketplace install: ${module.name}`); } catch { /* ignore */ }
+      }
       return { success: true, message: `${module.name} installed successfully` };
     }),
 

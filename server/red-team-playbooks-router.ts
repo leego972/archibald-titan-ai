@@ -238,9 +238,9 @@ export const redTeamPlaybooksRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
       }
 
-      // Credit check — 50 credits per playbook run
+      // Credit check — 500 credits per red team playbook run
       if (!isAdmin) {
-        await checkCredits(user.id, "advertising_run");
+        await checkCredits(user.id, "red_team_run");
       }
 
       const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -418,7 +418,7 @@ Format as clean Markdown.`;
   // Consume credits
   if (!isAdmin) {
     try {
-      await consumeCredits(userId, "advertising_run", `Red team playbook: ${run.playbookName}`);
+      await consumeCredits(userId, "red_team_run", `Red team playbook: ${run.playbookName}`);
     } catch { /* ignore credit errors after completion */ }
   }
 }

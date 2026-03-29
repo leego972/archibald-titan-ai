@@ -450,6 +450,14 @@ export const CREDIT_COSTS = {
   linken_quick_create: 25,       // Light — create a quick Linken Sphere session profile
   // ── CyberMCP ──────────────────────────────────────────────────────────────────────
   cybermcp_scan: 150,            // Heavy — full 5-check security scan with live SSE progress
+
+  // ── Red Team & Advanced Security ────────────────────────────────────────────────────────────
+  red_team_run: 500,             // Power — full multi-step red team playbook execution
+  compliance_report: 200,        // Heavy — AI-driven compliance assessment + report generation
+  siem_config: 25,               // Light — SIEM integration config create/update
+  siem_test: 75,                 // Medium — live SIEM endpoint connectivity test
+  event_bus_rule: 15,            // Light — automation rule creation in event bus
+  security_module_install: 50,   // Standard — security marketplace module install
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;

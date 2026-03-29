@@ -10,6 +10,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import axios from "axios";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { checkCredits, consumeCredits } from "./credit-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SiemProvider = "splunk" | "elastic" | "datadog" | "sentinel" | "qradar" | "generic_webhook";
@@ -186,6 +187,8 @@ export const siemRouter = router({
       // ── Plan gate: SIEM Integration requires Enterprise tier or above ──
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "siem_integration", "SIEM Integration");
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
+      if (!isAdmin) await checkCredits(ctx.user.id, "siem_config");
       const config: SiemConfig = {
         id: `siem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         userId: ctx.user.id,
@@ -200,6 +203,9 @@ export const siemRouter = router({
         eventsSent: 0,
       };
       siemConfigs.push(config);
+      if (!isAdmin) {
+        try { await consumeCredits(ctx.user.id, "siem_config", `SIEM config created: ${input.name}`); } catch { /* ignore */ }
+      }
       return { success: true, config: { ...config, apiKey: config.apiKey ? "••••••••" : undefined } };
     }),
 
@@ -245,6 +251,8 @@ export const siemRouter = router({
       // ── Plan gate ──
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "siem_integration", "SIEM Integration");
+      const isAdmin2 = ctx.user.role === "admin" || ctx.user.role === "head_admin";
+      if (!isAdmin2) await checkCredits(ctx.user.id, "siem_test");
       const config = siemConfigs.find((c) => c.id === input.configId && c.userId === (ctx.user.id as number));
       if (!config) throw new Error("Config not found");
 
@@ -255,6 +263,9 @@ export const siemRouter = router({
         });
         config.lastTestedAt = new Date();
         config.lastTestStatus = "success";
+        if (!isAdmin2) {
+          try { await consumeCredits(ctx.user.id, "siem_test", `SIEM test: ${config.name}`); } catch { /* ignore */ }
+        }
         return { success: true, message: "Test event sent successfully" };
       } catch (err: any) {
         config.lastTestedAt = new Date();
