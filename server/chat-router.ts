@@ -1298,7 +1298,7 @@ export const chatRouter = router({
     .input(
       z.object({
         message: z.string().min(1).max(4000),
-        conversationId: z.number().optional(),
+        conversationId: z.number().nullish(),
         preferredLanguage: z.string().optional(), // BCP-47 code from the UI language flag selector (e.g. "en", "fr", "ar")
       })
     )
