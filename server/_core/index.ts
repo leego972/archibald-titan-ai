@@ -647,6 +647,18 @@ async function startServer() {
       for (const idx of chatIndexes) {
         try { await pool.promise().query(idx); } catch (_) { /* index already exists */ }
       }
+      // Add dailyFreeCredits and dailyFreeLastGrantedAt columns to credit_balances if missing
+      // (IF NOT EXISTS guard — safe to re-run on every deploy)
+      try {
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN IF NOT EXISTS \`dailyFreeCredits\` int NOT NULL DEFAULT 0`);
+      } catch (e: unknown) {
+        log.warn('credit_balances dailyFreeCredits column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+      }
+      try {
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN IF NOT EXISTS \`dailyFreeLastGrantedAt\` timestamp NULL`);
+      } catch (e: unknown) {
+        log.warn('credit_balances dailyFreeLastGrantedAt column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+      }
       // Expand credit_transactions.type enum to include all action types
       // (MODIFY COLUMN is safe to re-run — MySQL will accept it even if values already exist)
       try {
