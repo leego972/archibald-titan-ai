@@ -650,14 +650,20 @@ async function startServer() {
       // Add dailyFreeCredits and dailyFreeLastGrantedAt columns to credit_balances if missing
       // (IF NOT EXISTS guard — safe to re-run on every deploy)
       try {
-        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN IF NOT EXISTS \`dailyFreeCredits\` int NOT NULL DEFAULT 0`);
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN \`dailyFreeCredits\` int NOT NULL DEFAULT 0`);
       } catch (e: unknown) {
-        log.warn('credit_balances dailyFreeCredits column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        // Ignore 'Duplicate column' — column already exists
+        if (!getErrorMessage(e)?.includes('Duplicate column')) {
+          log.warn('credit_balances dailyFreeCredits column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        }
       }
       try {
-        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN IF NOT EXISTS \`dailyFreeLastGrantedAt\` timestamp NULL`);
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN \`dailyFreeLastGrantedAt\` timestamp NULL`);
       } catch (e: unknown) {
-        log.warn('credit_balances dailyFreeLastGrantedAt column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        // Ignore 'Duplicate column' — column already exists
+        if (!getErrorMessage(e)?.includes('Duplicate column')) {
+          log.warn('credit_balances dailyFreeLastGrantedAt column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        }
       }
       // Expand credit_transactions.type enum to include all action types
       // (MODIFY COLUMN is safe to re-run — MySQL will accept it even if values already exist)
@@ -678,69 +684,70 @@ async function startServer() {
       for (const ddl of chatTableDDL) {
         try { await pool.promise().query(ddl); } catch (_) { /* table already exists */ }
       }
-      // Backfill missing columns on chat tables (idempotent — ADD COLUMN IF NOT EXISTS)
+      // Backfill missing columns on chat tables (idempotent — plain ADD COLUMN, ignore Duplicate column errors)
+      // Note: ADD COLUMN IF NOT EXISTS is only supported in MySQL 8.0.3+; use plain ADD COLUMN + catch instead
       const chatColumnBackfills = [
         // chat_conversations missing columns
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`pinned\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`messageCount\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`archived\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`lastMessageAt\` timestamp NOT NULL DEFAULT (now())`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`contextSummary\` text`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`summarizedUpToId\` int`,
-        `ALTER TABLE \`chat_conversations\` ADD COLUMN IF NOT EXISTS \`buildContext\` json`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`pinned\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`messageCount\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`archived\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`lastMessageAt\` timestamp NOT NULL DEFAULT (now())`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`contextSummary\` text`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`summarizedUpToId\` int`,
+        `ALTER TABLE \`chat_conversations\` ADD COLUMN \`buildContext\` json`,
         // chat_messages missing columns
-        `ALTER TABLE \`chat_messages\` ADD COLUMN IF NOT EXISTS \`toolCalls\` json`,
-        `ALTER TABLE \`chat_messages\` ADD COLUMN IF NOT EXISTS \`actionsTaken\` json`,
-        `ALTER TABLE \`chat_messages\` ADD COLUMN IF NOT EXISTS \`tokenCount\` int`,
+        `ALTER TABLE \`chat_messages\` ADD COLUMN \`toolCalls\` json`,
+        `ALTER TABLE \`chat_messages\` ADD COLUMN \`actionsTaken\` json`,
+        `ALTER TABLE \`chat_messages\` ADD COLUMN \`tokenCount\` int`,
         // users table missing columns (used in auth and admin checks)
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`loginMethod\` varchar(64)`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`emailVerified\` boolean NOT NULL DEFAULT false`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`emailVerificationToken\` varchar(128)`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`emailVerificationExpires\` timestamp`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`twoFactorSecret\` text`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`twoFactorEnabled\` boolean NOT NULL DEFAULT false`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`twoFactorBackupCodes\` json`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`onboardingCompleted\` boolean NOT NULL DEFAULT false`,
-        `ALTER TABLE \`users\` ADD COLUMN IF NOT EXISTS \`lastSignedIn\` timestamp NOT NULL DEFAULT (now())`,
+        `ALTER TABLE \`users\` ADD COLUMN \`loginMethod\` varchar(64)`,
+        `ALTER TABLE \`users\` ADD COLUMN \`emailVerified\` boolean NOT NULL DEFAULT false`,
+        `ALTER TABLE \`users\` ADD COLUMN \`emailVerificationToken\` varchar(128)`,
+        `ALTER TABLE \`users\` ADD COLUMN \`emailVerificationExpires\` timestamp`,
+        `ALTER TABLE \`users\` ADD COLUMN \`twoFactorSecret\` text`,
+        `ALTER TABLE \`users\` ADD COLUMN \`twoFactorEnabled\` boolean NOT NULL DEFAULT false`,
+        `ALTER TABLE \`users\` ADD COLUMN \`twoFactorBackupCodes\` json`,
+        `ALTER TABLE \`users\` ADD COLUMN \`onboardingCompleted\` boolean NOT NULL DEFAULT false`,
+        `ALTER TABLE \`users\` ADD COLUMN \`lastSignedIn\` timestamp NOT NULL DEFAULT (now())`,
         // fetcher_jobs missing columns (used in buildUserContext)
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`encryptedPassword\` text NOT NULL DEFAULT ''`,
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`selectedProviders\` json`,
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`totalProviders\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`completedProviders\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`failedProviders\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN IF NOT EXISTS \`completedAt\` timestamp`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`encryptedPassword\` text NOT NULL DEFAULT ''`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`selectedProviders\` json`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`totalProviders\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`completedProviders\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`failedProviders\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_jobs\` ADD COLUMN \`completedAt\` timestamp`,
         // fetcher_credentials missing columns (used in buildUserContext)
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`jobId\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`taskId\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`providerId\` varchar(64) NOT NULL DEFAULT ''`,
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`providerName\` varchar(128) NOT NULL DEFAULT ''`,
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`keyType\` varchar(64) NOT NULL DEFAULT ''`,
-        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN IF NOT EXISTS \`keyLabel\` varchar(256)`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`jobId\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`taskId\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`providerId\` varchar(64) NOT NULL DEFAULT ''`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`providerName\` varchar(128) NOT NULL DEFAULT ''`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`keyType\` varchar(64) NOT NULL DEFAULT ''`,
+        `ALTER TABLE \`fetcher_credentials\` ADD COLUMN \`keyLabel\` varchar(256)`,
         // fetcher_settings missing columns (used in buildUserContext)
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`proxyServer\` varchar(512)`,
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`proxyUsername\` varchar(128)`,
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`proxyPassword\` text`,
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`captchaService\` varchar(64)`,
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`captchaApiKey\` text`,
-        `ALTER TABLE \`fetcher_settings\` ADD COLUMN IF NOT EXISTS \`headless\` int NOT NULL DEFAULT 1`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`proxyServer\` varchar(512)`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`proxyUsername\` varchar(128)`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`proxyPassword\` text`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`captchaService\` varchar(64)`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`captchaApiKey\` text`,
+        `ALTER TABLE \`fetcher_settings\` ADD COLUMN \`headless\` int NOT NULL DEFAULT 1`,
         // fetcher_proxies missing columns (used in buildUserContext)
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`username\` varchar(128)`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`proxyType\` enum('residential','datacenter','mobile','isp') NOT NULL DEFAULT 'residential'`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`country\` varchar(8)`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`city\` varchar(128)`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`latencyMs\` int`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`lastCheckedAt\` timestamp`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`failCount\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`successCount\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`provider\` varchar(128)`,
-        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN IF NOT EXISTS \`notes\` text`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`username\` varchar(128)`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`proxyType\` enum('residential','datacenter','mobile','isp') NOT NULL DEFAULT 'residential'`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`country\` varchar(8)`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`city\` varchar(128)`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`latencyMs\` int`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`lastCheckedAt\` timestamp`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`failCount\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`successCount\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`provider\` varchar(128)`,
+        `ALTER TABLE \`fetcher_proxies\` ADD COLUMN \`notes\` text`,
         // credential_watches missing columns (used in buildUserContext)
-        `ALTER TABLE \`credential_watches\` ADD COLUMN IF NOT EXISTS \`credentialId\` int NOT NULL DEFAULT 0`,
-        `ALTER TABLE \`credential_watches\` ADD COLUMN IF NOT EXISTS \`alertDaysBefore\` int NOT NULL DEFAULT 7`,
-        `ALTER TABLE \`credential_watches\` ADD COLUMN IF NOT EXISTS \`lastNotifiedAt\` timestamp`,
+        `ALTER TABLE \`credential_watches\` ADD COLUMN \`credentialId\` int NOT NULL DEFAULT 0`,
+        `ALTER TABLE \`credential_watches\` ADD COLUMN \`alertDaysBefore\` int NOT NULL DEFAULT 7`,
+        `ALTER TABLE \`credential_watches\` ADD COLUMN \`lastNotifiedAt\` timestamp`,
       ];
       for (const alter of chatColumnBackfills) {
-        try { await pool.promise().query(alter); } catch (_) { /* column already exists or table missing */ }
+        try { await pool.promise().query(alter); } catch (_) { /* column already exists or table missing — safe to ignore */ }
       }
       log.info('Chat path columns ensured');
       log.info('All tables ensured');
