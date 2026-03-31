@@ -131,7 +131,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
   ];
 }
 
-export function FetcherLayout({ children }: { children: React.ReactNode }) {
+export default function FetcherLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const { subscription } = useSubscription();
   const [location, setLocation] = useLocation();
