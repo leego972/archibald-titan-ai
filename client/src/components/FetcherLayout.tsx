@@ -113,7 +113,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       ],
     },
     {
-      title: "Marketplace & Assets",
+      title: "Extensions",
       items: [
         { icon: Boxes, label: "Module Library", path: "/marketplace" },
         { icon: Database, label: "Titan Storage", path: "/storage" },
@@ -219,7 +219,7 @@ export function FetcherLayout({ children }: { children: React.ReactNode }) {
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-white/80 truncate">{user.email}</p>
                       <p className="text-[9px] text-white/20 truncate uppercase tracking-widest font-black">
-                        {subscription?.planId || "Free"} Tier
+                        {subscription?.planId ? subscription.planId.replace(/_/g, " ") : "No Active Plan"} Tier
                       </p>
                     </div>
                   )}

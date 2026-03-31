@@ -75,7 +75,7 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col items-center gap-1">
               <span className="text-xl font-black text-white">ISO 27001</span>
-              <span className="text-[9px] uppercase tracking-widest font-bold">Security Standard</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold">Aligned Design</span>
             </div>
             <div className="flex flex-col items-center gap-1">
               <span className="text-xl font-black text-white">100%</span>
@@ -123,10 +123,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-6 text-white">Enterprise Trust <br />by Design.</h2>
-              <p className="text-white/40 text-lg leading-relaxed mb-8">
-                Archibald Titan provides the infrastructure layer that connects your AI agents to your enterprise environment securely and reliably.
-              </p>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-6 text-white">Control, Auditability, <br />and Deployment Flexibility.</h2>
+          <p className="text-white/40 text-lg leading-relaxed mb-8">
+            Archibald Titan is built for teams that cannot afford ambiguity. Every credential access is logged, every workflow is versioned, and every deployment option preserves your data sovereignty.
+          </p>
               <div className="space-y-4">
                 {[
                   { icon: ShieldAlert, title: "Full Auditability", desc: "Comprehensive audit logs for every credential access and AI operation, ensuring complete traceability." },
@@ -206,8 +206,8 @@ export default function LandingPage() {
       <section className="relative py-24 sm:py-32 border-t border-white/5 overflow-hidden">
         <div className="absolute inset-0 bg-blue-600/[0.02] pointer-events-none" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Secure Your AI Operations.</h2>
-          <p className="text-lg text-white/40 mb-10">Join the professional teams building the future of AI on Archibald Titan.</p>
+          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Take Control of Your AI Operations.</h2>
+          <p className="text-lg text-white/40 mb-10">Trusted by engineering and security teams who require auditability, control, and local-first execution.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
               Get Started

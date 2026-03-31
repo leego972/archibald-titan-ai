@@ -29,11 +29,11 @@ export default function PricingPage() {
             <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Enterprise Packaging</span>
           </div>
           <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-[0.9] mb-8 text-white">
-            Scalable Plans for <br />
-            <span className="text-white/40">Professional Teams.</span>
+            Plans Built for <br />
+            <span className="text-white/40">Serious Operations.</span>
           </h1>
           <p className="max-w-2xl mx-auto text-lg text-white/40 leading-relaxed">
-            Choose the orchestration tier that fits your engineering and security requirements. From individual developers to global enterprises.
+            Choose the tier that fits your engineering and security requirements. Self-serve for teams, custom contracts for enterprise.
           </p>
         </div>
       </section>
@@ -51,12 +51,12 @@ export default function PricingPage() {
                   <span className="text-5xl font-black text-white">$49</span>
                   <span className="text-lg text-white/20">/mo</span>
                 </div>
-                <p className="text-sm text-white/40">For individual engineers and security researchers.</p>
+                <p className="text-sm text-white/40">For individual engineers and security professionals.</p>
               </div>
               
               <div className="flex-1 space-y-4 mb-10">
                 {[
-                  "15,000 Monthly Credits",
+                  "50,000 Monthly Credits",
                   "Titan Builder Access",
                   "Standard Security Suite",
                   "3 Encrypted Vaults",
@@ -85,12 +85,12 @@ export default function PricingPage() {
                   <span className="text-5xl font-black text-white">$199</span>
                   <span className="text-lg text-white/20">/mo</span>
                 </div>
-                <p className="text-sm text-white/40">For professional teams and growing organizations.</p>
+                <p className="text-sm text-white/40">For security teams and engineering organizations.</p>
               </div>
               
               <div className="flex-1 space-y-4 mb-10">
                 {[
-                  "75,000 Monthly Credits",
+                  "250,000 Monthly Credits",
                   "Advanced Red Team Ops",
                   "Unlimited Team Vaults",
                   "RBAC & Team Control",
@@ -104,7 +104,7 @@ export default function PricingPage() {
               </div>
 
               <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 h-12 font-bold shadow-xl shadow-blue-600/20">
-                Get Started
+                Start with Enterprise
               </Button>
             </div>
 
@@ -115,13 +115,13 @@ export default function PricingPage() {
                 <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-5xl font-black text-white">Custom</span>
                 </div>
-                <p className="text-sm text-white/40">For major studios and global enterprise brands.</p>
+                <p className="text-sm text-white/40">For large organizations requiring custom deployment and SLAs.</p>
               </div>
               
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "Unlimited Credits",
-                  "On-Premise Deployment",
+                  "On-Premise or Air-Gapped Deployment",
                   "Custom AI Model Tuning",
                   "Dedicated Account Manager",
                   "SLA & Procurement Support"
@@ -146,8 +146,8 @@ export default function PricingPage() {
       <section className="relative py-24 sm:py-32 border-t border-white/5 bg-white/[0.01]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-black tracking-tight mb-4 text-white">Enterprise Ready.</h2>
-            <p className="text-white/40 max-w-2xl mx-auto">Archibald Titan is built to meet the most rigorous security and compliance standards.</p>
+            <h2 className="text-3xl font-black tracking-tight mb-4 text-white">Built for Enterprise Security.</h2>
+            <p className="text-white/40 max-w-2xl mx-auto">Archibald Titan is designed with the controls and auditability required by professional security and engineering teams.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
