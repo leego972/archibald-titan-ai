@@ -20,92 +20,45 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
-  PlusCircle,
-  ListOrdered,
-  KeyRound,
-  Settings,
-  ShieldAlert,
-  ShieldCheck,
-  Download,
-  LogOut,
-  PanelLeft,
-  Crown,
-  Key,
-  Users,
-  ScrollText,
-  Package,
-  Timer,
-  RefreshCw,
-  History,
-  Activity,
-  CalendarClock,
-  Sparkles,
-  TrendingUp,
-  ScanSearch,
-  Wand2,
-  Vault,
-  Book,
-  Webhook,
-  BarChart3,
-  UserCog,
-  Zap,
-  CreditCard,
-  Upload,
-  Clock,
-  Bell,
-  Terminal,
-  Search,
-  Building2,
-  FileText,
-  Rocket,
-  Copy,
-  Megaphone,
-  DollarSign,
-  Gift,
-  Store,
-  ShoppingBag,
-  Package2,
   LayoutDashboard,
-  Sun,
-  Moon,
+  Terminal,
+  Monitor,
   FolderOpen,
-  Globe,
-  UserPlus,
-  Shield,
-  Loader2,
-  Mic,
-  MicOff,
-  Cpu,
-  Workflow,
-  Database,
-  Layers,
-  ShieldQuestion,
-  Fingerprint,
+  ShieldCheck,
+  Search,
+  ShieldAlert,
   Network,
-  Settings2,
-  GitBranch,
+  Activity,
+  ScrollText,
+  History,
+  Vault,
+  Workflow,
+  Webhook,
   Globe2,
   Boxes,
-  Server,
-  FileCode,
-  Monitor,
-  Lock,
-  ChevronRight
+  Database,
+  Users,
+  CreditCard,
+  Settings2,
+  Shield,
+  LogOut,
+  UserCog,
+  Zap,
+  Sun,
+  Moon,
+  Bell,
+  Lock
 } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { OutOfCreditsModal } from "./OutOfCreditsModal";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { TitanLogo } from "./TitanLogo";
 import { Button } from "./ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/i18n";
-import { AddAdminModal } from "./AddAdminModal";
 import { isAdminRole } from "@shared/const";
-import { useVoiceMode } from "./VoiceMode";
 
 type MenuItem = {
   icon: any;
@@ -185,7 +138,6 @@ export function FetcherLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { isCollapsed } = useSidebar();
-  const [showAddAdmin, setShowAddAdmin] = useState(false);
 
   const menuGroups = buildMenuGroups(t);
 
@@ -326,8 +278,6 @@ export function FetcherLayout({ children }: { children: React.ReactNode }) {
           </main>
         </SidebarInset>
       </div>
-      <OutOfCreditsModal />
-      <AddAdminModal open={showAddAdmin} onOpenChange={setShowAddAdmin} />
     </SidebarProvider>
   );
 }

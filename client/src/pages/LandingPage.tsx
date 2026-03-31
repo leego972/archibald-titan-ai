@@ -9,7 +9,9 @@ import {
   ShieldCheck, Server, Cpu, Activity,
   Database, Workflow, Globe2, Boxes,
   Vault, Terminal, ChevronUp, Lock,
-  Zap, BarChart3, Users, LayoutDashboard
+  Zap, BarChart3, Users, LayoutDashboard,
+  Search, Fingerprint, Network, Monitor,
+  FileText, ShieldAlert, History
 } from "lucide-react";
 
 function FAQItem({ question, answer }: { question: string; answer: string }) {
@@ -35,7 +37,7 @@ export default function LandingPage() {
 
   return (
     <MarketingLayout>
-      {/* HERO */}
+      {/* HERO: THE TITAN BUILDER FOCUS */}
       <section className="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
@@ -43,24 +45,25 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/5 border border-blue-500/10 mb-8">
-            <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Enterprise AI Orchestration</span>
+            <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Unified AI Command Center</span>
           </div>
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8 text-white">
-            The Unified <br />
-            <span className="text-white/40">AI Command Center.</span>
+            The Operating System <br />
+            <span className="text-white/40">for AI Operations.</span>
           </h1>
           <p className="max-w-2xl mx-auto text-lg sm:text-xl text-white/40 leading-relaxed mb-10">
             Archibald Titan is the professional orchestration platform for secure AI operations. Automate complex DevSecOps workflows, manage encrypted credentials, and deploy local-first intelligence with executive-grade control.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/20 h-14 px-10 text-base font-bold group">
-              Get Started <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              Launch Titan Builder <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button onClick={() => { document.getElementById("pillars")?.scrollIntoView({ behavior: "smooth" }); }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Explore Platform
             </Button>
           </div>
           
+          {/* TRUST SIGNALS */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto opacity-40 grayscale">
             <div className="flex flex-col items-center gap-1">
               <span className="text-xl font-black text-white">SOC2</span>
@@ -82,7 +85,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3 PLATFORM PILLARS */}
+      {/* 3 CORE PILLARS */}
       <section id="pillars" className="relative py-24 sm:py-32 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
@@ -115,20 +118,21 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CORE WORKFLOWS */}
+      {/* ENTERPRISE TRUST SURFACES */}
       <section className="relative py-24 sm:py-32 border-t border-white/5 bg-white/[0.01]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-6 text-white">Operational Excellence <br />by Design.</h2>
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-6 text-white">Enterprise Trust <br />by Design.</h2>
               <p className="text-white/40 text-lg leading-relaxed mb-8">
                 Archibald Titan provides the infrastructure layer that connects your AI agents to your enterprise environment securely and reliably.
               </p>
               <div className="space-y-4">
                 {[
-                  { icon: Activity, title: "Real-time Monitoring", desc: "Live tracking of credential health and provider status." },
-                  { icon: Database, title: "Secure Storage", desc: "Encrypted local storage for sensitive project data." },
-                  { icon: Workflow, title: "Automated Sync", desc: "Keep your credentials and tools in sync across the team." }
+                  { icon: ShieldAlert, title: "Full Auditability", desc: "Comprehensive audit logs for every credential access and AI operation." },
+                  { icon: History, title: "Versioned Workflows", desc: "Roll back and audit automation changes with complete history." },
+                  { icon: Network, title: "Deployment Flexibility", desc: "Deploy on-premise, in your private cloud, or via our secure managed cloud." },
+                  { icon: Fingerprint, title: "RBAC & Team Control", desc: "Granular role-based access control for teams and organizations." }
                 ].map((item, i) => (
                   <div key={i} className="flex gap-4 p-4 rounded-2xl border border-white/[0.05] bg-white/[0.02]">
                     <div className="h-10 w-10 rounded-xl bg-blue-600/10 flex items-center justify-center shrink-0">
@@ -149,14 +153,15 @@ export default function LandingPage() {
                   <div className="h-3 w-3 rounded-full bg-amber-500/20 border border-amber-500/40" />
                   <div className="h-3 w-3 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Titan Orchestrator v4.1</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Titan Compliance Monitor</span>
               </div>
               <div className="space-y-3">
                 {[
-                  { label: "Astra Security Scan", status: "Completed", color: "text-emerald-400" },
-                  { label: "Vault Rotation", status: "Active", color: "text-blue-400" },
-                  { label: "Agent Deployment", status: "Pending", color: "text-white/20" },
-                  { label: "Compliance Report", status: "Scheduled", color: "text-white/20" }
+                  { label: "Credential Integrity", status: "Verified", color: "text-emerald-400" },
+                  { label: "Audit Log Sync", status: "Active", color: "text-blue-400" },
+                  { label: "Encryption Status", status: "AES-256-GCM", color: "text-emerald-400" },
+                  { label: "Access Control", status: "Enforced", color: "text-blue-400" },
+                  { label: "SOC2 Compliance", status: "In Progress", color: "text-amber-400" }
                 ].map((row, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                     <span className="text-xs font-bold text-white/60">{row.label}</span>
@@ -169,68 +174,29 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING PREVIEW */}
-      <section id="pricing" className="relative py-24 sm:py-32 border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-4 text-white">Enterprise Packaging.</h2>
-            <p className="text-white/40 max-w-2xl mx-auto">Scalable plans designed for professional engineering and security teams.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Pro */}
-            <div className="p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01]">
-              <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">Pro</div>
-              <div className="text-4xl font-black mb-6 text-white">$49<span className="text-lg font-normal text-white/20">/mo</span></div>
-              <ul className="space-y-4 mb-8">
-                {["15,000 Credits/mo", "Titan Builder Access", "Standard Security Suite", "3 Vault Connections"].map(f => (
-                  <li key={f} className="flex items-center gap-3 text-sm text-white/50"><Check className="h-4 w-4 text-blue-500" />{f}</li>
-                ))}
-              </ul>
-              <Button onClick={() => setLocation("/pricing")} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold">Get Started</Button>
-            </div>
-            {/* Enterprise */}
-            <div className="p-8 rounded-3xl border border-blue-600/20 bg-blue-600/[0.02] relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 rounded-full text-[9px] font-black uppercase tracking-widest text-white">Recommended</div>
-              <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Enterprise</div>
-              <div className="text-4xl font-black mb-6 text-white">$499<span className="text-lg font-normal text-white/20">/mo</span></div>
-              <ul className="space-y-4 mb-8">
-                {["250,000 Credits/mo", "Full DevSecOps Suite", "Advanced Vault Orchestration", "Team Management"].map(f => (
-                  <li key={f} className="flex items-center gap-3 text-sm text-white/50"><Check className="h-4 w-4 text-blue-500" />{f}</li>
-                ))}
-              </ul>
-              <Button onClick={() => setLocation("/pricing")} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 font-bold shadow-lg shadow-blue-600/20">Select Enterprise</Button>
-            </div>
-            {/* Titan */}
-            <div className="p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01]">
-              <div className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">Titan</div>
-              <div className="text-4xl font-black mb-6 text-white">Custom</div>
-              <ul className="space-y-4 mb-8">
-                {["Unlimited Credits", "Custom Integrations", "Dedicated Support", "On-premise Deployment"].map(f => (
-                  <li key={f} className="flex items-center gap-3 text-sm text-white/50"><Check className="h-4 w-4 text-blue-500" />{f}</li>
-                ))}
-              </ul>
-              <Button onClick={() => setLocation("/contact")} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold">Contact Sales</Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
       <section className="relative py-24 sm:py-32 border-t border-white/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-black tracking-tight mb-12 text-center text-white">Frequently Asked Questions</h2>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-4 text-white">Frequently Asked Questions.</h2>
+            <p className="text-white/40">Common questions about the Titan platform and enterprise deployment.</p>
+          </div>
           <div className="divide-y divide-white/5">
             <FAQItem 
-              question="Is my data secure with Archibald Titan?" 
-              answer="Yes. Archibald Titan uses a local-first execution model, meaning your prompts and sensitive data never leave your infrastructure. All credentials are encrypted using AES-256-GCM." 
+              question="How does Archibald Titan handle data sovereignty?" 
+              answer="Titan is built with a local-first architecture. All AI operations, credential management, and sensitive data processing occur within your defined environment. We do not store your credentials or project data on our servers unless you explicitly opt for our managed cloud sync."
             />
             <FAQItem 
-              question="Can I integrate with my existing SIEM?" 
-              answer="Absolutely. Archibald Titan is designed for enterprise environments and supports integration with major SIEM and logging platforms for full auditability." 
+              question="Can we deploy Titan on-premise?" 
+              answer="Yes. Archibald Titan Enterprise supports full on-premise deployment via Docker or Kubernetes, allowing you to run the entire orchestration layer within your own air-gapped or private network."
             />
             <FAQItem 
-              question="What are credits used for?" 
-              answer="Credits power the AI orchestration and security scanning engines. Different tasks consume different amounts of credits based on complexity and resource usage." 
+              question="What encryption standards are used for the Vault?" 
+              answer="All credentials and sensitive project data are encrypted using AES-256-GCM. Encryption keys are managed via your choice of local key storage, AWS KMS, or HashiCorp Vault."
+            />
+            <FAQItem 
+              question="Does Titan support team collaboration?" 
+              answer="Absolutely. Titan includes robust role-based access control (RBAC), allowing you to manage team members, share encrypted vaults, and audit all team activities from a central organization console."
             />
           </div>
         </div>
@@ -239,12 +205,17 @@ export default function LandingPage() {
       {/* FINAL CTA */}
       <section className="relative py-24 sm:py-32 border-t border-white/5 overflow-hidden">
         <div className="absolute inset-0 bg-blue-600/[0.02] pointer-events-none" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Ready to Orchestrate?</h2>
-          <p className="max-w-xl mx-auto text-white/40 mb-10">Join the next generation of security-first engineering teams.</p>
-          <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/20 h-14 px-10 text-base font-bold">
-            Get Started Now
-          </Button>
+          <p className="text-lg text-white/40 mb-10">Join the engineering and security teams building the future of AI operations on Archibald Titan.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
+              Get Started Now
+            </Button>
+            <Button onClick={() => setLocation("/pricing")} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
+              View Pricing
+            </Button>
+          </div>
         </div>
       </section>
     </MarketingLayout>

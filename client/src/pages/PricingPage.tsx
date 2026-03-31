@@ -3,58 +3,15 @@ import { Button } from "@/components/ui/button";
 import { getRegisterUrl } from "@/const";
 import { useLocation } from "wouter";
 import MarketingLayout from "@/components/MarketingLayout";
-import { Check, ShieldCheck, Zap, Lock, Globe2, Activity, Users, Terminal, Shield } from "lucide-react";
-
-const PLANS = [
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$49",
-    description: "For individual developers and security researchers.",
-    features: [
-      "15,000 Credits per month",
-      "Titan Builder Access",
-      "Standard Security Suite",
-      "3 Vault Connections",
-      "Local-first Execution",
-      "Community Support"
-    ],
-    cta: "Get Started",
-    highlight: false
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "$499",
-    description: "For professional engineering and security teams.",
-    features: [
-      "250,000 Credits per month",
-      "Full DevSecOps Suite",
-      "Advanced Vault Orchestration",
-      "Team Management & RBAC",
-      "Audit Logging & Compliance",
-      "Priority Support"
-    ],
-    cta: "Select Enterprise",
-    highlight: true
-  },
-  {
-    id: "cyber",
-    name: "Cyber",
-    price: "$1,499",
-    description: "For high-stakes security operations and red teams.",
-    features: [
-      "1,000,000 Credits per month",
-      "Red Team Playbooks",
-      "Advanced OSINT & Scanning",
-      "Isolated Browser Access",
-      "Custom Automation Hooks",
-      "Dedicated Account Manager"
-    ],
-    cta: "Select Cyber",
-    highlight: false
-  }
-];
+import {
+  Check, Shield, Zap, Server, Cpu, Activity,
+  Database, Workflow, Globe2, Boxes,
+  Vault, Terminal, Lock, BarChart3, Users,
+  LayoutDashboard, ShieldCheck, Search,
+  Fingerprint, Network, Monitor, FileText,
+  ShieldAlert, History, ArrowRight, CalendarDays,
+  PhoneCall
+} from "lucide-react";
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -62,123 +19,173 @@ export default function PricingPage() {
 
   return (
     <MarketingLayout>
-      <div className="relative pt-32 pb-24 sm:pt-48 sm:pb-32 overflow-hidden">
+      {/* HEADER */}
+      <section className="relative pt-32 pb-16 sm:pt-48 sm:pb-24 overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
         </div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-20">
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-6 text-white">Enterprise Packaging.</h1>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/5 border border-blue-500/10 mb-8">
+            <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Enterprise Packaging</span>
+          </div>
+          <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-[0.9] mb-8 text-white">
+            Scalable Plans for <br />
+            <span className="text-white/40">Professional Teams.</span>
+          </h1>
           <p className="max-w-2xl mx-auto text-lg text-white/40 leading-relaxed">
-            Scalable plans designed for professional engineering and security teams. Choose the tier that fits your operational requirements.
+            Choose the orchestration tier that fits your engineering and security requirements. From individual developers to global enterprises.
           </p>
         </div>
+      </section>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
-            {PLANS.map((plan) => (
-              <div 
-                key={plan.id} 
-                className={`relative p-8 rounded-3xl border transition-all duration-500 flex flex-col ${
-                  plan.highlight 
-                    ? "border-blue-600/30 bg-blue-600/[0.03] shadow-2xl shadow-blue-600/10 scale-105 z-10" 
-                    : "border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03]"
-                }`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 rounded-full text-[9px] font-black uppercase tracking-widest text-white">
-                    Recommended
-                  </div>
-                )}
-                <div className="mb-8">
-                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">{plan.name}</h3>
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-4xl font-black text-white">{plan.price}</span>
-                    <span className="text-sm text-white/20">/mo</span>
-                  </div>
-                  <p className="text-sm text-white/40 leading-relaxed">{plan.description}</p>
+      {/* PRICING GRID */}
+      <section className="relative pb-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            
+            {/* PRO - SELF SERVE */}
+            <div className="flex flex-col p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.02] transition-all duration-500">
+              <div className="mb-8">
+                <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">Pro</h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-5xl font-black text-white">$49</span>
+                  <span className="text-lg text-white/20">/mo</span>
                 </div>
-                <ul className="space-y-4 mb-10 flex-1">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-3 text-sm text-white/50">
-                      <Check className="h-4 w-4 text-blue-500 shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Button 
-                  onClick={() => { window.location.href = getRegisterUrl(); }}
-                  className={`w-full h-12 font-bold transition-all ${
-                    plan.highlight 
-                      ? "bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-lg shadow-blue-600/20" 
-                      : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                  }`}
-                >
-                  {plan.cta}
-                </Button>
+                <p className="text-sm text-white/40">For individual engineers and security researchers.</p>
               </div>
-            ))}
-          </div>
-
-          {/* Titan Tier */}
-          <div className="max-w-4xl mx-auto p-8 sm:p-12 rounded-3xl border border-white/[0.05] bg-white/[0.01] relative overflow-hidden mb-24">
-            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-              <Shield className="h-48 w-48 text-white" />
-            </div>
-            <div className="relative grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-              <div>
-                <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Titan Tier</h3>
-                <h2 className="text-3xl font-black text-white mb-4">Custom Enterprise Solutions.</h2>
-                <p className="text-sm text-white/40 leading-relaxed mb-8">
-                  For global organizations requiring unlimited scale, custom integrations, and on-premise deployment options.
-                </p>
-                <Button 
-                  onClick={() => setLocation("/contact")}
-                  className="bg-white text-black hover:bg-white/90 font-bold h-12 px-8"
-                >
-                  Contact Sales
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div className="flex-1 space-y-4 mb-10">
                 {[
-                  { icon: Globe2, label: "On-premise Deploy" },
-                  { icon: Users, label: "Unlimited Seats" },
-                  { icon: Zap, label: "Custom Credits" },
-                  { icon: ShieldCheck, label: "Dedicated Support" }
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                    <item.icon className="h-4 w-4 text-blue-500" />
-                    <span className="text-xs font-bold text-white/60">{item.label}</span>
+                  "15,000 Monthly Credits",
+                  "Titan Builder Access",
+                  "Standard Security Suite",
+                  "3 Encrypted Vaults",
+                  "Community Support"
+                ].map(f => (
+                  <div key={f} className="flex items-center gap-3 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span>{f}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
 
-          {/* Trust Section */}
-          <div className="text-center">
-            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-12">Trusted Security Infrastructure</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-12 opacity-30 grayscale max-w-4xl mx-auto">
-              <div className="flex flex-col items-center gap-2">
-                <Lock className="h-6 w-6 text-white" />
-                <span className="text-[9px] font-black uppercase tracking-widest">AES-256-GCM</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <ShieldCheck className="h-6 w-6 text-white" />
-                <span className="text-[9px] font-black uppercase tracking-widest">SOC2 Ready</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <Activity className="h-6 w-6 text-white" />
-                <span className="text-[9px] font-black uppercase tracking-widest">99.9% Uptime</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <Users className="h-6 w-6 text-white" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Team RBAC</span>
-              </div>
+              <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 h-12 font-bold">
+                Get Started
+              </Button>
             </div>
+
+            {/* ENTERPRISE - MOST POPULAR */}
+            <div className="flex flex-col p-8 rounded-3xl border border-blue-600/20 bg-blue-600/[0.02] relative group">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-blue-600/20">
+                Most Popular
+              </div>
+              <div className="mb-8">
+                <h3 className="text-sm font-black uppercase tracking-widest text-blue-400 mb-4">Enterprise</h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-5xl font-black text-white">$199</span>
+                  <span className="text-lg text-white/20">/mo</span>
+                </div>
+                <p className="text-sm text-white/40">For professional teams and growing organizations.</p>
+              </div>
+              
+              <div className="flex-1 space-y-4 mb-10">
+                {[
+                  "75,000 Monthly Credits",
+                  "Everything in Pro, plus:",
+                  "Advanced Red Team Ops",
+                  "Unlimited Team Vaults",
+                  "RBAC & Team Control",
+                  "Priority Support"
+                ].map(f => (
+                  <div key={f} className="flex items-center gap-3 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 h-12 font-bold shadow-xl shadow-blue-600/20">
+                Start Free Trial
+              </Button>
+            </div>
+
+            {/* TITAN - CONTACT SALES */}
+            <div className="flex flex-col p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.02] transition-all duration-500">
+              <div className="mb-8">
+                <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">Titan</h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-5xl font-black text-white">Custom</span>
+                </div>
+                <p className="text-sm text-white/40">For major studios and global enterprise brands.</p>
+              </div>
+              
+              <div className="flex-1 space-y-4 mb-10">
+                {[
+                  "Unlimited Credits",
+                  "Everything in Enterprise, plus:",
+                  "On-Premise Deployment",
+                  "Custom AI Model Tuning",
+                  "Dedicated Account Manager",
+                  "SLA & Procurement Support"
+                ].map(f => (
+                  <div key={f} className="flex items-center gap-3 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} variant="outline" className="w-full border-white/10 bg-white/5 hover:bg-white/10 text-white h-12 font-bold">
+                Contact Sales
+              </Button>
+            </div>
+
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* TRUST & COMPLIANCE SECTION */}
+      <section className="relative py-24 sm:py-32 border-t border-white/5 bg-white/[0.01]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black tracking-tight mb-4 text-white">Enterprise Ready.</h2>
+            <p className="text-white/40 max-w-2xl mx-auto">Archibald Titan is built to meet the most rigorous security and compliance standards.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { icon: ShieldCheck, title: "SOC2 Compliance", desc: "Our systems are designed with SOC2 Type II standards in mind." },
+              { icon: Lock, title: "AES-256 Encryption", desc: "All sensitive data is encrypted at rest and in transit using GCM." },
+              { icon: Fingerprint, title: "RBAC Controls", desc: "Granular role-based access control for your entire organization." },
+              { icon: History, title: "Full Audit Logs", desc: "Complete history of all credential access and AI operations." }
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-2xl border border-white/[0.05] bg-white/[0.01]">
+                <div className="h-10 w-10 rounded-xl bg-blue-600/10 flex items-center justify-center mb-4">
+                  <item.icon className="h-5 w-5 text-blue-500" />
+                </div>
+                <h4 className="font-bold text-white/80 mb-2">{item.title}</h4>
+                <p className="text-xs text-white/40 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="relative py-24 sm:py-32 border-t border-white/5 overflow-hidden">
+        <div className="absolute inset-0 bg-blue-600/[0.02] pointer-events-none" />
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Secure Your AI Operations.</h2>
+          <p className="text-lg text-white/40 mb-10">Join the professional teams building the future of AI on Archibald Titan.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
+              Start Free Trial
+            </Button>
+            <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
+              Request Demo
+            </Button>
+          </div>
+        </div>
+      </section>
     </MarketingLayout>
   );
 }
