@@ -166,21 +166,21 @@ function SystemHealth() {
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400/60" />
               <span className="text-[11px] font-bold text-white/60">Credential Integrity</span>
             </div>
-            <span className="text-[11px] font-black text-emerald-400/80">{data?.healthyCount ?? 0} Healthy</span>
+            <span className="text-[11px] font-black text-emerald-400/80">{data?.summary?.healthy ?? 0} Healthy</span>
           </div>
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-3.5 w-3.5 text-amber-400/60" />
               <span className="text-[11px] font-bold text-white/60">Expiring Soon</span>
             </div>
-            <span className="text-[11px] font-black text-amber-400/80">{data?.warningCount ?? 0} Warning</span>
+            <span className="text-[11px] font-black text-amber-400/80">{(data?.expiringSoon?.length ?? 0) + (data?.expiringWarning?.length ?? 0)} Warning</span>
           </div>
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
             <div className="flex items-center gap-3">
               <AlertCircle className="h-3.5 w-3.5 text-red-400/60" />
               <span className="text-[11px] font-bold text-white/60">Critical Issues</span>
             </div>
-            <span className="text-[11px] font-black text-red-400/80">{data?.criticalCount ?? 0} Action</span>
+            <span className="text-[11px] font-black text-red-400/80">{data?.expired?.length ?? 0} Action</span>
           </div>
         </div>
       </CardContent>
@@ -190,7 +190,7 @@ function SystemHealth() {
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const { subscription } = useSubscription();
+  const sub = useSubscription();
   const [, setLocation] = useLocation();
 
   if (loading) return null;
@@ -208,7 +208,7 @@ export default function Home() {
               Welcome back, <span className="text-blue-500">{user.email?.split('@')[0]}</span>
             </h1>
             <p className="text-sm text-white/30 font-medium">
-              System status is optimal. You have <span className="text-white/60 font-bold">{subscription?.credits?.toLocaleString() ?? 0} credits</span> remaining.
+              System status is optimal. You have <span className="text-white/60 font-bold">{sub?.fetchesRemaining === -1 ? "unlimited" : (sub?.fetchesRemaining?.toLocaleString() ?? 0)} fetches</span> remaining.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ export default function Home() {
         </div>
       </header>
 
-      <UsageStatsWidget sub={subscription} />
+      <UsageStatsWidget sub={sub} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2">

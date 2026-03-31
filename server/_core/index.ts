@@ -563,6 +563,9 @@ async function startServer() {
         "ALTER TABLE `sandbox_files` ADD COLUMN `projectName` varchar(255) NULL",
         // chatConversations: cross-conversation build memory (build context)
         "ALTER TABLE `chatConversations` ADD COLUMN `buildContext` JSON NULL",
+        // releases: Android download URL and file size (added in v8+)
+        "ALTER TABLE `releases` ADD COLUMN `downloadUrlAndroid` text NULL",
+        "ALTER TABLE `releases` ADD COLUMN `fileSizeAndroid` int NULL",
       ];
       for (const sql of missingColumns) {
         try {
@@ -665,12 +668,44 @@ async function startServer() {
           log.warn('credit_balances dailyFreeLastGrantedAt column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
         }
       }
+      // Add lastLoginBonusAt and loginBonusThisMonth columns to credit_balances if missing
+      try {
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN \`lastLoginBonusAt\` timestamp NULL`);
+      } catch (e: unknown) {
+        if (!getErrorMessage(e)?.includes('Duplicate column')) {
+          log.warn('credit_balances lastLoginBonusAt column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        }
+      }
+      try {
+        await pool.promise().query(`ALTER TABLE \`credit_balances\` ADD COLUMN \`loginBonusThisMonth\` int NOT NULL DEFAULT 0`);
+      } catch (e: unknown) {
+        if (!getErrorMessage(e)?.includes('Duplicate column')) {
+          log.warn('credit_balances loginBonusThisMonth column (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+        }
+      }
+      // Rename api_keys.rate_limit → rateLimit to match Drizzle schema (idempotent — ignore if already renamed)
+      try {
+        const [cols] = await pool.promise().query(`SHOW COLUMNS FROM \`api_keys\` LIKE 'rate_limit'`) as any[];
+        if (Array.isArray(cols) && cols.length > 0) {
+          await pool.promise().query(`ALTER TABLE \`api_keys\` RENAME COLUMN \`rate_limit\` TO \`rateLimit\``);
+          log.info('api_keys: renamed rate_limit → rateLimit');
+        }
+      } catch (e: unknown) {
+        log.warn('api_keys rate_limit rename (non-fatal):', { error: getErrorMessage(e)?.substring(0, 200) });
+      }
       // Expand credit_transactions.type enum to include all action types
       // (MODIFY COLUMN is safe to re-run — MySQL will accept it even if values already exist)
       try {
         await pool.promise().query(`ALTER TABLE \`credit_transactions\` MODIFY COLUMN \`type\` enum('signup_bonus','monthly_refill','pack_purchase','admin_adjustment','referral_bonus','daily_login_bonus','marketplace_sale','marketplace_refund','chat_message','builder_action','voice_action','image_generation','video_generation','fetch_action','github_action','import_action','clone_action','replicate_action','seo_run','blog_generate','content_generate','marketing_run','advertising_run','security_scan','metasploit_action','evilginx_action','blackeye_action','grant_match','grant_apply','business_plan_generate','marketplace_list','marketplace_feature','marketplace_purchase','marketplace_seller_fee','marketplace_seller_renewal','marketplace_boost','marketplace_verification','site_monitor_add','sandbox_run','affiliate_action','api_call','vpn_generate','isolated_browser') NOT NULL`);
       } catch (e: unknown) {
         log.warn('credit_transactions enum expand warning', { error: getErrorMessage(e)?.substring(0, 200) });
+      }
+      // Expand subscriptions.plan enum to include all plan tiers (cyber, cyber_plus, titan)
+      // MODIFY COLUMN is idempotent — safe to re-run on every deploy
+      try {
+        await pool.promise().query(`ALTER TABLE \`subscriptions\` MODIFY COLUMN \`plan\` enum('free','pro','enterprise','cyber','cyber_plus','titan') NOT NULL DEFAULT 'free'`);
+      } catch (e: unknown) {
+        log.warn('subscriptions plan enum expand warning', { error: getErrorMessage(e)?.substring(0, 200) });
       }
       // ── CRITICAL: Ensure chat tables exist with all required columns ──────────
       // These tables are used in every chat.send call. If they don't exist or

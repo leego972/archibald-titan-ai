@@ -51,7 +51,6 @@ import {
   Bell,
   Lock
 } from "lucide-react";
-import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { TitanLogo } from "./TitanLogo";
@@ -133,11 +132,12 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
 
 export default function FetcherLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
-  const { subscription } = useSubscription();
+  const sub = useSubscription();
   const [location, setLocation] = useLocation();
   const { t } = useLanguage();
-  const { theme, setTheme } = useTheme();
-  const { isCollapsed } = useSidebar();
+  const { theme, toggleTheme } = useTheme();
+  const { state: sidebarState } = useSidebar();
+  const isCollapsed = sidebarState === "collapsed";
 
   const menuGroups = buildMenuGroups(t);
 
@@ -175,7 +175,7 @@ export default function FetcherLayout({ children }: { children: React.ReactNode 
                 <SidebarMenu>
                   {group.items.map((item) => {
                     if (item.adminOnly && !isAdminRole(user.role)) return null;
-                    if (item.titanOnly && subscription?.planId !== "titan") return null;
+                    if (item.titanOnly && sub?.planId !== "titan") return null;
 
                     const active = isActive(item.path);
                     return (
@@ -219,7 +219,7 @@ export default function FetcherLayout({ children }: { children: React.ReactNode 
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-white/80 truncate">{user.email}</p>
                       <p className="text-[9px] text-white/20 truncate uppercase tracking-widest font-black">
-                        {subscription?.planId ? subscription.planId.replace(/_/g, " ") : "No Active Plan"} Tier
+                        {sub?.planId ? sub.planId.replace(/_/g, " ") : "No Active Plan"} Tier
                       </p>
                     </div>
                   )}
@@ -251,13 +251,13 @@ export default function FetcherLayout({ children }: { children: React.ReactNode 
             <div className="flex items-center gap-4">
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
                 <Zap className="h-3.5 w-3.5 text-amber-400/60" />
-                <span className="text-xs font-bold text-white/60">{subscription?.credits?.toLocaleString() ?? 0}</span>
+                <span className="text-xs font-bold text-white/60">{(sub?.fetchesRemaining === -1 ? "∞" : sub?.fetchesRemaining?.toLocaleString()) ?? 0}</span>
                 <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">Credits</span>
               </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={() => toggleTheme?.()}
                 className="text-white/20 hover:text-white hover:bg-white/5 h-9 w-9"
               >
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

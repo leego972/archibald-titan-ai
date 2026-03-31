@@ -2,6 +2,7 @@ import { eq, and, or, gte, lte, like, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
 import { InsertUser, users, companies, InsertCompany, businessPlans, InsertBusinessPlan, grantOpportunities, InsertGrantOpportunity, grantApplications, InsertGrantApplication, grantMatches, InsertGrantMatch, crowdfundingCampaigns, InsertCrowdfundingCampaign, crowdfundingRewards, InsertCrowdfundingReward, crowdfundingContributions, InsertCrowdfundingContribution, crowdfundingUpdates, InsertCrowdfundingUpdate, crowdfundingComments, InsertCrowdfundingComment, marketplaceListings, InsertMarketplaceListing, marketplacePurchases, InsertMarketplacePurchase, marketplaceReviews, InsertMarketplaceReview, sellerProfiles, InsertSellerProfile, sellerPayoutMethods, InsertSellerPayoutMethod } from "../drizzle/schema";
+import * as schema from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createLogger } from "./_core/logger.js";
 const log = createLogger("Database");
@@ -18,7 +19,7 @@ export async function getDb() {
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000,
       });
-      _db = drizzle(_pool);
+      _db = drizzle(_pool, { schema, mode: 'default' });
     } catch (error) {
       log.warn("[Database] Failed to connect:", { error: String(error) });
       _db = null;

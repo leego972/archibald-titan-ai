@@ -57,9 +57,9 @@ CREATE TABLE IF NOT EXISTS `credit_escalation` (
 -- These are consumed BEFORE paid credits and do NOT accumulate.
 -- Paid tier users do NOT receive daily free credits.
 ALTER TABLE `credit_balances`
-  ADD COLUMN IF NOT EXISTS `dailyFreeCredits` INT NOT NULL DEFAULT 0
+  ADD COLUMN `dailyFreeCredits` INT NOT NULL DEFAULT 0
     COMMENT 'Current daily free credit balance — free tier only, resets every 24h, does not accumulate',
-  ADD COLUMN IF NOT EXISTS `dailyFreeCreditsLastGranted` TIMESTAMP NULL DEFAULT NULL
+  ADD COLUMN `dailyFreeCreditsLastGranted` TIMESTAMP NULL DEFAULT NULL
     COMMENT 'Timestamp of the last daily free credit grant — used to enforce 24h cooldown';
 
 -- ── Indexes ───────────────────────────────────────────────────────────────────

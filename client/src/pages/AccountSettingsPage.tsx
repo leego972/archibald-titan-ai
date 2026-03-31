@@ -267,7 +267,7 @@ export default function AccountSettingsPage() {
   });
 
   // Is this an OAuth-only user (no password set)?
-  const isOAuthUser = !user?.passwordHash;
+  const isOAuthUser = !user?.hasPassword;
 
   useEffect(() => {
     if (user) {

@@ -80,7 +80,14 @@ export const appRouter = router({
   files: filesRouter,
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      const u = opts.ctx.user;
+      if (!u) return null;
+      // Strip all sensitive server-only fields before sending to the client
+      const { passwordHash: _ph, emailVerificationToken: _evt, emailVerificationExpires: _eve, twoFactorSecret: _tfs, twoFactorBackupCodes: _tfbc, ...safeUser } = u;
+      // Expose a safe boolean so the client can check if the user has a password without leaking the hash
+      return { ...safeUser, hasPassword: !!_ph };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

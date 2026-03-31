@@ -979,11 +979,11 @@ export async function processAllMonthlyRefills(): Promise<{ processed: number; r
   const db = await getDb();
   if (!db) return { processed: 0, refilled: 0, errors: 0 };
 
-  // Get all non-unlimited credit balance holders
+  // Get all non-unlimited credit balance holders, excluding the canary token user (userId = -999)
   const allBalances = await db
     .select({ userId: creditBalances.userId })
     .from(creditBalances)
-    .where(eq(creditBalances.isUnlimited, false));
+    .where(and(eq(creditBalances.isUnlimited, false), ne(creditBalances.userId, -999)));
 
   let processed = 0;
   let refilled = 0;

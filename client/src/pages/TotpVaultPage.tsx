@@ -110,25 +110,7 @@ export default function TotpVaultPage() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
 
-  // Cyber plan gate
-  if (!sub.canUse("totp_vault")) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-            <Key className="h-7 w-7 text-primary" />
-            TOTP Vault
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your two-factor authentication secrets securely.
-          </p>
-        </div>
-        <UpgradeBanner feature="TOTP Vault" requiredPlan="cyber" />
-      </div>
-    );
-  }
-
-  // Form state
+  // Form state — must be declared before any conditional return
   const [name, setName] = useState("");
   const [issuer, setIssuer] = useState("");
   const [secret, setSecret] = useState("");
@@ -150,6 +132,16 @@ export default function TotpVaultPage() {
   const listQuery = trpc.totpVault.list.useQuery(undefined, {
     refetchInterval: 30000,
   });
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setIssuer("");
+    setSecret("");
+    setAlgorithm("SHA1");
+    setDigits(6);
+    setPeriod(30);
+    setShowSecret(false);
+  }, []);
 
   const addMutation = trpc.totpVault.add.useMutation({
     onSuccess: (data) => {
@@ -192,15 +184,23 @@ export default function TotpVaultPage() {
     },
   });
 
-  const resetForm = useCallback(() => {
-    setName("");
-    setIssuer("");
-    setSecret("");
-    setAlgorithm("SHA1");
-    setDigits(6);
-    setPeriod(30);
-    setShowSecret(false);
-  }, []);
+  // Cyber plan gate — after all hooks
+  if (!sub.canUse("totp_vault")) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+            <Key className="h-7 w-7 text-primary" />
+            TOTP Vault
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your two-factor authentication secrets securely.
+          </p>
+        </div>
+        <UpgradeBanner feature="TOTP Vault" requiredPlan="cyber" />
+      </div>
+    );
+  }
 
   const handleAdd = () => {
     if (!name.trim()) {

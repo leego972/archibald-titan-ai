@@ -3,6 +3,6 @@
 -- customInstructions (user-defined persistent Titan instructions)
 
 ALTER TABLE `users`
-  ADD COLUMN IF NOT EXISTS `titanUnlockExpiry` timestamp NULL,
-  ADD COLUMN IF NOT EXISTS `titanUnlockGrantedBy` int NULL,
-  ADD COLUMN IF NOT EXISTS `customInstructions` text NULL;
+  ADD COLUMN `titanUnlockExpiry` timestamp NULL,
+  ADD COLUMN `titanUnlockGrantedBy` int NULL,
+  ADD COLUMN `customInstructions` text NULL;

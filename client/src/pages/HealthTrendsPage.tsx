@@ -32,33 +32,10 @@ export default function HealthTrendsPage() {
   const sub = useSubscription();
   const [days, setDays] = useState(30);
 
-  // Cyber plan gate
-  if (!sub.canUse("credential_health")) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-            <Activity className="h-7 w-7 text-primary" />
-            Health Trends
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Track credential health over time.
-          </p>
-        </div>
-        <UpgradeBanner feature="Health Trends" requiredPlan="cyber" />
-      </div>
-    );
-  }
-
+  // All hooks must be called unconditionally before any conditional return
   const overviewQuery = trpc.healthTrends.overview.useQuery({ days });
   const dailyQuery = trpc.healthTrends.dailyTrend.useQuery({ days });
   const utils = trpc.useUtils();
-
-  const handleRefresh = () => {
-    utils.healthTrends.overview.invalidate();
-    utils.healthTrends.dailyTrend.invalidate();
-    toast.success("Refreshed");
-  };
 
   type OverviewItem = NonNullable<typeof overviewQuery.data>[number];
   type DailyItem = NonNullable<typeof dailyQuery.data>[number];
@@ -81,6 +58,30 @@ export default function HealthTrendsPage() {
       overallRate,
     };
   }, [overview]);
+
+  const handleRefresh = () => {
+    utils.healthTrends.overview.invalidate();
+    utils.healthTrends.dailyTrend.invalidate();
+    toast.success("Refreshed");
+  };
+
+  // Cyber plan gate — rendered after all hooks
+  if (!sub.canUse("credential_health")) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+            <Activity className="h-7 w-7 text-primary" />
+            Health Trends
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Track credential health over time.
+          </p>
+        </div>
+        <UpgradeBanner feature="Health Trends" requiredPlan="cyber" />
+      </div>
+    );
+  }
 
   // Mini bar chart for daily trend
   const DailyChart = ({ items }: { items: DailyItem[] }) => {
