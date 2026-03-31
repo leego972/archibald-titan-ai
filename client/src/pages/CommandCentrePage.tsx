@@ -118,40 +118,40 @@ export default function CommandCentrePage() {
   return (
     <div className="flex flex-col h-full bg-[#02040a] text-white">
       {/* Header */}
-      <div className="border-b border-white/[0.05] px-8 py-6 bg-[#02040a]/50 backdrop-blur-xl sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-blue-600/10 rounded-xl border border-blue-600/20">
+      <div className="border-b border-white/[0.05] px-8 py-8 bg-[#02040a]/50 backdrop-blur-xl sticky top-0 z-20">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-5">
+            <div className="p-3 bg-blue-600/10 rounded-xl border border-blue-600/20">
               <Monitor className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Command Center</h1>
-              <p className="text-sm text-white/40">Enterprise orchestration and real-time engine status</p>
+              <h1 className="text-2xl font-black tracking-tighter uppercase">Command Center</h1>
+              <p className="text-sm text-white/30 font-medium">Enterprise orchestration and real-time engine status</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] rounded-lg border border-white/[0.05]">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] rounded-lg border border-white/[0.05]">
+              <Zap className="w-3.5 h-3.5 text-amber-400/60" />
               <span className="text-xs font-bold text-white/60">
                 {credits ? ((credits as any).balance ?? 0).toLocaleString() : "0"} Credits
               </span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetchCredits()} className="border-white/10 bg-white/5 text-white/70 hover:text-white">
+            <Button variant="outline" size="sm" onClick={() => refetchCredits()} className="border-white/10 bg-white/5 text-white/40 hover:text-white h-10 px-4 font-bold">
               <RefreshCw className="w-4 h-4 mr-2" /> Sync
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {["all", "security", "infrastructure", "growth"].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+              className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.15em] transition-all border ${
                 categoryFilter === cat 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
-                  : "bg-white/[0.03] text-white/40 hover:text-white/60 border border-white/[0.05]"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20" 
+                  : "bg-white/[0.02] text-white/30 hover:text-white/60 border-white/[0.05]"
               }`}
             >
               {cat === "all" ? "All Engines" : CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS]}
@@ -161,7 +161,7 @@ export default function CommandCentrePage() {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredEngines.map((engine) => {
             const status = getEngineStatus(engine.id);
@@ -172,28 +172,28 @@ export default function CommandCentrePage() {
               <Card 
                 key={engine.id} 
                 onClick={() => setLocation(engine.path)}
-                className="group border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 transition-all cursor-pointer overflow-hidden"
+                className="group border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all cursor-pointer overflow-hidden"
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.05] group-hover:scale-110 transition-transform">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] group-hover:scale-105 transition-transform">
                       {engine.icon}
                     </div>
-                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${config.bg}/10 border-${config.bg}/20`}>
-                      <div className={`h-1.5 w-1.5 rounded-full ${config.bg} ${status === "running" ? "animate-pulse" : ""}`} />
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${config.color}`}>
+                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${config.bg}/5 border-${config.bg}/10`}>
+                      <div className={`h-1 w-1 rounded-full ${config.bg} ${status === "running" ? "animate-pulse" : ""}`} />
+                      <span className={`text-[9px] font-black uppercase tracking-widest ${config.color}`}>
                         {config.label}
                       </span>
                     </div>
                   </div>
-                  <CardTitle className="text-sm font-bold text-white/90">{engine.name}</CardTitle>
+                  <CardTitle className="text-sm font-bold text-white/80">{engine.name}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-white/30 uppercase tracking-widest font-medium">
+                    <span className="text-[10px] text-white/20 uppercase tracking-[0.1em] font-black">
                       {metric || "System Idle"}
                     </span>
-                    <ArrowRight className="w-3.5 h-3.5 text-white/10 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-3.5 h-3.5 text-white/5 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
                   </div>
                 </CardContent>
               </Card>
@@ -202,26 +202,26 @@ export default function CommandCentrePage() {
         </div>
 
         {/* Operational Insights */}
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="border-white/[0.05] bg-white/[0.02]">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500" />
+        <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <Card className="border-white/[0.05] bg-white/[0.01]">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 flex items-center gap-2">
+                <Activity className="h-3.5 w-3.5 text-blue-500/60" />
                 Real-time Orchestration
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[
                   { label: "Active AI Agents", value: "4", status: "Optimal" },
                   { label: "Vault Latency", value: "12ms", status: "Excellent" },
                   { label: "Provider Uptime", value: "99.98%", status: "Stable" },
                 ].map((stat, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                    <span className="text-xs text-white/50">{stat.label}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-white/90">{stat.value}</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60">{stat.status}</span>
+                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-[11px] font-bold text-white/40">{stat.label}</span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-black text-white/80">{stat.value}</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500/60">{stat.status}</span>
                     </div>
                   </div>
                 ))}
@@ -229,23 +229,23 @@ export default function CommandCentrePage() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/[0.05] bg-white/[0.02]">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-500" />
+          <Card className="border-white/[0.05] bg-white/[0.01]">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20 flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-500/60" />
                 Security Posture
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[
-                  { label: "Last Astra Scan", value: "14 mins ago", color: "text-white/90" },
-                  { label: "Critical Vulnerabilities", value: "0", color: "text-emerald-400" },
-                  { label: "Credential Leaks", value: "None Detected", color: "text-emerald-400" },
+                  { label: "Last Astra Scan", value: "14 mins ago", color: "text-white/80" },
+                  { label: "Critical Vulnerabilities", value: "0", color: "text-emerald-400/80" },
+                  { label: "Credential Leaks", value: "None Detected", color: "text-emerald-400/80" },
                 ].map((stat, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                    <span className="text-xs text-white/50">{stat.label}</span>
-                    <span className={`text-xs font-bold ${stat.color}`}>{stat.value}</span>
+                  <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-[11px] font-bold text-white/40">{stat.label}</span>
+                    <span className={`text-xs font-black ${stat.color}`}>{stat.value}</span>
                   </div>
                 ))}
               </div>

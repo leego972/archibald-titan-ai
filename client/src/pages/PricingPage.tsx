@@ -1,206 +1,184 @@
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
-import { trpc } from "@/lib/trpc";
-import { TIER_LOGOS } from "@/lib/logos";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { getRegisterUrl } from "@/const";
+import { useLocation } from "wouter";
 import MarketingLayout from "@/components/MarketingLayout";
-import {
-  Check,
-  Sparkles,
-  Loader2,
-  ShieldCheck,
-  Globe,
-  Lock
-} from "lucide-react";
-import {
-  PRICING_TIERS,
-  type PlanId,
-  type PricingTier,
-} from "@shared/pricing";
+import { Check, ShieldCheck, Zap, Lock, Globe2, Activity, Users, Terminal, Shield } from "lucide-react";
 
-// Filter tiers for public display: Pro, Enterprise, Cyber, Titan (Contact Sales)
-const PUBLIC_TIERS = PRICING_TIERS.filter(t => ["pro", "enterprise", "cyber", "titan"].includes(t.id));
-
-function BillingToggle({
-  interval,
-  setInterval,
-}: {
-  interval: "month" | "year";
-  setInterval: (v: "month" | "year") => void;
-}) {
-  return (
-    <div className="flex items-center justify-center gap-4 mb-12">
-      <span className={`text-sm font-medium transition-colors ${interval === "month" ? "text-white" : "text-white/40"}`}>
-        Monthly
-      </span>
-      <button
-        onClick={() => setInterval(interval === "month" ? "year" : "month")}
-        className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${
-          interval === "year" ? "bg-blue-600" : "bg-white/10 border border-white/20"
-        }`}
-      >
-        <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${
-          interval === "year" ? "translate-x-7" : "translate-x-0"
-        }`} />
-      </button>
-      <span className={`text-sm font-medium transition-colors ${interval === "year" ? "text-white" : "text-white/40"}`}>
-        Yearly
-      </span>
-      {interval === "year" && (
-        <span className="ml-1 px-2.5 py-0.5 text-xs font-bold bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
-          Save 17%
-        </span>
-      )}
-    </div>
-  );
-}
-
-function TierCard({
-  tier,
-  interval,
-  onSubscribe,
-  isLoading,
-}: {
-  tier: PricingTier;
-  interval: "month" | "year";
-  onSubscribe: (planId: PlanId) => void;
-  isLoading: boolean;
-}) {
-  const price = interval === "month" ? tier.monthlyPrice : tier.yearlyPrice;
-  const isHighlighted = tier.id === "enterprise";
-  const isContactSales = tier.id === "titan";
-  const tierLogo = TIER_LOGOS[tier.id];
-
-  return (
-    <div className={`relative flex flex-col rounded-3xl border transition-all duration-300 ${
-      isHighlighted 
-        ? "border-blue-500/40 bg-blue-500/[0.05] shadow-2xl shadow-blue-500/10 ring-1 ring-blue-500/20 scale-[1.02]" 
-        : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
-    }`}>
-      {isHighlighted && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center gap-1.5 px-4 py-1 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white rounded-full shadow-lg shadow-blue-500/30">
-            <Sparkles className="w-3 h-3" />
-            Most Popular
-          </span>
-        </div>
-      )}
-
-      <div className="p-8 flex-1 flex flex-col">
-        <div className="flex items-center gap-3 mb-4">
-          {tierLogo && <img src={tierLogo} alt={tier.name} className="w-10 h-10 object-contain opacity-80" />}
-          <h3 className="text-xl font-bold text-white">{tier.name}</h3>
-        </div>
-        <p className="text-sm text-white/50 mb-6 leading-relaxed">{tier.tagline}</p>
-
-        <div className="mb-8">
-          {isContactSales ? (
-            <div className="text-4xl font-black text-white tracking-tight">Custom</div>
-          ) : (
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-black text-white tracking-tight">${price.toLocaleString()}</span>
-              <span className="text-white/40 text-sm">/{interval === "month" ? "mo" : "yr"}</span>
-            </div>
-          )}
-        </div>
-
-        <Button 
-          onClick={() => isContactSales ? (window.location.href = "/contact") : onSubscribe(tier.id)}
-          disabled={isLoading}
-          className={`w-full h-12 text-sm font-bold mb-8 ${
-            isHighlighted 
-              ? "bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-xl shadow-blue-600/20" 
-              : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
-          }`}
-        >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isContactSales ? "Contact Sales" : tier.cta}
-        </Button>
-
-        <div className="space-y-4">
-          <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">Key Features</p>
-          <ul className="space-y-3">
-            {tier.features.slice(0, 6).map((feature, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <Check className="w-4 h-4 mt-0.5 text-blue-500 shrink-0" />
-                <span className="text-sm text-white/70">{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
+const PLANS = [
+  {
+    id: "pro",
+    name: "Pro",
+    price: "$49",
+    description: "For individual developers and security researchers.",
+    features: [
+      "15,000 Credits per month",
+      "Titan Builder Access",
+      "Standard Security Suite",
+      "3 Vault Connections",
+      "Local-first Execution",
+      "Community Support"
+    ],
+    cta: "Get Started",
+    highlight: false
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "$499",
+    description: "For professional engineering and security teams.",
+    features: [
+      "250,000 Credits per month",
+      "Full DevSecOps Suite",
+      "Advanced Vault Orchestration",
+      "Team Management & RBAC",
+      "Audit Logging & Compliance",
+      "Priority Support"
+    ],
+    cta: "Select Enterprise",
+    highlight: true
+  },
+  {
+    id: "cyber",
+    name: "Cyber",
+    price: "$1,499",
+    description: "For high-stakes security operations and red teams.",
+    features: [
+      "1,000,000 Credits per month",
+      "Red Team Playbooks",
+      "Advanced OSINT & Scanning",
+      "Isolated Browser Access",
+      "Custom Automation Hooks",
+      "Dedicated Account Manager"
+    ],
+    cta: "Select Cyber",
+    highlight: false
+  }
+];
 
 export default function PricingPage() {
   const { user } = useAuth();
-  const [interval, setInterval] = useState<"month" | "year">("month");
-  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
-
-  const createCheckout = trpc.stripe.createCheckoutSession.useMutation();
-
-  const handleSubscribe = async (planId: PlanId) => {
-    if (!user) { window.location.href = getLoginUrl(); return; }
-    try {
-      setLoadingPlan(planId);
-      const { url } = await createCheckout.mutateAsync({ planId, interval });
-      if (url) window.location.href = url;
-    } catch (err: any) {
-      console.error("Checkout failed:", err);
-    } finally {
-      setLoadingPlan(null);
-    }
-  };
+  const [, setLocation] = useLocation();
 
   return (
     <MarketingLayout>
-      <main className="pt-32 pb-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight mb-6">Enterprise-Grade <br />AI Orchestration.</h1>
-            <p className="text-white/50 text-lg max-w-2xl mx-auto mb-10">Choose the plan that fits your team's scale. All plans include our local-first architecture and AES-256 encrypted vault.</p>
-            <BillingToggle interval={interval} setInterval={setInterval} />
-          </div>
+      <div className="relative pt-32 pb-24 sm:pt-48 sm:pb-32 overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
+        </div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-20">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-6 text-white">Enterprise Packaging.</h1>
+          <p className="max-w-2xl mx-auto text-lg text-white/40 leading-relaxed">
+            Scalable plans designed for professional engineering and security teams. Choose the tier that fits your operational requirements.
+          </p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-24">
-            {PUBLIC_TIERS.map((tier) => (
-              <TierCard 
-                key={tier.id} 
-                tier={tier} 
-                interval={interval} 
-                onSubscribe={handleSubscribe}
-                isLoading={loadingPlan === tier.id}
-              />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
+            {PLANS.map((plan) => (
+              <div 
+                key={plan.id} 
+                className={`relative p-8 rounded-3xl border transition-all duration-500 flex flex-col ${
+                  plan.highlight 
+                    ? "border-blue-600/30 bg-blue-600/[0.03] shadow-2xl shadow-blue-600/10 scale-105 z-10" 
+                    : "border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03]"
+                }`}
+              >
+                {plan.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 rounded-full text-[9px] font-black uppercase tracking-widest text-white">
+                    Recommended
+                  </div>
+                )}
+                <div className="mb-8">
+                  <h3 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <span className="text-4xl font-black text-white">{plan.price}</span>
+                    <span className="text-sm text-white/20">/mo</span>
+                  </div>
+                  <p className="text-sm text-white/40 leading-relaxed">{plan.description}</p>
+                </div>
+                <ul className="space-y-4 mb-10 flex-1">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-3 text-sm text-white/50">
+                      <Check className="h-4 w-4 text-blue-500 shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Button 
+                  onClick={() => { window.location.href = getRegisterUrl(); }}
+                  className={`w-full h-12 font-bold transition-all ${
+                    plan.highlight 
+                      ? "bg-blue-600 hover:bg-blue-500 text-white border-0 shadow-lg shadow-blue-600/20" 
+                      : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                  }`}
+                >
+                  {plan.cta}
+                </Button>
+              </div>
             ))}
           </div>
 
+          {/* Titan Tier */}
+          <div className="max-w-4xl mx-auto p-8 sm:p-12 rounded-3xl border border-white/[0.05] bg-white/[0.01] relative overflow-hidden mb-24">
+            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+              <Shield className="h-48 w-48 text-white" />
+            </div>
+            <div className="relative grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+              <div>
+                <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Titan Tier</h3>
+                <h2 className="text-3xl font-black text-white mb-4">Custom Enterprise Solutions.</h2>
+                <p className="text-sm text-white/40 leading-relaxed mb-8">
+                  For global organizations requiring unlimited scale, custom integrations, and on-premise deployment options.
+                </p>
+                <Button 
+                  onClick={() => setLocation("/contact")}
+                  className="bg-white text-black hover:bg-white/90 font-bold h-12 px-8"
+                >
+                  Contact Sales
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { icon: Globe2, label: "On-premise Deploy" },
+                  { icon: Users, label: "Unlimited Seats" },
+                  { icon: Zap, label: "Custom Credits" },
+                  { icon: ShieldCheck, label: "Dedicated Support" }
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <item.icon className="h-4 w-4 text-blue-500" />
+                    <span className="text-xs font-bold text-white/60">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Trust Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 py-24 border-t border-white/5">
-            <div className="text-center">
-              <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-6">
-                <ShieldCheck className="h-6 w-6 text-blue-500" />
+          <div className="text-center">
+            <h3 className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-12">Trusted Security Infrastructure</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-12 opacity-30 grayscale max-w-4xl mx-auto">
+              <div className="flex flex-col items-center gap-2">
+                <Lock className="h-6 w-6 text-white" />
+                <span className="text-[9px] font-black uppercase tracking-widest">AES-256-GCM</span>
               </div>
-              <h4 className="font-bold mb-2">SOC2 Ready</h4>
-              <p className="text-sm text-white/40">Designed with enterprise compliance and security standards in mind.</p>
-            </div>
-            <div className="text-center">
-              <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-6">
-                <Globe className="h-6 w-6 text-blue-500" />
+              <div className="flex flex-col items-center gap-2">
+                <ShieldCheck className="h-6 w-6 text-white" />
+                <span className="text-[9px] font-black uppercase tracking-widest">SOC2 Ready</span>
               </div>
-              <h4 className="font-bold mb-2">Global Infrastructure</h4>
-              <p className="text-sm text-white/40">Connect to over 15+ cloud providers and credential systems seamlessly.</p>
-            </div>
-            <div className="text-center">
-              <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-6">
-                <Lock className="h-6 w-6 text-blue-500" />
+              <div className="flex flex-col items-center gap-2">
+                <Activity className="h-6 w-6 text-white" />
+                <span className="text-[9px] font-black uppercase tracking-widest">99.9% Uptime</span>
               </div>
-              <h4 className="font-bold mb-2">Local-First Privacy</h4>
-              <p className="text-sm text-white/40">Your prompts and credentials never leave your local environment.</p>
+              <div className="flex flex-col items-center gap-2">
+                <Users className="h-6 w-6 text-white" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Team RBAC</span>
+              </div>
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </MarketingLayout>
   );
 }
