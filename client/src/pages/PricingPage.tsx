@@ -91,7 +91,6 @@ export default function PricingPage() {
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "75,000 Monthly Credits",
-                  "Everything in Pro, plus:",
                   "Advanced Red Team Ops",
                   "Unlimited Team Vaults",
                   "RBAC & Team Control",
@@ -105,7 +104,7 @@ export default function PricingPage() {
               </div>
 
               <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 h-12 font-bold shadow-xl shadow-blue-600/20">
-                Start Free Trial
+                Get Started
               </Button>
             </div>
 
@@ -122,7 +121,6 @@ export default function PricingPage() {
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "Unlimited Credits",
-                  "Everything in Enterprise, plus:",
                   "On-Premise Deployment",
                   "Custom AI Model Tuning",
                   "Dedicated Account Manager",
@@ -178,7 +176,7 @@ export default function PricingPage() {
           <p className="text-lg text-white/40 mb-10">Join the professional teams building the future of AI on Archibald Titan.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
-              Start Free Trial
+              Get Started
             </Button>
             <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Request Demo

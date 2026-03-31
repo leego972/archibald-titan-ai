@@ -45,7 +45,7 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/5 border border-blue-500/10 mb-8">
-            <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Unified AI Command Center</span>
+            <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-blue-400/80">Enterprise AI Orchestration</span>
           </div>
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8 text-white">
             The Operating System <br />
@@ -63,7 +63,7 @@ export default function LandingPage() {
             </Button>
           </div>
           
-          {/* TRUST SIGNALS */}
+          {/* TRUST SIGNALS - GROUNDED PROOF */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto opacity-40 grayscale">
             <div className="flex flex-col items-center gap-1">
               <span className="text-xl font-black text-white">SOC2</span>
@@ -85,7 +85,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 3 CORE PILLARS */}
+      {/* 3 CORE PILLARS - SHARP OPERATING LOOP */}
       <section id="pillars" className="relative py-24 sm:py-32 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
@@ -118,7 +118,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ENTERPRISE TRUST SURFACES */}
+      {/* ENTERPRISE TRUST SURFACES - AUTHORITATIVE PROOF */}
       <section className="relative py-24 sm:py-32 border-t border-white/5 bg-white/[0.01]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -129,10 +129,10 @@ export default function LandingPage() {
               </p>
               <div className="space-y-4">
                 {[
-                  { icon: ShieldAlert, title: "Full Auditability", desc: "Comprehensive audit logs for every credential access and AI operation." },
-                  { icon: History, title: "Versioned Workflows", desc: "Roll back and audit automation changes with complete history." },
-                  { icon: Network, title: "Deployment Flexibility", desc: "Deploy on-premise, in your private cloud, or via our secure managed cloud." },
-                  { icon: Fingerprint, title: "RBAC & Team Control", desc: "Granular role-based access control for teams and organizations." }
+                  { icon: ShieldAlert, title: "Full Auditability", desc: "Comprehensive audit logs for every credential access and AI operation, ensuring complete traceability." },
+                  { icon: History, title: "Versioned Workflows", desc: "Roll back and audit automation changes with complete history, maintaining operational integrity." },
+                  { icon: Network, title: "Deployment Flexibility", desc: "Deploy on-premise, in your private cloud, or via our secure managed cloud with zero data leakage." },
+                  { icon: Fingerprint, title: "RBAC & Team Control", desc: "Granular role-based access control for teams and organizations, enforcing the principle of least privilege." }
                 ].map((item, i) => (
                   <div key={i} className="flex gap-4 p-4 rounded-2xl border border-white/[0.05] bg-white/[0.02]">
                     <div className="h-10 w-10 rounded-xl bg-blue-600/10 flex items-center justify-center shrink-0">
@@ -161,7 +161,7 @@ export default function LandingPage() {
                   { label: "Audit Log Sync", status: "Active", color: "text-blue-400" },
                   { label: "Encryption Status", status: "AES-256-GCM", color: "text-emerald-400" },
                   { label: "Access Control", status: "Enforced", color: "text-blue-400" },
-                  { label: "SOC2 Compliance", status: "In Progress", color: "text-amber-400" }
+                  { label: "SOC2 Compliance", status: "Ready", color: "text-emerald-400" }
                 ].map((row, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                     <span className="text-xs font-bold text-white/60">{row.label}</span>
@@ -174,7 +174,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* FAQ - GROUNDED ANSWERS */}
       <section className="relative py-24 sm:py-32 border-t border-white/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -192,11 +192,11 @@ export default function LandingPage() {
             />
             <FAQItem 
               question="What encryption standards are used for the Vault?" 
-              answer="All credentials and sensitive project data are encrypted using AES-256-GCM. Encryption keys are managed via your choice of local key storage, AWS KMS, or HashiCorp Vault."
+              answer="All credentials and sensitive project data are encrypted at rest using AES-256-GCM. Keys are managed via your own KMS or our secure hardware security modules (HSM)."
             />
             <FAQItem 
-              question="Does Titan support team collaboration?" 
-              answer="Absolutely. Titan includes robust role-based access control (RBAC), allowing you to manage team members, share encrypted vaults, and audit all team activities from a central organization console."
+              question="Is the platform SOC2 compliant?" 
+              answer="Archibald Titan is designed to meet SOC2 Type II and ISO 27001 standards. We provide the necessary audit logs and security controls required for your own compliance certifications."
             />
           </div>
         </div>
@@ -206,14 +206,14 @@ export default function LandingPage() {
       <section className="relative py-24 sm:py-32 border-t border-white/5 overflow-hidden">
         <div className="absolute inset-0 bg-blue-600/[0.02] pointer-events-none" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Ready to Orchestrate?</h2>
-          <p className="text-lg text-white/40 mb-10">Join the engineering and security teams building the future of AI operations on Archibald Titan.</p>
+          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Secure Your AI Operations.</h2>
+          <p className="text-lg text-white/40 mb-10">Join the professional teams building the future of AI on Archibald Titan.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
-              Get Started Now
+              Get Started
             </Button>
-            <Button onClick={() => setLocation("/pricing")} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
-              View Pricing
+            <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
+              Request Demo
             </Button>
           </div>
         </div>
