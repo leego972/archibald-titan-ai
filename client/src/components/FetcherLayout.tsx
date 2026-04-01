@@ -131,15 +131,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
 }
 
 export default function FetcherLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout } = useAuth();
-  const sub = useSubscription();
-  const [location, setLocation] = useLocation();
-  const { t } = useLanguage();
-  const { theme, toggleTheme } = useTheme();
-  const { state: sidebarState } = useSidebar();
-  const isCollapsed = sidebarState === "collapsed";
-
-  const menuGroups = buildMenuGroups(t);
+  const { user, loading } = useAuth();
 
   if (loading) return <DashboardLayoutSkeleton />;
   if (!user) {
@@ -147,10 +139,26 @@ export default function FetcherLayout({ children }: { children: React.ReactNode 
     return null;
   }
 
+  return (
+    <SidebarProvider>
+      <FetcherLayoutContent user={user} children={children} />
+    </SidebarProvider>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function FetcherLayoutContent({ user, children }: { user: any; children: React.ReactNode }) {
+  const { logout } = useAuth();
+  const sub = useSubscription();
+  const [location, setLocation] = useLocation();
+  const { t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
+  const { state: sidebarState } = useSidebar();
+  const isCollapsed = sidebarState === "collapsed";
+  const menuGroups = buildMenuGroups(t);
   const isActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
 
   return (
-    <SidebarProvider>
       <div className="flex min-h-screen w-full bg-[#02040a]">
         <Sidebar collapsible="icon" className="border-r border-white/[0.05] bg-[#03060e]">
           <SidebarHeader className="h-16 flex items-center px-4 border-b border-white/[0.05]">
@@ -278,6 +286,5 @@ export default function FetcherLayout({ children }: { children: React.ReactNode 
           </main>
         </SidebarInset>
       </div>
-    </SidebarProvider>
   );
 }
