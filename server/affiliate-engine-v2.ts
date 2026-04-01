@@ -26,6 +26,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 import {
@@ -1263,8 +1264,7 @@ export async function aiScorePartner(partnerData: {
 }> {
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_recommendation"),
       messages: [
         {
           role: "system",

@@ -10,6 +10,7 @@
  */
 
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { generateImage } from "./_core/imageGeneration";
 import { getDb } from "./db";
 import * as schema from "../drizzle/schema";
@@ -206,8 +207,7 @@ ${params.campaignGoal ? `CAMPAIGN GOAL: ${params.campaignGoal}` : ""}
 Generate the content now. Make it genuinely compelling — not corporate fluff.`;
 
   const response = await invokeLLM({
-    systemTag: "affiliate",
-      model: "fast",
+    ...getProviderParams("marketing_copy"),
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -322,8 +322,7 @@ Return your allocation as JSON:
 }`;
 
   const response = await invokeLLM({
-    systemTag: "affiliate",
-      model: "fast",
+    ...getProviderParams("marketing_copy"),
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -413,8 +412,7 @@ Return a campaign plan as JSON:
 }`;
 
   const response = await invokeLLM({
-    systemTag: "affiliate",
-      model: "fast",
+    ...getProviderParams("marketing_copy"),
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -825,8 +823,7 @@ export async function analyzePerformance(campaignId: number): Promise<{
 
   // AI-powered recommendations
   const response = await invokeLLM({
-    systemTag: "affiliate",
-      model: "fast",
+    ...getProviderParams("marketing_copy"),
     messages: [
       {
         role: "system",

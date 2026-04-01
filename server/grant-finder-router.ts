@@ -1,6 +1,7 @@
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { getUserOpenAIKey } from "./user-secrets-router";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
@@ -140,9 +141,9 @@ Generate the following sections with detailed, professional content:
 ## IP Strategy`;
 
     const response = await invokeLLM({
-      systemTag: "misc",
+      ...getProviderParams("grant_plan_generation"),
       userApiKey,
-      model: "fast", messages: [{ role: "user", content: prompt }] });
+      messages: [{ role: "user", content: prompt }] });
     const content = String(response.choices[0]?.message?.content || '');
 
     const plan = {
@@ -243,9 +244,8 @@ Return ONLY a JSON object with a "matches" array.`;
 
       try {
         const response = await invokeLLM({
-          systemTag: "misc",
+          ...getProviderParams("grant_matching"),
           userApiKey,
-          model: "strong",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_schema", json_schema: { name: "grant_matches", strict: true, schema: { type: "object", properties: { matches: { type: "array", items: { type: "object", properties: { grantId: { type: "number" }, matchScore: { type: "number" }, eligibilityScore: { type: "number" }, alignmentScore: { type: "number" }, competitivenessScore: { type: "number" }, reason: { type: "string" }, successProbability: { type: "number" } }, required: ["grantId", "matchScore", "eligibilityScore", "alignmentScore", "competitivenessScore", "reason", "successProbability"], additionalProperties: false } } }, required: ["matches"], additionalProperties: false } } },
         });
@@ -345,9 +345,8 @@ Region: ${grant.region || 'UK'}`;
     async function generateSection(sectionPrompt: string): Promise<string> {
       try {
         const response = await invokeLLM({
-          systemTag: "misc",
+          ...getProviderParams("grant_application_writing"),
           userApiKey,
-          model: "strong",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: sectionPrompt },
@@ -663,9 +662,8 @@ Be realistic — most first-time applications score 40-65. Strong applications w
     async function genSection(sectionPrompt: string): Promise<string> {
       try {
         const response = await invokeLLM({
-          systemTag: "misc",
+          ...getProviderParams("grant_application_writing"),
           userApiKey,
-          model: "strong",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: sectionPrompt },
@@ -1277,9 +1275,8 @@ Description: ${input.description}
 
 Write in first person plural ("we"). Keep it under 800 words. Use markdown formatting.`;
     const response = await invokeLLM({
-      systemTag: "misc",
+      ...getProviderParams("crowdfunding_story"),
       userApiKey,
-      model: "fast",
       messages: [{ role: "user", content: prompt }],
     });
     try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`); } catch {}
@@ -1306,9 +1303,8 @@ Goal: $${input.goalAmount.toLocaleString()}
 Return ONLY a JSON array with objects having: title, description, minAmount, estimatedDelivery (in months from now).
 Example: [{"title":"Early Bird","description":"Get early access","minAmount":25,"estimatedDelivery":"3 months"}]`;
     const response = await invokeLLM({
-      systemTag: "misc",
+      ...getProviderParams("crowdfunding_story"),
       userApiKey,
-      model: "fast",
       messages: [{ role: "user", content: prompt }],
     });
     const content = String(response.choices[0]?.message?.content || "[]");

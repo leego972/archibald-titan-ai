@@ -325,8 +325,8 @@ function Router() {
       <Route path="/desktop-login" component={DesktopLoginPage} />
       {/* Desktop billing callback — handles titandesktop:// deep links from Stripe */}
       <Route path="/desktop-billing-callback" component={DesktopBillingCallbackPage} />
-      {/* Desktop settings hub */}
-      <Route path="/desktop-settings" component={DashboardRouter} />
+      {/* Desktop settings hub — renders without requiring dashboard auth wrapper */}
+      <Route path="/desktop-settings" component={DesktopSettingsPage} />
 
       {/* Public pages */}
       <Route path="/builder" component={BuilderPage} />

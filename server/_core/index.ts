@@ -75,6 +75,22 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // ── Required env var guard — fail hard before anything else ──────────────
+  const missingRequired: string[] = [];
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    missingRequired.push('JWT_SECRET (must be at least 32 characters)');
+  }
+  if (!process.env.DATABASE_URL) {
+    missingRequired.push('DATABASE_URL');
+  }
+  if (missingRequired.length > 0) {
+    console.error('[FATAL] Missing or invalid required environment variables:');
+    for (const v of missingRequired) console.error(`  - ${v}`);
+    console.error('Server cannot start safely. Set the required variables and restart.');
+    process.exit(1);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const app = express();
   // Trust proxy headers (Railway uses a single reverse proxy layer)
   // Use number 1 instead of true to prevent express-rate-limit ERR_ERL_PERMISSIVE_TRUST_PROXY
@@ -785,6 +801,29 @@ async function startServer() {
         try { await pool.promise().query(alter); } catch (_) { /* column already exists or table missing — safe to ignore */ }
       }
       log.info('Chat path columns ensured');
+
+      // ── Performance indexes (idempotent, IF NOT EXISTS) ────────────────────────────────────────
+      const performanceIndexes = [
+        `CREATE INDEX IF NOT EXISTS idx_fetcher_jobs_userId ON fetcher_jobs(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_fetcher_tasks_userId ON fetcher_tasks(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_fetcher_credentials_userId ON fetcher_credentials(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_subscriptions_userId ON subscriptions(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_api_keys_userId ON api_keys(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_logs_userId ON audit_logs(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_credential_history_userId ON credential_history(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_sellerId ON marketplace_listings(sellerId)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_status ON marketplace_listings(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_purchases_buyerId ON marketplace_purchases(buyerId)`,
+        `CREATE INDEX IF NOT EXISTS idx_conversations_userId ON conversations(userId)`,
+        `CREATE INDEX IF NOT EXISTS idx_messages_conversationId ON messages(conversationId)`,
+        `CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug)`,
+        `CREATE INDEX IF NOT EXISTS idx_blog_posts_status ON blog_posts(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_logs_createdAt ON audit_logs(createdAt)`,
+      ];
+      for (const idx of performanceIndexes) {
+        try { await pool.promise().query(idx); } catch (_) { /* already exists or table missing — safe to ignore */ }
+      }
+      log.info('Performance indexes ensured');
       log.info('All tables ensured');
     } catch (err: unknown) {
       log.error('Raw SQL migration failed', { error: getErrorMessage(err) });

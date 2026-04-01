@@ -19,6 +19,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { getDb } from "./db";
 import { chatConversations, chatMessages, userMemory } from "../drizzle/schema";
 import { invokeLLM, type Message } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 
@@ -158,8 +159,8 @@ Return ONLY a JSON array (max ${MAX_FACTS_PER_EXTRACTION} items), no other text:
 If no meaningful facts, return: []`;
 
     const result = await invokeLLM({
+      ...getProviderParams("memory_fact_extraction"),
       messages: [{ role: "user", content: extractionPrompt }],
-      model: "fast",
       temperature: 0.1,
       userApiKey,
     });
@@ -368,8 +369,8 @@ Write a concise summary covering:
 3rd person, past tense. Max 500 words. Be specific — file names, tech choices, exact errors matter.`;
 
     const result = await invokeLLM({
+      ...getProviderParams("memory_summarization"),
       messages: [{ role: "user", content: summaryPrompt }],
-      model: "fast",
       temperature: 0.2,
       userApiKey,
     });

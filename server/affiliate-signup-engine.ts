@@ -37,6 +37,7 @@ import {
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { getSettings } from "./fetcher-db";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
@@ -299,8 +300,7 @@ async function analyzeFormWithLLM(page: Page): Promise<{
 
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_discovery"),
       messages: [
         {
           role: "system",

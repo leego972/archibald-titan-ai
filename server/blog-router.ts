@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { blogPosts, blogCategories } from "../drizzle/schema";
 import { eq, desc, sql, like, and, or } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { checkCredits, consumeCredits } from "./credit-service";
 
 // ─── Blog Router ────────────────────────────────────────────────
@@ -242,8 +243,7 @@ export const blogRouter = router({
         throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
       const response = await invokeLLM({
-        systemTag: "misc",
-      model: "fast",
+        ...getProviderParams("blog_post_generation"),
         messages: [
           {
             role: "system",
@@ -331,8 +331,7 @@ Tone: ${input.tone}`
       for (const topicConfig of input.topics) {
         try {
           const response = await invokeLLM({
-            systemTag: "misc",
-      model: "fast",
+            ...getProviderParams("blog_bulk_generation"),
             messages: [
               {
                 role: "system",

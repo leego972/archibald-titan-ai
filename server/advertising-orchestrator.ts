@@ -14,6 +14,7 @@
  */
 
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { notifyOwner } from "./_core/notification";
 import { getDb } from "./db";
 import { generateContent, allocateBudget, runAutonomousCycle as runMarketingCycle } from "./marketing-engine";
@@ -767,8 +768,7 @@ async function generateSeoBlogPost(): Promise<AdvertisingAction> {
 
     // Use LLM to generate the blog post
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1047,8 +1047,7 @@ async function runSeoOptimization(): Promise<AdvertisingAction> {
 async function generateBacklinkOutreach(): Promise<AdvertisingAction> {
   try {
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1134,8 +1133,7 @@ async function generateEmailNurture(): Promise<AdvertisingAction> {
     const segment = segments[Math.floor(Math.random() * segments.length)];
 
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1268,8 +1266,7 @@ async function generateCommunityContent(): Promise<AdvertisingAction> {
     const pillar = CONTENT_PILLARS[Math.floor(Math.random() * CONTENT_PILLARS.length)];
 
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1360,8 +1357,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (devtoAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Write a developer-focused article about "${pillar.pillar}" for Dev.to. Include practical code examples and actionable advice. Naturally mention Archibald Titan where relevant. Return JSON: { "title": "...", "body": "...(markdown)...", "tags": ["..."] }` },
           { role: "user", content: `Write a Dev.to article about ${pillar.blogTopics[Math.floor(Math.random() * pillar.blogTopics.length)]}` },
@@ -1386,8 +1382,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (mediumAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Write a thought-provoking Medium article about "${pillar.pillar}". Focus on storytelling and insights. Subtly position Archibald Titan as the solution. Return JSON: { "title": "...", "content": "...(markdown)...", "tags": ["..."] }` },
           { role: "user", content: `Write a Medium article about ${pillar.blogTopics[Math.floor(Math.random() * pillar.blogTopics.length)]}` },
@@ -1413,8 +1408,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (hashnodeAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Write a technical developer article about "${pillar.pillar}" for Hashnode. Include code snippets and practical tips. Return JSON: { "title": "...", "content": "...(markdown)...", "tags": ["..."] }` },
           { role: "user", content: `Write a Hashnode article about ${pillar.blogTopics[Math.floor(Math.random() * pillar.blogTopics.length)]}` },
@@ -1438,8 +1432,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (discordAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Generate a short, engaging Discord message about cybersecurity. Include an emoji, a security tip, and a link to https://archibaldtitan.com. Keep it under 200 words. Return JSON: { "content": "..." }` },
           { role: "user", content: `Generate a Discord security tip about ${pillar.pillar}` },
@@ -1458,8 +1451,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (mastodonAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Generate a Mastodon toot about cybersecurity for the infosec community. Include relevant hashtags (#infosec #cybersecurity #appsec). Keep under 500 chars. Return JSON: { "status": "..." }` },
           { role: "user", content: `Generate a Mastodon toot about ${pillar.pillar}` },
@@ -1478,8 +1470,7 @@ async function publishToExpandedChannels(): Promise<AdvertisingAction[]> {
   if (telegramAdapter.isConfigured) {
     try {
       const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
         messages: [
           { role: "system", content: `Generate a Telegram channel broadcast about cybersecurity. Include a security alert or tip, and a CTA to visit https://archibaldtitan.com. Use Telegram markdown formatting. Keep under 300 words. Return JSON: { "text": "..." }` },
           { role: "user", content: `Generate a Telegram broadcast about ${pillar.pillar}` },
@@ -1550,8 +1541,7 @@ async function generateHackerForumContent(): Promise<AdvertisingAction> {
     const pillar = CONTENT_PILLARS[Math.floor(Math.random() * CONTENT_PILLARS.length)];
 
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1644,8 +1634,7 @@ async function generateVideoScripts(): Promise<AdvertisingAction> {
     const channel: FreeChannel = platform === "TikTok" ? "tiktok_organic" : "youtube_shorts";
 
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         {
           role: "system",
@@ -1860,8 +1849,7 @@ async function generateContentQueueItems(): Promise<AdvertisingAction> {
     for (const ch of todayChannels) {
       try {
         const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
           messages: [
             { role: "system", content: `${ch.prompt}\n\nTopic area: ${pillar.pillar}\n\nReturn JSON: { "title": "...", "content": "...", "platform": "${ch.name}" }` },
             { role: "user", content: `Generate content for ${ch.name} about ${pillar.pillar}` },
@@ -2115,8 +2103,7 @@ async function recycleTopContent(): Promise<AdvertisingAction> {
     const format = formats[Math.floor(Math.random() * formats.length)];
 
     const response = await invokeLLM({
-        systemTag: "advertising",
-        model: "fast",
+        ...getProviderParams("advertising_copy"),
       messages: [
         { role: "system", content: `${format.prompt}\n\nReturn JSON: { "title": "...", "content": "...", "format": "${format.name}" }` },
         { role: "user", content: `Original blog post title: ${post.title}\n\nContent (first 2000 chars):\n${(post.content || "").substring(0, 2000)}` },

@@ -12,6 +12,7 @@
  */
 
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { eq, desc, and, sql, gte } from "drizzle-orm";
 import { getDb } from "./db";
 import {
@@ -347,8 +348,7 @@ async function discoverProgramsForVertical(
   for (const query of shuffledQueries) {
     try {
       const response = await invokeLLM({
-        systemTag: "affiliate",
-      model: "fast",
+        ...getProviderParams("affiliate_discovery"),
         messages: [
           {
             role: "system",
@@ -476,8 +476,7 @@ async function evaluateAndScoreProgram(discoveryId: number): Promise<{
 
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_discovery"),
       messages: [
         {
           role: "system",
@@ -573,8 +572,7 @@ async function generateApplication(discoveryId: number): Promise<{ subject: stri
 
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_discovery"),
       messages: [
         {
           role: "system",

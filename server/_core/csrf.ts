@@ -39,6 +39,8 @@ const EXEMPT_PATHS = [
   // These MUST be exempt because the login/register forms can't send CSRF headers
   // before the user has a session (chicken-and-egg problem)
   "/api/auth/",
+  "/api/email-auth/",   // email/password login & register
+  "/api/social-auth/",  // GitHub & Google OAuth callbacks
   // OAuth callback routes
   "/api/oauth/",
   // GitHub release sync webhook
@@ -62,11 +64,12 @@ function usesApiKeyAuth(req: Request): boolean {
 
 /** Check if the request comes from the desktop app (license-based auth, no browser CSRF risk) */
 function isDesktopLicenseAuth(req: Request): boolean {
-  // Desktop app proxy sends titan_session cookie but cannot set CSRF headers
-  // since the local Express server proxies to remote. Desktop requests are not
-  // vulnerable to CSRF because they originate from the Electron app, not a browser.
-  const cookies = req.cookies || {};
-  return !!cookies.titan_session;
+  // Desktop app proxy sends a dedicated X-Titan-Desktop header that browsers cannot set
+  // cross-origin (Same-Origin Policy). This is safe because:
+  // - An attacker on a different origin cannot set arbitrary headers via fetch/XHR
+  // - The Electron local-server.js must explicitly add this header to all proxied requests
+  // NOTE: Do NOT use cookie presence here — that would bypass CSRF for all browser sessions.
+  return req.headers['x-titan-desktop'] === '1';
 }
 
 /** Safe HTTP methods that don't need CSRF protection */

@@ -12,6 +12,7 @@
  */
 
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
@@ -702,8 +703,7 @@ export async function generateOutreachEmail(
 
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_recommendation"),
       messages: [
         {
           role: "system",
@@ -830,8 +830,7 @@ export async function analyzePartnerPerformance(partnerId: number): Promise<{
 
   try {
     const response = await invokeLLM({
-      systemTag: "affiliate",
-      model: "fast",
+      ...getProviderParams("affiliate_recommendation"),
       messages: [
         { role: "system", content: "You are an affiliate marketing analyst. Return only valid JSON." },
         {

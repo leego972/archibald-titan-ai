@@ -16,6 +16,7 @@ import { createLogger } from "./_core/logger";
 import { getErrorMessage } from "./_core/errors";
 import { checkCredits, consumeCredits } from "./credit-service";
 import { invokeLLM } from "./_core/llm";
+import { getProviderParams } from "./_core/provider-policy";
 
 const log = createLogger("RedTeamPlaybooks");
 
@@ -400,7 +401,7 @@ Write a professional security assessment report with:
 Format as clean Markdown.`;
 
       const reportResult = await invokeLLM({
-        model: "strong",
+        ...getProviderParams("security_report_generation"),
         messages: [{ role: "user", content: reportPrompt }],
         maxTokens: 2000,
         priority: "background",
@@ -445,7 +446,7 @@ Return a JSON object with:
 Return ONLY valid JSON, no markdown.`;
 
   const llmResult = await invokeLLM({
-    model: "fast",
+    ...getProviderParams("security_finding_analysis"),
     messages: [{ role: "user", content: prompt }],
     maxTokens: 800,
     priority: "background",

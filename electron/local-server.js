@@ -549,7 +549,7 @@ function startServer() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
           body: JSON.stringify(req.body),
         });
@@ -572,7 +572,7 @@ function startServer() {
       if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
       try {
         const remoteRes = await fetch(REMOTE_URL + `/api/chat/stream/${req.params.conversationId}`, {
-          headers: { "Accept": "text/event-stream", "Cookie": `titan_session=${license.licenseKey}` },
+          headers: { "Accept": "text/event-stream", "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1" },
         });
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
@@ -606,7 +606,7 @@ function startServer() {
       try {
         const remoteRes = await fetch(REMOTE_URL + `/api/chat/abort/${req.params.conversationId}`, {
           method: "POST",
-          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+          headers: { "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1" },
         });
         const data = await remoteRes.json();
         res.json(data);
@@ -621,7 +621,7 @@ function startServer() {
       if (!license?.licenseKey) return res.status(401).json({ error: "Not authenticated" });
       try {
         const remoteRes = await fetch(REMOTE_URL + `/api/chat/build-status/${req.params.conversationId}`, {
-          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+          headers: { "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1" },
         });
         const data = await remoteRes.json();
         res.json(data);
@@ -636,7 +636,7 @@ function startServer() {
       if (!license?.licenseKey) return res.json({ builds: [] });
       try {
         const remoteRes = await fetch(REMOTE_URL + "/api/chat/active-builds", {
-          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+          headers: { "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1" },
         });
         const data = await remoteRes.json();
         res.json(data);
@@ -660,7 +660,7 @@ function startServer() {
               method: "POST",
               headers: {
                 "Content-Type": req.headers["content-type"],
-                "Cookie": `titan_session=${license.licenseKey}`,
+                "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
               },
               body,
             });
@@ -689,7 +689,7 @@ function startServer() {
               method: "POST",
               headers: {
                 "Content-Type": req.headers["content-type"],
-                "Cookie": `titan_session=${license.licenseKey}`,
+                "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
               },
               body,
             });
@@ -838,7 +838,7 @@ function startServer() {
           method: req.method,
           headers: {
             "Content-Type": "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
         };
         if (req.method !== "GET" && req.method !== "HEAD") {
@@ -877,7 +877,7 @@ function startServer() {
         const url = REMOTE_URL + req.originalUrl;
         const fetchOpts = {
           method: req.method,
-          headers: { "Cookie": `titan_session=${license.licenseKey}` },
+          headers: { "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1" },
         };
         if (req.headers["content-type"]) fetchOpts.headers["Content-Type"] = req.headers["content-type"];
         if (req.method !== "GET" && req.method !== "HEAD") {
@@ -952,7 +952,7 @@ function startServer() {
           method: req.method,
           headers: {
             "Content-Type": "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
         };
         if (req.method !== "GET" && req.method !== "HEAD") {
@@ -978,7 +978,7 @@ function startServer() {
           method: req.method,
           headers: {
             "Content-Type": "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
         };
         if (req.method !== "GET" && req.method !== "HEAD") {
@@ -1008,7 +1008,7 @@ function startServer() {
               method: "POST",
               headers: {
                 "Content-Type": req.headers["content-type"],
-                "Cookie": `titan_session=${license.licenseKey}`,
+                "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
               },
               body,
             });
@@ -1033,7 +1033,7 @@ function startServer() {
           method: req.method,
           headers: {
             "Content-Type": req.headers["content-type"] || "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
         };
         if (req.method !== "GET" && req.method !== "HEAD") {
@@ -1059,7 +1059,7 @@ function startServer() {
           method: req.method,
           headers: {
             "Content-Type": "application/json",
-            "Cookie": `titan_session=${license.licenseKey}`,
+            "Cookie": `titan_session=${license.licenseKey}`, "x-titan-desktop": "1",
           },
         };
         if (req.method !== "GET" && req.method !== "HEAD") {
