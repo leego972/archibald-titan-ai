@@ -301,7 +301,13 @@ function saveDB() {
 
 // ─── Local DB ───────────────────────────────────────────────────────
 async function initDB() {
-  const SQL = await initSqlJs();
+  // When packaged in an Electron .asar, WASM files cannot be loaded from inside
+  // the archive. The asarUnpack config extracts sql.js/dist to app.asar.unpacked,
+  // so we must tell sql.js where to find the WASM binary via locateFile.
+  const wasmDir = path.join(__dirname, "node_modules", "sql.js", "dist");
+  const SQL = await initSqlJs({
+    locateFile: (file) => path.join(wasmDir, file)
+  });
 
   // Load existing DB or create new one
   if (fs.existsSync(DB_PATH)) {
