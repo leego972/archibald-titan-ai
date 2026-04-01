@@ -1224,24 +1224,9 @@ const sendgridAdapter = {
     recipients: string[];
     listId?: string;
   }): Promise<PostResult> {
-    try {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: { user: ENV.gmailUser, pass: ENV.gmailAppPassword },
-      });
-      // Send to each recipient sequentially to respect Gmail rate limits
-      for (const recipient of params.recipients) {
-        await transporter.sendMail({
-          from: `Archibald Titan <${ENV.gmailUser}>`,
-          to: recipient,
-          subject: params.subject,
-          html: params.htmlContent,
-        });
-      }
-      return { success: true };
-    } catch (error: unknown) {
-      return { success: false, error: getErrorMessage(error) };
-    }
+    // EMAIL SENDING DISABLED — no-op
+    log.info(`[Gmail] DISABLED — campaign email suppressed (subject: "${params.subject}", recipients: ${params.recipients.length})`);
+    return { success: true };
   },
   async createMarketingCampaign(params: {
     title: string;
