@@ -577,8 +577,8 @@ async function startServer() {
         // sandbox_files: track which conversation/project each file belongs to
         "ALTER TABLE `sandbox_files` ADD COLUMN `conversationId` int NULL",
         "ALTER TABLE `sandbox_files` ADD COLUMN `projectName` varchar(255) NULL",
-        // chatConversations: cross-conversation build memory (build context)
-        "ALTER TABLE `chatConversations` ADD COLUMN `buildContext` JSON NULL",
+        // chat_conversations: cross-conversation build memory (build context)
+        "ALTER TABLE `chat_conversations` ADD COLUMN `buildContext` JSON NULL",
         // releases: Android download URL and file size (added in v8+)
         "ALTER TABLE `releases` ADD COLUMN `downloadUrlAndroid` text NULL",
         "ALTER TABLE `releases` ADD COLUMN `fileSizeAndroid` int NULL",
