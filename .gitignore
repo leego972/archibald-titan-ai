@@ -4,6 +4,7 @@
 
 # Build outputs
 dist/
+!electron/build/entitlements.mac.plist
 build/
 *.dist
 
