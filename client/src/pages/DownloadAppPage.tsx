@@ -21,9 +21,10 @@ function detectPlatform(): "windows" | "mac" | "linux" {
   return "windows";
 }
 
-const PLATFORM_CONFIG: Record<Platform, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
+const PLATFORM_CONFIG: Record<Platform, { label: string; format: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
   windows: {
     label: "Windows",
+    format: ".exe installer",
     icon: <Monitor className="h-6 w-6" />,
     color: "text-blue-400",
     bg: "bg-blue-500/10",
@@ -31,6 +32,7 @@ const PLATFORM_CONFIG: Record<Platform, { label: string; icon: React.ReactNode; 
   },
   mac: {
     label: "macOS",
+    format: ".zip archive",
     icon: <Apple className="h-6 w-6" />,
     color: "text-slate-300",
     bg: "bg-slate-500/10",
@@ -38,6 +40,7 @@ const PLATFORM_CONFIG: Record<Platform, { label: string; icon: React.ReactNode; 
   },
   linux: {
     label: "Linux",
+    format: ".AppImage",
     icon: <Terminal className="h-6 w-6" />,
     color: "text-orange-400",
     bg: "bg-orange-500/10",
@@ -45,12 +48,21 @@ const PLATFORM_CONFIG: Record<Platform, { label: string; icon: React.ReactNode; 
   },
   android: {
     label: "Android",
+    format: ".apk",
     icon: <Smartphone className="h-6 w-6" />,
     color: "text-green-400",
     bg: "bg-green-500/10",
     border: "border-green-500/20",
   },
 };
+
+function getPlatformSize(release: any, platform: Platform): number | null {
+  if (platform === "windows") return release.fileSizeWindows ?? release.fileSizeMb ?? null;
+  if (platform === "mac") return release.fileSizeMac ?? release.fileSizeMb ?? null;
+  if (platform === "linux") return release.fileSizeLinux ?? release.fileSizeMb ?? null;
+  if (platform === "android") return release.fileSizeAndroid ?? null;
+  return null;
+}
 
 export default function DownloadAppPage() {
   const { data: latestRelease, isLoading } = trpc.releases.latest.useQuery();
@@ -141,6 +153,7 @@ export default function DownloadAppPage() {
                 platform === "mac" ? latestRelease?.hasMac :
                 platform === "android" ? !!(latestRelease as any)?.hasAndroid :
                 latestRelease?.hasLinux;
+              const sizeMb = latestRelease ? getPlatformSize(latestRelease, platform) : null;
 
               return (
                 <button
@@ -164,8 +177,13 @@ export default function DownloadAppPage() {
                   <div>
                     <p className="font-semibold text-sm">{cfg.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {hasDownload === undefined ? "Loading..." : hasDownload ? "Available" : "Coming soon"}
+                      {hasDownload === undefined ? "Loading..." : hasDownload
+                        ? `Available${sizeMb ? ` • ${sizeMb} MB` : ""}`
+                        : "Coming soon"}
                     </p>
+                    {hasDownload && (
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">{cfg.format}</p>
+                    )}
                   </div>
                 </button>
               );
@@ -182,20 +200,28 @@ export default function DownloadAppPage() {
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasWindows ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Windows {latestRelease.hasWindows ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
+                <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${latestRelease.hasWindows ? "text-green-400" : "text-muted-foreground/30"}`} />
+                <span>Windows {latestRelease.hasWindows
+                  ? (getPlatformSize(latestRelease, "windows") ? `(${getPlatformSize(latestRelease, "windows")} MB)` : "")
+                  : "(coming soon)"}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasMac ? "text-green-400" : "text-muted-foreground/30"}`} />
-                macOS {latestRelease.hasMac ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
+                <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${latestRelease.hasMac ? "text-green-400" : "text-muted-foreground/30"}`} />
+                <span>macOS {latestRelease.hasMac
+                  ? (getPlatformSize(latestRelease, "mac") ? `(${getPlatformSize(latestRelease, "mac")} MB)` : "")
+                  : "(coming soon)"}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasLinux ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Linux {latestRelease.hasLinux ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
+                <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${latestRelease.hasLinux ? "text-green-400" : "text-muted-foreground/30"}`} />
+                <span>Linux {latestRelease.hasLinux
+                  ? (getPlatformSize(latestRelease, "linux") ? `(${getPlatformSize(latestRelease, "linux")} MB)` : "")
+                  : "(coming soon)"}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <CheckCircle2 className={`h-4 w-4 ${(latestRelease as any).hasAndroid ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Android {(latestRelease as any).hasAndroid ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
+                <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${(latestRelease as any).hasAndroid ? "text-green-400" : "text-muted-foreground/30"}`} />
+                <span>Android {(latestRelease as any).hasAndroid
+                  ? (getPlatformSize(latestRelease, "android") ? `(${getPlatformSize(latestRelease, "android")} MB)` : "")
+                  : "(coming soon)"}</span>
               </div>
             </div>
             {latestRelease.changelog && (
