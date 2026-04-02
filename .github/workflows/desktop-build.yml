@@ -43,7 +43,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.platform }}
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Enable long paths (Windows)
@@ -92,16 +92,17 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
           p12-password: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
 
-      # ── macOS: Write API key file ─────────────────────────────────────────────
+      # ── macOS: Write App Store Connect API key file ───────────────────────────
       - name: Write App Store Connect API key to file
         if: runner.os == 'macOS'
         run: |
           mkdir -p /tmp/private_keys
-          printf '%s' "${{ secrets.APPLE_API_PRIVATE_KEY }}" > /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          printf '%s' "${{ secrets.APPLE_API_PRIVATE_KEY }}" \
+            > /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
           chmod 600 /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
           echo "API key file created ($(wc -c < /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8) bytes)"
 
-      # ── Build Electron app (macOS, signed only — no built-in notarization) ────
+      # ── Build Electron app (macOS, signed only — notarization handled below) ──
       - name: Build Electron app (macOS, signed)
         if: runner.os == 'macOS'
         working-directory: electron
@@ -110,58 +111,94 @@ jobs:
           ELECTRON_BUILDER_SKIP_NOTARIZE: 1
         run: npm run ${{ matrix.build_cmd }}
 
-      # ── macOS: Notarize the DMG using xcrun notarytool ────────────────────────
+      # ── macOS: Submit DMG for notarization (non-blocking poll loop) ───────────
+      #
+      # Strategy: submit without --wait, capture the submission ID, then poll
+      # every 30 s for up to 90 minutes.  This avoids xcrun's own blocking
+      # --wait flag which has been observed to time-out on slow Apple servers.
       - name: Notarize macOS DMG
         if: runner.os == 'macOS'
+        env:
+          KEY_FILE: /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
+          set -euo pipefail
+
           DMG=$(ls electron/dist/ArchibaldTitan-*-mac-*.dmg 2>/dev/null | head -1)
           if [ -z "$DMG" ]; then
             echo "ERROR: No DMG found to notarize"
             ls -la electron/dist/
             exit 1
           fi
-          echo "Notarizing: $DMG"
-          # Submit without --wait to avoid timeout issues with Apple's slow notarization service
-          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG" \
-            --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
-            --key-id ${{ secrets.APPLE_API_KEY_ID }} \
-            --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1)
-          echo "$SUBMISSION_OUTPUT"
-          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -E "^  id:" | awk '{print $2}' | head -1)
+          echo "Found DMG: $DMG"
+
+          # ── Submit (non-blocking) ──────────────────────────────────────────────
+          echo "Submitting to Apple notarization service..."
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "$DMG" \
+            --key "$KEY_FILE" \
+            --key-id "$KEY_ID" \
+            --issuer "$ISSUER" \
+            --output-format json 2>&1)
+
+          echo "Submit output: $SUBMIT_OUTPUT"
+
+          # Extract submission ID from JSON
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | python3 -c \
+            "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+
           if [ -z "$SUBMISSION_ID" ]; then
-            echo "ERROR: Could not extract submission ID"
+            echo "ERROR: Could not extract submission ID from notarytool output"
+            echo "Raw output: $SUBMIT_OUTPUT"
             exit 1
           fi
           echo "Submission ID: $SUBMISSION_ID"
-          # Poll for completion (up to 3 hours = 360 x 30s)
-          MAX_ATTEMPTS=360
+
+          # ── Poll for result (max 90 min, 30 s intervals) ──────────────────────
+          MAX_ATTEMPTS=180   # 180 × 30s = 90 minutes
           ATTEMPT=0
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          STATUS="In Progress"
+
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
             ATTEMPT=$((ATTEMPT + 1))
+            echo "Polling attempt $ATTEMPT / $MAX_ATTEMPTS — waiting 30s..."
             sleep 30
-            STATUS_OUTPUT=$(xcrun notarytool info "$SUBMISSION_ID" \
-              --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
-              --key-id ${{ secrets.APPLE_API_KEY_ID }} \
-              --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1)
-            STATUS=$(echo "$STATUS_OUTPUT" | grep -E "^  status:" | awk '{print $2}')
-            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — Status: $STATUS"
+
+            INFO_OUTPUT=$(xcrun notarytool info "$SUBMISSION_ID" \
+              --key "$KEY_FILE" \
+              --key-id "$KEY_ID" \
+              --issuer "$ISSUER" \
+              --output-format json 2>&1)
+
+            STATUS=$(echo "$INFO_OUTPUT" | python3 -c \
+              "import sys,json; d=json.load(sys.stdin); print(d.get('status','Unknown'))" 2>/dev/null || echo "Unknown")
+
+            echo "  Status: $STATUS"
+
             if [ "$STATUS" = "Accepted" ]; then
-              echo "Notarization accepted! Stapling ticket..."
-              xcrun stapler staple "$DMG"
-              echo "Notarization complete!"
-              exit 0
+              echo "Notarization accepted!"
+              break
             elif [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
               echo "ERROR: Notarization failed with status: $STATUS"
-              echo "$STATUS_OUTPUT"
+              # Fetch the full log for debugging
               xcrun notarytool log "$SUBMISSION_ID" \
-                --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
-                --key-id ${{ secrets.APPLE_API_KEY_ID }} \
-                --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1 || true
+                --key "$KEY_FILE" \
+                --key-id "$KEY_ID" \
+                --issuer "$ISSUER" 2>&1 || true
               exit 1
             fi
+            # Still "In Progress" — keep polling
           done
-          echo "ERROR: Notarization timed out after 3 hours"
-          exit 1
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "ERROR: Notarization timed out after 90 minutes. Last status: $STATUS"
+            exit 1
+          fi
+
+          # ── Staple the notarization ticket to the DMG ─────────────────────────
+          echo "Stapling notarization ticket to $DMG..."
+          xcrun stapler staple "$DMG"
+          echo "Notarization and stapling complete!"
 
       - name: Build Electron app (Linux/Windows)
         if: runner.os != 'macOS'
