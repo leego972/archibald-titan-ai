@@ -83,59 +83,15 @@ jobs:
         working-directory: electron
         run: npm install
 
-      # ── macOS: Set up keychain and import Developer ID certificate ─────────────
-      - name: Set up macOS keychain for code signing
-        if: runner.os == 'macOS'
-        env:
-          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
-          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
-        run: |
-          # Write P12 to temp file
-          echo "$APPLE_DEVELOPER_ID_P12" | base64 --decode > /tmp/developer_id.p12
-
-          # Create a dedicated build keychain
-          KEYCHAIN_PASSWORD="build-keychain-$(date +%s)"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 7200 -u build.keychain
-
-          # Import certificate with -A flag (allow all applications)
-          security import /tmp/developer_id.p12 \
-            -k build.keychain \
-            -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security \
-            -T /usr/bin/productbuild \
-            -A
-
-          # Grant codesign access without UI prompt
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
-          # Verify
-          security find-identity -v -p codesigning build.keychain
-
-          # Store keychain password for cleanup
-          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
-
-          # Clean up P12 file
-          rm /tmp/developer_id.p12
-
       # ── Build Electron app ───────────────────────────────────────────────────
-      - name: Build Electron app (macOS, signed + notarized)
+      # macOS code signing is currently disabled - builds unsigned DMG
+      # See MACOS_SIGNING.md for setup instructions
+      - name: Build Electron app (macOS, unsigned)
         if: runner.os == 'macOS'
         working-directory: electron
         env:
-          # Code signing — do NOT set CSC_LINK so electron-builder uses the keychain
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
-          # Notarization via App Store Connect API key
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Skip code signing by setting CSC_IDENTITY_AUTO_DISCOVERY to false
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run ${{ matrix.build_cmd }}
 
       - name: Build Electron app (Linux/Windows)
