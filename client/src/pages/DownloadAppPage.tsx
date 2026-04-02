@@ -183,15 +183,15 @@ export default function DownloadAppPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasWindows ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Windows {latestRelease.hasWindows ? `(${latestRelease.fileSizeMb ?? "?"} MB)` : "(coming soon)"}
+                Windows {latestRelease.hasWindows ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasMac ? "text-green-400" : "text-muted-foreground/30"}`} />
-                macOS {latestRelease.hasMac ? `(${latestRelease.fileSizeMb ?? "?"} MB)` : "(coming soon)"}
+                macOS {latestRelease.hasMac ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CheckCircle2 className={`h-4 w-4 ${latestRelease.hasLinux ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Linux {latestRelease.hasLinux ? `(${latestRelease.fileSizeMb ?? "?"} MB)` : "(coming soon)"}
+                Linux {latestRelease.hasLinux ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CheckCircle2 className={`h-4 w-4 ${(latestRelease as any).hasAndroid ? "text-green-400" : "text-muted-foreground/30"}`} />

@@ -48,6 +48,7 @@ import { registerBundleSyncRoutes } from "../bundle-sync";
 import { runHealthCheck, createSnapshot } from "../self-improvement-engine";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import { csrfCookieMiddleware, csrfValidationMiddleware } from "./csrf";
 import { correlationMiddleware } from "./correlation";
 import { createLogger } from "./logger";
@@ -224,6 +225,10 @@ async function startServer() {
   registerBinancePayWebhook(app);
   // Titan Storage billing webhook (also before express.json for raw body)
   registerStorageWebhook(app);
+
+  // ── Gzip/Brotli Compression ─────────────────────────────────
+  // Compress all responses except those that are already compressed
+  app.use(compression());
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));

@@ -277,6 +277,20 @@ export function injectMetaTags(html: string, requestPath: string): string {
   // Check for blog post pattern: /blog/:slug
   const blogMatch = cleanPath.match(/^\/blog\/([a-z0-9-]+)$/);
 
+  // Paths that require authentication — should never be indexed by search engines
+  const PRIVATE_PATH_PREFIXES = [
+    "/fetcher/", "/dashboard", "/settings", "/admin",
+    "/evilginx", "/metasploit", "/blackeye", "/tor",
+    "/vpn-chain", "/proxy-maker", "/marketing", "/advertising",
+    "/crowdfunding", "/affiliate", "/seo", "/bin-checker",
+    "/linken-sphere", "/red-team", "/compliance", "/siem",
+    "/isolated-browser", "/web-agent", "/ip-rotation",
+    "/proxy-rotation", "/vpn", "/escalation", "/event-bus",
+    "/security-marketplace", "/titan-server", "/astra", "/argus",
+    "/reset-password", "/verify-email",
+  ];
+  const isPrivatePath = PRIVATE_PATH_PREFIXES.some(prefix => cleanPath.startsWith(prefix));
+
   if (!page && !blogMatch) {
     // Unknown page — use homepage defaults
     page = PUBLIC_PAGES[0];
@@ -287,7 +301,7 @@ export function injectMetaTags(html: string, requestPath: string): string {
   const canonicalUrl = page?.canonicalUrl || `${SITE_URL}${cleanPath}`;
   const ogType = page?.ogType || "website";
   const keywords = page?.keywords?.join(", ") || PUBLIC_PAGES[0].keywords.join(", ");
-  const noIndex = page?.noIndex;
+  const noIndex = page?.noIndex || isPrivatePath;
 
   // Build replacement <head> content
   const replacements: Array<[RegExp, string]> = [
