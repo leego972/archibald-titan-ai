@@ -195,7 +195,9 @@ export const releasesRouter = router({
         downloadUrlWindows: z.string().nullable().optional(),
         downloadUrlMac: z.string().nullable().optional(),
         downloadUrlLinux: z.string().nullable().optional(),
+        downloadUrlAndroid: z.string().nullable().optional(),
         fileSizeMb: z.number().nullable().optional(),
+        fileSizeAndroid: z.number().nullable().optional(),
         isPrerelease: z.boolean().optional(),
         setAsLatest: z.boolean().optional(),
       })
