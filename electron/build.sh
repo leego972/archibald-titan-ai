@@ -7,6 +7,20 @@ pnpm build
 echo "[2/3] Copying to electron/public..."
 mkdir -p electron/public
 cp -r dist/public/* electron/public/
+echo "[2b] Cleaning development artifacts from desktop build..."
+# Remove Manus sandbox debug tools (not for production)
+rm -rf electron/public/__manus__
+# Remove unresolved Vite analytics placeholder and Manus scripts from index.html
+python3 -c "
+import re
+f = 'electron/public/index.html'
+c = open(f).read()
+c = re.sub(r'\\s*<script\\s+defer\\s+src=\\"%VITE_ANALYTICS_ENDPOINT%/umami\\"\\s+data-website-id=\\"%VITE_ANALYTICS_WEBSITE_ID%\\"></script>', '', c)
+c = re.sub(r'<script src=\\"/__manus__/debug-collector\\.js\\" defer></script>', '', c)
+c = re.sub(r'<script id=\\"manus-runtime\\">.*?</script>', '', c, flags=re.DOTALL)
+open(f, 'w').write(c)
+print('  Cleaned index.html')
+"
 echo "[3/3] Installing Electron deps..."
 cd electron && npm install
 echo ""

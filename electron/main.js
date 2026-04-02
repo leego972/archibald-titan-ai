@@ -299,6 +299,20 @@ function createTray() {
   tray.on("double-click", () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
 }
 
-app.whenReady().then(() => { createWindow(); createTray(); app.on("activate", () => { if (!mainWindow) createWindow(); else mainWindow.show(); }); });
+app.whenReady().then(() => {
+  createWindow().catch((err) => {
+    console.error('[Titan] Fatal startup error:', err);
+    dialog.showErrorBox(
+      'Archibald Titan — Startup Error',
+      `Failed to start the local server:\n\n${err.message}\n\nPlease reinstall the application or contact support at support@archibaldtitan.com`
+    );
+    app.quit();
+  });
+  createTray();
+  app.on('activate', () => {
+    if (!mainWindow) createWindow().catch(console.error);
+    else mainWindow.show();
+  });
+});
 app.on("before-quit", () => { isQuitting = true; stopServer(); });
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
