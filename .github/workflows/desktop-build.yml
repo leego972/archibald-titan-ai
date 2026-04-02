@@ -84,7 +84,7 @@ jobs:
 
       # ── macOS: Import Developer ID Application certificate ──────────────────
       - name: Import macOS Developer ID certificate
-        if: runner.os == 'macOS' && secrets.APPLE_DEVELOPER_ID_P12 != ''
+        if: runner.os == 'macOS'
         env:
           APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
           APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
