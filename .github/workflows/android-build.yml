@@ -75,16 +75,6 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_apk
-        with:
-          releaseDirectory: android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-
       - name: Get version
         id: version
         run: |
@@ -102,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: archibald-titan-${{ steps.version.outputs.version }}-android-apk
-          path: ${{ steps.sign_apk.outputs.signedReleaseFile }}
+          path: android/app/build/outputs/apk/release/*-release.apk
           retention-days: 30
 
       - name: Upload to Titan release system
@@ -111,7 +101,7 @@ jobs:
           TITAN_RELEASE_TOKEN: ${{ secrets.TITAN_RELEASE_TOKEN }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          APK_FILE="${{ steps.sign_apk.outputs.signedReleaseFile }}"
+          APK_FILE=$(ls android/app/build/outputs/apk/release/*-release.apk | head -1)
           AAB_FILE=$(ls android/app/build/outputs/bundle/release/*.aab | head -1)
           
           if [ -n "$TITAN_RELEASE_URL" ] && [ -n "$TITAN_RELEASE_TOKEN" ]; then
