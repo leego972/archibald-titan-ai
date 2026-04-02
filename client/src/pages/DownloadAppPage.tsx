@@ -195,7 +195,7 @@ export default function DownloadAppPage() {
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CheckCircle2 className={`h-4 w-4 ${(latestRelease as any).hasAndroid ? "text-green-400" : "text-muted-foreground/30"}`} />
-                Android {(latestRelease as any).hasAndroid ? `(${(latestRelease as any).fileSizeAndroid ?? "?"})` : "(coming soon)"}
+                Android {(latestRelease as any).hasAndroid ? (latestRelease.fileSizeMb ? `(${latestRelease.fileSizeMb} MB)` : "") : "(coming soon)"}
               </div>
             </div>
             {latestRelease.changelog && (
