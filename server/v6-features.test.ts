@@ -118,7 +118,7 @@ describe("V6.0: Electron Desktop App", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(electronDir, "package.json"), "utf-8"));
     expect(pkg.scripts["build:linux"]).toContain("AppImage");
     expect(pkg.scripts["build:win"]).toContain("nsis");
-    expect(pkg.scripts["build:mac"]).toContain("zip");
+    expect(pkg.scripts["build:mac"]).toContain("dmg");
   });
 
   it("should have security settings in main.js", () => {

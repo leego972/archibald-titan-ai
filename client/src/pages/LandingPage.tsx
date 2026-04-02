@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trackDownload } from "@/lib/adTracking";
 import { Button } from "@/components/ui/button";
 import { getRegisterUrl } from "@/const";
 import { useState, useEffect } from "react";
@@ -214,6 +215,9 @@ export default function LandingPage() {
             </Button>
             <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Request Demo
+            </Button>
+            <Button onClick={() => { trackDownload("desktop"); setLocation("/download"); }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
+              Download Desktop App
             </Button>
           </div>
         </div>

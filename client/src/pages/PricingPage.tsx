@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { trackPurchase, trackViewContent } from "@/lib/adTracking";
 import { Button } from "@/components/ui/button";
 import { getRegisterUrl } from "@/const";
 import { useLocation } from "wouter";
@@ -30,6 +31,7 @@ export default function PricingPage() {
       return;
     }
     setLoadingPlan(planId);
+    trackViewContent(planId);
     try {
       const result = await createCheckout.mutateAsync({
         planId,
@@ -37,6 +39,7 @@ export default function PricingPage() {
         source: "web",
       });
       if (result.url) {
+        trackPurchase({ value: planId === "pro" ? 49 : 199, currency: "USD", planName: planId });
         window.location.href = result.url;
       } else {
         toast.error("Failed to create checkout session. Please try again.");
