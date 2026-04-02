@@ -92,14 +92,20 @@ jobs:
           p12-password: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
 
       # ── Build Electron app ───────────────────────────────────────────────────
+      - name: Write App Store Connect API key to file
+        if: runner.os == 'macOS'
+        run: |
+          echo "${{ secrets.APPLE_API_PRIVATE_KEY }}" > /tmp/AuthKey.p8
+          chmod 600 /tmp/AuthKey.p8
+
       - name: Build Electron app (macOS, signed + notarized)
         if: runner.os == 'macOS'
         working-directory: electron
         env:
-          # Notarization via App Store Connect API key
+          # Notarization via App Store Connect API key (electron-builder format)
+          APPLE_API_KEY: /tmp/AuthKey.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run ${{ matrix.build_cmd }}
 
