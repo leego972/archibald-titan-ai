@@ -1,3 +1,4 @@
+# Build: macOS (signed+notarized), Windows, Linux — updated P12 cert
 name: Desktop Build & Upload
 
 on:
