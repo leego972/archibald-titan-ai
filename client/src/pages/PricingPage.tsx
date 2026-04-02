@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { getRegisterUrl } from "@/const";
 import { useLocation } from "wouter";
 import MarketingLayout from "@/components/MarketingLayout";
+import { trpc } from "@/lib/trpc";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   Check, Shield, Zap, Server, Cpu, Activity,
   Database, Workflow, Globe2, Boxes,
@@ -10,12 +13,40 @@ import {
   LayoutDashboard, ShieldCheck, Search,
   Fingerprint, Network, Monitor, FileText,
   ShieldAlert, History, ArrowRight, CalendarDays,
-  PhoneCall
+  PhoneCall, Loader2
 } from "lucide-react";
 
 export default function PricingPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const createCheckout = trpc.stripe.createCheckout.useMutation();
+
+  const handleGetStarted = async (planId: "pro" | "enterprise") => {
+    if (!user) {
+      // Not logged in — send to register with return path
+      window.location.href = getRegisterUrl("/pricing");
+      return;
+    }
+    setLoadingPlan(planId);
+    try {
+      const result = await createCheckout.mutateAsync({
+        planId,
+        interval: "month",
+        source: "web",
+      });
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        toast.error("Failed to create checkout session. Please try again.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
 
   return (
     <MarketingLayout>
@@ -69,8 +100,13 @@ export default function PricingPage() {
                 ))}
               </div>
 
-              <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 h-12 font-bold">
-                Get Started
+              <Button
+                onClick={() => handleGetStarted("pro")}
+                disabled={loadingPlan === "pro"}
+                className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 h-12 font-bold"
+              >
+                {loadingPlan === "pro" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {loadingPlan === "pro" ? "Redirecting..." : user ? "Subscribe Now" : "Get Started"}
               </Button>
             </div>
 
@@ -103,8 +139,13 @@ export default function PricingPage() {
                 ))}
               </div>
 
-              <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 h-12 font-bold shadow-xl shadow-blue-600/20">
-                Start with Enterprise
+              <Button
+                onClick={() => handleGetStarted("enterprise")}
+                disabled={loadingPlan === "enterprise"}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white border-0 h-12 font-bold shadow-xl shadow-blue-600/20"
+              >
+                {loadingPlan === "enterprise" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {loadingPlan === "enterprise" ? "Redirecting..." : user ? "Subscribe Now" : "Start with Enterprise"}
               </Button>
             </div>
 
@@ -175,8 +216,9 @@ export default function PricingPage() {
           <h2 className="text-4xl sm:text-6xl font-black tracking-tighter mb-8 text-white">Secure Your AI Operations.</h2>
           <p className="text-lg text-white/40 mb-10">Join the professional teams building the future of AI on Archibald Titan.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button onClick={() => { window.location.href = getRegisterUrl(); }} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
-              Get Started
+            <Button onClick={() => handleGetStarted("pro")} disabled={loadingPlan === "pro"} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
+              {loadingPlan === "pro" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {user ? "Subscribe Now" : "Get Started"}
             </Button>
             <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Request Demo
