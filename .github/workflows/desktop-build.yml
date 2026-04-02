@@ -121,15 +121,47 @@ jobs:
             exit 1
           fi
           echo "Notarizing: $DMG"
-          xcrun notarytool submit "$DMG" \
+          # Submit without --wait to avoid timeout issues with Apple's slow notarization service
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG" \
             --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
             --key-id ${{ secrets.APPLE_API_KEY_ID }} \
-            --issuer ${{ secrets.APPLE_API_ISSUER_ID }} \
-            --wait \
-            --timeout 3600
-          echo "Stapling notarization ticket..."
-          xcrun stapler staple "$DMG"
-          echo "Notarization complete!"
+            --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1)
+          echo "$SUBMISSION_OUTPUT"
+          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -E "^  id:" | awk '{print $2}' | head -1)
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "ERROR: Could not extract submission ID"
+            exit 1
+          fi
+          echo "Submission ID: $SUBMISSION_ID"
+          # Poll for completion (up to 3 hours = 360 x 30s)
+          MAX_ATTEMPTS=360
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+            STATUS_OUTPUT=$(xcrun notarytool info "$SUBMISSION_ID" \
+              --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
+              --key-id ${{ secrets.APPLE_API_KEY_ID }} \
+              --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1)
+            STATUS=$(echo "$STATUS_OUTPUT" | grep -E "^  status:" | awk '{print $2}')
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — Status: $STATUS"
+            if [ "$STATUS" = "Accepted" ]; then
+              echo "Notarization accepted! Stapling ticket..."
+              xcrun stapler staple "$DMG"
+              echo "Notarization complete!"
+              exit 0
+            elif [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
+              echo "ERROR: Notarization failed with status: $STATUS"
+              echo "$STATUS_OUTPUT"
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
+                --key-id ${{ secrets.APPLE_API_KEY_ID }} \
+                --issuer ${{ secrets.APPLE_API_ISSUER_ID }} 2>&1 || true
+              exit 1
+            fi
+          done
+          echo "ERROR: Notarization timed out after 3 hours"
+          exit 1
 
       - name: Build Electron app (Linux/Windows)
         if: runner.os != 'macOS'
