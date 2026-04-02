@@ -1,4 +1,4 @@
-# Build: macOS (signed+notarized), Windows, Linux — updated P12 cert
+# Build: macOS (signed+notarized via xcrun notarytool), Windows, Linux
 name: Desktop Build & Upload
 
 on:
@@ -91,26 +91,44 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
           p12-password: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
 
-      # ── Build Electron app ───────────────────────────────────────────────────
+      # ── macOS: Write API key file ─────────────────────────────────────────────
       - name: Write App Store Connect API key to file
         if: runner.os == 'macOS'
         run: |
           mkdir -p /tmp/private_keys
           printf '%s' "${{ secrets.APPLE_API_PRIVATE_KEY }}" > /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
           chmod 600 /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
-          echo "API key written to /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8"
+          echo "API key file created ($(wc -c < /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8) bytes)"
 
-      - name: Build Electron app (macOS, signed + notarized)
+      # ── Build Electron app (macOS, signed only — no built-in notarization) ────
+      - name: Build Electron app (macOS, signed)
         if: runner.os == 'macOS'
         working-directory: electron
         env:
-          # electron-builder v25+ built-in notarization env vars
-          # APPLE_API_KEY must be the absolute path to the .p8 file
-          APPLE_API_KEY: /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Disable electron-builder's built-in notarization — we handle it below
+          ELECTRON_BUILDER_SKIP_NOTARIZE: 1
         run: npm run ${{ matrix.build_cmd }}
+
+      # ── macOS: Notarize the DMG using xcrun notarytool ────────────────────────
+      - name: Notarize macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          DMG=$(ls electron/dist/ArchibaldTitan-*-mac-*.dmg 2>/dev/null | head -1)
+          if [ -z "$DMG" ]; then
+            echo "ERROR: No DMG found to notarize"
+            ls -la electron/dist/
+            exit 1
+          fi
+          echo "Notarizing: $DMG"
+          xcrun notarytool submit "$DMG" \
+            --key /tmp/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8 \
+            --key-id ${{ secrets.APPLE_API_KEY_ID }} \
+            --issuer ${{ secrets.APPLE_API_ISSUER_ID }} \
+            --wait \
+            --timeout 600
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG"
+          echo "Notarization complete!"
 
       - name: Build Electron app (Linux/Windows)
         if: runner.os != 'macOS'
