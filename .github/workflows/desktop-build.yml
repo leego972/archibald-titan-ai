@@ -116,6 +116,9 @@ jobs:
       # Strategy: submit without --wait, capture the submission ID, then poll
       # every 30 s for up to 90 minutes.  This avoids xcrun's own blocking
       # --wait flag which has been observed to time-out on slow Apple servers.
+      # The notarization log is saved to a file and uploaded as an artifact
+      # so rejection reasons are always visible even when the console log is
+      # truncated by GitHub Actions.
       - name: Notarize macOS DMG
         if: runner.os == 'macOS'
         env:
@@ -153,6 +156,7 @@ jobs:
             exit 1
           fi
           echo "Submission ID: $SUBMISSION_ID"
+          echo "$SUBMISSION_ID" > /tmp/notarization_submission_id.txt
 
           # ── Poll for result (max 90 min, 30 s intervals) ──────────────────────
           MAX_ATTEMPTS=180   # 180 × 30s = 90 minutes
@@ -164,11 +168,12 @@ jobs:
             echo "Polling attempt $ATTEMPT / $MAX_ATTEMPTS — waiting 30s..."
             sleep 30
 
+            # Use || true so transient network errors don't abort the script
             INFO_OUTPUT=$(xcrun notarytool info "$SUBMISSION_ID" \
               --key "$KEY_FILE" \
               --key-id "$KEY_ID" \
               --issuer "$ISSUER" \
-              --output-format json 2>&1)
+              --output-format json 2>&1) || true
 
             STATUS=$(echo "$INFO_OUTPUT" | python3 -c \
               "import sys,json; d=json.load(sys.stdin); print(d.get('status','Unknown'))" 2>/dev/null || echo "Unknown")
@@ -180,11 +185,14 @@ jobs:
               break
             elif [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
               echo "ERROR: Notarization failed with status: $STATUS"
-              # Fetch the full log for debugging
+              # Fetch the full log for debugging — save to file AND print
+              echo "=== Fetching notarization rejection log ==="
               xcrun notarytool log "$SUBMISSION_ID" \
                 --key "$KEY_FILE" \
                 --key-id "$KEY_ID" \
-                --issuer "$ISSUER" 2>&1 || true
+                --issuer "$ISSUER" \
+                2>&1 | tee /tmp/notarization_rejection_log.json || true
+              echo "=== End of rejection log ==="
               exit 1
             fi
             # Still "In Progress" — keep polling
@@ -199,6 +207,18 @@ jobs:
           echo "Stapling notarization ticket to $DMG..."
           xcrun stapler staple "$DMG"
           echo "Notarization and stapling complete!"
+
+      # ── Upload notarization rejection log as artifact (always, for debugging) ─
+      - name: Upload notarization log artifact
+        if: runner.os == 'macOS' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notarization-log-${{ github.run_id }}
+          path: |
+            /tmp/notarization_rejection_log.json
+            /tmp/notarization_submission_id.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Build Electron app (Linux/Windows)
         if: runner.os != 'macOS'
