@@ -43,6 +43,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.platform }}
+    timeout-minutes: 90
 
     steps:
       - name: Enable long paths (Windows)
@@ -125,7 +126,7 @@ jobs:
             --key-id ${{ secrets.APPLE_API_KEY_ID }} \
             --issuer ${{ secrets.APPLE_API_ISSUER_ID }} \
             --wait \
-            --timeout 600
+            --timeout 3600
           echo "Stapling notarization ticket..."
           xcrun stapler staple "$DMG"
           echo "Notarization complete!"
