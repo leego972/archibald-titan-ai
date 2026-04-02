@@ -35,6 +35,7 @@ import {
   Monitor,
   Apple,
   Terminal,
+  Smartphone,
   CheckCircle2,
   XCircle,
   Loader2,
@@ -50,6 +51,7 @@ const PLATFORMS = [
   { key: "windows" as const, label: "Windows", icon: Monitor, extensions: ".exe, .msi, .zip" },
   { key: "mac" as const, label: "macOS", icon: Apple, extensions: ".dmg, .pkg, .zip" },
   { key: "linux" as const, label: "Linux", icon: Terminal, extensions: ".AppImage, .deb, .rpm, .tar.gz" },
+  { key: "android" as const, label: "Android", icon: Smartphone, extensions: ".apk" },
 ];
 
 export default function ReleaseManagementPage() {
@@ -343,13 +345,15 @@ export default function ReleaseManagementPage() {
               </CardHeader>
               <CardContent>
                 {/* Platform binaries */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {PLATFORMS.map((p) => {
                     const urlField =
                       p.key === "windows"
                         ? release.downloadUrlWindows
                         : p.key === "mac"
                         ? release.downloadUrlMac
+                        : p.key === "android"
+                        ? release.downloadUrlAndroid
                         : release.downloadUrlLinux;
                     const hasFile = !!urlField;
                     const uploadKey = `${release.id}-${p.key}`;
