@@ -1,0 +1,137 @@
+name: Android Build & Upload
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm build
+
+      - name: Install Capacitor CLI
+        run: pnpm add -D @capacitor/cli @capacitor/core @capacitor/android @capacitor/splash-screen @capacitor/status-bar
+
+      - name: Capacitor sync Android
+        run: npx cap sync android
+
+      - name: Set up Android keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/archibald-titan.keystore
+          cat > android/keystore.properties << EOF
+          storeFile=../archibald-titan.keystore
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Build Android AAB (release)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Build Android APK (release)
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Sign APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_apk
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -e "const p=require('./electron/package.json'); console.log(p.version)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: archibald-titan-${{ steps.version.outputs.version }}-android-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: archibald-titan-${{ steps.version.outputs.version }}-android-apk
+          path: ${{ steps.sign_apk.outputs.signedReleaseFile }}
+          retention-days: 30
+
+      - name: Upload to Titan release system
+        env:
+          TITAN_RELEASE_URL: ${{ secrets.TITAN_RELEASE_URL }}
+          TITAN_RELEASE_TOKEN: ${{ secrets.TITAN_RELEASE_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          APK_FILE="${{ steps.sign_apk.outputs.signedReleaseFile }}"
+          AAB_FILE=$(ls android/app/build/outputs/bundle/release/*.aab | head -1)
+          
+          if [ -n "$TITAN_RELEASE_URL" ] && [ -n "$TITAN_RELEASE_TOKEN" ]; then
+            echo "Uploading APK to release system..."
+            curl -sf -X POST "$TITAN_RELEASE_URL/upload" \
+              -H "Authorization: Bearer $TITAN_RELEASE_TOKEN" \
+              -F "file=@$APK_FILE" \
+              -F "platform=android" \
+              -F "type=apk" \
+              -F "version=$VERSION" || echo "APK upload failed (non-fatal)"
+            
+            echo "Uploading AAB to release system..."
+            curl -sf -X POST "$TITAN_RELEASE_URL/upload" \
+              -H "Authorization: Bearer $TITAN_RELEASE_TOKEN" \
+              -F "file=@$AAB_FILE" \
+              -F "platform=android" \
+              -F "type=aab" \
+              -F "version=$VERSION" || echo "AAB upload failed (non-fatal)"
+          else
+            echo "TITAN_RELEASE_URL or TITAN_RELEASE_TOKEN not set — skipping release upload"
+          fi

@@ -110,3 +110,7 @@ temp/
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 electron/package-lock.json
+
+# Android keystore (generated at build time from secrets)
+android/archibald-titan.keystore
+android/keystore.properties
