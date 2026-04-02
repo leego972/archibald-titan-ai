@@ -9,8 +9,8 @@
     "start": "electron .",
     "build:linux": "electron-builder --linux AppImage",
     "build:win": "electron-builder --win nsis",
-    "build:mac": "electron-builder --mac zip",
-    "build:all": "electron-builder --linux AppImage --win nsis --mac zip"
+    "build:mac": "electron-builder --mac dmg",
+    "build:all": "electron-builder --linux AppImage --win nsis --mac dmg"
   },
   "build": {
     "appId": "com.archibald.titan",
@@ -36,24 +36,64 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "icon.ico"
+      "icon": "icon.ico",
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "verifyUpdateCodeSignature": false
     },
     "protocols": [
       {
         "name": "Archibald Titan",
-        "schemes": ["titandesktop"],
+        "schemes": [
+          "titandesktop"
+        ],
         "role": "Viewer"
       }
     ],
     "mac": {
-      "target": "zip",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "protocols": [
         {
           "name": "Archibald Titan",
-          "schemes": ["titandesktop"]
+          "schemes": [
+            "titandesktop"
+          ]
         }
       ]
+    },
+    "dmg": {
+      "title": "Archibald Titan",
+      "icon": "icon.png",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "nsis": {
       "oneClick": false,
@@ -71,7 +111,8 @@
         "provider": "generic",
         "url": "https://archibaldtitan.com/api/desktop/update"
       }
-    ]
+    ],
+    "afterSign": "scripts/notarize.js"
   },
   "dependencies": {
     "electron-updater": "^6.7.3",
@@ -80,6 +121,7 @@
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "@electron/notarize": "^2.5.0"
   }
 }
