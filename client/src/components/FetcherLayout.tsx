@@ -155,20 +155,16 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Terminal, label: "Content Creator", path: "/content-creator", adminOnly: true },
         { icon: Zap, label: "Master Growth", path: "/master-growth", adminOnly: true },
         { icon: Monitor, label: "Advertising", path: "/advertising", adminOnly: true },
-        // ── Developer & Automation ────────────────────────────────────────
+        // ── Admin Tools (hidden extras) ───────────────────────────────────
         { icon: Terminal, label: "CLI Tool", path: "/fetcher/cli", adminOnly: true },
         { icon: Terminal, label: "Git Bash", path: "/fetcher/git-bash", adminOnly: true },
         { icon: Activity, label: "API Analytics", path: "/fetcher/api-analytics", adminOnly: true },
-        { icon: Webhook, label: "Webhooks", path: "/fetcher/webhooks", adminOnly: true },
-        { icon: Bell, label: "Notifications", path: "/fetcher/notifications", adminOnly: true },
         { icon: ScrollText, label: "Developer Docs", path: "/fetcher/developer-docs", adminOnly: true },
-        { icon: History, label: "Credential History", path: "/fetcher/history", adminOnly: true },
         { icon: Workflow, label: "Bulk Sync", path: "/fetcher/bulk-sync", adminOnly: true },
         { icon: FolderOpen, label: "Import", path: "/fetcher/import", adminOnly: true },
         { icon: Database, label: "CSV Export", path: "/fetcher/export", adminOnly: true },
         { icon: Users, label: "Team Vault", path: "/fetcher/team-vault", adminOnly: true },
         { icon: Settings2, label: "Provider Onboarding", path: "/fetcher/onboarding", adminOnly: true },
-        // ── Admin Tools ───────────────────────────────────────────────────
         { icon: ScrollText, label: "Releases", path: "/fetcher/releases", adminOnly: true },
         { icon: Activity, label: "Activity Log", path: "/admin/activity-log", adminOnly: true },
         { icon: Terminal, label: "Titan Server", path: "/admin/titan-server", adminOnly: true },
@@ -178,7 +174,6 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Vault, label: "TOTP Vault", path: "/fetcher/totp-vault", adminOnly: true },
         { icon: Bell, label: "Expiry Watchdog", path: "/fetcher/watchdog", adminOnly: true },
         { icon: Monitor, label: "Desktop Settings", path: "/desktop-settings", adminOnly: true },
-        { icon: Database, label: "Credits", path: "/dashboard/credits", adminOnly: true },
       ],
     },
     {
