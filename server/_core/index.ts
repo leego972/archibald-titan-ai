@@ -96,6 +96,8 @@ async function startServer() {
   // Trust proxy headers (Railway uses a single reverse proxy layer)
   // Use number 1 instead of true to prevent express-rate-limit ERR_ERL_PERMISSIVE_TRUST_PROXY
   app.set("trust proxy", 1);
+  // Remove Express fingerprint from response headers
+  app.disable('x-powered-by');
   const server = createServer(app);
 
   // ── Non-WWW to WWW Redirect ────────────────────────────────────
