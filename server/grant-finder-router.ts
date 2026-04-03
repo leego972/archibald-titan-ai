@@ -265,7 +265,7 @@ Return ONLY a JSON object with a "matches" array.`;
     const sorted = allMatches.sort((a: any, b: any) => b.matchScore - a.matchScore).slice(0, 20);
     return { matchCount: sorted.length, matches: sorted };
   }),
-  apply: protectedProcedure.input(z.object({
+  submitApplication: protectedProcedure.input(z.object({
     grantId: z.number(),
     companyId: z.number(),
     businessPlanId: z.number().optional(),
