@@ -234,7 +234,15 @@ export async function getGrantMatchesByCompany(companyId: number) {
 // --- Crowdfunding Campaign functions ---
 export async function createCampaign(data: InsertCrowdfundingCampaign) {
   const db = await getDb(); if (!db) throw new Error("DB not available");
-  const result = await db.insert(crowdfundingCampaigns).values(data);
+  // Auto-generate slug from title if not provided
+  const slug = (data as any).slug || (
+    (data.title || "campaign")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 200)
+  ) + "-" + Date.now();
+  const result = await db.insert(crowdfundingCampaigns).values({ ...data, slug });
   return { id: result[0].insertId };
 }
 export async function listCampaigns(filters?: { status?: string; category?: string; userId?: number }) {
@@ -251,7 +259,13 @@ export async function listCampaigns(filters?: { status?: string; category?: stri
 export async function getCampaignById(id: number) {
   const db = await getDb(); if (!db) return undefined;
   const result = await db.select().from(crowdfundingCampaigns).where(eq(crowdfundingCampaigns.id, id));
-  return result[0];
+  if (!result[0]) return undefined;
+  const [rewards, updates, contributions] = await Promise.all([
+    db.select().from(crowdfundingRewards).where(eq(crowdfundingRewards.campaignId, id)),
+    db.select().from(crowdfundingUpdates).where(eq(crowdfundingUpdates.campaignId, id)).orderBy(desc(crowdfundingUpdates.createdAt)),
+    db.select().from(crowdfundingContributions).where(eq(crowdfundingContributions.campaignId, id)).orderBy(desc(crowdfundingContributions.createdAt)).limit(20),
+  ]);
+  return { ...result[0], rewards, updates, contributions };
 }
 export async function getCampaignBySlug(slug: string) {
   const db = await getDb(); if (!db) return undefined;
@@ -490,5 +504,52 @@ export async function getSellerStats(userId: number) {
     activeListings: listings.filter(l => l.status === "active" && l.reviewStatus === "approved").length,
     avgRating: profile?.avgRating || 0,
     ratingCount: profile?.ratingCount || 0,
+  };
+}
+
+// --- Grant Applications by User (via their companies) ---
+export async function getGrantApplicationsByUser(userId: number) {
+  const db = await getDb(); if (!db) return [];
+  const userCompanies = await getCompaniesByUser(userId);
+  if (!userCompanies.length) return [];
+  const companyIds = userCompanies.map(c => c.id);
+  const { inArray } = await import("drizzle-orm");
+  return db.select().from(grantApplications)
+    .where(inArray(grantApplications.companyId, companyIds))
+    .orderBy(desc(grantApplications.createdAt));
+}
+
+// --- Crowdfunding Stats ---
+export async function getCrowdfundingStats() {
+  const db = await getDb();
+  if (!db) return { totalCampaigns: 0, totalRaised: 0, totalBackers: 0, activeCampaigns: 0 };
+  const { count, sum } = await import("drizzle-orm");
+  const [totals] = await db.select({
+    totalCampaigns: count(crowdfundingCampaigns.id),
+    totalRaised: sum(crowdfundingCampaigns.currentAmount),
+    totalBackers: sum(crowdfundingCampaigns.backerCount),
+  }).from(crowdfundingCampaigns);
+  const [active] = await db.select({ activeCampaigns: count(crowdfundingCampaigns.id) })
+    .from(crowdfundingCampaigns)
+    .where(sql`status = 'active'`);
+  const [internalCount] = await db.select({ n: count(crowdfundingCampaigns.id) })
+    .from(crowdfundingCampaigns).where(sql`source = 'internal'`);
+  const [ksCount] = await db.select({ n: count(crowdfundingCampaigns.id) })
+    .from(crowdfundingCampaigns).where(sql`source = 'kickstarter'`);
+  const [igCount] = await db.select({ n: count(crowdfundingCampaigns.id) })
+    .from(crowdfundingCampaigns).where(sql`source = 'indiegogo'`);
+  const [gfCount] = await db.select({ n: count(crowdfundingCampaigns.id) })
+    .from(crowdfundingCampaigns).where(sql`source = 'gofundme'`);
+  const total = totals?.totalCampaigns ?? 0;
+  return {
+    total,
+    totalCampaigns: total,
+    totalRaised: Number(totals?.totalRaised ?? 0),
+    totalBackers: Number(totals?.totalBackers ?? 0),
+    activeCampaigns: active?.activeCampaigns ?? 0,
+    internal: internalCount?.n ?? 0,
+    kickstarter: ksCount?.n ?? 0,
+    indiegogo: igCount?.n ?? 0,
+    gofundme: gfCount?.n ?? 0,
   };
 }

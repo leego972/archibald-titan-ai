@@ -188,7 +188,7 @@ function BrowseView() {
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Backers</div>
               </div>
               <div className="bg-background/50 rounded-lg p-3 border border-white/5">
-                <div className="text-lg font-bold text-yellow-400">{stats.kickstarter + stats.indiegogo + stats.gofundme}</div>
+                <div className="text-lg font-bold text-yellow-400">{(stats.kickstarter ?? 0) + (stats.indiegogo ?? 0) + (stats.gofundme ?? 0)}</div>
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider">External</div>
               </div>
             </div>
