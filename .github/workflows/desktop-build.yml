@@ -43,7 +43,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.platform }}
-    timeout-minutes: 120
+    timeout-minutes: 360
 
     steps:
       - name: Enable long paths (Windows)
@@ -114,8 +114,9 @@ jobs:
       # ── macOS: Submit DMG for notarization (non-blocking poll loop) ───────────
       #
       # Strategy: submit without --wait, capture the submission ID, then poll
-      # every 30 s for up to 90 minutes.  This avoids xcrun's own blocking
+      # every 30 s for up to 3 hours.  This avoids xcrun's own blocking
       # --wait flag which has been observed to time-out on slow Apple servers.
+      # Apple's notarization service can take up to 3 hours on busy days.
       # The notarization log is saved to a file and uploaded as an artifact
       # so rejection reasons are always visible even when the console log is
       # truncated by GitHub Actions.
@@ -158,8 +159,8 @@ jobs:
           echo "Submission ID: $SUBMISSION_ID"
           echo "$SUBMISSION_ID" > /tmp/notarization_submission_id.txt
 
-          # ── Poll for result (max 90 min, 30 s intervals) ──────────────────────
-          MAX_ATTEMPTS=180   # 180 × 30s = 90 minutes
+          # ── Poll for result (max 3 hours, 30 s intervals) ─────────────────────
+          MAX_ATTEMPTS=360   # 360 × 30s = 180 minutes (3 hours)
           ATTEMPT=0
           STATUS="In Progress"
 
@@ -199,7 +200,7 @@ jobs:
           done
 
           if [ "$STATUS" != "Accepted" ]; then
-            echo "ERROR: Notarization timed out after 90 minutes. Last status: $STATUS"
+            echo "ERROR: Notarization timed out after 3 hours. Last status: $STATUS"
             exit 1
           fi
 
