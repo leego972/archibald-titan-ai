@@ -171,14 +171,28 @@ export default function BinCheckerPage() {
         <span><strong>Zero-charge methods only.</strong> All checks are passive — no transactions, no authorisation requests, no balance checks. Cards are never touched.</span>
       </div>
 
+      {/* Quick-access shortcut — always visible on all browsers */}
+      {tab !== "reverse" && (
+        <button
+          type="button"
+          onClick={() => setTab("reverse")}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-yellow-600/10 border border-yellow-500/30 text-yellow-300 text-sm font-semibold hover:bg-yellow-600/20 transition-colors"
+        >
+          <Search className="w-4 h-4" />
+          Reverse BIN Search — find BINs by bank name, country, network, or card type
+        </button>
+      )}
+
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-zinc-900 border border-zinc-800">
-          <TabsTrigger value="bin">BIN Lookup</TabsTrigger>
-          <TabsTrigger value="validate">Card Validator</TabsTrigger>
-          <TabsTrigger value="bulk">Bulk Check</TabsTrigger>
-          <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
-          <TabsTrigger value="network">Network ID</TabsTrigger>
-          <TabsTrigger value="reverse">BIN by Criteria</TabsTrigger>
+        <TabsList className="bg-zinc-900 border border-zinc-800 h-auto flex flex-wrap gap-1 p-1">
+          <TabsTrigger value="bin" className="flex-1 min-w-[100px]">BIN Lookup</TabsTrigger>
+          <TabsTrigger value="validate" className="flex-1 min-w-[100px]">Card Validator</TabsTrigger>
+          <TabsTrigger value="bulk" className="flex-1 min-w-[90px]">Bulk Check</TabsTrigger>
+          <TabsTrigger value="bulkbin" className="flex-1 min-w-[90px]">Bulk BIN</TabsTrigger>
+          <TabsTrigger value="network" className="flex-1 min-w-[90px]">Network ID</TabsTrigger>
+          <TabsTrigger value="reverse" className="flex-1 min-w-[130px] data-[state=active]:bg-yellow-600 data-[state=active]:text-black font-semibold">
+            🔍 Reverse Search
+          </TabsTrigger>
         </TabsList>
 
         {/* ── BIN Lookup ── */}
