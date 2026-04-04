@@ -18,7 +18,7 @@ const DATA_DIR = path.join(os.homedir(), ".archibald-titan");
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, "titan.db");
 const LICENSE_PATH = path.join(DATA_DIR, "license.json");
-const REMOTE_URL = "https://archibaldtitan.com";
+const REMOTE_URL = "https://www.archibaldtitan.com";
 
 let db = null, server = null, port = 0;
 let cachedLicense = null;
