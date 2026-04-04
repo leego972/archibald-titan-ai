@@ -1324,8 +1324,9 @@ export async function detectBuildIntentAsync(
 
 /**
  * Get the first tool to force-call based on the build type.
- * Self-build: self_list_files (explore the codebase)
- * External-build: sandbox_list_files (explore the sandbox)
+ * Self-build: directory listings are pre-injected as a system message — NO forced tool call.
+ *   The builder must go straight to planning and executing the user's instruction.
+ * External-build: let the LLM decide whether to research or start building.
  * Research: web_search
  */
 export function getForceFirstTool(message: string, isSelfBuild: boolean = true): string | null {
@@ -1337,11 +1338,12 @@ export function getForceFirstTool(message: string, isSelfBuild: boolean = true):
   if (RESEARCH_KEYWORDS.some(kw => msgLower.includes(kw))) {
     return 'web_search';
   }
-  // Return the correct tool based on build type
-  // Self-builds: explore the codebase first
-  // External builds: don't force a tool — let the LLM decide whether to research or start building
-  // Forcing sandbox_list_files on an empty sandbox wastes a round
-  return isSelfBuild ? 'self_list_files' : null;
+  // Self-builds: the pre-flight block in chat-router.ts already injects server/ and client/src/pages/
+  // directory listings as a system message before the LLM sees the user's request.
+  // Forcing self_list_files wastes a full round re-scanning repos the builder already knows.
+  // The builder MUST execute the user's explicit instruction directly — no autonomous repo scanning.
+  // External builds: don't force a tool — let the LLM decide.
+  return null;
 }
 
 export function isRefusalResponse(text: string): boolean {
@@ -1413,19 +1415,23 @@ You are now in BUILDER MODE. The user wants you to modify Archibald Titan's own 
 
 ### OPTIMAL WORKFLOW (3-4 rounds max)
 
-**MANDATORY FIRST STEP — do this before ANYTHING else:**
-Your very first action MUST be calling self_list_files with dirPath="server" AND self_list_files with dirPath="client/src/pages". These two calls give you the complete map of the codebase. NEVER guess or assume file paths — always discover them first. If you skip this step, you WILL reference wrong paths and fail.
+**DIRECTORY MAP IS ALREADY PROVIDED** — The server/ and client/src/pages/ directory listings have been pre-loaded for you in the system context above. You already know every file path. Do NOT call self_list_files at the start — it wastes a round re-scanning what you already have.
 
-1. **Round 1 — DISCOVER**: Call self_list_files("server") and self_list_files("client/src/pages") to see ALL existing files. Then self_read_file on 1-2 key integration files (e.g. client/src/App.tsx for routes, client/src/components/FetcherLayout.tsx for sidebar, server/routers.ts for API registration).
+**YOUR FIRST ACTION IS TO EXECUTE THE USER'S INSTRUCTION:**
+1. **Round 1 — PLAN + READ**: State your plan in 1-2 lines (what you will create/modify and why). Then call self_read_file on the 1-2 specific files you need to modify. Only read files directly relevant to the task.
 2. **Round 2 — BUILD**: Use self_multi_file_modify to create/modify ALL files in one batch call.
-3. **Round 3 — INTEGRATE**: Patch App.tsx routes and FetcherLayout sidebar in one self_multi_file_modify call.
+3. **Round 3 — INTEGRATE**: Patch App.tsx routes and FetcherLayout sidebar in one self_multi_file_modify call (only if adding a new page).
 4. **Round 4 — RESPOND**: Tell the user what you built and how to use it.
 
+**WHEN TO USE self_list_files:**
+- ONLY when you need a file that is NOT in the pre-loaded directory map (e.g. a deeply nested subdirectory)
+- NEVER call it for server/ or client/src/pages/ — those are already in your context
+- NEVER call it as a reflexive first step just because you are in builder mode
+
 **PATH RULES (non-negotiable):**
-- Pages live in client/src/pages/ — ALWAYS verify exact filenames with self_list_files("client/src/pages") first
-- Backend routers live in server/ — ALWAYS verify with self_list_files("server") first
-- NEVER construct a path like client/src/pages/SomePage/index.tsx without first confirming the directory structure
-- If a directory listing returns empty or an error, try the parent directory (e.g. client/src instead of client/src/pages)
+- Pages live in client/src/pages/ — use the pre-loaded listing; only call self_list_files if the path is not there
+- Backend routers live in server/ — use the pre-loaded listing; only call self_list_files if the path is not there
+- NEVER construct a path like client/src/pages/SomePage/index.tsx without confirming the directory structure first
 
 ### PATCH ACTION (preferred for existing files)
 Use action="patch" with patches array: [{"search": "exact text to find", "replace": "replacement text"}]
