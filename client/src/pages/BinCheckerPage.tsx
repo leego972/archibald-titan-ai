@@ -149,6 +149,13 @@ export default function BinCheckerPage() {
     { enabled: networkPrefix.length >= 1 }
   );
 
+  // Full Card Check (Luhn + BIN + Stripe live)
+  const [fullCardNumber, setFullCardNumber] = useState("");
+  const [fullExpMonth, setFullExpMonth] = useState("");
+  const [fullExpYear, setFullExpYear] = useState("");
+  const [fullCvc, setFullCvc] = useState("");
+  const fullCheck = trpc.binChecker.fullCheck.useMutation({ onError: (e) => toast.error(e.message) });
+
   const formatCard = (val: string) => val.replace(/\D/g, "").replace(/(.{4})/g, "$1 ").trim().slice(0, 19);
 
   return (
@@ -178,6 +185,7 @@ export default function BinCheckerPage() {
           <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
           <TabsTrigger value="network">Network ID</TabsTrigger>
           <TabsTrigger value="reverse">Reverse Search</TabsTrigger>
+          <TabsTrigger value="fullcheck" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black font-semibold">⚡ Full Card Check</TabsTrigger>
         </TabsList>
 
         {/* ── BIN Lookup ── */}
@@ -472,6 +480,191 @@ export default function BinCheckerPage() {
               {networkPrefix.length >= 1 && !networkLoading && !networkData?.found && (
                 <p className="text-sm text-zinc-500">No network matched for prefix <span className="font-mono text-zinc-300">{networkPrefix}</span></p>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Full Card Check (Luhn + BIN + Stripe Live) ── */}
+        <TabsContent value="fullcheck" className="mt-4 space-y-4">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-4 h-4 text-yellow-400" />
+                Full 3-Layer Card Check
+              </CardTitle>
+              <CardDescription>
+                Layer 1: Luhn validation &nbsp;·&nbsp; Layer 2: BIN lookup (bank, country, type) &nbsp;·&nbsp;
+                Layer 3: Stripe SetupIntent live verification — real bank decline codes returned.
+                <span className="text-green-400 font-medium"> Zero charge. Card is never burned.</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-zinc-400 text-xs mb-1 block">Card Number</Label>
+                  <Input
+                    value={fullCardNumber}
+                    onChange={e => setFullCardNumber(formatCard(e.target.value))}
+                    placeholder="4111 1111 1111 1111"
+                    className="bg-zinc-800 border-zinc-700 font-mono text-lg tracking-widest"
+                    maxLength={19}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-zinc-400 text-xs mb-1 block">Exp Month (MM)</Label>
+                    <Input
+                      value={fullExpMonth}
+                      onChange={e => setFullExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                      placeholder="12"
+                      className="bg-zinc-800 border-zinc-700 font-mono"
+                      maxLength={2}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400 text-xs mb-1 block">Exp Year (YYYY)</Label>
+                    <Input
+                      value={fullExpYear}
+                      onChange={e => setFullExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="2027"
+                      className="bg-zinc-800 border-zinc-700 font-mono"
+                      maxLength={4}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400 text-xs mb-1 block">CVC</Label>
+                    <Input
+                      value={fullCvc}
+                      onChange={e => setFullCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="123"
+                      className="bg-zinc-800 border-zinc-700 font-mono"
+                      maxLength={4}
+                      type="password"
+                    />
+                  </div>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  const clean = fullCardNumber.replace(/\D/g, "");
+                  const month = parseInt(fullExpMonth, 10);
+                  const year = parseInt(fullExpYear, 10);
+                  if (clean.length < 13) return toast.error("Enter a valid card number");
+                  if (!month || month < 1 || month > 12) return toast.error("Enter a valid expiry month (1-12)");
+                  if (!year || year < 2024) return toast.error("Enter a valid 4-digit expiry year");
+                  if (fullCvc.length < 3) return toast.error("Enter a valid CVC");
+                  fullCheck.mutate({ cardNumber: clean, expMonth: month, expYear: year, cvc: fullCvc });
+                }}
+                disabled={fullCheck.isPending}
+                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold"
+              >
+                {fullCheck.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Checking with issuing bank...</>
+                ) : (
+                  <><Shield className="w-4 h-4 mr-2" />Run Full Card Check</>
+                )}
+              </Button>
+
+              {fullCheck.data && (() => {
+                const d = fullCheck.data;
+                const isLive = d.overallStatus === "LIVE";
+                const isDeclined = d.overallStatus === "DECLINED";
+                const isInvalid = d.overallStatus === "INVALID_NUMBER";
+                const isBinOnly = d.overallStatus === "BIN_ONLY";
+                const borderColor = isLive ? "border-green-500/30" : isDeclined ? "border-red-500/30" : isInvalid ? "border-red-500/30" : "border-yellow-500/30";
+                const bgColor = isLive ? "bg-green-500/5" : isDeclined ? "bg-red-500/5" : isInvalid ? "bg-red-500/5" : "bg-yellow-500/5";
+                const statusColor = isLive ? "text-green-400" : isDeclined ? "text-red-400" : isInvalid ? "text-red-400" : "text-yellow-400";
+                return (
+                  <div className={`rounded-lg border ${borderColor} ${bgColor} p-4 space-y-4`}>
+                    {/* Status Banner */}
+                    <div className="flex items-center gap-3">
+                      {isLive ? <CheckCircle2 className="w-5 h-5 text-green-400" /> :
+                        (isDeclined || isInvalid) ? <XCircle className="w-5 h-5 text-red-400" /> :
+                        <AlertTriangle className="w-5 h-5 text-yellow-400" />}
+                      <div>
+                        <p className={`font-bold text-lg ${statusColor}`}>{d.overallStatus.replace(/_/g, " ")}</p>
+                        <p className="text-xs text-zinc-500">Checked at {new Date(d.checkedAt).toLocaleTimeString()}</p>
+                      </div>
+                    </div>
+
+                    {/* Status Code — always shown */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-zinc-500">Status Code:</span>
+                      <span className={`font-mono font-bold text-sm px-2 py-0.5 rounded ${isLive ? 'bg-green-500/20 text-green-300' : isDeclined ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                        {(d as any).statusCode ?? d.overallStatus}
+                      </span>
+                    </div>
+
+                    {/* Decline Code — shown prominently when declined */}
+                    {d.liveCheck && !d.liveCheck.isLive && d.liveCheck.declineCode && (
+                      <div className="p-3 rounded bg-red-500/10 border border-red-500/20 space-y-1.5">
+                        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bank Decline Details</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-500">Code:</span>
+                          <span className="font-mono font-bold text-red-300 text-sm">{d.liveCheck.declineCode}</span>
+                        </div>
+                        {(d.liveCheck as any).declineCategory && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-500">Category:</span>
+                            <span className="font-mono text-red-400 text-xs">{(d.liveCheck as any).declineCategory}</span>
+                          </div>
+                        )}
+                        {d.liveCheck.declineMessage && (
+                          <p className="text-xs text-red-300 mt-1 border-t border-red-500/20 pt-1.5">{d.liveCheck.declineMessage}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Layer 1: Luhn */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layer 1 — Luhn Validation</p>
+                      <InfoRow label="Luhn Valid" value={d.luhnValid ? "✅ Pass" : "❌ Fail"} />
+                      <InfoRow label="Card Length" value={`${d.cardNumberLength} digits`} />
+                      <InfoRow label="Detected Network" value={d.detectedScheme?.toUpperCase()} />
+                    </div>
+
+                    {/* Layer 2: BIN */}
+                    {d.binLookup && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layer 2 — BIN Lookup</p>
+                        <InfoRow label="Issuing Bank" value={d.binLookup.bank} />
+                        <InfoRow label="Country" value={`${d.binLookup.country} (${d.binLookup.countryCode})`} />
+                        <InfoRow label="Card Type" value={d.binLookup.type} />
+                        <InfoRow label="Brand/Level" value={d.binLookup.brand} />
+                        <InfoRow label="Prepaid" value={d.binLookup.prepaid ? "Yes" : "No"} />
+                        <InfoRow label="Data Source" value={(d.binLookup as any).source === 'local_db' ? '⚡ Local DB (343k records)' : (d.binLookup as any).source === 'external_api' ? '🌐 External API' : 'Unknown'} />
+                      </div>
+                    )}
+                    {d.binError && <p className="text-xs text-zinc-500">BIN lookup: {d.binError}</p>}
+
+                    {/* Layer 3: Live */}
+                    {d.liveCheck && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layer 3 — Live Verification (Stripe SetupIntent)</p>
+                        <InfoRow label="Status" value={d.liveCheck.isLive ? "✅ LIVE — Card is active" : "❌ DECLINED"} />
+                        <InfoRow label="CVC Check" value={d.liveCheck.cvcCheck === "pass" ? "✅ Pass" : d.liveCheck.cvcCheck === "fail" ? "❌ Fail (wrong CVC)" : d.liveCheck.cvcCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
+                        <InfoRow label="Address Check" value={d.liveCheck.addressCheck === "pass" ? "✅ Pass" : d.liveCheck.addressCheck === "fail" ? "❌ Fail" : d.liveCheck.addressCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
+                        <InfoRow label="ZIP Check" value={d.liveCheck.zipCheck === "pass" ? "✅ Pass" : d.liveCheck.zipCheck === "fail" ? "❌ Fail" : d.liveCheck.zipCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
+                        <InfoRow label="Funding Type" value={d.liveCheck.funding} />
+                        <InfoRow label="Network Brand" value={d.liveCheck.brand} />
+                        <InfoRow label="Last 4" value={d.liveCheck.last4} />
+                        {d.liveCheck.expMonth && d.liveCheck.expYear && (
+                          <InfoRow label="Expiry (confirmed)" value={`${String(d.liveCheck.expMonth).padStart(2,'0')}/${d.liveCheck.expYear}`} />
+                        )}
+                      </div>
+                    )}
+                    {d.liveError && (
+                      <p className="text-xs text-zinc-500">Live check: {d.liveError}</p>
+                    )}
+
+                    {/* Full Summary */}
+                    <details className="mt-2">
+                      <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300">View full summary</summary>
+                      <pre className="mt-2 text-xs text-zinc-300 bg-zinc-950 rounded p-3 overflow-auto whitespace-pre-wrap font-mono">{d.summary}</pre>
+                    </details>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>

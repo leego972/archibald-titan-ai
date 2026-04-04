@@ -187,30 +187,44 @@ export const binCheckerRouter = router({
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for BIN lookup. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      const bin = input.bin.replace(/\D/g, "").slice(0, 8);
+       const bin = input.bin.replace(/\D/g, "").slice(0, 8);
       if (bin.length < 6) return { success: false, error: "BIN must be at least 6 digits." };
-
       // Detect card network from prefix
       const network = detectNetwork(bin);
 
-      // Try primary API, then fallback
-      let apiData = await lookupBinApi(bin.slice(0, 6));
-      if (!apiData) apiData = await lookupBinFallback(bin.slice(0, 6));
+      // ── Layer 1: Try local 343k-row BIN database first (instant, no rate limits) ──
+      const localResults = searchBins({ bin: bin.slice(0, 6) });
+      let localRow = localResults.length > 0 ? localResults[0] : null;
+
+      // ── Layer 2: Fall back to external API only if not found locally ──
+      let apiData: BinApiResult | null = null;
+      if (!localRow) {
+        apiData = await lookupBinApi(bin.slice(0, 6));
+        if (!apiData) apiData = await lookupBinFallback(bin.slice(0, 6));
+      }
 
       // Deduct credits after successful lookup
       try { await consumeCredits(ctx.user.id, "bin_lookup", `BIN lookup: ${bin.slice(0, 6)}`); } catch (e) {
         log.warn("[BinChecker] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
 
+      // Build unified response from local DB or API data
+      const bankName = localRow?.issuer ?? apiData?.bank?.name ?? null;
+      const countryCode = localRow?.alpha2 ?? apiData?.country?.alpha2 ?? null;
+      const countryName = localRow?.country ?? apiData?.country?.name ?? null;
+      const cardType = localRow?.type ?? apiData?.type ?? null;
+      const cardBrand = localRow?.brand ?? apiData?.brand ?? apiData?.scheme ?? null;
+
       return {
         success: true,
         bin: bin.slice(0, 6),
-        network: network ? { name: network.name, code: network.code } : (apiData?.scheme ? { name: apiData.scheme, code: apiData.scheme } : null),
-        type: apiData?.type ?? null,
-        brand: apiData?.brand ?? null,
+        source: localRow ? "local_db" : (apiData ? "external_api" : "network_only"),
+        network: network ? { name: network.name, code: network.code } : (cardBrand ? { name: cardBrand, code: cardBrand.toLowerCase() } : null),
+        type: cardType,
+        brand: cardBrand,
         prepaid: apiData?.prepaid ?? null,
-        country: apiData?.country ?? null,
-        bank: apiData?.bank ?? null,
+        country: countryCode ? { name: countryName, alpha2: countryCode } : apiData?.country ?? null,
+        bank: bankName ? { name: bankName } : apiData?.bank ?? null,
         luhnEnabled: apiData?.number?.luhn ?? (network?.luhnCheck ?? true),
       };
     }),
@@ -231,11 +245,20 @@ export const binCheckerRouter = router({
       const luhnValid = luhnCheck(clean);
       const lengthValid = network ? network.lengths.includes(clean.length) : true;
 
-      // Look up BIN info
+      // Look up BIN info — local DB first, then external API fallback
       const bin = clean.slice(0, 6);
-      let binData = await lookupBinApi(bin);
-      if (!binData) binData = await lookupBinFallback(bin);
-
+      const localBin = searchBins({ bin });
+      const localRow = localBin.length > 0 ? localBin[0] : null;
+      let binData = null;
+      if (!localRow) {
+        binData = await lookupBinApi(bin);
+        if (!binData) binData = await lookupBinFallback(bin);
+      }
+      const bankName = localRow?.issuer ?? binData?.bank?.name ?? null;
+      const countryCode = localRow?.alpha2 ?? binData?.country?.alpha2 ?? null;
+      const countryName = localRow?.country ?? binData?.country?.name ?? null;
+      const cardType = localRow?.type ?? binData?.type ?? null;
+      const cardBrand = localRow?.brand ?? binData?.brand ?? binData?.scheme ?? null;
       return {
         valid: luhnValid && lengthValid,
         luhnValid,
@@ -243,9 +266,10 @@ export const binCheckerRouter = router({
         cardLength: clean.length,
         network: network ? { name: network.name, code: network.code, cvvLength: network.cvvLength } : null,
         bin,
-        bank: binData?.bank ?? null,
-        country: binData?.country ?? null,
-        type: binData?.type ?? null,
+        bank: bankName ? { name: bankName } : binData?.bank ?? null,
+        country: countryCode ? { name: countryName, alpha2: countryCode } : binData?.country ?? null,
+        type: cardType,
+        brand: cardBrand,
         prepaid: binData?.prepaid ?? null,
         maskedNumber: `${clean.slice(0, 4)} **** **** ${clean.slice(-4)}`,
         message: luhnValid && lengthValid ? "✓ Card number is mathematically valid" : luhnValid ? "Card passes Luhn but length is unusual for this network" : "✗ Card number fails Luhn check — likely invalid",
@@ -398,11 +422,11 @@ export const binCheckerRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       // Consume credits for a live card check
-      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      const creditCheck = await checkCredits(ctx.user.id, "card_live_check");
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      await consumeCredits(ctx.user.id, "bin_lookup", "Full card check (Luhn + BIN + Stripe live)");
+      await consumeCredits(ctx.user.id, "card_live_check", "Full card check (Luhn + BIN + Stripe live)");
       const result = await checkCard({
         cardNumber: input.cardNumber.replace(/\D/g, ""),
         expMonth: input.expMonth,

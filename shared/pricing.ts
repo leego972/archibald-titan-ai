@@ -409,10 +409,11 @@ export const CREDIT_COSTS = {
   exploit_exec: 500,             // Power — exploit module execution on node
   exploit_cve_search: 50,        // Standard — CVE database search + AI enrichment
 
-  // ── BIN Checker ───────────────────────────────────────────────────────────
+  // ── BIN Checker ───────────────────────────────────────────────────────────────
   bin_lookup: 5,                 // Micro — single BIN database lookup
   bin_bulk_lookup: 50,           // Standard — bulk BIN lookup batch (up to 100)
   bin_reverse_search: 25,        // Light — reverse BIN search by country/network
+  card_live_check: 50,           // Standard — 3-layer card check: Luhn + BIN + Stripe SetupIntent live verification
 
   // ── Proxy & IP Rotation ───────────────────────────────────────────────────
   proxy_test: 10,                // Light — single proxy connectivity test
