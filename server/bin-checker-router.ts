@@ -17,6 +17,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { createLogger } from "./_core/logger.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { getErrorMessage } from "./_core/errors.js";
+import { searchBins } from "./bin-database.js";
 
 const log = createLogger("BinChecker");
 
@@ -285,98 +286,44 @@ export const binCheckerRouter = router({
    */
   reverseBinSearch: protectedProcedure
     .input(z.object({
-      query: z.string().min(2).max(100),
-      country: z.string().optional(),   // ISO alpha-2 code e.g. "AU"
-      network: z.string().optional(),   // "visa", "mastercard", etc.
-      cardType: z.string().optional(),  // "credit", "debit"
+      query: z.string().min(1).max(100),
+      country: z.string().nullish(),   // ISO alpha-2 code e.g. "AU"
+      network: z.string().nullish(),   // "visa", "mastercard", etc.
+      cardType: z.string().nullish(),  // "credit", "debit", "prepaid"
     }))
     .mutation(async ({ ctx, input }) => {
       const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for reverse BIN search. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      const query = input.query.trim().toLowerCase();
+      // Search the local 343k-row BIN database — no external API needed
+      const matches = searchBins({
+        bank: input.query.trim() || undefined,
+        country: input.country ?? undefined,
+        network: input.network ?? undefined,
+        cardType: input.cardType ?? undefined,
+        limit: 100,
+      });
 
-      // Build search URL with filters
-      const params = new URLSearchParams();
-      params.set("q", query);
-      if (input.country) params.set("country", input.country);
-      if (input.network) params.set("scheme", input.network);
-      if (input.cardType) params.set("type", input.cardType);
-
-      const results: Array<{
-        bin: string;
-        bank: string;
-        brand: string;
-        type: string;
-        network: string;
-        country: string;
-        countryCode: string;
-        prepaid: boolean;
-      }> = [];
-
-      try {
-        // Primary: binlist.net search
-        const res = await fetch(`https://lookup.binlist.net/search?${params.toString()}`, {
-          headers: { "Accept-Version": "3", "User-Agent": "TitanBinChecker/1.0" },
-          signal: AbortSignal.timeout(10000),
-        });
-
-        if (res.ok) {
-          const data = await res.json() as any;
-          const items = Array.isArray(data) ? data : (data.results ?? data.data ?? []);
-          for (const item of items.slice(0, 50)) {
-            results.push({
-              bin: item.bin ?? item.number ?? "",
-              bank: item.bank?.name ?? item.issuer ?? "Unknown",
-              brand: item.brand ?? item.scheme ?? "Unknown",
-              type: item.type ?? "Unknown",
-              network: item.scheme ?? item.network ?? "Unknown",
-              country: item.country?.name ?? item.country ?? "Unknown",
-              countryCode: item.country?.alpha2 ?? item.countryCode ?? "",
-              prepaid: item.prepaid ?? false,
-            });
-          }
-        }
-      } catch { /* fallback below */ }
-
-      // Fallback: bincheck.io search
-      if (results.length === 0) {
-        try {
-          const res = await fetch(`https://api.bincodes.com/binsearch/?format=json&api_key=free&bank=${encodeURIComponent(input.query)}${input.country ? `&country=${input.country}` : ""}`, {
-            signal: AbortSignal.timeout(10000),
-          });
-          if (res.ok) {
-            const data = await res.json() as any;
-            const items = Array.isArray(data) ? data : (data.results ?? []);
-            for (const item of items.slice(0, 50)) {
-              results.push({
-                bin: item.bin ?? "",
-                bank: item.bank ?? "Unknown",
-                brand: item.brand ?? "Unknown",
-                type: item.type ?? "Unknown",
-                network: item.card ?? "Unknown",
-                country: item.country ?? "Unknown",
-                countryCode: item.countrycode ?? "",
-                prepaid: false,
-              });
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Filter by country if specified and API didn't filter
-      const filtered = input.country
-        ? results.filter(r => r.countryCode.toUpperCase() === input.country!.toUpperCase() || r.country.toLowerCase().includes(input.query.toLowerCase()) || r.bank.toLowerCase().includes(query))
-        : results;
+      // Map local DB results to the expected response format
+      const results = matches.map(m => ({
+        bin: m.bin,
+        bank: m.issuer || "Unknown",
+        brand: m.brand || "Unknown",
+        type: m.type || "Unknown",
+        network: m.brand || "Unknown",
+        country: m.country || "Unknown",
+        countryCode: m.alpha2 || "",
+        prepaid: m.prepaid,
+      }));
 
       return {
         success: true,
-        results: filtered,
-        count: filtered.length,
+        results,
+        count: results.length,
         query: input.query,
         country: input.country,
-        message: filtered.length > 0 ? `Found ${filtered.length} BIN(s) matching "${input.query}"` : `No BINs found for "${input.query}"${input.country ? ` in ${input.country}` : ""}. Try a shorter search term.`,
+        message: results.length > 0 ? `Found ${results.length} BIN(s) matching "${input.query}"` : `No BINs found for "${input.query}"${input.country ? ` in ${input.country}` : ""}. Try a shorter search term.`,
       };
     }),
 
