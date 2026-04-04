@@ -393,6 +393,18 @@ function Router() {
       <Route path="/admin/titan-server" component={DashboardRouter} />
       <Route path="/admin/activity-log" component={DashboardRouter} />
       <Route path="/fetcher/self-improvement" component={DashboardRouter} />
+      {/* Additional dashboard routes — were missing from outer Switch causing 404 */}
+      <Route path="/proxy-interceptor" component={DashboardRouter} />
+      <Route path="/attack-graph" component={DashboardRouter} />
+      <Route path="/red-team-playbooks" component={DashboardRouter} />
+      <Route path="/command-centre" component={DashboardRouter} />
+      <Route path="/event-bus" component={DashboardRouter} />
+      <Route path="/compliance-reports" component={DashboardRouter} />
+      <Route path="/siem-integration" component={DashboardRouter} />
+      <Route path="/security-marketplace" component={DashboardRouter} />
+      <Route path="/exploitpack" component={DashboardRouter} />
+      <Route path="/builder-templates" component={DashboardRouter} />
+      <Route path="/master-growth" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
