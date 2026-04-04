@@ -328,7 +328,7 @@ async function binLookup(cardNumber: string): Promise<BinInfo | null> {
   const bin6 = digits.substring(0, 6);
 
   // ── Primary: local 343k-row database (instant, no rate limits) ──
-  const localResults = searchBins({ bin: bin6 });
+  const localResults = await searchBins({ bin: bin6 });
   if (localResults.length > 0) {
     const row = localResults[0];
     return {

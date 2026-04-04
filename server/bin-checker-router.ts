@@ -193,7 +193,7 @@ export const binCheckerRouter = router({
       const network = detectNetwork(bin);
 
       // ── Layer 1: Try local 343k-row BIN database first (instant, no rate limits) ──
-      const localResults = searchBins({ bin: bin.slice(0, 6) });
+      const localResults = await searchBins({ bin: bin.slice(0, 6) });
       let localRow = localResults.length > 0 ? localResults[0] : null;
 
       // ── Layer 2: Fall back to external API only if not found locally ──
@@ -247,7 +247,7 @@ export const binCheckerRouter = router({
 
       // Look up BIN info — local DB first, then external API fallback
       const bin = clean.slice(0, 6);
-      const localBin = searchBins({ bin });
+      const localBin = await searchBins({ bin });
       const localRow = localBin.length > 0 ? localBin[0] : null;
       let binData = null;
       if (!localRow) {
@@ -307,7 +307,7 @@ export const binCheckerRouter = router({
 
   /**
    * Reverse BIN search — search by bank name + country to get BIN numbers.
-   * Uses the binlist.net database via their search endpoint.
+   * Uses the local 343k-row BIN database — no external API needed.
    */
   reverseBinSearch: protectedProcedure
     .input(z.object({
@@ -321,8 +321,8 @@ export const binCheckerRouter = router({
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for reverse BIN search. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      // Search the local 343k-row BIN database — no external API needed
-      const matches = searchBins({
+      // Search the local 343k-row BIN database — awaits DB load if cold start
+      const matches = await searchBins({
         bank: input.query.trim() || undefined,
         country: input.country ?? undefined,
         network: input.network ?? undefined,
@@ -341,6 +341,11 @@ export const binCheckerRouter = router({
         countryCode: m.alpha2 || "",
         prepaid: m.prepaid,
       }));
+
+      // Consume credits after successful search
+      try { await consumeCredits(ctx.user.id, "bin_lookup", `Reverse BIN search: ${input.query}`); } catch (e) {
+        log.warn("[BinChecker] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      }
 
       return {
         success: true,
@@ -366,19 +371,25 @@ export const binCheckerRouter = router({
       for (const rawBin of input.bins) {
         const bin = rawBin.replace(/\D/g, "").slice(0, 6);
         const network = detectNetwork(bin);
-        let apiData = await lookupBinApi(bin);
-        if (!apiData) apiData = await lookupBinFallback(bin);
+        // Try local DB first
+        const localResults = await searchBins({ bin });
+        const localRow = localResults.length > 0 ? localResults[0] : null;
+        let apiData = null;
+        if (!localRow) {
+          apiData = await lookupBinApi(bin);
+          if (!apiData) apiData = await lookupBinFallback(bin);
+          // Rate limit: 1 request per 500ms for binlist.net
+          await new Promise(r => setTimeout(r, 500));
+        }
         results.push({
           bin,
-          network: network?.name ?? apiData?.scheme ?? "Unknown",
-          type: apiData?.type ?? "Unknown",
-          bank: apiData?.bank?.name ?? "Unknown",
-          country: apiData?.country?.name ?? "Unknown",
-          countryCode: apiData?.country?.alpha2 ?? "",
-          prepaid: apiData?.prepaid ?? false,
+          network: network?.name ?? localRow?.brand ?? apiData?.scheme ?? "Unknown",
+          type: localRow?.type ?? apiData?.type ?? "Unknown",
+          bank: localRow?.issuer ?? apiData?.bank?.name ?? "Unknown",
+          country: localRow?.country ?? apiData?.country?.name ?? "Unknown",
+          countryCode: localRow?.alpha2 ?? apiData?.country?.alpha2 ?? "",
+          prepaid: localRow?.prepaid ?? apiData?.prepaid ?? false,
         });
-        // Rate limit: 1 request per 500ms for binlist.net
-        await new Promise(r => setTimeout(r, 500));
       }
       return { results, count: results.length };
     }),

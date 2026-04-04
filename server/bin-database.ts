@@ -42,7 +42,7 @@ function getDataPath(): string {
   return join(__dirname, "data", "bins.json.gz");
 }
 
-async function loadDatabase(): Promise<BinRow[]> {
+export async function loadDatabase(): Promise<BinRow[]> {
   if (_db) return _db;
   if (_loading) return _loading;
 
@@ -102,14 +102,16 @@ async function loadDatabase(): Promise<BinRow[]> {
 loadDatabase().catch(() => {});
 
 /**
- * Search the local BIN database.
+ * Search the local BIN database (async — awaits DB load if not yet ready).
  *
  * Returns up to `limit` rows matching all provided criteria.
  * All string comparisons are case-insensitive.
  */
-export function searchBins(params: SearchParams): BinRow[] {
-  if (!_db || _db.length === 0) {
-    // Database not yet loaded or empty — return empty (caller falls back to API)
+export async function searchBins(params: SearchParams): Promise<BinRow[]> {
+  // Always await the database — handles cold-start race condition
+  const db = await loadDatabase();
+
+  if (!db || db.length === 0) {
     return [];
   }
 
@@ -129,7 +131,7 @@ export function searchBins(params: SearchParams): BinRow[] {
 
   const results: BinRow[] = [];
 
-  for (const row of _db) {
+  for (const row of db) {
     if (results.length >= limit) break;
 
     // BIN prefix match
@@ -154,11 +156,11 @@ export function searchBins(params: SearchParams): BinRow[] {
 }
 
 /**
- * Look up a single BIN by exact prefix.
+ * Look up a single BIN by exact prefix (async).
  * Returns the first matching row or null.
  */
-export function lookupBin(bin: string): BinRow | null {
-  const results = searchBins({ bin: bin.slice(0, 8), limit: 1 });
+export async function lookupBin(bin: string): Promise<BinRow | null> {
+  const results = await searchBins({ bin: bin.slice(0, 8), limit: 1 });
   return results.length > 0 ? results[0] : null;
 }
 
