@@ -136,7 +136,6 @@ export default function BinCheckerPage() {
   const [reverseQuery, setReverseQuery] = useState("");
   const [reverseCountry, setReverseCountry] = useState("");
   const [reverseNetwork, setReverseNetwork] = useState("");
-  const [reverseCardType, setReverseCardType] = useState(""); // "credit" | "debit" | "prepaid" | ""
 
   const lookupBin = trpc.binChecker.lookupBin.useMutation({ onError: (e) => toast.error(e.message) });
   const validateCard = trpc.binChecker.validateCard.useMutation({ onError: (e) => toast.error(e.message) });
@@ -171,28 +170,14 @@ export default function BinCheckerPage() {
         <span><strong>Zero-charge methods only.</strong> All checks are passive — no transactions, no authorisation requests, no balance checks. Cards are never touched.</span>
       </div>
 
-      {/* Quick-access shortcut — always visible on all browsers */}
-      {tab !== "reverse" && (
-        <button
-          type="button"
-          onClick={() => setTab("reverse")}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-yellow-600/10 border border-yellow-500/30 text-yellow-300 text-sm font-semibold hover:bg-yellow-600/20 transition-colors"
-        >
-          <Search className="w-4 h-4" />
-          Reverse BIN Search — find BINs by bank name, country, network, or card type
-        </button>
-      )}
-
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-zinc-900 border border-zinc-800 h-auto flex flex-wrap gap-1 p-1">
-          <TabsTrigger value="bin" className="flex-1 min-w-[100px]">BIN Lookup</TabsTrigger>
-          <TabsTrigger value="validate" className="flex-1 min-w-[100px]">Card Validator</TabsTrigger>
-          <TabsTrigger value="bulk" className="flex-1 min-w-[90px]">Bulk Check</TabsTrigger>
-          <TabsTrigger value="bulkbin" className="flex-1 min-w-[90px]">Bulk BIN</TabsTrigger>
-          <TabsTrigger value="network" className="flex-1 min-w-[90px]">Network ID</TabsTrigger>
-          <TabsTrigger value="reverse" className="flex-1 min-w-[130px] data-[state=active]:bg-yellow-600 data-[state=active]:text-black font-semibold">
-            🔍 Reverse Search
-          </TabsTrigger>
+        <TabsList className="bg-zinc-900 border border-zinc-800">
+          <TabsTrigger value="bin">BIN Lookup</TabsTrigger>
+          <TabsTrigger value="validate">Card Validator</TabsTrigger>
+          <TabsTrigger value="bulk">Bulk Check</TabsTrigger>
+          <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
+          <TabsTrigger value="network">Network ID</TabsTrigger>
+          <TabsTrigger value="reverse">Reverse Search</TabsTrigger>
         </TabsList>
 
         {/* ── BIN Lookup ── */}
@@ -342,116 +327,40 @@ export default function BinCheckerPage() {
           </Card>
         </TabsContent>
 
-        {/* ── BIN by Criteria ── */}
+        {/* ── Reverse Search ── */}
         <TabsContent value="reverse" className="mt-4 space-y-4">
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">BIN Lookup by Criteria</CardTitle>
-              <CardDescription>Enter a bank name, country, card type, and/or network to find matching BIN numbers. All fields are optional — fill in as many as you know.</CardDescription>
+              <CardTitle className="text-base">Reverse BIN Search</CardTitle>
+              <CardDescription>Search by bank name or card product name to find BIN numbers. Select a country first to narrow results.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-
-              {/* Bank name */}
+              {/* Country picker */}
               <div className="space-y-1">
-                <Label className="text-zinc-300 text-sm font-medium">Bank Name</Label>
-                <Input
-                  value={reverseQuery}
-                  onChange={e => setReverseQuery(e.target.value)}
-                  placeholder="e.g. Chase, ANZ, Barclays, HSBC, Wells Fargo"
-                  className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500"
-                />
-                <p className="text-xs text-zinc-500">Enter the issuing bank or card product name</p>
+                <Label className="text-zinc-300">1. Select Country (optional but recommended)</Label>
+                <CountryPicker value={reverseCountry} onChange={setReverseCountry} />
               </div>
 
-              {/* Country + Network row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-zinc-300 text-sm font-medium">Country</Label>
-                  <CountryPicker value={reverseCountry} onChange={setReverseCountry} />
-                  <p className="text-xs text-zinc-500">Filter by card-issuing country</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-zinc-300 text-sm font-medium">Card Network</Label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { value: "", label: "Any" },
-                      { value: "visa", label: "Visa" },
-                      { value: "mastercard", label: "MC" },
-                      { value: "amex", label: "Amex" },
-                      { value: "discover", label: "Discover" },
-                      { value: "unionpay", label: "UnionPay" },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setReverseNetwork(opt.value)}
-                        className={`px-2 py-1.5 rounded text-xs font-medium border transition-colors ${
-                          reverseNetwork === opt.value
-                            ? "bg-yellow-600 border-yellow-500 text-black"
-                            : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-600"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Type */}
+              {/* Search */}
               <div className="space-y-1">
-                <Label className="text-zinc-300 text-sm font-medium">Card Type</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    { value: "", label: "Any Type" },
-                    { value: "credit", label: "Credit" },
-                    { value: "debit", label: "Debit" },
-                    { value: "prepaid", label: "Prepaid" },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setReverseCardType(opt.value)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        reverseCardType === opt.value
-                          ? "bg-yellow-600 border-yellow-500 text-black"
-                          : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-600"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                <Label className="text-zinc-300">2. Enter bank or card name</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={reverseQuery}
+                    onChange={e => setReverseQuery(e.target.value)}
+                    placeholder={reverseCountry ? "e.g. ANZ Business Platinum" : "e.g. Chase Sapphire, ANZ Business Platinum"}
+                    className="bg-zinc-800 border-zinc-700"
+                    onKeyDown={e => e.key === "Enter" && reverseQuery.length >= 2 && reverseSearch.mutate({ query: reverseQuery, country: reverseCountry || undefined, network: reverseNetwork || undefined })}
+                  />
+                  <Button
+                    onClick={() => reverseSearch.mutate({ query: reverseQuery, country: reverseCountry || undefined, network: reverseNetwork || undefined })}
+                    disabled={reverseSearch.isPending || reverseQuery.length < 2}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-black font-semibold"
+                  >
+                    {reverseSearch.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
                 </div>
               </div>
-
-              {/* Active filters summary */}
-              {(reverseQuery || reverseCountry || reverseNetwork || reverseCardType) && (
-                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
-                  <span className="text-xs text-zinc-500 self-center mr-1">Searching for:</span>
-                  {reverseQuery && <Badge variant="outline" className="text-xs text-yellow-300 border-yellow-500/30">{reverseQuery}</Badge>}
-                  {reverseCountry && <Badge variant="outline" className="text-xs text-blue-300 border-blue-500/30">Country: {reverseCountry}</Badge>}
-                  {reverseNetwork && <Badge variant="outline" className="text-xs text-purple-300 border-purple-500/30 capitalize">{reverseNetwork}</Badge>}
-                  {reverseCardType && <Badge variant="outline" className="text-xs text-green-300 border-green-500/30 capitalize">{reverseCardType}</Badge>}
-                </div>
-              )}
-
-              {/* Search button */}
-              <Button
-                onClick={() => {
-                  const q = reverseQuery.trim() || reverseNetwork || reverseCardType || reverseCountry || "bank";
-                  reverseSearch.mutate({
-                    query: q,
-                    country: reverseCountry || undefined,
-                    network: reverseNetwork || undefined,
-                    cardType: reverseCardType || undefined,
-                  });
-                }}
-                disabled={reverseSearch.isPending || (!reverseQuery && !reverseCountry && !reverseNetwork && !reverseCardType)}
-                className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-semibold"
-              >
-                {reverseSearch.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-                Find BINs
-              </Button>
 
               {reverseSearch.data && (
                 <div className="space-y-2">

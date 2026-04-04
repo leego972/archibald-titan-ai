@@ -17,7 +17,6 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { createLogger } from "./_core/logger.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { getErrorMessage } from "./_core/errors.js";
-import { searchBins } from "./bin-database";
 
 const log = createLogger("BinChecker");
 
@@ -286,51 +285,100 @@ export const binCheckerRouter = router({
    */
   reverseBinSearch: protectedProcedure
     .input(z.object({
-      query: z.string().min(1).max(100),
+      query: z.string().min(2).max(100),
       country: z.string().optional(),   // ISO alpha-2 code e.g. "AU"
       network: z.string().optional(),   // "visa", "mastercard", etc.
-      cardType: z.string().optional(),  // "credit", "debit", "prepaid"
+      cardType: z.string().optional(),  // "credit", "debit"
     }))
     .mutation(async ({ ctx, input }) => {
       const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for reverse BIN search. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
+      const query = input.query.trim().toLowerCase();
 
-      // Search the local 343k-row BIN database — no external API needed
-      const matches = searchBins({
-        bank: input.query.trim() || undefined,
-        country: input.country,
-        network: input.network,
-        cardType: input.cardType,
-        limit: 100,
-      });
+      // Build search URL with filters
+      const params = new URLSearchParams();
+      params.set("q", query);
+      if (input.country) params.set("country", input.country);
+      if (input.network) params.set("scheme", input.network);
+      if (input.cardType) params.set("type", input.cardType);
 
-      const results = matches.map(r => ({
-        bin: r.bin,
-        bank: r.issuer || "Unknown",
-        brand: r.brand || "Unknown",
-        type: r.type || "Unknown",
-        network: r.brand || "Unknown",
-        country: r.country || "Unknown",
-        countryCode: r.alpha2 || "",
-        prepaid: r.prepaid,
-      }));
+      const results: Array<{
+        bin: string;
+        bank: string;
+        brand: string;
+        type: string;
+        network: string;
+        country: string;
+        countryCode: string;
+        prepaid: boolean;
+      }> = [];
 
-      try { await consumeCredits(ctx.user.id, "bin_lookup", `Reverse BIN search: ${input.query}`); } catch { /* non-fatal */ }
+      try {
+        // Primary: binlist.net search
+        const res = await fetch(`https://lookup.binlist.net/search?${params.toString()}`, {
+          headers: { "Accept-Version": "3", "User-Agent": "TitanBinChecker/1.0" },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (res.ok) {
+          const data = await res.json() as any;
+          const items = Array.isArray(data) ? data : (data.results ?? data.data ?? []);
+          for (const item of items.slice(0, 50)) {
+            results.push({
+              bin: item.bin ?? item.number ?? "",
+              bank: item.bank?.name ?? item.issuer ?? "Unknown",
+              brand: item.brand ?? item.scheme ?? "Unknown",
+              type: item.type ?? "Unknown",
+              network: item.scheme ?? item.network ?? "Unknown",
+              country: item.country?.name ?? item.country ?? "Unknown",
+              countryCode: item.country?.alpha2 ?? item.countryCode ?? "",
+              prepaid: item.prepaid ?? false,
+            });
+          }
+        }
+      } catch { /* fallback below */ }
+
+      // Fallback: bincheck.io search
+      if (results.length === 0) {
+        try {
+          const res = await fetch(`https://api.bincodes.com/binsearch/?format=json&api_key=free&bank=${encodeURIComponent(input.query)}${input.country ? `&country=${input.country}` : ""}`, {
+            signal: AbortSignal.timeout(10000),
+          });
+          if (res.ok) {
+            const data = await res.json() as any;
+            const items = Array.isArray(data) ? data : (data.results ?? []);
+            for (const item of items.slice(0, 50)) {
+              results.push({
+                bin: item.bin ?? "",
+                bank: item.bank ?? "Unknown",
+                brand: item.brand ?? "Unknown",
+                type: item.type ?? "Unknown",
+                network: item.card ?? "Unknown",
+                country: item.country ?? "Unknown",
+                countryCode: item.countrycode ?? "",
+                prepaid: false,
+              });
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Filter by country if specified and API didn't filter
+      const filtered = input.country
+        ? results.filter(r => r.countryCode.toUpperCase() === input.country!.toUpperCase() || r.country.toLowerCase().includes(input.query.toLowerCase()) || r.bank.toLowerCase().includes(query))
+        : results;
 
       return {
         success: true,
-        results,
-        count: results.length,
+        results: filtered,
+        count: filtered.length,
         query: input.query,
         country: input.country,
-        message: results.length > 0
-          ? `Found ${results.length} BIN(s) matching your criteria`
-          : `No BINs found for the given criteria. Try a broader search.`,
+        message: filtered.length > 0 ? `Found ${filtered.length} BIN(s) matching "${input.query}"` : `No BINs found for "${input.query}"${input.country ? ` in ${input.country}` : ""}. Try a shorter search term.`,
       };
     }),
-
 
   /**
    * Bulk BIN lookup — look up multiple BINs at once.

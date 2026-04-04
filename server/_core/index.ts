@@ -96,8 +96,6 @@ async function startServer() {
   // Trust proxy headers (Railway uses a single reverse proxy layer)
   // Use number 1 instead of true to prevent express-rate-limit ERR_ERL_PERMISSIVE_TRUST_PROXY
   app.set("trust proxy", 1);
-  // Remove Express fingerprint from response headers
-  app.disable('x-powered-by');
   const server = createServer(app);
 
   // ── Non-WWW to WWW Redirect ────────────────────────────────────
@@ -637,8 +635,6 @@ async function startServer() {
         `CREATE TABLE IF NOT EXISTS \`storage_files\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`s3Key\` varchar(512) NOT NULL, \`s3Url\` text, \`originalName\` varchar(512) NOT NULL, \`mimeType\` varchar(128) NOT NULL, \`sizeBytes\` bigint NOT NULL, \`feature\` enum('vault','builder','fetcher','scanner','webhook','export','generic') NOT NULL DEFAULT 'generic', \`featureResourceId\` varchar(128), \`tags\` json, \`isDeleted\` boolean NOT NULL DEFAULT false, \`deletedAt\` timestamp NULL, \`createdAt\` timestamp NOT NULL DEFAULT (now()), \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP, CONSTRAINT \`storage_files_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_files_s3Key_unique\` UNIQUE(\`s3Key\`))`,
         `CREATE TABLE IF NOT EXISTS \`storage_share_links\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`fileId\` int NOT NULL, \`token\` varchar(64) NOT NULL, \`expiresAt\` timestamp NULL, \`maxDownloads\` int NOT NULL DEFAULT 0, \`downloadCount\` int NOT NULL DEFAULT 0, \`passwordHash\` varchar(64), \`isActive\` boolean NOT NULL DEFAULT true, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`storage_share_links_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_share_links_token_unique\` UNIQUE(\`token\`))`,
         `CREATE TABLE IF NOT EXISTS \`storage_api_keys\` (\`id\` int AUTO_INCREMENT NOT NULL, \`userId\` int NOT NULL, \`name\` varchar(128) NOT NULL, \`keyHash\` varchar(64) NOT NULL, \`keyPrefix\` varchar(12) NOT NULL, \`scopes\` json NOT NULL, \`lastUsedAt\` timestamp NULL, \`expiresAt\` timestamp NULL, \`isActive\` boolean NOT NULL DEFAULT true, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`storage_api_keys_id\` PRIMARY KEY(\`id\`), CONSTRAINT \`storage_api_keys_keyHash_unique\` UNIQUE(\`keyHash\`))`,
-        // Crowdfunding promotion log — tracks multi-channel promotion results per campaign
-        `CREATE TABLE IF NOT EXISTS \`crowdfunding_promotion_log\` (\`id\` int AUTO_INCREMENT NOT NULL, \`campaignId\` int NOT NULL, \`trigger\` varchar(32) NOT NULL, \`channelsAttempted\` int NOT NULL DEFAULT 0, \`channelsSucceeded\` int NOT NULL DEFAULT 0, \`channelsFailed\` int NOT NULL DEFAULT 0, \`results\` json, \`createdAt\` timestamp NOT NULL DEFAULT (now()), CONSTRAINT \`crowdfunding_promotion_log_id\` PRIMARY KEY(\`id\`))`,
       ];
       for (const ddl of createTables) {
         try {

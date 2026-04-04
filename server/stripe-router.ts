@@ -1235,65 +1235,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
-  // ─── Handle Crowdfunding Donation (card payment via Stripe Checkout) ──────────
-  if (session.metadata?.type === "crowdfunding_donation") {
-    const campaignId = parseInt(session.metadata.campaignId || "0");
-    const donorName = session.metadata.donorName || "Anonymous";
-    const donorEmail = session.metadata.donorEmail || session.customer_details?.email || "";
-    const donorMessage = session.metadata.donorMessage || "";
-    const anonymous = parseInt(session.metadata.anonymous || "0");
-    const amountCents = session.amount_total || 0;
-    const amountDollars = amountCents / 100;
-    const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
-
-    if (!campaignId || amountDollars <= 0) {
-      log.error("[Stripe Webhook] crowdfunding_donation missing campaignId or amount");
-      return;
-    }
-
-    try {
-      const { getCampaignById, createContribution, updateCampaign } = await import("./db");
-      const campaign = await getCampaignById(campaignId);
-      if (!campaign) {
-        log.error(`[Stripe Webhook] crowdfunding_donation campaign not found: ${campaignId}`);
-        return;
-      }
-      // Record the contribution
-      await createContribution({
-        campaignId,
-        userId: userId || 0,
-        amount: amountDollars,
-        status: "completed",
-        backerName: donorName,
-        backerEmail: donorEmail,
-        message: donorMessage || undefined,
-        anonymous,
-        stripePaymentIntentId: paymentIntentId,
-      } as any);
-      // Update percent funded
-      const updated = await getCampaignById(campaignId);
-      if (updated) {
-        const pct = Math.round((updated.currentAmount / updated.goalAmount) * 100);
-        await updateCampaign(campaignId, { percentFunded: pct } as any);
-        // Check for milestone promotions
-        const prevPct = Math.round(((updated.currentAmount - amountDollars) / updated.goalAmount) * 100);
-        for (const milestone of [25, 50, 75, 100]) {
-          if (prevPct < milestone && pct >= milestone) {
-            const { promoteCampaign } = await import("./crowdfunding-promoter.js");
-            const trigger = `milestone_${milestone}` as any;
-            promoteCampaign(updated as any, trigger).catch((err: unknown) => {
-              log.warn(`[Stripe Webhook] Milestone ${milestone}% promotion failed (non-fatal)`, { error: String(err) });
-            });
-          }
-        }
-      }
-      log.info(`[Stripe Webhook] Crowdfunding donation completed: campaign=${campaignId}, donor=${donorName}, amount=$${amountDollars.toFixed(2)}, pi=${paymentIntentId}`);
-    } catch (err: unknown) {
-      log.error("[Stripe Webhook] crowdfunding_donation fulfillment error", { error: String(err) });
-    }
-    return;
-  }
-
   // Handle Bazaar Seller one-time registration payment (from marketplace-router becomeSeller)
   if (session.metadata?.type === "bazaar_seller_registration") {
     const displayName = session.metadata.display_name || "Seller";

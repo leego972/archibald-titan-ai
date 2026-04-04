@@ -2449,17 +2449,3 @@ export const marketplaceVersionHistory = mysqlTable("marketplace_version_history
 });
 export type MarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferSelect;
 export type InsertMarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferInsert;
-
-// ─── Crowdfunding Promotion Log ───────────────────────────────────────────────
-export const crowdfundingPromotionLog = mysqlTable("crowdfunding_promotion_log", {
-  id: int("id").autoincrement().primaryKey(),
-  campaignId: int("campaignId").notNull(),
-  trigger: varchar("trigger", { length: 32 }).notNull(),
-  channelsAttempted: int("channelsAttempted").notNull().default(0),
-  channelsSucceeded: int("channelsSucceeded").notNull().default(0),
-  channelsFailed: int("channelsFailed").notNull().default(0),
-  results: json("results"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-export type CrowdfundingPromotionLog = typeof crowdfundingPromotionLog.$inferSelect;
-export type InsertCrowdfundingPromotionLog = typeof crowdfundingPromotionLog.$inferInsert;

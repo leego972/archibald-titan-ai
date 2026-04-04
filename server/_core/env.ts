@@ -107,9 +107,4 @@ export const ENV = {
   // Support both raw PEM key (TITAN_SERVER_KEY) and base64-encoded key (TITAN_SERVER_KEY_B64)
   titanServerKey: process.env.TITAN_SERVER_KEY ||
     (process.env.TITAN_SERVER_KEY_B64 ? Buffer.from(process.env.TITAN_SERVER_KEY_B64, "base64").toString("utf8") : ""),
-  // Product Hunt API — for crowdfunding campaign promotion
-  productHuntToken: process.env.PRODUCT_HUNT_TOKEN ?? "",
-  // Hacker News — for "Show HN" crowdfunding promotion posts
-  hackerNewsUsername: process.env.HN_USERNAME ?? "",
-  hackerNewsPassword: process.env.HN_PASSWORD ?? "",
 };

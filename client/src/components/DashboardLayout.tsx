@@ -21,7 +21,15 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Bell, LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import {
+  Bell, LayoutDashboard, LogOut, PanelLeft, Users,
+  Bot, Globe, Database, ShoppingBag, FolderOpen,
+  Shield, Key, Settings, TrendingUp, Megaphone,
+  Search, BookOpen, DollarSign, Users2, Zap,
+  FileText, Activity, GitBranch, Lock, Webhook,
+  BarChart3, Download, Upload, RefreshCw, Eye,
+  CreditCard, UserCog, Share2
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -32,9 +40,37 @@ import { trpc } from "@/lib/trpc";
 import { TitanLogo } from "./TitanLogo";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  // Core
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", group: "Core" },
+  { icon: Bot, label: "AI Assistant", path: "/dashboard", group: "Core" },
+  { icon: ShoppingBag, label: "Marketplace", path: "/marketplace", group: "Core" },
+  { icon: FolderOpen, label: "Project Files", path: "/project-files", group: "Core" },
+  // Intelligence
+  { icon: Globe, label: "Smart Fetch", path: "/fetcher/smart-fetch", group: "Intelligence" },
+  { icon: Database, label: "Credentials", path: "/fetcher/credentials", group: "Intelligence" },
+  { icon: Activity, label: "Provider Health", path: "/fetcher/provider-health", group: "Intelligence" },
+  { icon: Eye, label: "Watchdog", path: "/fetcher/watchdog", group: "Intelligence" },
+  { icon: Lock, label: "TOTP Vault", path: "/fetcher/totp-vault", group: "Intelligence" },
+  // Growth
+  { icon: DollarSign, label: "Grants", path: "/grants", group: "Growth" },
+  { icon: TrendingUp, label: "Master Growth", path: "/master-growth", group: "Growth" },
+  { icon: Megaphone, label: "Advertising", path: "/advertising", group: "Growth" },
+  { icon: Search, label: "SEO", path: "/seo", group: "Growth" },
+  { icon: Share2, label: "Affiliate", path: "/affiliate", group: "Growth" },
+  { icon: BookOpen, label: "Blog Admin", path: "/blog-admin", group: "Growth" },
+  // Business
+  { icon: Users2, label: "Companies", path: "/companies", group: "Business" },
+  { icon: FileText, label: "Business Plans", path: "/business-plans", group: "Business" },
+  { icon: Zap, label: "Crowdfunding", path: "/crowdfunding", group: "Business" },
+  { icon: Users, label: "Referrals", path: "/referrals", group: "Business" },
+  // Account
+  { icon: CreditCard, label: "Credits", path: "/dashboard/credits", group: "Account" },
+  { icon: UserCog, label: "Account Settings", path: "/fetcher/account", group: "Account" },
+  { icon: Key, label: "API Access", path: "/fetcher/api-access", group: "Account" },
+  { icon: Settings, label: "Settings", path: "/fetcher/settings", group: "Account" },
 ];
+
+const GROUPS = ["Core", "Intelligence", "Growth", "Business", "Account"] as const;
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -190,27 +226,37 @@ function DashboardLayoutContent({
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="gap-0">
-            <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
-                    >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+          <SidebarContent className="gap-0 overflow-y-auto">
+            {GROUPS.map(group => {
+              const groupItems = menuItems.filter(i => i.group === group);
+              return (
+                <div key={group}>
+                  {!isCollapsed && (
+                    <div className="px-4 pt-3 pb-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{group}</span>
+                    </div>
+                  )}
+                  <SidebarMenu className="px-2 py-0.5">
+                    {groupItems.map(item => {
+                      const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
+                      return (
+                        <SidebarMenuItem key={item.path}>
+                          <SidebarMenuButton
+                            isActive={isActive}
+                            onClick={() => setLocation(item.path)}
+                            tooltip={item.label}
+                            className="h-9 transition-all font-normal"
+                          >
+                            <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                            <span>{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </div>
+              );
+            })}
           </SidebarContent>
 
           <SidebarFooter className="p-3">
