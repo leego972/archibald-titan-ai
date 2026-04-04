@@ -224,7 +224,7 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
   const isActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
 
   return (
-      <div className="flex min-h-screen w-full bg-[#02040a]">
+    <>
         <Sidebar collapsible="icon" className="border-r border-white/[0.05] bg-[#03060e]">
           <SidebarHeader className="h-16 flex items-center px-4 border-b border-white/[0.05]">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
@@ -350,6 +350,6 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
             {children}
           </main>
         </SidebarInset>
-      </div>
+    </>
   );
 }

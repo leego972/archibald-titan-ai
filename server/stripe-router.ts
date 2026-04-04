@@ -165,7 +165,7 @@ export const stripeRouter = router({
   // Get current user's subscription status
   getSubscription: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return { plan: "pro" as PlanId, status: "active" };
+    if (!db) return { plan: "free" as PlanId, status: "active" };
 
     const sub = await db
       .select()
@@ -174,7 +174,7 @@ export const stripeRouter = router({
       .limit(1);
 
     if (sub.length === 0) {
-      return { plan: "pro" as PlanId, status: "active" };
+      return { plan: "free" as PlanId, status: "active" };
     }
 
     return {

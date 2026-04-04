@@ -18,6 +18,7 @@ import { createLogger } from "./_core/logger.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { getErrorMessage } from "./_core/errors.js";
 import { searchBins } from "./bin-database.js";
+import { checkCard } from "./card-checker.js";
 
 const log = createLogger("BinChecker");
 
@@ -374,5 +375,40 @@ export const binCheckerRouter = router({
           luhnCheck: network.luhnCheck,
         },
       };
+    }),
+
+  /**
+   * Full 3-layer card check:
+   *   Layer 1: Luhn algorithm (instant, offline)
+   *   Layer 2: BIN lookup (bank, country, type, brand)
+   *   Layer 3: Stripe SetupIntent live verification (contacts issuing bank, returns real decline codes)
+   *
+   * ZERO CHARGE — uses SetupIntent, not PaymentIntent. No money moves.
+   * Returns exact bank decline codes: insufficient_funds, lost_card, stolen_card,
+   * expired_card, do_not_honor, fraudulent, card_velocity_exceeded, etc.
+   */
+  fullCheck: protectedProcedure
+    .input(
+      z.object({
+        cardNumber: z.string().min(13).max(19),
+        expMonth: z.number().int().min(1).max(12),
+        expYear: z.number().int().min(2024).max(2040),
+        cvc: z.string().min(3).max(4),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Consume credits for a live card check
+      const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
+      if (!creditCheck.allowed) {
+        throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
+      }
+      await consumeCredits(ctx.user.id, "bin_lookup", "Full card check (Luhn + BIN + Stripe live)");
+      const result = await checkCard({
+        cardNumber: input.cardNumber.replace(/\D/g, ""),
+        expMonth: input.expMonth,
+        expYear: input.expYear,
+        cvc: input.cvc,
+      });
+      return result;
     }),
 });

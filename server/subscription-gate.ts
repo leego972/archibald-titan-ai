@@ -36,10 +36,11 @@ export interface PlanUsage {
 export async function getUserPlan(userId: number): Promise<UserPlan> {
   const db = await getDb();
   const proTier = PRICING_TIERS.find((t) => t.id === "pro")!;
+  const freeTier = PRICING_TIERS.find((t) => t.id === "free")!;
   const enterpriseTier = PRICING_TIERS.find((t) => t.id === "enterprise")!;
 
   if (!db) {
-    return { planId: "pro", tier: proTier, status: "active", isActive: true };
+    return { planId: "free", tier: freeTier, status: "active", isActive: true };
   }
 
   // ─── Admin Bypass: admins always get full enterprise access ───
@@ -83,7 +84,7 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
     .limit(1);
 
   if (sub.length === 0 || sub[0].status === "canceled") {
-    return { planId: "pro", tier: proTier, status: "active", isActive: true };
+    return { planId: "free", tier: freeTier, status: "active", isActive: true };
   }
 
   const planId = sub[0].plan as PlanId;
@@ -92,7 +93,7 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
 
   // If subscription is past_due or incomplete, treat as free
   if (!isActive) {
-    return { planId: "pro", tier: proTier, status: sub[0].status, isActive: false };
+    return { planId: "free", tier: freeTier, status: sub[0].status, isActive: false };
   }
 
   return { planId, tier, status: sub[0].status, isActive };
