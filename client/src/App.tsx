@@ -394,6 +394,61 @@ function Router() {
       <Route path="/admin/activity-log" component={DashboardRouter} />
       <Route path="/fetcher/self-improvement" component={DashboardRouter} />
 
+      {/* Security & Ops routes */}
+      <Route path="/siem-integration" component={DashboardRouter} />
+      <Route path="/security-marketplace" component={DashboardRouter} />
+      <Route path="/red-team-playbooks" component={DashboardRouter} />
+      <Route path="/command-centre" component={DashboardRouter} />
+      <Route path="/event-bus" component={DashboardRouter} />
+      <Route path="/compliance-reports" component={DashboardRouter} />
+      <Route path="/attack-graph" component={DashboardRouter} />
+      <Route path="/proxy-interceptor" component={DashboardRouter} />
+      <Route path="/exploitpack" component={DashboardRouter} />
+      <Route path="/master-growth" component={DashboardRouter} />
+      <Route path="/builder-templates" component={DashboardRouter} />
+
+      {/* Dashboard sub-routes */}
+      <Route path="/dashboard/subscription" component={DashboardRouter} />
+      <Route path="/dashboard/credits" component={DashboardRouter} />
+
+      {/* Fetcher sub-routes */}
+      <Route path="/fetcher/smart-fetch" component={DashboardRouter} />
+      <Route path="/fetcher/new" component={DashboardRouter} />
+      <Route path="/fetcher/jobs/:id" component={DashboardRouter} />
+      <Route path="/fetcher/jobs" component={DashboardRouter} />
+      <Route path="/fetcher/totp-vault" component={DashboardRouter} />
+      <Route path="/fetcher/watchdog" component={DashboardRouter} />
+      <Route path="/fetcher/provider-health" component={DashboardRouter} />
+      <Route path="/fetcher/health-trends" component={DashboardRouter} />
+      <Route path="/fetcher/leak-scanner" component={DashboardRouter} />
+      <Route path="/fetcher/credential-health" component={DashboardRouter} />
+      <Route path="/fetcher/credentials" component={DashboardRouter} />
+      <Route path="/fetcher/api-access" component={DashboardRouter} />
+      <Route path="/fetcher/team" component={DashboardRouter} />
+      <Route path="/fetcher/team-vault" component={DashboardRouter} />
+      <Route path="/fetcher/settings" component={DashboardRouter} />
+      <Route path="/fetcher/account" component={DashboardRouter} />
+      <Route path="/fetcher/export" component={DashboardRouter} />
+      <Route path="/fetcher/import" component={DashboardRouter} />
+      <Route path="/fetcher/bulk-sync" component={DashboardRouter} />
+      <Route path="/fetcher/auto-sync" component={DashboardRouter} />
+      <Route path="/fetcher/onboarding" component={DashboardRouter} />
+      <Route path="/fetcher/history" component={DashboardRouter} />
+      <Route path="/fetcher/audit-logs" component={DashboardRouter} />
+      <Route path="/fetcher/developer-docs" component={DashboardRouter} />
+      <Route path="/fetcher/webhooks" component={DashboardRouter} />
+      <Route path="/fetcher/notifications" component={DashboardRouter} />
+      <Route path="/fetcher/api-analytics" component={DashboardRouter} />
+      <Route path="/fetcher/cli" component={DashboardRouter} />
+      <Route path="/fetcher/git-bash" component={DashboardRouter} />
+      <Route path="/fetcher/download-app" component={DashboardRouter} />
+      <Route path="/fetcher/releases" component={DashboardRouter} />
+      <Route path="/fetcher/admin" component={DashboardRouter} />
+
+      {/* Parameterised sub-routes */}
+      <Route path="/grants/:id" component={DashboardRouter} />
+      <Route path="/project-files/:projectId" component={DashboardRouter} />
+
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
