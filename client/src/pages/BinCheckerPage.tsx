@@ -178,15 +178,17 @@ export default function BinCheckerPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-zinc-900 border border-zinc-800">
-          <TabsTrigger value="bin">BIN Lookup</TabsTrigger>
-          <TabsTrigger value="validate">Card Validator</TabsTrigger>
-          <TabsTrigger value="bulk">Bulk Check</TabsTrigger>
-          <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
-          <TabsTrigger value="network">Network ID</TabsTrigger>
-          <TabsTrigger value="reverse">Reverse Search</TabsTrigger>
-          <TabsTrigger value="fullcheck" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black font-semibold">⚡ Full Card Check</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="bg-zinc-900 border border-zinc-800 flex w-max min-w-full">
+            <TabsTrigger value="bin">BIN Lookup</TabsTrigger>
+            <TabsTrigger value="validate">Card Validator</TabsTrigger>
+            <TabsTrigger value="bulk">Bulk Check</TabsTrigger>
+            <TabsTrigger value="bulkbin">Bulk BIN</TabsTrigger>
+            <TabsTrigger value="network">Network ID</TabsTrigger>
+            <TabsTrigger value="reverse" className="text-yellow-300 data-[state=active]:bg-yellow-600 data-[state=active]:text-black font-semibold">🔍 Reverse Lookup</TabsTrigger>
+            <TabsTrigger value="fullcheck" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black font-semibold">⚡ Full Card Check</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── BIN Lookup ── */}
         <TabsContent value="bin" className="mt-4 space-y-4">
@@ -224,8 +226,8 @@ export default function BinCheckerPage() {
                   <InfoRow label="Bank" value={lookupBin.data.bank?.name} />
                   <InfoRow label="Bank City" value={lookupBin.data.bank?.city} />
                   <InfoRow label="Bank Phone" value={lookupBin.data.bank?.phone} />
-                  <InfoRow label="Country" value={lookupBin.data.country?.name ? `${lookupBin.data.country.emoji ?? ""} ${lookupBin.data.country.name}`.trim() : null} />
-                  <InfoRow label="Currency" value={lookupBin.data.country?.currency} />
+                  <InfoRow label="Country" value={lookupBin.data.country?.name ? `${(lookupBin.data.country as any).emoji ?? ""} ${lookupBin.data.country.name}`.trim() : null} />
+                  <InfoRow label="Currency" value={(lookupBin.data.country as any)?.currency} />
                   <InfoRow label="Brand" value={lookupBin.data.brand} />
                   <InfoRow label="Luhn Check" value={lookupBin.data.luhnEnabled ? "Required" : "Not required"} />
                 </div>
