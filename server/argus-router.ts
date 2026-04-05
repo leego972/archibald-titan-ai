@@ -54,6 +54,34 @@ async function execSSHCommand(ssh: SSHConfig, command: string, timeoutMs = 60000
   });
 }
 
+// ─── Public helpers for cross-router use (e.g. playbooks engine) ─────────────
+export async function runArgusModule(userId: number, moduleId: number, target: string, timeoutSec = 60): Promise<string> {
+  const ssh = await getSshConfig(userId);
+  const cmd = [
+    `cd /opt/argus 2>/dev/null || true`,
+    `ARGUS_CMD="use ${moduleId}\\nset target ${target}\\nrun\\nexit"`,
+    `echo -e "$ARGUS_CMD" | timeout ${timeoutSec} python3 -m argus 2>&1 || echo -e "$ARGUS_CMD" | timeout ${timeoutSec} argus 2>&1 || echo 'Argus not installed'`,
+  ].join("\n");
+  return execSSHCommand(ssh, cmd, (timeoutSec + 15) * 1000);
+}
+
+export async function runArgusModulesBatch(userId: number, moduleIds: number[], target: string, timeoutSec = 60): Promise<Array<{ moduleId: number; moduleName: string; output: string; duration: number }>> {
+  const ssh = await getSshConfig(userId);
+  const results: Array<{ moduleId: number; moduleName: string; output: string; duration: number }> = [];
+  await Promise.allSettled(moduleIds.map(async (moduleId) => {
+    const moduleMeta = ARGUS_MODULES.find(m => m.id === moduleId);
+    const cmd = `cd /opt/argus 2>/dev/null || true && echo -e "use ${moduleId}\\nset target ${target}\\nrun\\nexit" | timeout ${timeoutSec} python3 -m argus 2>&1 || echo 'Skipped'`;
+    const t = Date.now();
+    try {
+      const output = await execSSHCommand(ssh, cmd, (timeoutSec + 15) * 1000);
+      results.push({ moduleId, moduleName: moduleMeta?.name ?? `Module ${moduleId}`, output, duration: Date.now() - t });
+    } catch {
+      results.push({ moduleId, moduleName: moduleMeta?.name ?? `Module ${moduleId}`, output: "Timed out", duration: Date.now() - t });
+    }
+  }));
+  return results;
+}
+
 // ─── Get SSH Config ───────────────────────────────────────────────
 async function getSshConfig(userId: number): Promise<SSHConfig> {
   // First try user-specific SSH config, then fall back to shared Titan server

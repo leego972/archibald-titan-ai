@@ -106,6 +106,51 @@ async function getSshConfig(userId: number): Promise<SSHConfig> {
   return { host: cfg.host, port: cfg.port || 22, username: cfg.username, password: cfg.password || undefined, privateKey: cfg.privateKey || undefined, astraPort: cfg.astraPort || 8094 };
 }
 
+// ─── Public helpers for cross-router use (e.g. playbooks engine) ─────────────
+export async function runAstraScan(userId: number, url: string, appname: string): Promise<{ scanId: string | null; message: string }> {
+  try {
+    const ssh = await getSshConfig(userId);
+    const payload = { appname, url, method: "GET", headers: "", body: "", auth_header: "", auth_url: "" };
+    const result = await astraApiCall(ssh, "/scan/", "POST", payload, 30000, userId);
+    if (result.data?.status && result.data.status !== "Failed") {
+      return { scanId: result.data.status, message: `Astra scan started for ${url}` };
+    }
+    return { scanId: null, message: `Astra scan failed: ${JSON.stringify(result.data)}` };
+  } catch (err: any) {
+    return { scanId: null, message: `Astra unavailable: ${err?.message ?? String(err)}` };
+  }
+}
+
+export async function runAstraFuzzer(userId: number, targetUrl: string): Promise<string> {
+  try {
+    const ssh = await getSshConfig(userId);
+    const cmd = `gobuster dir -u '${targetUrl}' -w /usr/share/wordlists/dirb/common.txt -x php,html,js,json -t 20 --no-error 2>&1 | head -200`;
+    return await execSSHCommand(ssh, cmd, 120000);
+  } catch (err: any) {
+    return `Fuzzer unavailable: ${err?.message ?? String(err)}`;
+  }
+}
+
+export async function getAstraAlerts(userId: number, scanId: string): Promise<Array<{ title: string; severity: string; url: string; description: string }>> {
+  try {
+    const ssh = await getSshConfig(userId);
+    const result = await astraApiCall(ssh, `/alerts/${scanId}`, "GET", undefined, 15000, userId);
+    return Array.isArray(result.data) ? result.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function runAstraSecurityHeadersCheck(userId: number, targetUrl: string): Promise<string> {
+  try {
+    const ssh = await getSshConfig(userId);
+    const cmd = `curl -sI '${targetUrl}' 2>&1 | head -50`;
+    return await execSSHCommand(ssh, cmd, 20000);
+  } catch (err: any) {
+    return `Headers check unavailable: ${err?.message ?? String(err)}`;
+  }
+}
+
 // ─── Router ───────────────────────────────────────────────────────
 export const astraRouter = router({
 
