@@ -3342,7 +3342,7 @@ export default function ChatPage() {
       </div>
       {/* Token Input Panel */}
       {showTokenInput && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[360px] border-l border-border'} flex flex-col bg-background`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-16 bottom-0 w-[360px] border-l border-border z-40'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Key className="h-4 w-4 text-amber-400" />
@@ -3492,7 +3492,7 @@ export default function ChatPage() {
       )}
       {/* Custom Instructions Panel */}
       {showCustomInstructions && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[400px] border-l border-border'} flex flex-col bg-background`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-16 bottom-0 w-[400px] border-l border-border z-40'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-violet-400" />
@@ -3558,7 +3558,7 @@ export default function ChatPage() {
       {/* Project Files Panel with Preview */}
       {/* Builder History Panel (#32) */}
       {showBuilderHistory && buildLog.length > 0 && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[420px] border-l border-border'} flex flex-col bg-background`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-16 bottom-0 w-[420px] border-l border-border z-40'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Bug className="h-4 w-4 text-red-400" />
@@ -3611,7 +3611,7 @@ export default function ChatPage() {
       )}
 
       {showProjectFiles && createdFiles.length > 0 && (
-        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-0 bottom-0 w-[420px] border-l border-border'} flex flex-col bg-background`}>
+        <div className={`${isMobile ? 'fixed inset-0 z-50 bg-background' : 'fixed right-0 top-16 bottom-0 w-[420px] border-l border-border z-40'} flex flex-col bg-background`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4 text-emerald-400" />
