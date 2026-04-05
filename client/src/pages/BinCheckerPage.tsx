@@ -3,7 +3,7 @@
  * Zero-charge passive checks only — no live transactions, no auth requests.
  * Features: BIN lookup, card validator, bulk check, reverse BIN search with country picker.
  */
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,12 +108,12 @@ function NetworkBadge({ name }: { name: string }) {
   return <Badge variant="outline" className={colors[key] ?? "text-zinc-300"}>{name}</Badge>;
 }
 
-function InfoRow({ label, value }: { label: string; value: string | null | undefined | boolean }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode | string | null | undefined | boolean }) {
   if (value === null || value === undefined || value === "") return null;
   return (
     <div className="flex items-start justify-between py-1.5 border-b border-zinc-800/50 last:border-0">
       <span className="text-zinc-500 text-sm">{label}</span>
-      <span className="text-zinc-200 text-sm font-medium text-right max-w-[60%]">{String(value)}</span>
+      <span className="text-zinc-200 text-sm font-medium text-right max-w-[60%]">{typeof value === 'boolean' ? String(value) : value}</span>
     </div>
   );
 }
@@ -598,22 +598,23 @@ export default function BinCheckerPage() {
                     </div>
 
                     {/* Decline Code — shown prominently when declined */}
-                    {d.liveCheck && !d.liveCheck.isLive && d.liveCheck.declineCode && (
+                    {d.liveCheck && !d.liveCheck.isLive && (
                       <div className="p-3 rounded bg-red-500/10 border border-red-500/20 space-y-1.5">
-                        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bank Decline Details</p>
+                        <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">Bank Decline Details</p>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-zinc-500">Code:</span>
-                          <span className="font-mono font-bold text-red-300 text-sm">{d.liveCheck.declineCode}</span>
+                          <span className="text-xs text-zinc-500">Decline Code:</span>
+                          <span className="font-mono font-bold text-red-300 text-sm">{d.liveCheck.declineCode ?? "card_declined"}</span>
                         </div>
-                        {(d.liveCheck as any).declineCategory && (
+                        {(d.liveCheck.declineCategory || (d.liveCheck as any).declineCategory) && (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-zinc-500">Category:</span>
-                            <span className="font-mono text-red-400 text-xs">{(d.liveCheck as any).declineCategory}</span>
+                            <span className="font-mono text-orange-300 text-xs font-semibold">{d.liveCheck.declineCategory ?? (d.liveCheck as any).declineCategory}</span>
                           </div>
                         )}
-                        {d.liveCheck.declineMessage && (
-                          <p className="text-xs text-red-300 mt-1 border-t border-red-500/20 pt-1.5">{d.liveCheck.declineMessage}</p>
-                        )}
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs text-zinc-500 flex-shrink-0">Reason:</span>
+                          <span className="text-xs text-red-200">{d.liveCheck.declineMessage ?? "The issuing bank declined this card. This may indicate the card is inactive, expired, or the bank requires the cardholder to authorise the request."}</span>
+                        </div>
                       </div>
                     )}
 
@@ -644,6 +645,9 @@ export default function BinCheckerPage() {
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layer 3 — Live Verification (Stripe SetupIntent)</p>
                         <InfoRow label="Status" value={d.liveCheck.isLive ? "✅ LIVE — Card is active" : "❌ DECLINED"} />
+                        {!d.liveCheck.isLive && <InfoRow label="Decline Code" value={<span className="font-mono text-red-300 font-bold">{d.liveCheck.declineCode ?? "card_declined"}</span>} />}
+                        {!d.liveCheck.isLive && d.liveCheck.declineCategory && <InfoRow label="Decline Category" value={<span className="font-mono text-orange-300">{d.liveCheck.declineCategory}</span>} />}
+                        {!d.liveCheck.isLive && d.liveCheck.declineMessage && <InfoRow label="Decline Reason" value={<span className="text-red-200">{d.liveCheck.declineMessage}</span>} />}
                         <InfoRow label="CVC Check" value={d.liveCheck.cvcCheck === "pass" ? "✅ Pass" : d.liveCheck.cvcCheck === "fail" ? "❌ Fail (wrong CVC)" : d.liveCheck.cvcCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
                         <InfoRow label="Address Check" value={d.liveCheck.addressCheck === "pass" ? "✅ Pass" : d.liveCheck.addressCheck === "fail" ? "❌ Fail" : d.liveCheck.addressCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
                         <InfoRow label="ZIP Check" value={d.liveCheck.zipCheck === "pass" ? "✅ Pass" : d.liveCheck.zipCheck === "fail" ? "❌ Fail" : d.liveCheck.zipCheck === "unchecked" ? "— Not checked" : "⚠️ Unavailable"} />
