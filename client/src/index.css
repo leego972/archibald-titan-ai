@@ -289,11 +289,17 @@ body {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.18);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.32);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
   }
 }
 
@@ -452,6 +458,111 @@ body {
 @media all and (display-mode: standalone) {
   body {
     padding-top: var(--sat);
+  }
+}
+
+/* ─── Light Mode: Fix hardcoded dark backgrounds & invisible text ─── */
+/*
+  Many pages use bg-zinc-900 / bg-gray-900 / bg-gray-950 etc. without a
+  dark: prefix.  In light mode these render as dark boxes with invisible
+  text.  The overrides below remap those classes to semantic tokens so
+  every page looks correct in both themes without touching every file.
+*/
+:root:not(.dark) {
+  /* Remap dark background shades to card/surface colours */
+  .bg-gray-950, .bg-zinc-950, .bg-slate-950,
+  .bg-gray-900, .bg-zinc-900, .bg-slate-900,
+  .bg-neutral-900 {
+    background-color: var(--card) !important;
+    color: var(--card-foreground) !important;
+  }
+  .bg-gray-800, .bg-zinc-800, .bg-slate-800,
+  .bg-neutral-800 {
+    background-color: var(--muted) !important;
+    color: var(--foreground) !important;
+  }
+  /* Borders that use dark shades */
+  .border-gray-800, .border-zinc-800, .border-slate-800,
+  .border-gray-700, .border-zinc-700, .border-slate-700,
+  .border-gray-600, .border-zinc-600 {
+    border-color: var(--border) !important;
+  }
+  /* Text that is light-on-dark (invisible on white) */
+  .text-gray-100, .text-gray-200, .text-gray-300,
+  .text-zinc-100, .text-zinc-200, .text-zinc-300,
+  .text-slate-100, .text-slate-200, .text-slate-300,
+  .text-neutral-100, .text-neutral-200, .text-neutral-300 {
+    color: var(--foreground) !important;
+  }
+  /* Mid-grey text — keep readable but slightly muted */
+  .text-gray-400, .text-zinc-400, .text-slate-400,
+  .text-neutral-400, .text-gray-500, .text-zinc-500,
+  .text-slate-500, .text-neutral-500 {
+    color: var(--muted-foreground) !important;
+  }
+  /* Hover states that reference dark shades */
+  .hover\:bg-gray-700:hover, .hover\:bg-zinc-700:hover,
+  .hover\:bg-gray-800:hover, .hover\:bg-zinc-800:hover {
+    background-color: var(--accent) !important;
+  }
+  /* Sidebar logo gradient — blue-400/blue-200 is invisible on white */
+  .from-blue-400 {
+    --tw-gradient-from: #1d4ed8 !important;
+  }
+  .to-blue-200 {
+    --tw-gradient-to: #3b82f6 !important;
+  }
+  /* White gradient headings — completely invisible on white */
+  .from-white, .to-white\/70 {
+    --tw-gradient-from: #1e293b !important;
+    --tw-gradient-to: #334155 !important;
+  }
+  /* StreamingTerminal — keep it dark (it's intentionally a terminal) */
+  .bg-gray-950.overflow-hidden,
+  [class*="StreamingTerminal"] {
+    background-color: #0f172a !important;
+  }
+  /* Inputs inside dark panels */
+  .bg-zinc-800.border-zinc-700,
+  input.bg-zinc-800 {
+    background-color: var(--input) !important;
+    border-color: var(--border) !important;
+    color: var(--foreground) !important;
+  }
+  /* Page-level full-screen dark backgrounds (AdvertisingDashboard etc.) */
+  .min-h-screen.bg-gray-950,
+  .min-h-screen.bg-gray-900,
+  .min-h-screen.bg-zinc-900 {
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
+  }
+  /* Tab lists with dark backgrounds */
+  .bg-gray-900.border.border-gray-800 {
+    background-color: var(--muted) !important;
+    border-color: var(--border) !important;
+  }
+  /* Section label in light mode — ensure it's visible */
+  .section-label {
+    color: oklch(0.45 0.02 286);
+  }
+  /* Page header border */
+  .page-header {
+    border-bottom-color: var(--border);
+  }
+  /* shadow-panel was designed for dark mode — neutralise it */
+  .shadow-panel {
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08);
+  }
+  /* ring-subtle / shadow-inset-top — neutralise dark-only glows */
+  .ring-subtle {
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .shadow-inset-top {
+    box-shadow: inset 0 1px 0 rgba(0,0,0,0.06);
+  }
+  /* scrollbar-thin — use dark thumb in light mode */
+  .scrollbar-thin {
+    scrollbar-color: rgba(0,0,0,0.18) transparent;
   }
 }
 

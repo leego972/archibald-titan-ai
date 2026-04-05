@@ -218,7 +218,7 @@ function DashboardLayoutContent({
                   title="Go to home"
                 >
                   <TitanLogo size="sm" />
-                  <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-400 to-blue-200 bg-clip-text text-transparent">
+                  <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-700 to-blue-500 dark:from-blue-400 dark:to-blue-200 bg-clip-text text-transparent">
                     Archibald Titan
                   </span>
                 </div>

@@ -112,6 +112,36 @@ const MERCHANT_BOTS = [
     avgRating: 49,
     ratingCount: 42,
   },
+  {
+    openId: "bot_nullbyte_010",
+    name: "NullByte Labs",
+    email: "nullbyte@protonmail.com",
+    bio: "We build the tools that CTF players dream about and enterprise teams actually need. Specialising in creative, never-seen-before security utilities — honeypots with teeth, AI-powered recon engines, and browser-based attack labs. If it doesn't exist yet, we build it.",
+    verified: true,
+    totalSales: 203,
+    avgRating: 50,
+    ratingCount: 91,
+  },
+  {
+    openId: "bot_phantomcode_011",
+    name: "PhantomCode",
+    email: "phantom@phantomcode.dev",
+    bio: "Reverse engineers and malware analysts turned tool builders. We dissect threats so you don't have to. Every product ships with real samples, real analysis, and real detection logic — not toy examples.",
+    verified: true,
+    totalSales: 178,
+    avgRating: 49,
+    ratingCount: 74,
+  },
+  {
+    openId: "bot_ironclad_012",
+    name: "IronClad DevSec",
+    email: "build@ironclad.security",
+    bio: "We bridge the gap between developers and security. Our tools integrate into your IDE, your CI/CD pipeline, and your brain — making secure-by-default the path of least resistance. Used by 500+ engineering teams.",
+    verified: true,
+    totalSales: 445,
+    avgRating: 48,
+    ratingCount: 212,
+  },
 ];
 
 // ─── Module Catalog ─────────────────────────────────────────────────
@@ -1245,6 +1275,952 @@ const MODULE_CATALOG: ModuleDef[] = [
     version: "1.0.0",
     totalSales: 0,
     viewCount: 0,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PREMIUM INNOVATIVE BUILDS — NullByte Labs, PhantomCode, IronClad
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    merchantIndex: 9, // NullByte Labs
+    title: "HoneyNet — Deception Grid for Attackers",
+    description: "Deploy a full fake network inside your real one. Realistic honeypot servers (SSH, RDP, HTTP, FTP, SMB) that fingerprint, track, and automatically ban every attacker who touches them. Includes live attacker heatmap and Slack/Discord alerting.",
+    longDescription: `# HoneyNet — Deception Grid for Attackers
+
+Most honeypots are boring. Attackers hit them once, get nothing, and move on. HoneyNet is different — it's a full deception grid that makes your network look like a goldmine, captures everything the attacker does, and automatically feeds that intelligence back into your defenses.
+
+## What You Deploy
+- **SSH Honeypot**: Accepts any credential, logs every command typed, captures uploaded files and reverse shells
+- **RDP Honeypot**: Full Windows-looking RDP session that records screen activity and keystrokes
+- **HTTP/S Honeypot**: Fake admin panels (WordPress, cPanel, Jira, GitLab) that log every login attempt and payload
+- **SMB Honeypot**: Fake Windows file shares that capture NTLM hashes automatically
+- **FTP Honeypot**: Logs credentials and all file transfer attempts
+- **Database Honeypot**: Fake MySQL/MSSQL instances that log every query
+
+## Intelligence Collection
+- Full attacker fingerprint (IP, ASN, geolocation, ISP, VPN/Tor detection)
+- TTPs mapped to MITRE ATT&CK automatically
+- Credential spray patterns extracted and shared to your real auth systems as blocklists
+- Malware samples auto-collected and submitted to sandbox
+- Session recordings (every command, every keystroke)
+
+## Automated Response
+- Auto-ban attacking IPs at firewall level (iptables, AWS Security Groups, Cloudflare)
+- Slack/Discord/PagerDuty real-time alerts with attacker profile
+- Threat intel export (STIX/TAXII, JSON, CSV) for SIEM ingestion
+- Weekly attacker trend reports
+
+## Live Dashboard
+- World map showing attack origins in real time
+- Top attacker IPs, credentials tried, commands run
+- Protocol breakdown charts
+- Attack timeline with session replay
+
+## Deployment
+\`\`\`bash
+docker compose up -d  # Full grid running in under 2 minutes
+\`\`\`
+Supports bare metal, VPS, AWS, Azure, GCP. Lightweight — runs on a $5/month VPS.
+
+## Why This Beats Cowrie/Kippo
+- Multi-protocol (not just SSH)
+- Built-in threat intel export
+- Automatic firewall integration
+- Live dashboard included
+- Zero config required`,
+    category: "artifacts",
+    riskCategory: "safe",
+    priceCredits: 420,
+    tags: ["honeypot", "deception", "threat-intel", "blue-team", "network-security", "MITRE"],
+    language: "Go/TypeScript",
+    license: "MIT",
+    featured: true,
+    version: "2.0.0",
+    totalSales: 87,
+    viewCount: 4200,
+  },
+
+  {
+    merchantIndex: 9, // NullByte Labs
+    title: "ReconAI — AI-Powered Attack Surface Discovery",
+    description: "Give it a company name. ReconAI finds every domain, subdomain, IP, employee, email, leaked credential, exposed service, and technology stack — fully automated in under 10 minutes. Outputs a structured attack surface map ready for pentesting.",
+    longDescription: `# ReconAI — AI-Powered Attack Surface Discovery
+
+ReconAI is what happens when you give a senior OSINT analyst a GPT-4.1 brain and 20 data sources at once. Hand it a company name and walk away. Come back to a complete, structured attack surface map.
+
+## Phase 1: Identity Resolution (0–60 seconds)
+- Resolves company name → official domains via Google, LinkedIn, Crunchbase
+- Discovers all registered domains (reverse WHOIS by org name/email)
+- Identifies ASN ranges and IP blocks owned by the target
+- Finds all subsidiaries and acquired companies
+
+## Phase 2: Asset Enumeration (1–5 minutes)
+- Subdomain discovery: Certificate Transparency + DNS brute-force (500K wordlist) + Shodan + VirusTotal
+- Port scanning across all discovered IPs (top 1000 ports)
+- Service fingerprinting (banner grabbing, version detection)
+- Cloud asset discovery (S3 buckets, Azure Blobs, GCP Storage — public exposure check)
+- GitHub/GitLab org scanning (public repos, exposed secrets, employee accounts)
+
+## Phase 3: People & Credentials (5–8 minutes)
+- Employee enumeration via LinkedIn scraping
+- Email format detection and address generation
+- Breach database lookup (HIBP, DeHashed, IntelligenceX)
+- Leaked credential matching with severity scoring
+- Password pattern analysis from breach data
+
+## Phase 4: AI Analysis (8–10 minutes)
+- GPT-4.1 analyses all collected data
+- Identifies highest-value attack paths
+- Maps findings to MITRE ATT&CK Initial Access techniques
+- Generates executive summary + technical findings
+- Prioritises targets by exploitability
+
+## Output Formats
+- Interactive HTML report with clickable attack graph
+- JSON export for tool integration
+- Markdown report for bug bounty submissions
+- CSV asset inventory
+- Titan platform integration (auto-populates target scope)
+
+## What Makes This Different
+Other recon tools give you raw data. ReconAI gives you an attack plan.`,
+    category: "agents",
+    riskCategory: "medium_risk",
+    priceCredits: 680,
+    tags: ["recon", "OSINT", "AI", "attack-surface", "bug-bounty", "automation"],
+    language: "Python/TypeScript",
+    license: "Proprietary",
+    featured: true,
+    version: "1.5.0",
+    totalSales: 134,
+    viewCount: 7800,
+  },
+
+  {
+    merchantIndex: 9, // NullByte Labs
+    title: "BrowserPwn — In-Browser Exploitation Lab",
+    description: "A fully self-contained browser-based hacking lab. 40 interactive challenges across XSS, CSRF, SSRF, SQLi, deserialization, and prototype pollution — all running live in your browser with no setup. Perfect for CTF prep, interviews, and team training.",
+    longDescription: `# BrowserPwn — In-Browser Exploitation Lab
+
+No Kali. No Docker. No setup. Just open your browser and start hacking.
+
+BrowserPwn runs entirely in-browser using WebAssembly and Service Workers to simulate real vulnerable backends. Every challenge is a real vulnerability, not a toy simulation.
+
+## Challenge Categories (40 total)
+
+### Web Exploitation (15 challenges)
+- Reflected XSS → Stored XSS → DOM XSS → CSP bypass → XSS via SVG
+- CSRF token bypass → SameSite cookie abuse → CORS misconfiguration
+- SQL injection (union → blind → time-based → out-of-band)
+- SSRF (basic → cloud metadata → blind SSRF via PDF generator)
+
+### JavaScript Security (10 challenges)
+- Prototype pollution → gadget chain to RCE
+- Insecure deserialization (JSON → YAML → pickle)
+- JWT algorithm confusion (RS256 → HS256 swap)
+- GraphQL introspection → batching attack → IDOR
+
+### API Security (8 challenges)
+- IDOR through mass assignment
+- Broken object level authorization
+- Rate limit bypass via header manipulation
+- OAuth2 redirect_uri hijacking
+
+### Advanced (7 challenges)
+- HTTP request smuggling (CL.TE and TE.CL)
+- Cache poisoning via unkeyed headers
+- Web cache deception
+- Server-side template injection (Jinja2, Handlebars, Pug)
+
+## Features
+- **Hint system**: 3-tier hints per challenge (nudge → direction → near-solution)
+- **Solution explainer**: Full write-up unlocked after solving
+- **Leaderboard**: Compare your time and score against the community
+- **Team mode**: Share a lab instance with your team for group training
+- **Interview mode**: Generate a unique challenge link to send candidates
+- **Progress tracking**: Completion badges, streak tracking, skill radar chart
+
+## Why Developers Love This
+No environment setup means you can practice during a lunch break, on a train, or on your phone. The challenges are designed by real pentesters — not academics.`,
+    category: "blueprints",
+    riskCategory: "low_risk",
+    priceCredits: 290,
+    tags: ["CTF", "web-security", "training", "XSS", "SQLi", "browser", "challenges"],
+    language: "TypeScript/WebAssembly",
+    license: "MIT",
+    featured: true,
+    version: "3.1.0",
+    totalSales: 312,
+    viewCount: 9400,
+  },
+
+  {
+    merchantIndex: 10, // PhantomCode
+    title: "MalDNA — Malware Behaviour Fingerprinting Engine",
+    description: "Drop a suspicious binary. MalDNA extracts its behavioural DNA — syscall sequences, network patterns, registry mutations, process trees — and matches it against 50,000 known malware family signatures. Outputs a family classification, confidence score, and YARA rules in under 30 seconds.",
+    longDescription: `# MalDNA — Malware Behaviour Fingerprinting Engine
+
+MalDNA doesn't care about hashes. It cares about behaviour. The same malware recompiled with a different key has a different hash but identical DNA.
+
+## How It Works
+
+### 1. Dynamic Analysis (Sandbox Execution)
+- Executes the sample in an isolated Windows 10 VM (KVM-based)
+- Captures all syscalls via ETW (Event Tracing for Windows)
+- Records network traffic (DNS, HTTP, TLS SNI, raw TCP/UDP)
+- Monitors registry reads/writes/deletes
+- Tracks process creation, injection, and hollowing
+- Captures file system mutations
+- Records persistence mechanisms (registry run keys, scheduled tasks, services)
+
+### 2. Static Analysis
+- PE header analysis (imports, exports, sections, entropy)
+- String extraction with context classification (URLs, IPs, registry keys, crypto constants)
+- Packer/protector detection (UPX, Themida, VMProtect, custom)
+- Code similarity via function-level fuzzy hashing (TLSH)
+- Embedded resource extraction (dropped files, shellcode)
+
+### 3. DNA Extraction & Matching
+- Converts behaviour into a normalised behavioural vector
+- Compares against 50,000 malware family signatures
+- Returns: family name, variant, confidence %, closest known sample
+- Maps to MITRE ATT&CK techniques automatically
+
+### 4. Output
+- **Family report**: Classification, TTPs, known C2 infrastructure, threat actor attribution
+- **YARA rules**: Auto-generated detection rules based on unique strings and patterns
+- **Sigma rules**: SIEM detection rules for the observed behaviours
+- **IOC export**: Domains, IPs, hashes, registry keys, file paths (STIX 2.1 format)
+- **Analyst notes**: Plain-English explanation of what the malware does
+
+## Supported File Types
+PE (EXE/DLL), PowerShell scripts, JavaScript (JScript/Node), Python, Bash, Office macros (VBA), PDF with embedded code, ZIP/RAR (auto-extracted)
+
+## API
+\`\`\`python
+from maldna import MalDNA
+client = MalDNA(api_key="your-key")
+result = client.analyze("sample.exe", timeout=60)
+print(result.family)        # "Emotet"
+print(result.confidence)    # 0.94
+print(result.mitre_ttps)    # ["T1055", "T1071.001", ...]
+\`\`\``,
+    category: "agents",
+    riskCategory: "safe",
+    priceCredits: 890,
+    tags: ["malware", "analysis", "sandbox", "YARA", "MITRE", "threat-intel", "reverse-engineering"],
+    language: "Python/Rust",
+    license: "Proprietary",
+    featured: true,
+    version: "2.3.0",
+    totalSales: 67,
+    viewCount: 5600,
+  },
+
+  {
+    merchantIndex: 10, // PhantomCode
+    title: "GhostTraffic — Encrypted C2 over Legitimate Protocols",
+    description: "Educational framework demonstrating how advanced threat actors hide C2 traffic inside DNS, HTTPS, Slack, Discord, and Twitter APIs. Includes full detection guide, Suricata/Zeek rules, and a blue team lab to practice identifying covert channels.",
+    longDescription: `# GhostTraffic — Covert Channel Research Framework
+
+Understand how nation-state actors hide command-and-control traffic inside protocols your firewall trusts completely. This is the most comprehensive covert channel educational framework available.
+
+## Covert Channel Implementations
+
+### DNS Tunneling
+- Data encoded in DNS TXT/CNAME/NULL record queries
+- Subdomain-based exfiltration (data.target.attacker.com)
+- Slow-drip mode to evade DNS anomaly detection
+- Encrypted payload with ChaCha20-Poly1305
+- Includes dnscat2-compatible server
+
+### HTTPS Steganography
+- C2 commands hidden in HTTP/2 header values
+- Data embedded in TLS session ticket extensions
+- Timing-based covert channel (inter-packet delays encode bits)
+- Domain fronting via CDN providers
+
+### Social Media C2
+- Commands posted as innocuous tweets/Discord messages
+- Steganography in profile images (LSB encoding)
+- Polling-based agent (no inbound connections)
+- Dead drop pattern via public paste sites
+
+### Cloud Storage C2
+- Commands written to S3/GCS/Azure Blob objects
+- Agent polls for new objects at random intervals
+- Encrypted with per-session keys
+- Blends with legitimate cloud traffic
+
+## Blue Team Detection Lab
+- **Suricata rules**: 40+ rules for detecting each covert channel type
+- **Zeek scripts**: Protocol-level analysis for DNS tunneling and HTTP anomalies
+- **ML detection model**: Trained on 100K benign + 10K covert channel samples
+- **Wireshark dissectors**: Custom dissectors for visualising covert channels
+- **Lab exercises**: 10 pcap files with hidden C2 traffic to find and decode
+
+## Legal & Ethical Use
+For security research, red team education, and building better detection capabilities only. All implementations include deliberate detection artefacts for training purposes.
+
+## Who This Is For
+- Red teamers building realistic simulations
+- Blue teamers learning to detect covert channels
+- Security researchers studying APT tradecraft
+- CTF players tackling network forensics challenges`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 750,
+    tags: ["C2", "covert-channel", "DNS-tunneling", "steganography", "red-team", "detection"],
+    language: "Python/Go",
+    license: "Educational",
+    featured: true,
+    version: "1.4.0",
+    totalSales: 48,
+    viewCount: 6100,
+  },
+
+  {
+    merchantIndex: 10, // PhantomCode
+    title: "FirmwareX — IoT Firmware Analysis Toolkit",
+    description: "Extract, unpack, and analyse IoT firmware images. Finds hardcoded credentials, backdoors, vulnerable libraries, and exposed debug interfaces. Supports 200+ router/camera/NAS firmware formats. The only toolkit you need for IoT security research.",
+    longDescription: `# FirmwareX — IoT Firmware Analysis Toolkit
+
+IoT devices are the most neglected attack surface in most organisations. FirmwareX makes firmware analysis accessible to any security researcher — no reverse engineering PhD required.
+
+## Firmware Extraction & Unpacking
+- Automatic format detection (SquashFS, JFFS2, YAFFS2, CramFS, ext2/3/4, ROMFS, raw)
+- Binwalk-powered carving with entropy analysis
+- Encrypted firmware decryption (common vendor keys database)
+- U-Boot environment extraction
+- Kernel and initrd extraction
+- Supports 200+ vendor firmware formats (TP-Link, Netgear, D-Link, Asus, Hikvision, Dahua, Synology, QNAP)
+
+## Static Analysis
+- **Hardcoded credential scanner**: Finds passwords, API keys, private keys in extracted filesystem
+- **Vulnerable library detector**: Matches linked libraries against CVE database (BusyBox, OpenSSL, libupnp, etc.)
+- **Backdoor detector**: Identifies hidden accounts, debug shells, telnet daemons, UART interfaces
+- **Binary analysis**: Architecture detection, stripped binary analysis, dangerous function calls (strcpy, system, etc.)
+- **Web interface scanner**: Extracts embedded web apps and scans for SQLi, XSS, command injection
+
+## Dynamic Analysis
+- **QEMU emulation**: Boot firmware in emulated environment without physical hardware
+- **Network service fuzzing**: Auto-discovers and fuzzes exposed services
+- **Firmware diffing**: Compare two firmware versions to find security-relevant changes
+
+## Reporting
+- Severity-rated findings with CVE references
+- Vendor notification templates
+- Responsible disclosure timeline tracker
+- CVSSv3 scoring for each finding
+
+## Real-World Results
+Used to find 12 CVEs in consumer routers and 8 CVEs in IP cameras. All findings were responsibly disclosed.`,
+    category: "artifacts",
+    riskCategory: "medium_risk",
+    priceCredits: 560,
+    tags: ["IoT", "firmware", "reverse-engineering", "embedded", "CVE", "hardware-hacking"],
+    language: "Python",
+    license: "MIT",
+    featured: true,
+    version: "2.1.0",
+    totalSales: 93,
+    viewCount: 5300,
+  },
+
+  {
+    merchantIndex: 11, // IronClad DevSec
+    title: "SecureCI — Security Gate for Every Pull Request",
+    description: "A single GitHub/GitLab CI action that runs SAST, secret scanning, dependency audit, container scanning, and IaC security checks on every PR — and blocks merges when it finds critical issues. Zero config. Works in 5 minutes.",
+    longDescription: `# SecureCI — Security Gate for Every Pull Request
+
+Most teams have security tools. Almost none have them running on every PR. SecureCI fixes that with a single action that takes 5 minutes to set up and runs 6 security checks in parallel on every commit.
+
+## What Runs on Every PR
+
+### 1. Secret Scanning (30 seconds)
+- 400+ secret patterns (AWS keys, GitHub tokens, Stripe keys, private keys, JWT secrets, database URLs)
+- Git history scanning — catches secrets committed and then deleted
+- Entropy analysis for unknown secret formats
+- Zero false positives via context-aware filtering
+
+### 2. SAST — Static Application Security Testing (60 seconds)
+- Language-aware analysis: TypeScript/JavaScript, Python, Go, Java, C#, Ruby, PHP
+- OWASP Top 10 vulnerability patterns
+- Custom rule engine (write rules in YAML)
+- Semgrep rule library (10,000+ community rules included)
+
+### 3. Dependency Audit (20 seconds)
+- npm/yarn, pip, go.mod, Cargo.toml, Gemfile, Maven/Gradle
+- CVE matching against NVD + GitHub Advisory Database
+- License compliance checking (block GPL in proprietary projects)
+- Outdated package detection with upgrade suggestions
+
+### 4. Container Security (45 seconds)
+- Dockerfile best practice analysis
+- Base image CVE scanning (Trivy)
+- Secrets in image layers
+- Non-root user enforcement
+- Minimal image recommendations
+
+### 5. IaC Security (30 seconds)
+- Terraform, CloudFormation, Kubernetes, Helm, Docker Compose
+- 500+ misconfiguration rules (Checkov)
+- Drift detection vs. last approved state
+
+### 6. AI Code Review (90 seconds)
+- GPT-4.1-powered review of security-sensitive code changes
+- Focuses only on auth, crypto, input handling, and data access
+- Inline PR comments with fix suggestions
+- Never blocks — advisory only
+
+## Setup
+\`\`\`yaml
+# .github/workflows/secureci.yml
+- uses: ironclad/secureci@v3
+  with:
+    fail_on: critical,high
+    notify: slack
+\`\`\`
+
+## Results
+Teams using SecureCI catch 73% more security issues before they reach production (internal study, 200+ repos, 12 months).`,
+    category: "modules",
+    riskCategory: "safe",
+    priceCredits: 185,
+    tags: ["CI/CD", "SAST", "secret-scanning", "DevSecOps", "GitHub-Actions", "security"],
+    language: "TypeScript/YAML",
+    license: "MIT",
+    featured: true,
+    version: "3.0.0",
+    totalSales: 567,
+    viewCount: 11200,
+  },
+
+  {
+    merchantIndex: 11, // IronClad DevSec
+    title: "ThreatModel.AI — Automated Threat Modelling for Developers",
+    description: "Paste your architecture diagram or describe your system in plain English. ThreatModel.AI generates a full STRIDE threat model, attack trees, data flow diagrams, and prioritised mitigations in 2 minutes. No security expertise required.",
+    longDescription: `# ThreatModel.AI — Automated Threat Modelling for Developers
+
+Threat modelling is the most valuable security activity most teams never do — because it's slow, requires expertise, and produces documents nobody reads. ThreatModel.AI changes all of that.
+
+## Input Methods
+
+### Option 1: Architecture Diagram
+- Upload a PNG/SVG of your architecture (draw.io, Lucidchart, Miro, hand-drawn photo)
+- AI extracts components, data flows, trust boundaries, and external entities
+- Works with any diagram style
+
+### Option 2: Plain English Description
+- Describe your system in plain English ("We have a React frontend, Node.js API, PostgreSQL database, and Redis cache. Users authenticate with JWT. Admins can access all data.")
+- AI builds the architecture model automatically
+
+### Option 3: Code Scan
+- Point at your GitHub/GitLab repo
+- AI analyses routes, middleware, database models, and auth logic
+- Builds architecture model from actual code
+
+## What Gets Generated
+
+### STRIDE Analysis
+- Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege
+- Every threat mapped to specific components in your architecture
+- Severity rating (Critical/High/Medium/Low) for each threat
+- Likelihood × Impact matrix
+
+### Attack Trees
+- Visual attack trees for the top 5 highest-risk threats
+- Each node shows attacker capability required
+- Countermeasure annotations
+
+### Data Flow Diagrams
+- Auto-generated DFDs showing where sensitive data flows
+- Trust boundary annotations
+- PII/sensitive data classification
+
+### Mitigations
+- Prioritised list of security controls to implement
+- Code examples for each mitigation (in your language/framework)
+- Effort estimates (hours)
+- Links to relevant OWASP guidance
+
+## Integrations
+- Jira: Creates tickets for each mitigation automatically
+- Confluence: Publishes threat model as a formatted page
+- GitHub Issues: Creates issues with security labels
+- PDF export for compliance documentation
+
+## Why This Matters
+A threat model that takes 2 minutes gets done. A threat model that takes 2 weeks doesn't.`,
+    category: "agents",
+    riskCategory: "safe",
+    priceCredits: 340,
+    tags: ["threat-modelling", "STRIDE", "AI", "architecture", "security", "DevSecOps"],
+    language: "TypeScript",
+    license: "Proprietary",
+    featured: true,
+    version: "1.2.0",
+    totalSales: 234,
+    viewCount: 8900,
+  },
+
+  {
+    merchantIndex: 9, // NullByte Labs
+    title: "PacketPoison — Live Network Attack Simulator",
+    description: "Safely simulate 20 real network attacks against your own infrastructure — ARP poisoning, DNS hijacking, BGP hijacking, SSL stripping, and more — without touching production. Generates realistic attack traffic so your SOC team can practice detection and response.",
+    longDescription: `# PacketPoison — Live Network Attack Simulator
+
+You can't train your SOC team to detect attacks they've never seen. PacketPoison generates realistic attack traffic against your own test environment so your team can practice detection, triage, and response before the real thing happens.
+
+## Attack Simulations (20 scenarios)
+
+### Layer 2 Attacks
+- ARP cache poisoning (bidirectional MITM)
+- MAC flooding (CAM table overflow)
+- VLAN hopping (double tagging, switch spoofing)
+- STP manipulation (root bridge takeover)
+
+### Layer 3/4 Attacks
+- IP spoofing with realistic traffic patterns
+- ICMP redirect injection
+- TCP session hijacking
+- UDP flood (volumetric DDoS simulation)
+- SYN flood with source IP rotation
+
+### Application Layer
+- DNS cache poisoning (Kaminsky attack)
+- BGP route hijacking simulation (lab only)
+- SSL stripping with HSTS bypass
+- HTTP request smuggling (CL.TE and TE.CL)
+- TLS downgrade attack simulation
+
+### Wireless
+- Evil twin AP with deauth flood
+- PMKID capture simulation
+- WPA2 handshake capture
+
+## Blue Team Training Mode
+- Each attack generates realistic logs, alerts, and traffic
+- SOC analyst receives only the logs — must identify the attack
+- Scoring system (time to detect, accuracy of classification)
+- Debrief mode shows exactly what to look for
+
+## Safe Execution
+- All attacks run in an isolated Docker network
+- Cannot affect production systems
+- Full audit log of every simulation run
+- Configurable blast radius (single host → full subnet)
+
+## Integrations
+- Sends attack traffic to your SIEM for realistic alert testing
+- Integrates with Splunk, Elastic, QRadar, Sentinel
+- Generates test cases for IDS/IPS rule validation`,
+    category: "artifacts",
+    riskCategory: "low_risk",
+    priceCredits: 380,
+    tags: ["network", "attack-simulation", "SOC", "blue-team", "training", "MITM", "IDS"],
+    language: "Python/Go",
+    license: "MIT",
+    featured: true,
+    version: "1.8.0",
+    totalSales: 156,
+    viewCount: 6700,
+  },
+
+  {
+    merchantIndex: 11, // IronClad DevSec
+    title: "APIFuzz — Intelligent REST & GraphQL API Fuzzer",
+    description: "Point it at any REST or GraphQL API. APIFuzz automatically generates thousands of intelligent test cases, finds authentication bypasses, IDOR vulnerabilities, injection points, and business logic flaws — then writes you a report in 10 minutes.",
+    longDescription: `# APIFuzz — Intelligent REST & GraphQL API Fuzzer
+
+API security testing is broken. Traditional fuzzers spray random data and hope for the best. APIFuzz understands your API's structure and generates intelligent test cases that actually find real vulnerabilities.
+
+## How It Works
+
+### Step 1: API Discovery
+- Import OpenAPI/Swagger spec (v2 and v3)
+- Import Postman collection
+- Auto-discover from browser HAR export
+- GraphQL introspection (auto-discovers all queries, mutations, subscriptions)
+- gRPC protobuf import
+
+### Step 2: Intelligent Test Generation
+For each endpoint, APIFuzz generates:
+- **Authentication tests**: Missing auth header, expired token, wrong scope, token from different user
+- **IDOR tests**: Replaces IDs with IDs from other test accounts, checks for cross-user data access
+- **Injection tests**: SQLi, NoSQLi, command injection, SSTI, path traversal — context-aware payloads
+- **Business logic tests**: Negative quantities, price manipulation, state machine violations
+- **Rate limiting tests**: Burst requests, distributed requests, header manipulation
+- **Mass assignment tests**: Adds unexpected fields to request bodies
+
+### Step 3: AI-Powered Analysis
+- GPT-4.1 analyses responses to detect subtle vulnerabilities
+- Identifies information disclosure in error messages
+- Detects inconsistent access control across similar endpoints
+- Flags business logic anomalies (e.g., price = 0 accepted)
+
+### Step 4: Report Generation
+- Severity-rated findings with request/response proof
+- CVSS 3.1 scoring
+- Remediation code examples
+- OWASP API Top 10 mapping
+- PDF/HTML/JSON export
+
+## GraphQL-Specific Tests
+- Introspection enabled in production (information disclosure)
+- Batching attacks (rate limit bypass)
+- Deeply nested query DoS
+- Field suggestion exploitation
+- Subscription abuse
+
+## CI/CD Integration
+\`\`\`bash
+apifuzz scan --spec openapi.yaml --target https://api.staging.example.com --fail-on high
+\`\`\``,
+    category: "modules",
+    riskCategory: "low_risk",
+    priceCredits: 320,
+    tags: ["API", "fuzzing", "GraphQL", "REST", "IDOR", "security-testing", "automation"],
+    language: "TypeScript",
+    license: "MIT",
+    featured: true,
+    version: "2.4.0",
+    totalSales: 289,
+    viewCount: 7400,
+  },
+
+  {
+    merchantIndex: 10, // PhantomCode
+    title: "DeObfuscator Pro — JS/PowerShell/VBA Deobfuscation Engine",
+    description: "Paste any obfuscated JavaScript, PowerShell, VBA macro, or PHP webshell. DeObfuscator Pro unravels it layer by layer, reconstructs the original logic, and explains what it does in plain English. Handles 50+ obfuscation techniques including eval chains, hex encoding, and packer-generated code.",
+    longDescription: `# DeObfuscator Pro — Malicious Code Deobfuscation Engine
+
+When your EDR flags a suspicious script, you need to know what it does — fast. DeObfuscator Pro turns impenetrable obfuscated code into readable, analysable source in seconds.
+
+## Supported Languages & Techniques
+
+### JavaScript (25+ techniques)
+- eval() chain unwrapping (nested eval up to 20 layers deep)
+- String.fromCharCode / hex / base64 decoding
+- Array rotation and shuffle deobfuscation
+- Control flow flattening reversal
+- Dead code elimination
+- Variable name recovery (semantic naming via AI)
+- Obfuscator.io, JSFuck, JJencode, AAencode, Dean Edwards packer
+
+### PowerShell (15+ techniques)
+- IEX (Invoke-Expression) chain unwrapping
+- -EncodedCommand base64 decoding
+- String concatenation and reversal
+- Backtick and caret insertion removal
+- Variable substitution resolution
+- AMSI bypass pattern detection
+- Compressed/deflate payload extraction
+
+### VBA Macros (10+ techniques)
+- Chr() and Asc() resolution
+- String concatenation unwrapping
+- Auto-execution trigger identification (AutoOpen, Document_Open)
+- Shell command extraction
+- Dropper payload extraction
+
+### PHP Webshells
+- base64_decode chain unwrapping
+- gzinflate/str_rot13 decoding
+- Variable function call resolution
+- Backdoor functionality identification
+
+## AI Analysis Layer
+After deobfuscation, GPT-4.1 provides:
+- Plain-English explanation of what the code does
+- Malicious intent classification (dropper, RAT, ransomware, cryptominer, webshell, etc.)
+- IOC extraction (domains, IPs, file paths, registry keys)
+- MITRE ATT&CK technique mapping
+- Recommended detection signatures
+
+## API
+\`\`\`python
+from deobfuscator import DeObfuscator
+result = DeObfuscator().analyze(obfuscated_code, language="javascript")
+print(result.clean_code)      # Readable source
+print(result.explanation)     # Plain English
+print(result.iocs)            # Extracted IOCs
+\`\`\``,
+    category: "modules",
+    riskCategory: "safe",
+    priceCredits: 240,
+    tags: ["deobfuscation", "malware", "JavaScript", "PowerShell", "VBA", "analysis", "reverse-engineering"],
+    language: "TypeScript/Python",
+    license: "Proprietary",
+    featured: true,
+    version: "2.0.0",
+    totalSales: 198,
+    viewCount: 8100,
+  },
+
+  {
+    merchantIndex: 9, // NullByte Labs
+    title: "CredSniper Pro — Password Spray & Stuffing Lab",
+    description: "Educational credential attack framework covering password spraying, credential stuffing, and brute-force techniques against 15 common authentication systems. Includes full detection and lockout bypass analysis, plus a defensive hardening guide and detection rule set.",
+    longDescription: `# CredSniper Pro — Credential Attack Research Lab
+
+Understand exactly how attackers compromise accounts at scale — so you can build defences that actually stop them.
+
+## Attack Techniques Covered
+
+### Password Spraying
+- Slow-and-low spraying (1 attempt per account per hour — evades lockout)
+- Distributed spraying via proxy rotation
+- Seasonal password pattern targeting (Company2024!, Summer24, etc.)
+- Targets: Office 365, Azure AD, Okta, Google Workspace, VPN portals
+- Lockout threshold detection (backs off automatically)
+
+### Credential Stuffing
+- Breach database integration (HIBP API, custom lists)
+- Credential format normalisation (email:pass, user:pass, phone:pass)
+- Success detection via HTTP response analysis (not just status codes)
+- Session token extraction on success
+- Proxy rotation with health checking
+
+### Brute Force Patterns
+- Rule-based mutation (password → P@ssw0rd → P@ssw0rd1 → P@ssw0rd1!)
+- Keyboard walk patterns (qwerty, 123456, etc.)
+- Name + year + special char combinations
+- Company-specific wordlist generation
+
+## Detection & Defence
+- **Impossible travel detection**: Flags logins from geographically impossible locations
+- **Velocity detection**: Identifies spray patterns from single or distributed IPs
+- **Device fingerprinting**: Detects new device logins
+- **Credential stuffing signatures**: 50+ Suricata/Snort rules
+- **Lockout policy calculator**: Optimal lockout thresholds by risk tolerance
+- **MFA bypass resistance testing**: Tests whether your MFA can be bypassed
+
+## Hardening Guide
+- Passwordless authentication migration guide
+- Conditional access policy templates (Azure AD, Okta)
+- CAPTCHA integration patterns
+- Breached password checking (HIBP k-anonymity API integration)
+
+## Legal
+For authorised security testing and building defensive systems only. All attack modules require explicit target configuration.`,
+    category: "exploits",
+    riskCategory: "high_risk",
+    priceCredits: 410,
+    tags: ["credential-stuffing", "password-spray", "brute-force", "authentication", "defence", "MFA"],
+    language: "Python",
+    license: "Educational",
+    featured: false,
+    version: "1.6.0",
+    totalSales: 74,
+    viewCount: 4800,
+  },
+
+  {
+    merchantIndex: 11, // IronClad DevSec
+    title: "VaultAudit — Secrets & Credentials Scanner for Codebases",
+    description: "Scans your entire Git history — every commit, every branch, every deleted file — for leaked secrets. Finds AWS keys, database passwords, private keys, API tokens, and 600+ other secret types. Integrates with GitHub, GitLab, Bitbucket, and Azure DevOps. Remediates with one click.",
+    longDescription: `# VaultAudit — Git History Secrets Scanner
+
+Secrets committed to Git don't disappear when you delete them. They live in history forever — and attackers know this. VaultAudit scans every commit across your entire organisation's repos and finds every secret that was ever committed.
+
+## What It Finds (600+ patterns)
+
+### Cloud Credentials
+- AWS Access Keys + Secret Keys (all formats including new AKIA prefix variants)
+- Azure Service Principal credentials and connection strings
+- GCP service account JSON keys
+- DigitalOcean personal access tokens
+- Cloudflare API tokens and Global API keys
+
+### Database Credentials
+- PostgreSQL, MySQL, MongoDB, Redis connection strings
+- Database passwords in config files (.env, application.yml, appsettings.json)
+- Hardcoded credentials in ORM configurations
+
+### API Keys & Tokens
+- GitHub/GitLab personal access tokens and deploy keys
+- Stripe live and test API keys
+- Twilio auth tokens
+- SendGrid, Mailgun, Postmark API keys
+- Slack webhook URLs and bot tokens
+- OpenAI, Anthropic, Google AI API keys
+- 500+ additional service-specific patterns
+
+### Cryptographic Material
+- RSA/EC private keys (PEM format)
+- SSH private keys (OpenSSH, PuTTY)
+- JWT signing secrets
+- Encryption keys (AES, ChaCha20)
+- TLS certificate private keys
+
+## Scanning Capabilities
+- **Full Git history**: Every commit, every branch, every tag, every deleted file
+- **High entropy detection**: Finds unknown secrets via entropy analysis
+- **Context-aware filtering**: Reduces false positives by understanding code context
+- **Allowlist support**: Mark known false positives to suppress
+
+## One-Click Remediation
+- Generates git-filter-repo commands to purge secrets from history
+- Creates rotation checklist for each exposed secret type
+- Sends rotation reminders until confirmed
+- Tracks remediation status per finding
+
+## Organisation-Wide Scanning
+- Scans all repos in a GitHub org / GitLab group
+- Priority ranking by secret type and repo visibility
+- Trend dashboard (secrets found per week, remediation rate)
+- Slack/Teams alerts for new findings
+
+## Setup
+\`\`\`bash
+npx vaultaudit scan --org mycompany --provider github
+# Scans all repos, outputs prioritised findings in 5 minutes
+\`\`\``,
+    category: "modules",
+    riskCategory: "safe",
+    priceCredits: 160,
+    tags: ["secrets-scanning", "git", "credentials", "API-keys", "DevSecOps", "remediation"],
+    language: "TypeScript",
+    license: "MIT",
+    featured: true,
+    version: "3.2.0",
+    totalSales: 445,
+    viewCount: 10300,
+  },
+
+  {
+    merchantIndex: 10, // PhantomCode
+    title: "RansomSim — Ransomware Behaviour Simulator for IR Training",
+    description: "Safely simulate a full ransomware attack on your own test environment — file encryption, shadow copy deletion, network propagation, and ransom note deployment — without any real malware. Trains your IR team on detection, containment, and recovery before a real incident.",
+    longDescription: `# RansomSim — Ransomware Behaviour Simulator
+
+Your incident response plan is only as good as the last time you tested it. RansomSim lets you run a realistic ransomware drill against your own test environment — so your team knows exactly what to do when the real thing hits.
+
+## What RansomSim Simulates
+
+### Initial Access & Execution
+- Phishing email delivery simulation (no real payload — just the behaviour)
+- Macro execution simulation
+- PowerShell download-and-execute pattern
+- Living-off-the-land binary (LOLBin) usage
+
+### Discovery & Lateral Movement
+- Network share enumeration
+- Active Directory user/group enumeration
+- Credential dumping simulation (LSASS access patterns)
+- PsExec/WMI lateral movement to configured test hosts
+- SMB propagation simulation
+
+### Impact Phase
+- **File encryption simulation**: Renames files with .encrypted extension, writes decoy encrypted content (no real encryption of real data)
+- **Shadow copy deletion**: Executes vssadmin delete shadows (on test VM only)
+- **Backup targeting**: Identifies and simulates targeting of backup directories
+- **Ransom note deployment**: Drops README.txt in every directory
+- **Wallpaper change**: Simulates ransom wallpaper deployment
+- **Network drive encryption**: Simulates targeting of mapped network drives
+
+## Detection Opportunities Generated
+- 40+ Windows Event IDs triggered
+- Realistic Sysmon telemetry
+- Network traffic patterns matching known ransomware families (LockBit, BlackCat, Ryuk)
+- Registry modifications for persistence simulation
+
+## IR Training Features
+- **Tabletop mode**: Walks IR team through decision points without executing anything
+- **Live drill mode**: Executes simulation while IR team responds in real time
+- **Scoring system**: Measures time to detect, contain, and recover
+- **After-action report**: Shows what was detected, what was missed, and why
+
+## Recovery Training
+- Backup restoration drill
+- System rebuild checklist
+- Communication template library (internal, customer, regulator notifications)
+- Lessons-learned template
+
+## Safety
+- Runs only in explicitly configured test environments
+- Requires signed authorisation file before execution
+- Full rollback capability
+- No real encryption — ever`,
+    category: "blueprints",
+    riskCategory: "low_risk",
+    priceCredits: 490,
+    tags: ["ransomware", "incident-response", "simulation", "IR-training", "blue-team", "tabletop"],
+    language: "Python/PowerShell",
+    license: "Proprietary",
+    featured: true,
+    version: "1.3.0",
+    totalSales: 112,
+    viewCount: 6900,
+  },
+
+  {
+    merchantIndex: 11, // IronClad DevSec
+    title: "SupplyChain Guard — Third-Party Dependency Risk Scorer",
+    description: "Every npm/pip/cargo package you install is a potential supply chain attack. SupplyChain Guard scores every dependency in your project across 15 risk dimensions — maintainer reputation, typosquat risk, install script behaviour, network calls, and known malicious indicators — before you install anything.",
+    longDescription: `# SupplyChain Guard — Dependency Risk Intelligence
+
+The next SolarWinds or XZ Utils attack will come through a dependency you trusted. SupplyChain Guard makes supply chain risk visible before it becomes a breach.
+
+## Risk Dimensions Scored (15 total)
+
+### Package Reputation
+- Download velocity (sudden spike = suspicious)
+- Maintainer account age and history
+- Number of maintainers (single maintainer = higher risk)
+- GitHub stars, forks, and contributor count
+- Time since last commit (abandoned packages)
+- Semantic versioning compliance
+
+### Malicious Behaviour Indicators
+- **Install script analysis**: Scans postinstall/preinstall scripts for suspicious patterns (network calls, file writes to sensitive paths, environment variable access)
+- **Typosquat detection**: Checks if package name is similar to popular packages (requests vs request, lodash vs 1odash)
+- **Dependency confusion risk**: Checks if internal package names could be hijacked
+- **Known malicious package database**: 10,000+ confirmed malicious packages
+
+### Code Quality & Security
+- Static analysis for hardcoded credentials
+- Obfuscated code detection
+- Suspicious network call patterns
+- Dangerous function usage (eval, exec, child_process.exec)
+
+### Supply Chain Integrity
+- Package signing verification (npm provenance, PyPI attestations)
+- Reproducible build verification
+- Source code vs. published package diff
+- Lockfile integrity checking
+
+## Risk Score Output
+- 0-100 risk score per package
+- Red/Amber/Green classification
+- Specific risk factors with evidence
+- Recommended action (install / review / block)
+- Alternative package suggestions for high-risk packages
+
+## Integration
+\`\`\`bash
+# Block installation of high-risk packages
+npx supplychain-guard check package.json --block-above 70
+
+# CI/CD gate
+supplychain-guard audit --fail-on critical
+\`\`\`
+
+## IDE Plugin
+- VS Code extension shows risk score inline as you type import statements
+- Hover tooltip with risk breakdown
+- One-click to view full report`,
+    category: "modules",
+    riskCategory: "safe",
+    priceCredits: 145,
+    tags: ["supply-chain", "dependencies", "npm", "pip", "security", "DevSecOps", "risk"],
+    language: "TypeScript",
+    license: "MIT",
+    featured: true,
+    version: "2.1.0",
+    totalSales: 378,
+    viewCount: 9200,
   },
 ];
 
