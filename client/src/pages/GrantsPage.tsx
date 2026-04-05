@@ -38,9 +38,6 @@ export default function GrantsPage() {
       if (data.errors && data.errors.length > 0) {
         toast.info(`${data.errors.length} minor issues (some APIs may be temporarily unavailable)`);
       }
-      if (data.sources && data.sources.length > 0) {
-        toast.info(`Sources: ${data.sources.map((s: any) => `${s.name} (${s.count})`).join(", ")}`);
-      }
       refetch();
     },
     onError: (err) => toast.error(`Refresh failed: ${err.message}`),
