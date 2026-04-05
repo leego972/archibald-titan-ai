@@ -367,7 +367,7 @@ export const binCheckerRouter = router({
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for bulk BIN lookup. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      const results = [];
+      const results: Array<{ bin: string; network: string; type: string; bank: string; country: string; countryCode: string; prepaid: boolean }> = [];
       for (const rawBin of input.bins) {
         const bin = rawBin.replace(/\D/g, "").slice(0, 6);
         const network = detectNetwork(bin);
