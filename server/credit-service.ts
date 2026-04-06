@@ -66,7 +66,7 @@ async function ensureBalance(userId: number): Promise<void> {
 
     // Get user's plan for signup bonus
     const plan = await getUserPlan(userId);
-    const tier = PRICING_TIERS.find((t) => t.id === plan.planId);
+    const tier = PRICING_TIERS.find((t) => t.id === plan.planId) || INTERNAL_TIERS.find((t) => t.id === plan.planId);
     const signupBonus = tier?.credits.signupBonus ?? 25;
 
     await db.insert(creditBalances).values({
