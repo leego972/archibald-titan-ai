@@ -238,7 +238,14 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
           </SidebarHeader>
 
           <SidebarContent className="py-6 px-2 custom-scrollbar">
-            {menuGroups.map((group, idx) => (
+            {menuGroups.map((group, idx) => {
+              const visibleItems = group.items.filter(item => {
+                if (item.adminOnly && !isAdminRole(user.role)) return false;
+                if (item.titanOnly && sub?.planId !== "titan") return false;
+                return true;
+              });
+              if (visibleItems.length === 0) return null;
+              return (
               <div key={idx} className="mb-8 last:mb-0">
                 {!isCollapsed && (
                   <h4 className="px-3 mb-3 text-[9px] font-black uppercase tracking-[0.2em] text-white/20">
@@ -246,10 +253,7 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
                   </h4>
                 )}
                 <SidebarMenu>
-                  {group.items.map((item) => {
-                    if (item.adminOnly && !isAdminRole(user.role)) return null;
-                    if (item.titanOnly && sub?.planId !== "titan") return null;
-
+                  {visibleItems.map((item) => {
                     const active = isActive(item.path);
                     return (
                       <SidebarMenuItem key={item.path}>
@@ -276,7 +280,8 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
                   })}
                 </SidebarMenu>
               </div>
-            ))}
+              );
+            })}
           </SidebarContent>
 
           <SidebarFooter className="p-4 border-t border-white/[0.05]">
@@ -291,8 +296,11 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
                   {!isCollapsed && (
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-white/80 truncate">{user.email}</p>
-                      <p className="text-[9px] text-white/20 truncate uppercase tracking-widest font-black">
-                        {sub?.planId ? sub.planId.replace(/_/g, " ") : "No Active Plan"} Tier
+                      <p className="text-[9px] truncate uppercase tracking-widest font-black"
+                        style={{ color: isAdminRole(user.role) ? '#f59e0b' : 'rgba(255,255,255,0.2)' }}>
+                        {isAdminRole(user.role)
+                          ? (user.role === 'head_admin' ? 'Head Admin' : 'Admin')
+                          : (sub?.planId ? sub.planId.replace(/_/g, ' ') + ' Tier' : 'No Active Plan')}
                       </p>
                     </div>
                   )}
