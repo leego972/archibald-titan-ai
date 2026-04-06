@@ -731,11 +731,17 @@ async function _invokeLLMWithRetry(
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
 
     if ((err as Error).name === 'AbortError') {
-      // Timeout: advance uncensored fallback chain instead of failing
+      // Timeout on uncensored chain: advance to next step
       if (useVenice || useOpenRouterUncensored) {
         const nextStep = uncensoredStep + 1;
         log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} timed out, advancing to step ${nextStep}`);
         const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
+        return _invokeLLMWithRetry(fallbackParams, priority, 0);
+      }
+      // Timeout on shared Venice: fall back to OpenAI
+      if (useSharedVenice) {
+        log.warn(`[LLM] ${systemTag}: Shared Venice timed out after ${fetchTimeoutMs / 1000}s, falling back to OpenAI`);
+        const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
         return _invokeLLMWithRetry(fallbackParams, priority, 0);
       }
       throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`);
