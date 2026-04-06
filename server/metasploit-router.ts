@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -184,6 +184,7 @@ export const metasploitRouter = router({
 
   listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -203,7 +204,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -231,7 +233,8 @@ export const metasploitRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -265,7 +268,8 @@ export const metasploitRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -291,7 +295,8 @@ export const metasploitRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const nodes = await getNodes(ctx.user.id);
       if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       await setActiveNodeId(ctx.user.id, input.nodeId);
@@ -302,7 +307,8 @@ export const metasploitRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -319,6 +325,7 @@ export const metasploitRouter = router({
   /** Get connection status */
   getConnection: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     const nodes = await getNodes(ctx.user.id);
@@ -341,7 +348,8 @@ export const metasploitRouter = router({
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node. Add and deploy a dedicated VPS node first." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit command: ${input.command.substring(0, 60)}`); } catch {}
@@ -352,6 +360,7 @@ export const metasploitRouter = router({
   /** List active sessions */
   listSessions: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node." });
@@ -394,7 +403,8 @@ export const metasploitRouter = router({
     .input(z.object({ query: z.string().min(1), type: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node." });
       const typeFilter = input.type ? ` type:${input.type}` : '';
@@ -413,7 +423,8 @@ export const metasploitRouter = router({
     .input(z.object({ host: z.string().optional(), port: z.number().optional(), password: z.string().optional() }))
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) return { success: false, message: "No active Metasploit node. Add a dedicated VPS node first." };
       return { success: true, message: `Using node "${node.label}" at ${node.publicIp ?? node.sshHost}` };
@@ -421,6 +432,7 @@ export const metasploitRouter = router({
 
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     await setActiveNodeId(ctx.user.id, null);
     return { success: true, message: "Disconnected from active node." };
@@ -431,7 +443,8 @@ export const metasploitRouter = router({
     .input(z.object({ host: z.string().optional(), port: z.number().default(55553).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) return { success: false, message: "No active Metasploit node. Add a dedicated VPS node first." };
       try {
@@ -449,6 +462,7 @@ export const metasploitRouter = router({
 
   getStatus: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) return { running: false, version: null, raw: "No active node.", message: "No active node." };
@@ -463,6 +477,7 @@ export const metasploitRouter = router({
 
   install: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -502,6 +517,7 @@ export const metasploitRouter = router({
 
   update: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -516,6 +532,7 @@ export const metasploitRouter = router({
     .input(z.object({ rpcPassword: z.string().optional(), rpcPort: z.number().optional(), ssl: z.boolean().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -539,6 +556,7 @@ export const metasploitRouter = router({
 
   stopRpcd: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -553,7 +571,8 @@ export const metasploitRouter = router({
     .input(z.object({ module: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       // execMsfCommand already wraps in msfconsole -r, so pass the msfconsole command directly
@@ -565,7 +584,8 @@ export const metasploitRouter = router({
     .input(z.object({ sessionId: z.union([z.string(), z.number()]).transform(v => String(v)) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       // Pass msfconsole command directly to execMsfCommand (it wraps in msfconsole -r)
@@ -577,7 +597,8 @@ export const metasploitRouter = router({
     .input(z.object({ module: z.string(), options: z.record(z.string(), z.unknown()).optional(), payload: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       // Build a multi-line msfconsole resource script — execMsfCommand handles the wrapping
@@ -593,7 +614,8 @@ export const metasploitRouter = router({
     .input(z.object({ payload: z.string(), lhost: z.string(), lport: z.number(), format: z.string().default("raw"), encoder: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       const encoderFlag = input.encoder ? `-e ${input.encoder}` : '';
@@ -607,6 +629,7 @@ export const metasploitRouter = router({
 
   listWorkspaces: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -623,7 +646,8 @@ export const metasploitRouter = router({
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       const out = await execMsfCommand(node, `workspace -a ${input.name}`, 15000, ctx.user.id);
@@ -634,7 +658,8 @@ export const metasploitRouter = router({
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       const out = await execMsfCommand(node, `workspace ${input.name}`, 15000, ctx.user.id);
@@ -643,6 +668,7 @@ export const metasploitRouter = router({
 
   listHosts: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -652,6 +678,7 @@ export const metasploitRouter = router({
 
   listServices: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -661,6 +688,7 @@ export const metasploitRouter = router({
 
   listVulns: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -670,6 +698,7 @@ export const metasploitRouter = router({
 
   listLoot: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -679,6 +708,7 @@ export const metasploitRouter = router({
 
   listCreds: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -693,7 +723,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `db_nmap: ${input.target}`); } catch {}
@@ -709,7 +740,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `Start listener: ${input.lhost}:${input.lport}`); } catch {}
@@ -725,7 +757,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `Session interact: ${input.sessionId}`); } catch {}
@@ -742,7 +775,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `Post module: ${input.module}`); } catch {}
@@ -766,7 +800,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `Obfuscated payload: ${input.payload}`); } catch {}
@@ -786,7 +821,8 @@ export const metasploitRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "metasploit_action", `AutoExploit: ${input.target}`); } catch {}
@@ -803,7 +839,8 @@ export const metasploitRouter = router({
     .input(z.object({ format: z.enum(["xml", "html", "pdf", "csv"]).default("xml") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
+      enforceAdminFeature(ctx.user.role, "Metasploit");
+    enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       const outFile = `/tmp/msf_report_${Date.now()}.${input.format}`;

@@ -216,7 +216,7 @@ export default function LandingPage() {
             <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Request Demo
             </Button>
-            <Button onClick={() => { trackDownload("desktop"); setLocation("/download"); }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
+            <Button onClick={() => { trackDownload("desktop"); window.location.href = getRegisterUrl("/fetcher/download-app"); }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
               Download Desktop App
             </Button>
           </div>

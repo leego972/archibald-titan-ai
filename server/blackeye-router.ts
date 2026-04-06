@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -161,6 +161,7 @@ export const blackeyeRouter = router({
 
   listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -179,7 +180,8 @@ export const blackeyeRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -206,7 +208,8 @@ export const blackeyeRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -240,7 +243,8 @@ export const blackeyeRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -266,7 +270,8 @@ export const blackeyeRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const nodes = await getNodes(ctx.user.id);
       if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       await setActiveNodeId(ctx.user.id, input.nodeId);
@@ -277,7 +282,8 @@ export const blackeyeRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -293,6 +299,7 @@ export const blackeyeRouter = router({
 
   getConnection: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     const nodes = await getNodes(ctx.user.id);
@@ -313,7 +320,8 @@ export const blackeyeRouter = router({
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node. Add and deploy a dedicated VPS node first." });
       try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye command: ${input.command.substring(0, 60)}`); } catch {}
@@ -324,6 +332,7 @@ export const blackeyeRouter = router({
   /** List available phishing templates */
   listTemplates: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node." });
@@ -371,7 +380,8 @@ export const blackeyeRouter = router({
     .input(z.object({ host: z.string().optional(), port: z.number().default(22).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) return { success: false, message: "No active BlackEye node. Add a dedicated VPS node first." };
       try {
@@ -388,6 +398,7 @@ export const blackeyeRouter = router({
 
   getStatus: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) return { running: false, installed: false, message: "No active node.", lastCommit: null, templateCount: 0 };
@@ -404,6 +415,7 @@ export const blackeyeRouter = router({
 
   install: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -439,7 +451,8 @@ export const blackeyeRouter = router({
     .input(z.object({ template: z.string().optional(), port: z.number().default(80).optional(), customDomain: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye: launch ${input.template ?? 'facebook'} phishing page`); } catch {}
@@ -487,6 +500,7 @@ export const blackeyeRouter = router({
 
   stop: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -497,6 +511,7 @@ export const blackeyeRouter = router({
 
   getCaptured: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -526,6 +541,7 @@ export const blackeyeRouter = router({
     .input(z.object({ lines: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -537,6 +553,7 @@ export const blackeyeRouter = router({
 
   update: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -547,6 +564,7 @@ export const blackeyeRouter = router({
   /** Clear all captured credentials */
   clearCaptures: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -557,6 +575,7 @@ export const blackeyeRouter = router({
   /** Export captures as structured JSON with metadata */
   exportCaptures: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -580,6 +599,7 @@ export const blackeyeRouter = router({
   /** List all currently running PHP phishing servers on the node */
   getActiveServers: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
@@ -605,7 +625,8 @@ export const blackeyeRouter = router({
     .input(z.object({ port: z.number().min(1).max(65535) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
+      enforceAdminFeature(ctx.user.role, "BlackEye");
+    enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
       await execSSHCommand(

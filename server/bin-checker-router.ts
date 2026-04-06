@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { createLogger } from "./_core/logger.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { getErrorMessage } from "./_core/errors.js";
@@ -172,7 +172,7 @@ export const COUNTRIES = [
 export const binCheckerRouter = router({
 
   /** Get the country list for the country picker */
-  getCountries: protectedProcedure.query(async () => {
+  getCountries: adminProcedure.query(async () => {
     return { countries: COUNTRIES };
   }),
 
@@ -180,7 +180,7 @@ export const binCheckerRouter = router({
    * Look up a BIN (first 6-8 digits of a card number).
    * Returns bank name, card type, country, network — NO charge, NO auth.
    */
-  lookupBin: protectedProcedure
+  lookupBin: adminProcedure
     .input(z.object({ bin: z.string().min(6).max(8) }))
     .mutation(async ({ ctx, input }) => {
       const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
@@ -233,7 +233,7 @@ export const binCheckerRouter = router({
    * Validate a full card number using Luhn algorithm + network detection.
    * Completely offline — no network request, no charge.
    */
-  validateCard: protectedProcedure
+  validateCard: adminProcedure
     .input(z.object({ cardNumber: z.string().min(13).max(19) }))
     .mutation(async ({ input }) => {
       const clean = input.cardNumber.replace(/\D/g, "");
@@ -279,7 +279,7 @@ export const binCheckerRouter = router({
   /**
    * Bulk validate multiple card numbers at once.
    */
-  bulkValidate: protectedProcedure
+  bulkValidate: adminProcedure
     .input(z.object({ cards: z.array(z.string()).min(1).max(100) }))
     .mutation(async ({ ctx, input }) => {
       const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
@@ -309,7 +309,7 @@ export const binCheckerRouter = router({
    * Reverse BIN search — search by bank name + country to get BIN numbers.
    * Uses the local 343k-row BIN database — no external API needed.
    */
-  reverseBinSearch: protectedProcedure
+  reverseBinSearch: adminProcedure
     .input(z.object({
       query: z.string().min(1).max(100),
       country: z.string().nullish(),   // ISO alpha-2 code e.g. "AU"
@@ -360,7 +360,7 @@ export const binCheckerRouter = router({
   /**
    * Bulk BIN lookup — look up multiple BINs at once.
    */
-  bulkBinLookup: protectedProcedure
+  bulkBinLookup: adminProcedure
     .input(z.object({ bins: z.array(z.string().min(6).max(8)).min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
       const creditCheck = await checkCredits(ctx.user.id, "bin_lookup");
@@ -395,7 +395,7 @@ export const binCheckerRouter = router({
     }),
 
   /** Get card network info by prefix (instant, offline) */
-  detectNetwork: protectedProcedure
+  detectNetwork: adminProcedure
     .input(z.object({ prefix: z.string().min(1).max(8) }))
     .query(async ({ input }) => {
       const network = detectNetwork(input.prefix);
@@ -422,7 +422,7 @@ export const binCheckerRouter = router({
    * Returns exact bank decline codes: insufficient_funds, lost_card, stolen_card,
    * expired_card, do_not_honor, fraudulent, card_velocity_exceeded, etc.
    */
-  fullCheck: protectedProcedure
+  fullCheck: adminProcedure
     .input(
       z.object({
         cardNumber: z.string().min(13).max(19),

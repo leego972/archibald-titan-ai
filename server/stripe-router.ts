@@ -4,8 +4,8 @@ import { eq, and, isNotNull, ne, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { getDb } from "./db";
-import { subscriptions, users, creditBalances, creditEscalation } from "../drizzle/schema";
-import { PRICING_TIERS, CREDIT_PACKS, type PlanId } from "../shared/pricing";
+import { subscriptions, users, creditBalances, creditEscalation, creditTransactions } from "../drizzle/schema";
+import { PRICING_TIERS, INTERNAL_TIERS, CREDIT_PACKS, type PlanId } from "../shared/pricing";
 import { addCredits, processMonthlyRefill, getCreditBalance } from "./credit-service";
 import { referralCodes } from "../drizzle/schema";
 import { REFERRAL_CONFIG } from "./affiliate-engine";
@@ -51,7 +51,7 @@ async function getOrCreatePrice(
   if (priceCache[cacheKey]) return priceCache[cacheKey];
 
   const stripe = getStripe();
-  const tier = PRICING_TIERS.find((t) => t.id === planId);
+  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
   if (!tier) throw new Error(`Unknown plan: ${planId}`);
 
   const amount =
@@ -409,18 +409,47 @@ export const stripeRouter = router({
         .set({ plan: input.planId })
         .where(eq(subscriptions.userId, ctx.user.id));
 
-      // Grant credit difference on upgrade (so users get extra credits immediately)
-      const oldTier = PRICING_TIERS.find((t) => t.id === sub[0].plan);
-      const newTier = PRICING_TIERS.find((t) => t.id === input.planId);
-      if (oldTier && newTier && newTier.credits.monthlyAllocation > oldTier.credits.monthlyAllocation) {
-        const creditDiff = newTier.credits.monthlyAllocation - oldTier.credits.monthlyAllocation;
-        await addCredits(
-          ctx.user.id,
-          creditDiff,
-          "admin_adjustment",
-          `Plan upgrade (${oldTier.name} → ${newTier.name}): +${creditDiff} bonus credits`
-        );
-        log.info(`[Stripe] Upgrade credit bonus: user=${ctx.user.id}, ${oldTier.name} → ${newTier.name}, +${creditDiff} credits`);
+      // Grant credit difference on upgrade / cap credits on downgrade
+      const oldTier = PRICING_TIERS.find((t) => t.id === sub[0].plan) || INTERNAL_TIERS.find((t) => t.id === sub[0].plan);
+      const newTier = PRICING_TIERS.find((t) => t.id === input.planId) || INTERNAL_TIERS.find((t) => t.id === input.planId);
+      if (oldTier && newTier) {
+        const oldAlloc = oldTier.credits.monthlyAllocation;
+        const newAlloc = newTier.credits.monthlyAllocation;
+        if (newAlloc > oldAlloc) {
+          // Upgrade: grant the pro-rated difference immediately
+          const creditDiff = newAlloc - oldAlloc;
+          await addCredits(
+            ctx.user.id,
+            creditDiff,
+            "admin_adjustment",
+            `Plan upgrade (${oldTier.name} \u2192 ${newTier.name}): +${creditDiff} bonus credits`
+          );
+          log.info(`[Stripe] Upgrade credit bonus: user=${ctx.user.id}, ${oldTier.name} \u2192 ${newTier.name}, +${creditDiff} credits`);
+        } else if (newAlloc < oldAlloc) {
+          // Downgrade: cap current balance at the new tier's monthly allocation
+          const currentBal = await getCreditBalance(ctx.user.id);
+          if (!currentBal.isUnlimited && currentBal.credits > newAlloc) {
+            const excess = currentBal.credits - newAlloc;
+            await db.transaction(async (tx) => {
+              await tx
+                .update(creditBalances)
+                .set({
+                  credits: newAlloc,
+                  lifetimeCreditsUsed: sql`${creditBalances.lifetimeCreditsUsed} + ${excess}`,
+                })
+                .where(eq(creditBalances.userId, ctx.user.id));
+              await tx.insert(creditTransactions).values({
+                userId: ctx.user.id,
+                amount: -excess,
+                type: "admin_adjustment",
+                description: `Plan downgrade (${oldTier.name} \u2192 ${newTier.name}): balance capped at ${newAlloc}`,
+                balanceAfter: newAlloc,
+                stripePaymentIntentId: null,
+              });
+            });
+            log.info(`[Stripe] Downgrade credit cap: user=${ctx.user.id}, ${oldTier.name} \u2192 ${newTier.name}, balance capped at ${newAlloc} (removed ${excess})`);
+          }
+        }
       }
 
       return { success: true, newPlan: input.planId };
@@ -1381,7 +1410,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Grant initial monthly credit allocation for the new subscription
-  const tier = PRICING_TIERS.find((t) => t.id === planId);
+  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
   if (tier && tier.credits.monthlyAllocation > 0) {
     await addCredits(
       userId,
@@ -1453,8 +1482,8 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   // If plan changed (upgrade or downgrade), handle credit difference
   if (previousPlan && previousPlan !== planId && subRecord[0]) {
-    const newTier = PRICING_TIERS.find((t) => t.id === planId);
-    const oldTier = PRICING_TIERS.find((t) => t.id === previousPlan);
+    const newTier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
+    const oldTier = PRICING_TIERS.find((t) => t.id === previousPlan) || INTERNAL_TIERS.find((t) => t.id === previousPlan);
     log.info(`[Stripe Webhook] Plan changed: user=${subRecord[0].userId}, ${oldTier?.name || previousPlan} → ${newTier?.name || planId}`);
 
     // Grant credit difference on upgrade
@@ -1552,7 +1581,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
       if (userRecord.length > 0) {
         const { email, name } = userRecord[0];
-        const tier = PRICING_TIERS.find((t) => t.id === subRecord[0].plan);
+        const tier = PRICING_TIERS.find((t) => t.id === subRecord[0].plan) || INTERNAL_TIERS.find((t) => t.id === subRecord[0].plan);
         const planName = tier?.name || subRecord[0].plan;
         const periodEnd = subRecord[0].currentPeriodEnd || new Date();
 
@@ -1623,7 +1652,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   if (billingReason === "subscription_cycle") {
     // This is an auto-renewal payment — refill credits!
-    const tier = PRICING_TIERS.find((t) => t.id === planId);
+    const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
     const allocation = tier?.credits.monthlyAllocation ?? 0;
 
     if (allocation > 0) {
@@ -1688,7 +1717,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
       if (userRecord.length > 0) {
         const { email, name } = userRecord[0];
-        const tier2 = PRICING_TIERS.find((t) => t.id === planId);
+        const tier2 = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
         const planName = tier2?.name || planId;
         const amountCents = (invoice as any).amount_paid ?? 0;
         const nextBillingDate = newPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -1769,7 +1798,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   if (userRecord.length === 0) return;
   const { email, name } = userRecord[0];
 
-  const tier = PRICING_TIERS.find((t) => t.id === plan);
+  const tier = PRICING_TIERS.find((t) => t.id === plan) || INTERNAL_TIERS.find((t) => t.id === plan);
   const planName = tier?.name || plan;
   const updateUrl = `${process.env.APP_URL || "https://www.archibaldtitan.com"}/settings/billing`;
 

@@ -19,6 +19,7 @@ import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { decrypt } from "./fetcher-db";
 import { createLogger } from "./_core/logger.js";
+import { isAdminRole } from '@shared/const';
 
 const log = createLogger("security-stream");
 
@@ -104,6 +105,10 @@ export function registerSecurityStreamRoutes(app: Express): void {
       const ctx = await createContext({ req, res, info: {} as any });
       if (!ctx.user) {
         res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!isAdminRole(ctx.user.role)) {
+        res.status(403).json({ error: "Forbidden" });
         return;
       }
       userId = ctx.user.id;

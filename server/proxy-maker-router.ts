@@ -17,7 +17,7 @@ import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { encrypt, decrypt } from "./fetcher-db";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits, consumeCreditsAmount } from "./credit-service";
 import { execSSHCommand, type SSHConfig } from "./titan-server";
 import { createLogger } from "./_core/logger.js";
@@ -157,6 +157,7 @@ export const proxyMakerRouter = router({
   /** List all proxy nodes (SSH credentials stripped) */
   listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Proxy Maker");
     enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
     const nodes = await getNodes(ctx.user.id);
     const rotation = await getRotation(ctx.user.id);
@@ -182,7 +183,8 @@ export const proxyMakerRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -209,7 +211,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -246,7 +249,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -272,6 +276,7 @@ export const proxyMakerRouter = router({
   /** Check all nodes at once */
   checkAllNodes: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Proxy Maker");
     enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
     const nodes = await getNodes(ctx.user.id);
     const results: { nodeId: string; label: string; alive: boolean; publicIp?: string; latencyMs: number }[] = [];
@@ -301,7 +306,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -321,7 +327,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ nodeId: z.string(), stopFirst: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -352,7 +359,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const rotation = await getRotation(ctx.user.id);
       rotation.enabled = input.enabled;
       await saveRotation(ctx.user.id, rotation);
@@ -377,7 +385,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ nodeId: z.string(), testUrl: z.string().default("https://api.ipify.org") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       const nodes = await getNodes(ctx.user.id);
       const node = nodes.find(n => n.id === input.nodeId);
       if (!node) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -399,7 +408,8 @@ export const proxyMakerRouter = router({
     .input(z.object({ type: z.enum(["socks5", "http", "all"]).default("socks5"), onlineOnly: z.boolean().default(true) }))
     .query(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
+      enforceAdminFeature(ctx.user.role, "Proxy Maker");
+    enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
       let nodes = await getNodes(ctx.user.id);
       if (input.onlineOnly) nodes = nodes.filter(n => n.status === "online" && n.publicIp);
       const lines: string[] = [];

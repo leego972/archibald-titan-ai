@@ -27,7 +27,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -318,6 +318,7 @@ export const evilginxRouter = router({
   /** List all Evilginx nodes */
   listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -338,7 +339,8 @@ export const evilginxRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -367,7 +369,8 @@ export const evilginxRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -402,6 +405,7 @@ export const evilginxRouter = router({
   /** Start the Evilginx service on the active node */
   startServer: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -427,6 +431,7 @@ export const evilginxRouter = router({
   /** Stop the Evilginx service on the active node */
   stopServer: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -449,7 +454,8 @@ export const evilginxRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -480,7 +486,8 @@ export const evilginxRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const nodes = await getNodes(ctx.user.id);
       if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       await setActiveNodeId(ctx.user.id, input.nodeId);
@@ -492,7 +499,8 @@ export const evilginxRouter = router({
     .input(z.object({ nodeId: z.string(), stopFirst: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -512,6 +520,7 @@ export const evilginxRouter = router({
   /** Get status of the active node */
   checkInstall: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) return { installed: false, running: false, version: "", path: "", message: "No active node. Add a dedicated VPS node first." };
@@ -532,7 +541,8 @@ export const evilginxRouter = router({
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node. Add and deploy a dedicated VPS node first." });
       if (!node.installed) throw new TRPCError({ code: "BAD_REQUEST", message: `Evilginx not installed on "${node.label}". Deploy the node first.` });
@@ -543,6 +553,7 @@ export const evilginxRouter = router({
   /** List phishlets on the active node */
   listPhishlets: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -555,7 +566,8 @@ export const evilginxRouter = router({
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: enable phishlet ${input.name}`); } catch {}
@@ -567,7 +579,8 @@ export const evilginxRouter = router({
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `phishlets disable ${input.name}`, 20000, ctx.user.id);
@@ -578,7 +591,8 @@ export const evilginxRouter = router({
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `phishlets hide ${input.name}`, 20000, ctx.user.id);
@@ -589,7 +603,8 @@ export const evilginxRouter = router({
     .input(z.object({ name: z.string().min(1), hostname: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `phishlets hostname ${input.name} ${input.hostname}`, 20000, ctx.user.id);
@@ -598,6 +613,7 @@ export const evilginxRouter = router({
 
   listLures: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -615,7 +631,8 @@ export const evilginxRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: create lure for ${input.phishlet}`); } catch {}
@@ -638,7 +655,8 @@ export const evilginxRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `lures delete ${input.id}`, 15000, ctx.user.id);
@@ -649,7 +667,8 @@ export const evilginxRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `lures get-url ${input.id}`, 15000, ctx.user.id);
@@ -659,6 +678,7 @@ export const evilginxRouter = router({
 
   listSessions: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -670,7 +690,8 @@ export const evilginxRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `sessions ${input.id}`, 15000, ctx.user.id);
@@ -681,7 +702,8 @@ export const evilginxRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `sessions delete ${input.id}`, 15000, ctx.user.id);
@@ -693,7 +715,8 @@ export const evilginxRouter = router({
     .input(z.object({ key: z.string().min(1), value: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `config ${input.key} ${input.value}`, 15000, ctx.user.id);
@@ -703,6 +726,7 @@ export const evilginxRouter = router({
   /** Get current config */
   getConfig: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -715,7 +739,8 @@ export const evilginxRouter = router({
     .input(z.object({ lines: z.number().min(1).max(500).default(100) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const script = `journalctl -u evilginx -n ${input.lines} --no-pager 2>/dev/null || tail -${input.lines} /var/log/evilginx.log 2>/dev/null || echo 'No logs found'`;
@@ -726,6 +751,7 @@ export const evilginxRouter = router({
   /** Export all captured sessions as JSON */
   exportSessions: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -737,6 +763,7 @@ export const evilginxRouter = router({
   /** Clear all captured sessions */
   clearSessions: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -754,7 +781,8 @@ export const evilginxRouter = router({
     .input(z.object({ url: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, `config redirect_key ${input.url}`, 15000, ctx.user.id);
@@ -764,6 +792,7 @@ export const evilginxRouter = router({
   /** Get per-phishlet session statistics */
   getPhishletStats: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
@@ -786,7 +815,8 @@ export const evilginxRouter = router({
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional().default(30000) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
+      enforceAdminFeature(ctx.user.role, "Evilginx");
+    enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
       const raw = await execOnNode(node, input.command, input.timeoutMs, ctx.user.id);
@@ -796,6 +826,7 @@ export const evilginxRouter = router({
   // ── Legacy compatibility procedures (kept for existing UI) ────────────────
   connectLocal: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     if (!node) return { success: false, message: "No active Evilginx node. Add a dedicated VPS node first.", mode: "none" };
@@ -804,6 +835,7 @@ export const evilginxRouter = router({
 
   getConnection: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     const node = await getActiveNode(ctx.user.id);
     const nodes = await getNodes(ctx.user.id);
@@ -827,6 +859,7 @@ export const evilginxRouter = router({
 
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
     await setActiveNodeId(ctx.user.id, null);
     return { success: true, message: "Disconnected from active node." };

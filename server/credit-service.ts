@@ -10,7 +10,7 @@ import { eq, sql, desc } from "drizzle-orm";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions, users } from "../drizzle/schema";
 import {
-  PRICING_TIERS, CREDIT_COSTS,
+  PRICING_TIERS, INTERNAL_TIERS, CREDIT_COSTS,
   DAILY_FREE_CREDITS_PLAN,
   type PlanId, type CreditActionType
 } from "../shared/pricing";
@@ -478,7 +478,7 @@ export async function processMonthlyRefill(userId: number): Promise<boolean> {
 
   // Get user's plan allocation
   const plan = await getUserPlan(userId);
-  const tier = PRICING_TIERS.find((t) => t.id === plan.planId);
+  const tier = PRICING_TIERS.find((t) => t.id === plan.planId) || INTERNAL_TIERS.find((t) => t.id === plan.planId);
   const allocation = tier?.credits.monthlyAllocation ?? 50;
 
   if (allocation <= 0) return false;

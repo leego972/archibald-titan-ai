@@ -22,7 +22,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits, consumeCreditsAmount } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -407,6 +407,7 @@ export const vpnChainRouter = router({
 
   listHops: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const active = await isChainActive(ctx.user.id);
@@ -430,7 +431,8 @@ export const vpnChainRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -456,7 +458,8 @@ export const vpnChainRouter = router({
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       const hops = await getHops(ctx.user.id);
       const idx = hops.findIndex(h => h.id === input.hopId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
@@ -499,6 +502,7 @@ export const vpnChainRouter = router({
    */
   buildChain: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const readyHops = hops.filter(h => h.status === "ready" && h.installed);
@@ -528,6 +532,7 @@ export const vpnChainRouter = router({
    */
   generateClientConfig: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const readyHops = hops.filter(h => h.status === "ready" && h.installed && h.chainLinked);
@@ -588,7 +593,8 @@ export const vpnChainRouter = router({
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       const hops = await getHops(ctx.user.id);
       const idx = hops.findIndex(h => h.id === input.hopId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
@@ -621,7 +627,8 @@ export const vpnChainRouter = router({
     .input(z.object({ orderedIds: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       const hops = await getHops(ctx.user.id);
       const reordered = input.orderedIds.map((id, i) => {
         const hop = hops.find(h => h.id === id);
@@ -637,7 +644,8 @@ export const vpnChainRouter = router({
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       const hops = await getHops(ctx.user.id);
       const idx = hops.findIndex(h => h.id === input.hopId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
@@ -654,6 +662,7 @@ export const vpnChainRouter = router({
 
   testChain: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const sorted = hops.sort((a, b) => a.hopIndex - b.hopIndex);
@@ -687,7 +696,8 @@ export const vpnChainRouter = router({
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       if (input.enabled) {
         const hops = await getHops(ctx.user.id);
         const readyHops = hops.filter(h => h.status === "ready" && h.installed);
@@ -720,6 +730,7 @@ export const vpnChainRouter = router({
 
   getStatus: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const active = await isChainActive(ctx.user.id);
@@ -736,6 +747,7 @@ export const vpnChainRouter = router({
 
   getChain: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const active = await isChainActive(ctx.user.id);
@@ -753,6 +765,7 @@ export const vpnChainRouter = router({
 
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     const readyHops = hops.filter(h => h.status === "ready" && h.installed);
@@ -781,7 +794,8 @@ export const vpnChainRouter = router({
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       if (input.active) {
         const hops = await getHops(ctx.user.id);
         const readyHops = hops.filter(h => h.status === "ready" && h.installed);
@@ -813,7 +827,8 @@ export const vpnChainRouter = router({
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
+      enforceAdminFeature(ctx.user.role, "VPN Chain");
+    enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
       const hops = await getHops(ctx.user.id);
       const hop = hops.find(h => h.id === input.hopId);
       if (!hop) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
@@ -828,6 +843,7 @@ export const vpnChainRouter = router({
 
   clearChain: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
     const hops = await getHops(ctx.user.id);
     await teardownChainTunnels(ctx.user.id, hops);

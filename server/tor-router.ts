@@ -22,7 +22,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits, consumeCreditsAmount } from "./credit-service";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -215,6 +215,7 @@ export const torRouter = router({
 
   listNodes: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const nodes = await getNodes(ctx.user.id);
     const activeId = await getActiveNodeId(ctx.user.id);
@@ -233,7 +234,8 @@ export const torRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       if (!input.sshPassword && !input.sshKey) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "SSH password or private key required." });
       }
@@ -260,7 +262,8 @@ export const torRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -296,7 +299,8 @@ export const torRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -323,7 +327,8 @@ export const torRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const nodes = await getNodes(ctx.user.id);
       if (!nodes.some(n => n.id === input.nodeId)) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       await setActiveNodeId(ctx.user.id, input.nodeId);
@@ -334,7 +339,8 @@ export const torRouter = router({
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const nodes = await getNodes(ctx.user.id);
       const idx = nodes.findIndex(n => n.id === input.nodeId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
@@ -352,6 +358,7 @@ export const torRouter = router({
   /** Get status of the active node */
   getStatus: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     const nodes = await getNodes(ctx.user.id);
@@ -369,6 +376,7 @@ export const torRouter = router({
   /** Request a new Tor circuit (new exit IP) */
   newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
@@ -396,6 +404,7 @@ export const torRouter = router({
   /** Start Tor on the active node */
   startTor: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
@@ -412,6 +421,7 @@ export const torRouter = router({
   /** Stop Tor on the active node */
   stopTor: protectedProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
@@ -427,7 +437,8 @@ export const torRouter = router({
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
       const script = input.enabled
@@ -458,6 +469,7 @@ export const torRouter = router({
   /** Get whether Tor is currently active — does a live SSH check, not just DB status */
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
+    enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
     const node = await getActiveNode(ctx.user.id);
     if (!node || !node.installed) return { active: false, nodeLabel: node?.label, installed: node?.installed ?? false };
@@ -483,7 +495,8 @@ export const torRouter = router({
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const node = await getActiveNode(ctx.user.id);
       if (!node) {
         throw new TRPCError({
@@ -514,7 +527,8 @@ export const torRouter = router({
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
-      enforceFeature(plan.planId, "offensive_tooling", "Tor");
+      enforceAdminFeature(ctx.user.role, "Tor");
+    enforceFeature(plan.planId, "offensive_tooling", "Tor");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
       // Medium (75) — routing a command through an existing Tor circuit is lightweight

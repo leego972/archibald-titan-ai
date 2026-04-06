@@ -102,7 +102,7 @@ export default function SecurityMarketplacePage() {
               <ShoppingBag className="h-7 w-7 text-purple-400" />
               Security Module Marketplace
             </h1>
-            <p className="text-slate-400 mt-1">Community-built security modules, playbooks, and automation scripts</p>
+            <p className="text-slate-400 mt-1">Security module templates and examples — publish your own to grow the community library</p>
           </div>
           <Button onClick={() => setShowPublish(true)} className="bg-purple-600 hover:bg-purple-700">
             <Upload className="h-4 w-4 mr-2" />
@@ -115,8 +115,6 @@ export default function SecurityMarketplacePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Total Modules", value: stats.totalModules, icon: <Package className="h-4 w-4" />, color: "text-purple-400" },
-              { label: "Total Downloads", value: stats.totalDownloads.toLocaleString(), icon: <Download className="h-4 w-4" />, color: "text-blue-400" },
-              { label: "Contributors", value: stats.totalContributors, icon: <Users className="h-4 w-4" />, color: "text-green-400" },
               { label: "Installed", value: installed.length, icon: <CheckCircle className="h-4 w-4" />, color: "text-cyan-400" },
             ].map((s) => (
               <Card key={s.label} className="bg-slate-900/50 border-slate-800">

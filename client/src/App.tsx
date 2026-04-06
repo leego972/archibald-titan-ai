@@ -1,4 +1,7 @@
 import { useEffect } from "react";
+import { useAuth } from "./_core/hooks/useAuth";
+import { isAdminRole } from "@shared/const";
+import { useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
 import { initAdTracking } from "@/lib/adTracking";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -159,6 +162,18 @@ import ComplianceReportsPage from "./pages/ComplianceReportsPage";
 import SiemIntegrationPage from "./pages/SiemIntegrationPage";
 import SecurityMarketplacePage from "./pages/SecurityMarketplacePage";
 
+/** Renders the given page only when the logged-in user has an admin role.
+ * Non-admins are immediately redirected to /dashboard. */
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
+  if (loading) return null;
+  if (!user || !isAdminRole(user.role)) {
+    setLocation("/dashboard");
+    return null;
+  }
+  return <Component />;
+}
 
 function DashboardRouter() {
   return (
@@ -237,13 +252,13 @@ function DashboardRouter() {
         {/* LinkenSphere */}
         <Route path="/linken-sphere" component={LinkenSpherePage} />
 
-        {/* Evilginx */}
-        <Route path="/evilginx" component={EvilginxPage} />
+        {/* Evilginx — admin only */}
+        <Route path="/evilginx" component={() => <AdminRoute component={EvilginxPage} />} />
 
-        {/* Specialised Tools */}
-        <Route path="/blackeye" component={BlackEyePage} />
-        <Route path="/metasploit" component={MetasploitPage} />
-        <Route path="/exploitpack" component={ExploitPackPage} />
+        {/* Specialised Tools — admin only */}
+        <Route path="/blackeye" component={() => <AdminRoute component={BlackEyePage} />} />
+        <Route path="/metasploit" component={() => <AdminRoute component={MetasploitPage} />} />
+        <Route path="/exploitpack" component={() => <AdminRoute component={ExploitPackPage} />} />
 
         {/* Content Creator */}
         <Route path="/content-creator" component={ContentCreatorPage} />
@@ -263,15 +278,15 @@ function DashboardRouter() {
         <Route path="/proxy-maker" component={ProxyMakerPage} />
         <Route path="/proxy-rotation" component={ProxyRotationPage} />
         <Route path="/ip-rotation" component={IPRotationPage} />
-        <Route path="/bin-checker" component={BinCheckerPage} />
+        <Route path="/bin-checker" component={() => <AdminRoute component={BinCheckerPage} />} />
         <Route path="/web-agent" component={WebAgentPage} />
 
-        {/* Admin */}
-        <Route path="/fetcher/releases" component={ReleaseManagementPage} />
-        <Route path="/fetcher/admin" component={AdminPanel} />
-        <Route path="/admin/activity-log" component={AdminActivityLogPage} />
-        <Route path="/admin/titan-server" component={TitanServerAdminPage} />
-        <Route path="/fetcher/self-improvement" component={SelfImprovementDashboard} />
+        {/* Admin — requires admin role; non-admins are redirected to /dashboard */}
+        <Route path="/fetcher/releases" component={() => <AdminRoute component={ReleaseManagementPage} />} />
+        <Route path="/fetcher/admin" component={() => <AdminRoute component={AdminPanel} />} />
+        <Route path="/admin/activity-log" component={() => <AdminRoute component={AdminActivityLogPage} />} />
+        <Route path="/admin/titan-server" component={() => <AdminRoute component={TitanServerAdminPage} />} />
+        <Route path="/fetcher/self-improvement" component={() => <AdminRoute component={SelfImprovementDashboard} />} />
 
         {/* Desktop App Settings */}
         <Route path="/desktop-settings" component={DesktopSettingsPage} />

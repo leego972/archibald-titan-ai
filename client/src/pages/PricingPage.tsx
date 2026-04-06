@@ -39,7 +39,7 @@ export default function PricingPage() {
         source: "web",
       });
       if (result.url) {
-        trackPurchase({ value: planId === "pro" ? 49 : 199, currency: "USD", planName: planId });
+        trackPurchase({ value: planId === "pro" ? 29 : 99, currency: "USD", planName: planId });
         window.location.href = result.url;
       } else {
         toast.error("Failed to create checkout session. Please try again.");
@@ -82,7 +82,7 @@ export default function PricingPage() {
               <div className="mb-8">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">Pro</h3>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl font-black text-white">$49</span>
+                  <span className="text-5xl font-black text-white">$29</span>
                   <span className="text-lg text-white/20">/mo</span>
                 </div>
                 <p className="text-sm text-white/40">For individual engineers and security professionals.</p>
@@ -121,7 +121,7 @@ export default function PricingPage() {
               <div className="mb-8">
                 <h3 className="text-sm font-black uppercase tracking-widest text-blue-400 mb-4">Enterprise</h3>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl font-black text-white">$199</span>
+                  <span className="text-5xl font-black text-white">$99</span>
                   <span className="text-lg text-white/20">/mo</span>
                 </div>
                 <p className="text-sm text-white/40">For security teams and engineering organizations.</p>
@@ -164,7 +164,7 @@ export default function PricingPage() {
               
               <div className="flex-1 space-y-4 mb-10">
                 {[
-                  "Unlimited Credits",
+                  "10,000,000 Credits/Month",
                   "On-Premise or Air-Gapped Deployment",
                   "Custom AI Model Tuning",
                   "Dedicated Account Manager",

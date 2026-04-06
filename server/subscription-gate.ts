@@ -321,6 +321,20 @@ export function enforceFeature(planId: PlanId, feature: string, featureLabel: st
   }
 }
 
+/**
+ * enforceAdminFeature — for features that are admin-role gated (not just plan-gated).
+ * Throws FORBIDDEN if the user is not an admin, regardless of their plan tier.
+ * Use this for offensive security tools, BIN checker, and other admin-only capabilities.
+ */
+export function enforceAdminFeature(userRole: string, featureLabel: string): void {
+  if (!isAdminRole(userRole)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `${featureLabel} requires administrator access.`,
+    });
+  }
+}
+
 // ─── Clone Website Gate ────────────────────────────────────────────
 // Clone Website is a premium exclusive feature for Cyber+ and Titan tiers only.
 // Returns true if the user can access the clone website feature.
