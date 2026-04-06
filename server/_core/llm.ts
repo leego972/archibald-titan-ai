@@ -431,11 +431,23 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       const titanResult = await _invokeTitanAI(params, requestedModel);
       return titanResult;
     } catch (titanErr: unknown) {
-      // If TitanAI is down or returns an error, log and fall through to Venice/OpenAI
-      log.warn(`[LLM] TitanAI API failed, falling back to Venice/OpenAI: ${(titanErr as Error).message}`);
-      // Strip the titan model override so normal routing picks the best available model
-      const fallbackParams = { ...params, model: "strong" as const };
-      return _invokeLLMWithRetry(fallbackParams, params.priority || "background");
+      // If TitanAI is down or returns an error, fall through to the normal
+      // Venice-first routing chain (Venice Pro → OpenRouter → OpenAI).
+      // Strip the titan model string so the routing logic selects the best
+      // available Venice/OpenAI model as it normally would.
+      log.warn(`[LLM] TitanAI API failed, falling back to Venice → OpenAI chain: ${(titanErr as Error).message}`);
+      initKeyPool();
+      assertApiKey();
+      const priority = params.priority || "background";
+      const isChat = priority === "chat";
+      if (isChat) chatCallStarted();
+      // Remove the titan-* model string — let Venice/OpenAI routing decide the model
+      const { model: _drop, ...restParams } = params;
+      try {
+        return await _invokeLLMWithRetry(restParams, priority);
+      } finally {
+        if (isChat) chatCallFinished();
+      }
     }
   }
 
