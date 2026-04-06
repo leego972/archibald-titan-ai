@@ -22,7 +22,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <span className="text-lg font-bold tracking-tight text-white/90">Archibald Titan</span>
             </Link>
             <div className="hidden md:flex items-center gap-8">
-              <Link href="/solutions" className="text-sm text-white/60 hover:text-white transition-colors">Solutions</Link>
+              <Link href="/use-cases" className="text-sm text-white/60 hover:text-white transition-colors">Solutions</Link>
               <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
               <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
               <Link href="/docs" className="text-sm text-white/60 hover:text-white transition-colors">Documentation</Link>
@@ -50,7 +50,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-[#02040a] pt-20 px-4 md:hidden">
           <div className="flex flex-col gap-6">
-            <Link href="/solutions" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Solutions</Link>
+            <Link href="/use-cases" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Solutions</Link>
             <Link href="/security" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Security</Link>
             <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Pricing</Link>
             <Link href="/docs" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Documentation</Link>
@@ -79,7 +79,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Link href="/contact" className="text-xs text-white/30 hover:text-white transition-colors">Contact</Link>
             </div>
             <div className="text-xs text-white/20">
-              © 2026 Archibald Titan. All rights reserved.
+              &copy; 2026 Archibald Titan. All rights reserved.
             </div>
           </div>
         </div>
