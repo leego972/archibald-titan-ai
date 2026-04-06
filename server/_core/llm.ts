@@ -519,7 +519,16 @@ async function _invokeTitanAI(
   return data;
 }
 
-async function _invokeLLMWithRetry(
+// ═══════════════════════════════════════════════════════════════════════════
+// CHAIN A — General traffic
+//   Venice Pro (shared) → OpenAI GPT-4.1
+//   Used for: all normal chat, website building, tools, background tasks.
+//   Venice is primary (best quality, no per-token cost to user).
+//   OpenAI is fallback (reliable, always available).
+//   Gemini is emergency-only when ALL OpenAI keys are simultaneously 429'd.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function _invokeGeneral(
   params: InvokeParams,
   priority: "chat" | "background",
   attempt = 0
@@ -537,57 +546,19 @@ async function _invokeLLMWithRetry(
     response_format,
   } = params;
 
-  // Model selection:
-  //   "fast"    = gpt-4.1-nano  (cheapest, simple text)
-  //   "strong"  = gpt-4.1-mini  (best value for code)
-  //   "premium" = gpt-4.1       (full model, used for security builds that need max capability)
-  // OpenRouter uncensored models are used for security builds (forceOpenRouter: true).
-  // Gemini is ONLY used as emergency fallback when all OpenAI keys are exhausted.
-  const hasToolsDefined = params.tools && params.tools.length > 0;
+  const hasToolsDefined = !!tools && tools.length > 0;
+  // Model preference: fast=gpt-4.1-nano, strong=gpt-4.1-mini (default for tools), premium=gpt-4.1
   const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
   const useOpenAI = hasKeys();
-  // forceGemini: routes this specific call to Gemini 2.5 Flash
   const forceGemini = params.forceGemini === true;
-  // forceOpenRouter: routes to uncensored model via Venice → OpenRouter → OpenAI fallback chain
-  const forceOpenRouter = params.forceOpenRouter === true;
-  // Uncensored fallback step: 0=Venice (primary), 1=OpenRouter free (secondary), 2=OpenAI (final)
-  const uncensoredStep = params._uncensoredFallbackStep ?? 0;
-  // Venice Pro models (upgraded to best available on Pro tier):
-  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, 128K ctx, best uncensored reasoning
-  //   Tools fast:      mistral-31-24b — 128K ctx, fn-calling + vision, fast
-  //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call + vision, best value
-  //   Tools premium:   qwen3-235b-a22b-instruct-2507 — 235B, maximum capability
-  const VENICE_UNCENSORED_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
-  const VENICE_UNCENSORED_TOOLS_MODEL =
-    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
-    modelPreference === "fast"    ? "mistral-31-24b" :
-                                    "kimi-k2-5"; // strong default: 256K ctx, code+vision+fn-call
-  const VENICE_UNCENSORED_MODEL = hasToolsDefined ? VENICE_UNCENSORED_TOOLS_MODEL : VENICE_UNCENSORED_CHAT_MODEL;
-  // OpenRouter secondary: Dolphin Mistral 24B Venice free tier
-  const OPENROUTER_UNCENSORED_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
-  // Determine which uncensored provider to use based on fallback step and key availability
-  const useVenice = forceOpenRouter && uncensoredStep === 0 && !!VENICE_API_KEY;
-  const useOpenRouterUncensored = forceOpenRouter && !useVenice && uncensoredStep <= 1 && !!OPENROUTER_API_KEY;
-  // Step 2 (or no uncensored keys): fall through to OpenAI
-
-  // ── Shared Venice Free Tier ──────────────────────────────────────────────
-  // When a user has NOT provided their own API key, route through the owner's
-  // Venice Pro key as a shared free tier. Users with their own key bypass this
-  // entirely. This gives every user Venice Pro quality without needing a key.
-  // Venice Pro models used for shared tier:
-  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, best reasoning
-  //   Tools fast:      mistral-31-24b — 128K ctx, fast fn-calling
-  //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call, best value
-  //   Tools premium:   qwen3-235b-a22b-instruct-2507 — max capability
   const usingUserKey = !!params.userApiKey;
-  // Respect _sharedVeniceFailed flag — if Venice already failed for this request, skip it
   const sharedVeniceFailed = params._sharedVeniceFailed === true;
-  const useSharedVenice = !usingUserKey && !forceOpenRouter && !forceGemini && !!VENICE_API_KEY && !sharedVeniceFailed;
 
-  // ── Venice shared-tier daily budget check ──────────────────────────────────
-  // Only enforce when: (a) we're about to use the shared Venice key, AND
-  // (b) a userId is provided (user-initiated calls). System/background calls
-  // without a userId bypass the limit to avoid breaking internal pipelines.
+  // Venice Pro shared tier — primary provider for all users without their own key.
+  // Skipped if: user has their own key, Venice key not set, or Venice already failed this request.
+  const useSharedVenice = !usingUserKey && !forceGemini && !!VENICE_API_KEY && !sharedVeniceFailed;
+
+  // ── Venice shared-tier daily budget check ──
   if (useSharedVenice && params.userId) {
     const planId = params.planId || "free";
     const veniceCheck = checkVeniceLimit(params.userId, planId);
@@ -595,25 +566,29 @@ async function _invokeLLMWithRetry(
       throw new Error(veniceCheck.message || "Daily Venice AI limit reached. Please try again tomorrow or add your own API key.");
     }
   }
-  const VENICE_SHARED_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
-  const VENICE_SHARED_TOOLS_MODEL =
+
+  // ── Model selection ──
+  // Venice Pro models:
+  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, best reasoning
+  //   Tools fast:      mistral-31-24b — 128K ctx, fast fn-calling
+  //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call, best value
+  //   Tools premium:   qwen3-235b-a22b-instruct-2507 — max capability
+  const VENICE_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_TOOLS_MODEL =
     modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
     modelPreference === "fast"    ? "mistral-31-24b" :
                                     "kimi-k2-5";
-  const VENICE_SHARED_MODEL = hasToolsDefined ? VENICE_SHARED_TOOLS_MODEL : VENICE_SHARED_CHAT_MODEL;
+  const VENICE_MODEL = hasToolsDefined ? VENICE_TOOLS_MODEL : VENICE_CHAT_MODEL;
 
-  const model = useVenice
-    ? VENICE_UNCENSORED_MODEL
-    : useOpenRouterUncensored
-    ? OPENROUTER_UNCENSORED_MODEL
-    : useSharedVenice
-    ? VENICE_SHARED_MODEL
+  const model = useSharedVenice
+    ? VENICE_MODEL
     : forceGemini
     ? "gemini-2.5-flash"
     : useOpenAI
     ? (modelPreference === "fast" ? "gpt-4.1-nano" : modelPreference === "premium" ? "gpt-4.1" : "gpt-4.1-mini")
     : "gemini-2.5-flash";
 
+  // ── Build request payload ──
   const payload: Record<string, unknown> = {
     model,
     messages: messages.map(normalizeMessage),
@@ -621,253 +596,153 @@ async function _invokeLLMWithRetry(
 
   if (tools && tools.length > 0) {
     payload.tools = tools;
-    // Force sequential tool calls — prevents the LLM from returning multiple
-    // tool_calls in one response, which causes 400 errors when any single
-    // tool execution fails (missing tool_call_id response messages).
-    // Venice supports parallel_tool_calls; OpenRouter Dolphin may not — skip for OpenRouter.
-    if (!useOpenRouterUncensored) {
-      payload.parallel_tool_calls = false;
-    }
+    payload.parallel_tool_calls = false; // force sequential tool calls
   }
 
-  // Venice-specific parameters: disable default system prompt so our uncensored
-  // instructions are not overridden by Venice's built-in system prompt.
-  if (useVenice || useSharedVenice) {
-    payload.venice_parameters = {
-      include_venice_system_prompt: false,
-    };
+  if (useSharedVenice) {
+    payload.venice_parameters = { include_venice_system_prompt: false };
   }
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
-  }
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
 
-  // gpt-4.1-mini supports up to 32768 output tokens.
-  // Default 4096 keeps responses fast; callers that need more (builder) pass maxTokens explicitly.
-  const defaultMaxTokens = 4096;
-  payload.max_tokens = maxTokens || max_tokens || defaultMaxTokens;
+  payload.max_tokens = maxTokens || max_tokens || 4096;
 
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
+  const normalizedResponseFormat = normalizeResponseFormat({ responseFormat, response_format, outputSchema, output_schema });
+  if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
 
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  // Temperature control — 0 for precise code generation, higher for creative responses
-  if (typeof params.temperature === 'number') {
-    payload.temperature = params.temperature;
-  }
+  if (typeof params.temperature === "number") payload.temperature = params.temperature;
 
   // ── Acquire API key ──
-  // Determine system tag: explicit tag > priority-based default
   const systemTag = params.systemTag || (priority === "chat" ? "chat" : "misc");
-  // When using Venice/OpenRouter uncensored, shared Venice, or Gemini — skip OpenAI key pool entirely
-  const skipOpenAIPool = forceGemini || useVenice || useOpenRouterUncensored || useSharedVenice;
+  const skipOpenAIPool = forceGemini || useSharedVenice;
   const keyHandle = (!usingUserKey && useOpenAI && !skipOpenAIPool) ? acquireKey(systemTag) : null;
-  const apiKey = useVenice
-    ? VENICE_API_KEY
-    : useOpenRouterUncensored
-    ? OPENROUTER_API_KEY
-    : useSharedVenice
+  const apiKey = useSharedVenice
     ? VENICE_API_KEY
     : forceGemini
     ? GEMINI_API_KEY
     : usingUserKey ? params.userApiKey! : (keyHandle ? keyHandle.key : getLegacyApiKey());
 
   if (usingUserKey) {
-    log.info("Using user's personal API key", { system: systemTag, model });
+    log.info("[LLM] Using user's personal API key", { system: systemTag, model });
   } else if (useSharedVenice) {
-    log.info(`[LLM] ${systemTag}: Shared Venice Pro tier — ${model}`);
-  }
-  if (useVenice) {
-    log.info(`[LLM] ${systemTag}: Uncensored step 0 — Venice Dolphin: ${model}`);
-  } else if (useOpenRouterUncensored) {
-    log.info(`[LLM] ${systemTag}: Uncensored step 1 — OpenRouter Dolphin free: ${model}`);
-  } else if (forceOpenRouter) {
-    log.info(`[LLM] ${systemTag}: Uncensored step 2 — OpenAI GPT-4.1 fallback: ${model}`);
+    log.info(`[LLM] ${systemTag}: Venice Pro → ${model}`);
+  } else {
+    log.info(`[LLM] ${systemTag}: OpenAI → ${model}`);
   }
 
-  // Add fetch timeout to prevent hanging requests (5 minutes for chat, 2 minutes for background)
+  // ── Fetch ──
   const fetchTimeoutMs = priority === "chat" ? 300_000 : 120_000;
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
 
+  const apiUrl = useSharedVenice
+    ? "https://api.venice.ai/api/v1/chat/completions"
+    : forceGemini
+    ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    : resolveApiUrl();
+
   let response: Response;
   try {
-    const apiUrl = (useVenice || useSharedVenice)
-      ? "https://api.venice.ai/api/v1/chat/completions"
-      : useOpenRouterUncensored
-      ? "https://openrouter.ai/api/v1/chat/completions"
-      : forceGemini
-      ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-      : resolveApiUrl();
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    };
-    // OpenRouter requires these headers for proper routing and app identification
-    if (useOpenRouterUncensored) {
-      headers["HTTP-Referer"] = "https://archibaldtitan.com";
-      headers["X-Title"] = "Archibald Titan";
-    }
     response = await fetch(apiUrl, {
       method: "POST",
-      headers,
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
   } catch (err: unknown) {
     clearTimeout(fetchTimeout);
-    // Release key on error
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
 
-    if ((err as Error).name === 'AbortError') {
-      // Timeout on uncensored chain: advance to next step
-      if (useVenice || useOpenRouterUncensored) {
-        const nextStep = uncensoredStep + 1;
-        log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} timed out, advancing to step ${nextStep}`);
-        const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
-        return _invokeLLMWithRetry(fallbackParams, priority, 0);
-      }
-      // Timeout on shared Venice: fall back to OpenAI
+    if ((err as Error).name === "AbortError") {
       if (useSharedVenice) {
-        log.warn(`[LLM] ${systemTag}: Shared Venice timed out after ${fetchTimeoutMs / 1000}s, falling back to OpenAI`);
-        const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
-        return _invokeLLMWithRetry(fallbackParams, priority, 0);
+        log.warn(`[LLM] ${systemTag}: Venice timed out after ${fetchTimeoutMs / 1000}s, falling back to OpenAI`);
+        return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
       }
       throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`);
     }
 
-    // For Venice/OpenRouter network errors, advance the fallback chain
-    // Shared Venice errors fall back to OpenAI gracefully
     if (useSharedVenice) {
-      log.warn(`[LLM] ${systemTag}: Shared Venice network error, falling back to OpenAI: ${(err as Error).message}`);
-      const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
-      return _invokeLLMWithRetry(fallbackParams, priority, 0);
-    }
-    if (useVenice || useOpenRouterUncensored) {
-      const nextStep = uncensoredStep + 1;
-      log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} network error, advancing to step ${nextStep}: ${(err as Error).message}`);
-      const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
-      return _invokeLLMWithRetry(fallbackParams, priority, 0);
+      log.warn(`[LLM] ${systemTag}: Venice network error, falling back to OpenAI: ${(err as Error).message}`);
+      return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
     }
 
-    // Retry on network errors (ECONNRESET, ECONNREFUSED, fetch failures)
-    // These are transient and usually succeed on retry
     const MAX_NETWORK_RETRIES = priority === "chat" ? 3 : 1;
     if (attempt < MAX_NETWORK_RETRIES) {
       const waitMs = Math.min(1000 * Math.pow(2, attempt), 8_000);
       log.warn(`[LLM] ${systemTag}: Network error (attempt ${attempt + 1}/${MAX_NETWORK_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s: ${(err as Error).message}`);
       await new Promise((r) => setTimeout(r, waitMs));
-      return _invokeLLMWithRetry(params, priority, attempt + 1);
+      return _invokeGeneral(params, priority, attempt + 1);
     }
     throw err;
   } finally {
     clearTimeout(fetchTimeout);
   }
 
-  // ── Handle 429 Rate Limit ──
-  // Shared Venice 429: fall back to OpenAI gracefully
+  // ── 429 Rate Limit ──
+  // Venice 429: fall back to OpenAI
   if (response.status === 429 && useSharedVenice) {
-    log.warn(`[LLM] ${systemTag}: Shared Venice rate-limited (429), falling back to OpenAI`);
-    const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
-    return _invokeLLMWithRetry(fallbackParams, priority, 0);
-  }
-  // For Venice/OpenRouter uncensored: immediately advance to next fallback step on 429
-  if (response.status === 429 && (useVenice || useOpenRouterUncensored)) {
-    const nextStep = uncensoredStep + 1;
-    log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} rate-limited (429), advancing to step ${nextStep}`);
-    const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
-    return _invokeLLMWithRetry(fallbackParams, priority, 0);
+    log.warn(`[LLM] ${systemTag}: Venice rate-limited (429), falling back to OpenAI`);
+    return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
   }
 
-  // With dedicated keys per system, we retry on our own key (+ fallback for chat)
+  // OpenAI 429: retry with backoff, then nano fallback, then Gemini emergency
   if (response.status === 429) {
     if (keyHandle) reportRateLimit(keyHandle.index, keyHandle.envVar);
-
     const maxRetries = priority === "chat" ? MAX_429_RETRIES_CHAT : MAX_429_RETRIES_BACKGROUND;
 
     if (attempt < maxRetries) {
       const retryAfterHeader = response.headers.get("retry-after");
       let waitMs: number;
-
       if (retryAfterHeader) {
         waitMs = Math.min(parseFloat(retryAfterHeader) * 1000, 30_000);
       } else if (priority === "chat") {
         // Chat: patient backoff — 3s, 5s, 8s, 12s, 18s, 25s, 30s, 30s
-        // Tier 1 TPM resets every 60s, so we need to wait long enough for tokens to free up
         waitMs = Math.min(3000 + 2000 * attempt + 500 * attempt * attempt, 30_000);
       } else {
         // Background: longer backoff — 5s, 15s
         waitMs = Math.min(5_000 * Math.pow(3, attempt), 30_000);
       }
 
-      // Fall back to gpt-4.1-nano after retries on gpt-4.1-mini to reduce TPM pressure.
-      // For builds: fall back after 4 retries (code quality matters)
-      // For chat/background: fall back after 2 retries (speed > quality for text responses)
-      const nanoFallbackThreshold = (params.tools && params.tools.length > 0) ? 4 : 2;
+      // Fall back to gpt-4.1-nano after several retries to reduce TPM pressure
+      const nanoFallbackThreshold = hasToolsDefined ? 4 : 2;
       if (attempt >= nanoFallbackThreshold && (modelPreference === "strong" || modelPreference === "premium") && useOpenAI) {
-        log.info(`[LLM] ${systemTag}: falling back to gpt-4.1-nano after ${attempt + 1} retries`);
-        const fallbackParams = { ...params, model: "fast" as const };
+        log.info(`[LLM] ${systemTag}: Falling back to gpt-4.1-nano after ${attempt + 1} retries`);
         await new Promise((r) => setTimeout(r, waitMs));
-        return _invokeLLMWithRetry(fallbackParams, priority, 0);
+        return _invokeGeneral({ ...params, model: "fast" as const }, priority, 0);
       }
 
-      log.info(`[LLM] ${systemTag}: 429 rate limited (attempt ${attempt + 1}/${maxRetries}), ` +
-        `waiting ${Math.round(waitMs / 1000)}s`);
-
+      log.info(`[LLM] ${systemTag}: 429 rate limited (attempt ${attempt + 1}/${maxRetries}), waiting ${Math.round(waitMs / 1000)}s`);
       await new Promise((r) => setTimeout(r, waitMs));
-      return _invokeLLMWithRetry(params, priority, attempt + 1);
+      return _invokeGeneral(params, priority, attempt + 1);
     }
 
-    // All OpenAI retries exhausted — try Gemini as emergency fallback
-    // ONLY for non-tool-calling requests (Gemini doesn't support OpenAI tool format reliably)
-    const hasTools = params.tools && params.tools.length > 0;
-    if (GEMINI_API_KEY && !hasTools) {
+    // All OpenAI retries exhausted — emergency Gemini fallback (non-tool calls only)
+    if (GEMINI_API_KEY && !hasToolsDefined) {
       log.warn(`[LLM] ${systemTag}: ALL OpenAI keys exhausted after ${maxRetries} retries — emergency Gemini fallback`);
       try {
-        const geminiResponse = await fetch(
+        const geminiRes = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
           {
             method: "POST",
-            headers: {
-              "content-type": "application/json",
-              authorization: `Bearer ${GEMINI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "gemini-2.5-flash",
-              messages: messages.map(normalizeMessage),
-              max_tokens: payload.max_tokens,
-            }),
+            headers: { "content-type": "application/json", authorization: `Bearer ${GEMINI_API_KEY}` },
+            body: JSON.stringify({ model: "gemini-2.5-flash", messages: messages.map(normalizeMessage), max_tokens: payload.max_tokens }),
           }
         );
-        if (geminiResponse.ok) {
+        if (geminiRes.ok) {
           log.info(`[LLM] ${systemTag}: Gemini emergency fallback succeeded`);
-          return (await geminiResponse.json()) as InvokeResult;
+          return (await geminiRes.json()) as InvokeResult;
         }
-        log.warn(`[LLM] ${systemTag}: Gemini emergency fallback also failed: ${geminiResponse.status}`);
+        log.warn(`[LLM] ${systemTag}: Gemini emergency fallback failed: ${geminiRes.status}`);
       } catch (geminiErr: unknown) {
         log.warn(`[LLM] ${systemTag}: Gemini emergency fallback error: ${(geminiErr as Error).message}`);
       }
     }
 
-    // Truly exhausted — all providers failed
-    const errorText = await response.text();
-    throw new Error(
-      `All LLM providers exhausted for system "${systemTag}" after ${maxRetries} retries. Please try again in a moment.`
-    );
+    throw new Error(`All LLM providers exhausted for system "${systemTag}" after ${maxRetries} retries. Please try again in a moment.`);
   }
 
-  // ── Handle transient server errors (500, 502, 503, 504) with retry ──
+  // ── 5xx transient server errors ──
   const RETRYABLE_STATUS = [500, 502, 503, 504];
   if (RETRYABLE_STATUS.includes(response.status)) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
@@ -876,46 +751,27 @@ async function _invokeLLMWithRetry(
       const waitMs = Math.min(2000 * Math.pow(2, attempt), 15_000);
       log.warn(`[LLM] ${systemTag}: Server error ${response.status} (attempt ${attempt + 1}/${MAX_SERVER_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s`);
       await new Promise((r) => setTimeout(r, waitMs));
-      return _invokeLLMWithRetry(params, priority, attempt + 1);
+      return _invokeGeneral(params, priority, attempt + 1);
     }
     const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed after ${MAX_SERVER_RETRIES} retries: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    throw new Error(`LLM invoke failed after ${MAX_SERVER_RETRIES} retries: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  // ── Handle other non-retryable errors ──
+  // ── Other non-retryable errors ──
   if (!response.ok) {
     if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
     const errorText = await response.text();
-    // Shared Venice error: fall back to OpenAI gracefully
     if (useSharedVenice) {
-      log.warn(`[LLM] ${systemTag}: Shared Venice failed (${response.status}), falling back to OpenAI: ${errorText.slice(0, 200)}`);
-      const fallbackParams = { ...params, userApiKey: undefined, _sharedVeniceFailed: true };
-      return _invokeLLMWithRetry(fallbackParams, priority, 0);
+      log.warn(`[LLM] ${systemTag}: Venice failed (${response.status}), falling back to OpenAI: ${errorText.slice(0, 200)}`);
+      return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
     }
-    // Uncensored fallback chain: advance to next step on any failure
-    if (useVenice || useOpenRouterUncensored) {
-      const nextStep = uncensoredStep + 1;
-      log.warn(`[LLM] ${systemTag}: Uncensored step ${uncensoredStep} failed (${response.status}), advancing to step ${nextStep}: ${errorText.slice(0, 200)}`);
-      const fallbackParams = { ...params, _uncensoredFallbackStep: nextStep };
-      return _invokeLLMWithRetry(fallbackParams, priority, 0);
-    }
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  // ── Success — release key back to pool ──
+  // ── Success ──
   if (keyHandle) releaseKey(keyHandle.index, keyHandle.envVar);
+  if (useSharedVenice && params.userId) recordVeniceRequest(params.userId);
 
-  // ── Record Venice shared-tier usage ──
-  if (useSharedVenice && params.userId) {
-    recordVeniceRequest(params.userId);
-  }
-
-  // Parse JSON response with error handling — malformed responses under load
-  // can cause unhandled exceptions that bypass all retry logic
   let body: InvokeResult;
   try {
     body = (await response.json()) as InvokeResult;
@@ -923,11 +779,172 @@ async function _invokeLLMWithRetry(
     const MAX_PARSE_RETRIES = priority === "chat" ? 2 : 1;
     if (attempt < MAX_PARSE_RETRIES) {
       const waitMs = 2000 * Math.pow(2, attempt);
-      log.warn(`[LLM] ${systemTag}: JSON parse error (attempt ${attempt + 1}/${MAX_PARSE_RETRIES}), retrying in ${Math.round(waitMs / 1000)}s: ${(parseErr as Error).message}`);
+      log.warn(`[LLM] ${systemTag}: JSON parse error (attempt ${attempt + 1}/${MAX_PARSE_RETRIES}), retrying: ${(parseErr as Error).message}`);
       await new Promise((r) => setTimeout(r, waitMs));
-      return _invokeLLMWithRetry(params, priority, attempt + 1);
+      return _invokeGeneral(params, priority, attempt + 1);
     }
-    throw new Error(`LLM response JSON parse failed after ${MAX_PARSE_RETRIES} retries: ${(parseErr as Error).message}`);
+    throw new Error(`LLM response JSON parse failed: ${(parseErr as Error).message}`);
   }
   return body;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHAIN B — Uncensored / security traffic  (forceOpenRouter: true)
+//   Venice Dolphin (uncensored) → OpenRouter Dolphin (free) → OpenAI GPT-4.1
+//   Used for: Metasploit, Astra, BlackEye, Evilginx, exploit generation.
+//   OpenAI refuses offensive security code — uncensored models go first.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function _invokeUncensored(
+  params: InvokeParams,
+  priority: "chat" | "background",
+  attempt = 0
+): Promise<InvokeResult> {
+  const { messages, tools, toolChoice, tool_choice, maxTokens, max_tokens } = params;
+  const hasToolsDefined = !!tools && tools.length > 0;
+  const modelPreference = params.model || (hasToolsDefined ? "strong" : "fast");
+  // Fallback step: 0=Venice Dolphin, 1=OpenRouter Dolphin, 2=OpenAI
+  const step = params._uncensoredFallbackStep ?? 0;
+
+  const useVeniceDolphin = step === 0 && !!VENICE_API_KEY;
+  const useOpenRouter    = step === 1 && !!OPENROUTER_API_KEY;
+  // step 2 (or no uncensored keys): fall through to OpenAI
+
+  // ── Model selection ──
+  const VENICE_DOLPHIN_CHAT  = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_DOLPHIN_TOOLS =
+    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
+    modelPreference === "fast"    ? "mistral-31-24b" :
+                                    "kimi-k2-5";
+  const VENICE_DOLPHIN_MODEL = hasToolsDefined ? VENICE_DOLPHIN_TOOLS : VENICE_DOLPHIN_CHAT;
+  const OPENROUTER_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
+  const OPENAI_MODEL = modelPreference === "fast" ? "gpt-4.1-nano" : modelPreference === "premium" ? "gpt-4.1" : "gpt-4.1-mini";
+
+  const model = useVeniceDolphin ? VENICE_DOLPHIN_MODEL
+    : useOpenRouter ? OPENROUTER_MODEL
+    : OPENAI_MODEL;
+
+  const systemTag = params.systemTag || (priority === "chat" ? "chat" : "misc");
+
+  if (useVeniceDolphin) log.info(`[LLM] ${systemTag}: Uncensored step 0 — Venice Dolphin: ${model}`);
+  else if (useOpenRouter) log.info(`[LLM] ${systemTag}: Uncensored step 1 — OpenRouter Dolphin: ${model}`);
+  else log.info(`[LLM] ${systemTag}: Uncensored step 2 — OpenAI fallback: ${model}`);
+
+  // ── Build payload ──
+  const payload: Record<string, unknown> = {
+    model,
+    messages: messages.map(normalizeMessage),
+    max_tokens: maxTokens || max_tokens || 4096,
+  };
+
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+    if (!useOpenRouter) payload.parallel_tool_calls = false;
+  }
+
+  if (useVeniceDolphin) {
+    payload.venice_parameters = { include_venice_system_prompt: false };
+  }
+
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
+
+  if (typeof params.temperature === "number") payload.temperature = params.temperature;
+
+  // ── API key and URL ──
+  const useOpenAI = hasKeys();
+  const keyHandle = (!useVeniceDolphin && !useOpenRouter && useOpenAI) ? acquireKey(systemTag) : null;
+  const apiKey = useVeniceDolphin ? VENICE_API_KEY
+    : useOpenRouter ? OPENROUTER_API_KEY
+    : (keyHandle ? keyHandle.key : getLegacyApiKey());
+
+  const apiUrl = useVeniceDolphin ? "https://api.venice.ai/api/v1/chat/completions"
+    : useOpenRouter ? "https://openrouter.ai/api/v1/chat/completions"
+    : resolveApiUrl();
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  };
+  if (useOpenRouter) {
+    headers["HTTP-Referer"] = "https://archibaldtitan.com";
+    headers["X-Title"] = "Archibald Titan";
+  }
+
+  // ── Fetch ──
+  const fetchTimeoutMs = priority === "chat" ? 300_000 : 120_000;
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    clearTimeout(fetchTimeout);
+    if (keyHandle) reportError(keyHandle.index, keyHandle.envVar);
+    if (step < 2) {
+      log.warn(`[LLM] ${systemTag}: Uncensored step ${step} failed (${(err as Error).name}), advancing to step ${step + 1}`);
+      return _invokeUncensored({ ...params, _uncensoredFallbackStep: step + 1 }, priority, 0);
+    }
+    throw err;
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
+
+  // ── 429 or any HTTP failure: advance to next step ──
+  if (!response.ok || response.status === 429) {
+    if (keyHandle) reportRateLimit(keyHandle.index, keyHandle.envVar);
+    if (step < 2) {
+      const errText = await response.text().catch(() => "");
+      log.warn(`[LLM] ${systemTag}: Uncensored step ${step} returned ${response.status}, advancing to step ${step + 1}: ${errText.slice(0, 200)}`);
+      return _invokeUncensored({ ...params, _uncensoredFallbackStep: step + 1 }, priority, 0);
+    }
+    // Step 2 (OpenAI) — retry with backoff
+    const maxRetries = priority === "chat" ? MAX_429_RETRIES_CHAT : MAX_429_RETRIES_BACKGROUND;
+    if (response.status === 429 && attempt < maxRetries) {
+      const waitMs = Math.min(3000 + 2000 * attempt + 500 * attempt * attempt, 30_000);
+      log.info(`[LLM] ${systemTag}: OpenAI 429 (attempt ${attempt + 1}/${maxRetries}), waiting ${Math.round(waitMs / 1000)}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return _invokeUncensored(params, priority, attempt + 1);
+    }
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Uncensored LLM chain exhausted: ${response.status} ${response.statusText} – ${errorText}`);
+  }
+
+  // ── Success ──
+  if (keyHandle) releaseKey(keyHandle.index, keyHandle.envVar);
+
+  let body: InvokeResult;
+  try {
+    body = (await response.json()) as InvokeResult;
+  } catch (parseErr: unknown) {
+    if (step < 2) {
+      log.warn(`[LLM] ${systemTag}: Uncensored step ${step} JSON parse error, advancing: ${(parseErr as Error).message}`);
+      return _invokeUncensored({ ...params, _uncensoredFallbackStep: step + 1 }, priority, 0);
+    }
+    throw new Error(`Uncensored LLM JSON parse failed: ${(parseErr as Error).message}`);
+  }
+  return body;
+}
+
+/**
+ * Internal dispatcher — routes to the correct chain based on params.
+ * Kept for backward compatibility with any internal callers that use
+ * _invokeLLMWithRetry directly.
+ * @internal
+ */
+function _invokeLLMWithRetry(
+  params: InvokeParams,
+  priority: "chat" | "background",
+  attempt = 0
+): Promise<InvokeResult> {
+  if (params.forceOpenRouter) {
+    return _invokeUncensored(params, priority, attempt);
+  }
+  return _invokeGeneral(params, priority, attempt);
 }
