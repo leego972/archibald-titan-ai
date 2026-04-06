@@ -1,0 +1,18 @@
+diff --git a/shared/pricing.ts b/shared/pricing.ts
+--- a/shared/pricing.ts
++++ b/shared/pricing.ts
+@@ -95,7 +95,7 @@
+       credentialStorage: -1,
+       proxySlots: 5,
+-      exportFormats: ["json", "env"],
++      exportFormats: ["json", "env", "csv"],
+       support: "priority_email",
+
+diff --git a/server/subscription-gate.ts b/server/subscription-gate.ts
+--- a/server/subscription-gate.ts
++++ b/server/subscription-gate.ts
+@@ -141,7 +141,7 @@
+     env_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+-    csv_export: ["enterprise", "cyber", "cyber_plus", "titan"],
++    csv_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+     api_export: ["enterprise", "cyber", "cyber_plus", "titan"],
