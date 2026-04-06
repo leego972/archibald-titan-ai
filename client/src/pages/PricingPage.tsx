@@ -24,22 +24,22 @@ export default function PricingPage() {
 
   const createCheckout = trpc.stripe.createCheckout.useMutation();
 
-  const handleGetStarted = async (planId: "pro" | "enterprise") => {
+  const handleGetStarted = async (planId: "pro" | "enterprise" | "cyber") => {
     if (!user) {
-      // Not logged in — send to register with return path
       window.location.href = getRegisterUrl("/pricing");
       return;
     }
     setLoadingPlan(planId);
     trackViewContent(planId);
     try {
+      const priceMap: Record<string, number> = { pro: 29, enterprise: 99, cyber: 199 };
       const result = await createCheckout.mutateAsync({
         planId,
         interval: "month",
         source: "web",
       });
       if (result.url) {
-        trackPurchase({ value: planId === "pro" ? 29 : 99, currency: "USD", planName: planId });
+        trackPurchase({ value: priceMap[planId] || 29, currency: "USD", planName: planId });
         window.location.href = result.url;
       } else {
         toast.error("Failed to create checkout session. Please try again.");
@@ -75,9 +75,9 @@ export default function PricingPage() {
       {/* PRICING GRID */}
       <section className="relative pb-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            
-            {/* PRO - SELF SERVE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+
+            {/* PRO */}
             <div className="flex flex-col p-8 rounded-3xl border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.02] transition-all duration-500">
               <div className="mb-8">
                 <h3 className="text-sm font-black uppercase tracking-widest text-white/30 mb-4">Pro</h3>
@@ -87,7 +87,6 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm text-white/40">For individual engineers and security professionals.</p>
               </div>
-              
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "50,000 Monthly Credits",
@@ -102,7 +101,6 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-
               <Button
                 onClick={() => handleGetStarted("pro")}
                 disabled={loadingPlan === "pro"}
@@ -126,7 +124,6 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm text-white/40">For security teams and engineering organizations.</p>
               </div>
-              
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "250,000 Monthly Credits",
@@ -141,7 +138,6 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-
               <Button
                 onClick={() => handleGetStarted("enterprise")}
                 disabled={loadingPlan === "enterprise"}
@@ -149,6 +145,44 @@ export default function PricingPage() {
               >
                 {loadingPlan === "enterprise" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {loadingPlan === "enterprise" ? "Redirecting..." : user ? "Subscribe Now" : "Start with Enterprise"}
+              </Button>
+            </div>
+
+            {/* CYBER - SECURITY TIER */}
+            <div className="flex flex-col p-8 rounded-3xl border border-emerald-600/20 bg-emerald-600/[0.02] relative group">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-emerald-600 text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-emerald-600/20">
+                Security
+              </div>
+              <div className="mb-8">
+                <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-4">Cyber</h3>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-5xl font-black text-white">$199</span>
+                  <span className="text-lg text-white/20">/mo</span>
+                </div>
+                <p className="text-sm text-white/40">Elite cybersecurity arsenal for professionals.</p>
+              </div>
+              <div className="flex-1 space-y-4 mb-10">
+                {[
+                  "750,000 Monthly Credits",
+                  "Everything in Enterprise",
+                  "TOTP Vault & 2FA Mgmt",
+                  "Credential Leak Scanner",
+                  "Advanced Threat Modeling",
+                  "1-Year Audit Log Retention"
+                ].map(f => (
+                  <div key={f} className="flex items-center gap-3 text-sm text-white/60">
+                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => handleGetStarted("cyber")}
+                disabled={loadingPlan === "cyber"}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white border-0 h-12 font-bold shadow-xl shadow-emerald-600/20"
+              >
+                {loadingPlan === "cyber" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {loadingPlan === "cyber" ? "Redirecting..." : user ? "Subscribe Now" : "Unlock Cyber"}
               </Button>
             </div>
 
@@ -161,7 +195,6 @@ export default function PricingPage() {
                 </div>
                 <p className="text-sm text-white/40">For large organizations requiring custom deployment and SLAs.</p>
               </div>
-              
               <div className="flex-1 space-y-4 mb-10">
                 {[
                   "10,000,000 Credits/Month",
@@ -176,7 +209,6 @@ export default function PricingPage() {
                   </div>
                 ))}
               </div>
-
               <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} variant="outline" className="w-full border-white/10 bg-white/5 hover:bg-white/10 text-white h-12 font-bold">
                 Contact Sales
               </Button>
