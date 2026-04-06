@@ -107,4 +107,9 @@ export const ENV = {
   // Support both raw PEM key (TITAN_SERVER_KEY) and base64-encoded key (TITAN_SERVER_KEY_B64)
   titanServerKey: process.env.TITAN_SERVER_KEY ||
     (process.env.TITAN_SERVER_KEY_B64 ? Buffer.from(process.env.TITAN_SERVER_KEY_B64, "base64").toString("utf8") : ""),
+  // TitanAI Inference API — self-hosted model server (FastAPI, OpenAI-compatible)
+  // Set TITAN_API_URL to the address of the running TitanAI API server, e.g. http://ssh3.vast.ai:8000
+  // Leave empty to disable TitanAI routing (falls back to Venice/OpenAI as normal).
+  titanApiUrl: process.env.TITAN_API_URL ?? "",
+  titanApiKey: process.env.TITAN_API_KEY ?? "",
 };

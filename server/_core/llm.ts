@@ -20,6 +20,15 @@ import { createLogger } from "./logger.js";
 const log = createLogger("LLM");
 
 /**
+ * TitanAI Inference API — self-hosted model server (FastAPI, OpenAI-compatible).
+ * Routes model: "titan-*" requests to the TitanAI API instead of OpenAI/Venice.
+ * Set TITAN_API_URL in Railway env to enable (e.g. http://ssh3.vast.ai:8000).
+ * Leave empty to disable — all traffic falls through to Venice/OpenAI as normal.
+ */
+const TITAN_API_URL = ENV.titanApiUrl || "";
+const TITAN_API_KEY = ENV.titanApiKey || "";
+
+/**
  * Gemini API key — EMERGENCY FALLBACK ONLY.
  * Used only when ALL OpenAI keys are simultaneously exhausted (all 6 keys 429'd).
  * Normal traffic should NEVER hit Gemini. If it does, we have a key pool problem.
@@ -411,6 +420,25 @@ const MAX_429_RETRIES_BACKGROUND = 2;
 
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // ── TitanAI provider fast-path ─────────────────────────────────────────────
+  // If TITAN_API_URL is set AND the caller explicitly requests a titan-* model,
+  // route directly to the self-hosted TitanAI API server (OpenAI-compatible).
+  // Falls back to normal Venice/OpenAI routing if TitanAI API is unavailable.
+  const requestedModel = typeof params.model === "string" ? params.model : "";
+  if (TITAN_API_URL && requestedModel.startsWith("titan-")) {
+    log.info(`[LLM] Routing to TitanAI API: ${requestedModel}`);
+    try {
+      const titanResult = await _invokeTitanAI(params, requestedModel);
+      return titanResult;
+    } catch (titanErr: unknown) {
+      // If TitanAI is down or returns an error, log and fall through to Venice/OpenAI
+      log.warn(`[LLM] TitanAI API failed, falling back to Venice/OpenAI: ${(titanErr as Error).message}`);
+      // Strip the titan model override so normal routing picks the best available model
+      const fallbackParams = { ...params, model: "strong" as const };
+      return _invokeLLMWithRetry(fallbackParams, params.priority || "background");
+    }
+  }
+
   // Initialize key pool on first call (safe to call multiple times)
   initKeyPool();
   assertApiKey();
@@ -426,6 +454,57 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } finally {
     if (isChat) chatCallFinished();
   }
+}
+
+/**
+ * Call the self-hosted TitanAI API server.
+ * Uses OpenAI-compatible /v1/chat/completions endpoint.
+ * Throws on HTTP error or network failure (caller handles fallback).
+ */
+async function _invokeTitanAI(
+  params: InvokeParams,
+  model: string,
+): Promise<InvokeResult> {
+  const { messages, maxTokens, max_tokens, temperature } = params;
+  const maxTok = maxTokens || max_tokens || 512;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (TITAN_API_KEY) {
+    headers["Authorization"] = `Bearer ${TITAN_API_KEY}`;
+  }
+
+  const body = JSON.stringify({
+    model,
+    messages: messages.map(normalizeMessage),
+    max_tokens: maxTok,
+    ...(typeof temperature === "number" ? { temperature } : {}),
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+
+  let response: Response;
+  try {
+    response = await fetch(`${TITAN_API_URL}/v1/chat/completions`, {
+      method: "POST",
+      headers,
+      body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "(no body)");
+    throw new Error(`TitanAI API returned ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json() as InvokeResult;
+  log.info(`[LLM] TitanAI response received — model: ${model}, tokens: ${data.usage?.total_tokens ?? "?"}`);
+  return data;
 }
 
 async function _invokeLLMWithRetry(
