@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import { createLogger } from "./_core/logger";
 import { getErrorMessage } from "./_core/errors";
 import { checkCredits, consumeCredits } from "./credit-service";
@@ -196,6 +197,7 @@ export const redTeamPlaybooksRouter = router({
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
     }).optional())
     .query(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const user = ctx.user!;
       const planId = (user as any).planId ?? "free";
       const isAdmin = user.role === "admin" || user.role === "head_admin";
@@ -237,6 +239,7 @@ export const redTeamPlaybooksRouter = router({
       options: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const user = ctx.user!;
       const planId = (user as any).planId ?? "free";
       const isAdmin = user.role === "admin" || user.role === "head_admin";
@@ -297,6 +300,7 @@ export const redTeamPlaybooksRouter = router({
   getRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .query(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const run = runs.get(input.runId);
       if (!run || run.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
@@ -310,6 +314,7 @@ export const redTeamPlaybooksRouter = router({
       limit: z.number().min(1).max(50).optional().default(20),
     }).optional())
     .query(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const userId = ctx.user!.id;
       const userRuns = Array.from(runs.values())
         .filter((r) => r.userId === userId)
@@ -322,6 +327,7 @@ export const redTeamPlaybooksRouter = router({
   cancelRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const run = runs.get(input.runId);
       if (!run || run.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
@@ -344,6 +350,7 @@ export const redTeamPlaybooksRouter = router({
   deleteRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
       const run = runs.get(input.runId);
       if (!run || run.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });

@@ -5,7 +5,7 @@
 import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { checkCredits, consumeCredits } from "./credit-service";
 import * as db from "./db";
 import type { InsertSecurityModule } from "../drizzle/schema";
@@ -54,6 +54,7 @@ export const securityMarketplaceRouter = router({
       offset: z.number().min(0).default(0),
     }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const modules = await db.listSecurityModules({ category: input.category, search: input.search, featured: input.featured, limit: 500 });
       const installedSlugs = new Set((await db.getSecurityModuleInstalls(ctx.user.id as number)).map(i => i.moduleSlug));
       let filtered = input.license !== "all" ? modules.filter(m => m.license === input.license) : [...modules];
@@ -70,6 +71,7 @@ export const securityMarketplaceRouter = router({
   getModule: protectedProcedure
     .input(z.object({ moduleId: z.string() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
       const installed = await db.isSecurityModuleInstalled(ctx.user.id as number, module.slug);
       const reviews = await db.getSecurityModuleReviews(module.slug);
@@ -79,6 +81,7 @@ export const securityMarketplaceRouter = router({
   installModule: protectedProcedure
     .input(z.object({ moduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Security Module Marketplace");
       const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
@@ -92,11 +95,13 @@ export const securityMarketplaceRouter = router({
   uninstallModule: protectedProcedure
     .input(z.object({ moduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       await db.uninstallSecurityModule(ctx.user.id as number, input.moduleId);
       return { success: true };
     }),
 
   getInstalled: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
     const installs = await db.getSecurityModuleInstalls(ctx.user.id as number);
     if (installs.length === 0) return { modules: [] };
     const slugs = new Set(installs.map(i => i.moduleSlug));
@@ -107,6 +112,7 @@ export const securityMarketplaceRouter = router({
   addReview: protectedProcedure
     .input(z.object({ moduleId: z.string(), rating: z.number().min(1).max(5), comment: z.string().min(10).max(1000) }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
       const existing = (await db.getSecurityModuleReviews(input.moduleId)).find(r => r.userId === (ctx.user.id as number));
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already reviewed this module" });
@@ -117,6 +123,7 @@ export const securityMarketplaceRouter = router({
   rateModule: protectedProcedure
     .input(z.object({ moduleId: z.string(), rating: z.number().min(1).max(5), comment: z.string().min(10).max(1000) }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
       const existing = (await db.getSecurityModuleReviews(input.moduleId)).find(r => r.userId === (ctx.user.id as number));
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already reviewed this module" });
@@ -127,6 +134,7 @@ export const securityMarketplaceRouter = router({
   publishModule: protectedProcedure
     .input(z.object({ name: z.string().min(3).max(80), description: z.string().min(10).max(300), category: z.enum(["osint","scanning","exploitation","phishing","anonymity","automation","reporting","playbook","wordlist","template"]), version: z.string().default("1.0.0"), tags: z.string().optional(), code: z.string().optional(), readme: z.string().optional(), price: z.number().min(0).default(0) }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const slug = "community_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
       await db.createSecurityModule({ slug, name: input.name, description: input.description, longDescription: input.readme ?? input.description, category: input.category, tags: input.tags ? JSON.stringify(input.tags.split(",").map((t: string) => t.trim())) : JSON.stringify([]), authorId: String(ctx.user.id), authorLabel: (ctx.user as any).username ?? "Community", version: input.version, license: input.price > 0 ? "credits" : "free", creditCost: input.price > 0 ? input.price : undefined, readme: input.readme, status: "draft", downloads: 0, rating: 0, ratingCount: 0, verified: false, featured: false });
       return { success: true, message: "Your module has been submitted for review. It will appear in the marketplace once approved by the Archibald Titan team." };
@@ -139,6 +147,7 @@ export const securityMarketplaceRouter = router({
   }),
 
   getStats: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Security Marketplace");
     return db.getSecurityModuleStats(ctx.user.id as number);
   }),
 });

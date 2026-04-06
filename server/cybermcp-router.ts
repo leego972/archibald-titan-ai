@@ -16,7 +16,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { consumeCredits } from "./credit-service";
-import { getUserPlan, enforceFeature } from "./subscription-gate";
+import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { logAdminAction } from "./admin-activity-log";
 
 // ─── HTTP Helper ──────────────────────────────────────────────────
@@ -206,6 +206,7 @@ export const cybermcpRouter = router({
       method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const credentials = Buffer.from(`${input.username}:${input.password}`).toString("base64");
@@ -230,6 +231,7 @@ export const cybermcpRouter = router({
       customHeader: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const headerName = input.customHeader || "Authorization";
@@ -247,6 +249,7 @@ export const cybermcpRouter = router({
   checkJwtVulnerability: protectedProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
       const analysis = analyseJwt(input.token);
@@ -271,6 +274,7 @@ export const cybermcpRouter = router({
       authHeaderName: z.string().default("Authorization"),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -315,6 +319,7 @@ export const cybermcpRouter = router({
       headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -349,6 +354,7 @@ export const cybermcpRouter = router({
       headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -382,6 +388,7 @@ export const cybermcpRouter = router({
       body: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -412,6 +419,7 @@ export const cybermcpRouter = router({
       headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -442,6 +450,7 @@ export const cybermcpRouter = router({
       headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -484,6 +493,7 @@ export const cybermcpRouter = router({
       authToken: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 
@@ -521,6 +531,7 @@ export const cybermcpRouter = router({
       headers: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "CyberMCP");
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "CyberMCP");
 

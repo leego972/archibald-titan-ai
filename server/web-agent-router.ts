@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { webAgentTasks, webAgentCredentials } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -39,6 +40,7 @@ export const webAgentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const creditCheck = await checkCredits(ctx.user.id, "web_agent_task");
       if (!creditCheck.allowed) {
         throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for Web Agent task. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
@@ -76,6 +78,7 @@ export const webAgentRouter = router({
   getTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const tasks = await db
@@ -101,6 +104,7 @@ export const webAgentRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       return db
@@ -115,6 +119,7 @@ export const webAgentRouter = router({
   confirmTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       const tasks = await db
@@ -153,6 +158,7 @@ export const webAgentRouter = router({
   cancelTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
@@ -171,6 +177,7 @@ export const webAgentRouter = router({
   deleteTask: protectedProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
@@ -186,6 +193,7 @@ export const webAgentRouter = router({
 
   // ─── Credential Management ───────────────────────────────────────────────────
   listCredentials: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
     return listCredentials(ctx.user.id);
   }),
 
@@ -201,6 +209,7 @@ export const webAgentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       const id = await saveCredential(
         ctx.user.id,
         input.siteName,
@@ -216,6 +225,7 @@ export const webAgentRouter = router({
   deleteCredential: protectedProcedure
     .input(z.object({ credentialId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Web Agent");
       await deleteCredential(ctx.user.id, input.credentialId);
       return { deleted: true };
     }),

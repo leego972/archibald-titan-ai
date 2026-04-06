@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "./_core/trpc";
-import { canUseCloneWebsite } from "./subscription-gate";
+import { canUseCloneWebsite, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { enforceCloneSafety, checkScrapedContent } from "./clone-safety";
 import { detectCloneComplexity, type CloneComplexity } from "../shared/pricing";
@@ -37,6 +37,7 @@ export const replicateRouter = router({
    * List all replicate projects for the current user
    */
   list: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
     return listProjects(ctx.user.id);
   }),
 
@@ -46,6 +47,7 @@ export const replicateRouter = router({
   get: protectedProcedure
     .input(z.object({ projectId: z.number().int() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new Error("Project not found");
       return project;
@@ -78,6 +80,7 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       // ═══ REQUIRED API KEYS: Pull from vault or use per-project input ═══
       // Users must have their own API keys saved — the platform does not subsidize API costs.
 
@@ -213,6 +216,7 @@ export const replicateRouter = router({
   research: protectedProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       return researchTarget(input.projectId, ctx.user.id);
     }),
 
@@ -228,6 +232,7 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       return generateBuildPlan(input.projectId, ctx.user.id, {
         features: input.features,
         techStack: input.techStack,
@@ -240,6 +245,7 @@ export const replicateRouter = router({
   build: protectedProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       return executeBuild(input.projectId, ctx.user.id);
     }),
 
@@ -265,6 +271,7 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       await updateBranding(input.projectId, ctx.user.id, {
         brandName: input.brandName,
         brandColors: input.brandColors,
@@ -287,6 +294,7 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       await updateStripeConfig(input.projectId, ctx.user.id, {
         publishableKey: input.publishableKey,
         secretKey: input.secretKey,
@@ -306,6 +314,7 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       return pushToGithub(input.projectId, ctx.user.id, input.repoName);
     }),
   /**
@@ -354,6 +363,7 @@ export const replicateRouter = router({
       privacy: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       // Verify project belongs to user
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
@@ -380,6 +390,7 @@ export const replicateRouter = router({
       envVars: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
@@ -439,6 +450,7 @@ export const replicateRouter = router({
   delete: protectedProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Clone Website");
       const deleted = await deleteProject(input.projectId, ctx.user.id);
       return { success: deleted };
     }),

@@ -25,6 +25,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { consumeCreditsAmount, getCreditBalance } from "./credit-service";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { launchStealthBrowser, getRandomProfile, DEVICE_PROFILES } from "./fetcher-engine/browser";
 import { storagePut } from "./storage";
@@ -285,6 +286,7 @@ export const isolatedBrowserRouter = router({
       proxyServer: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const planId = (user as any).planId ?? "free";
       const isAdmin = user.role === "admin" || user.role === "head_admin";
@@ -404,6 +406,7 @@ export const isolatedBrowserRouter = router({
       url: z.string().url(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -429,6 +432,7 @@ export const isolatedBrowserRouter = router({
       y: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -455,6 +459,7 @@ export const isolatedBrowserRouter = router({
       pressEnter: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -482,6 +487,7 @@ export const isolatedBrowserRouter = router({
       amount: z.number().min(100).max(2000).optional().default(500),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -503,6 +509,7 @@ export const isolatedBrowserRouter = router({
   goBack: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -522,6 +529,7 @@ export const isolatedBrowserRouter = router({
   goForward: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -542,6 +550,7 @@ export const isolatedBrowserRouter = router({
   reload: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -563,6 +572,7 @@ export const isolatedBrowserRouter = router({
       label: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -578,6 +588,7 @@ export const isolatedBrowserRouter = router({
   getScreenshots: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found." });
@@ -589,6 +600,7 @@ export const isolatedBrowserRouter = router({
   heartbeat: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
 
@@ -676,6 +688,7 @@ export const isolatedBrowserRouter = router({
   end: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
 
@@ -722,6 +735,7 @@ export const isolatedBrowserRouter = router({
   getSession: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const user = ctx.user!;
       const session = sessions.get(input.sessionId);
 
@@ -752,6 +766,7 @@ export const isolatedBrowserRouter = router({
 
   // ── List user's recent sessions ──────────────────────────────────────────
   listSessions: protectedProcedure.query(({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
     const user = ctx.user!;
     const userSessions = Array.from(sessions.values())
       .filter(s => s.userId === user.id)
@@ -795,6 +810,7 @@ export const isolatedBrowserRouter = router({
       enabled: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const session = sessions.get(input.sessionId);
       if (!session || session.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
@@ -860,6 +876,7 @@ export const isolatedBrowserRouter = router({
       limit: z.number().min(1).max(500).optional().default(100),
     }))
     .query(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const session = sessions.get(input.sessionId);
       if (!session || session.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
@@ -880,6 +897,7 @@ export const isolatedBrowserRouter = router({
   clearTrafficLog: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
       const session = sessions.get(input.sessionId);
       if (!session || session.userId !== ctx.user!.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
@@ -890,6 +908,7 @@ export const isolatedBrowserRouter = router({
 
   // ── Get credit cost info for current plan ────────────────────────────────
   getCostInfo: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Isolated Browser");
     const user = ctx.user!;
     const planId = (user as any).planId ?? "free";
     const isAdmin = user.role === "admin" || user.role === "head_admin";

@@ -18,6 +18,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -217,6 +218,7 @@ export const proxyRotationRouter = router({
 
   /** Get current state: proxy list + active flag */
   getState: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
     const [proxies, active] = await Promise.all([
       getProxyList(ctx.user.id),
       isRotationActive(ctx.user.id),
@@ -254,6 +256,7 @@ export const proxyRotationRouter = router({
       replace: z.boolean().default(false), // if true, replaces existing list
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
       const lines = input.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const parsed: RotationProxy[] = [];
       let skipped = 0;
@@ -290,6 +293,7 @@ export const proxyRotationRouter = router({
       password: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
       const proxies = await getProxyList(ctx.user.id);
       if (proxies.some(p => p.host === input.host && p.port === input.port)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Proxy with this host:port already exists." });
@@ -317,6 +321,7 @@ export const proxyRotationRouter = router({
   removeProxy: protectedProcedure
     .input(z.object({ proxyId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
       const proxies = await getProxyList(ctx.user.id);
       const filtered = proxies.filter(p => p.id !== input.proxyId);
       if (filtered.length === proxies.length) throw new TRPCError({ code: "NOT_FOUND", message: "Proxy not found." });
@@ -326,6 +331,7 @@ export const proxyRotationRouter = router({
 
   /** Clear all proxies */
   clearAll: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
     await saveProxyList(ctx.user.id, []);
     await setRotationActiveFlag(ctx.user.id, false);
     return { success: true };
@@ -335,6 +341,7 @@ export const proxyRotationRouter = router({
   setActive: protectedProcedure
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
       if (input.active) {
         const proxies = await getProxyList(ctx.user.id);
         if (!proxies.length) throw new TRPCError({ code: "BAD_REQUEST", message: "No proxies configured. Import a proxy list first." });
@@ -346,6 +353,7 @@ export const proxyRotationRouter = router({
 
   /** Get active state (for sidebar button) */
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
     const [active, proxies] = await Promise.all([
       isRotationActive(ctx.user.id),
       getProxyList(ctx.user.id),
@@ -357,6 +365,7 @@ export const proxyRotationRouter = router({
   testProxy: protectedProcedure
     .input(z.object({ proxyId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
       const proxies = await getProxyList(ctx.user.id);
       const idx = proxies.findIndex(p => p.id === input.proxyId);
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Proxy not found." });
@@ -371,6 +380,7 @@ export const proxyRotationRouter = router({
 
   /** Test all proxies (health check sweep) */
   testAll: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Proxy Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "proxy_test_all");
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to test proxies. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });

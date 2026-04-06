@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
@@ -72,6 +73,7 @@ export const ipRotationRouter = router({
 
   /** Full state for the IP Rotation Manager page */
   getState: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings = await getSettings(ctx.user.id);
     const torStatus = torSupervisor.getStatus();
     const poolStats = proxyPool.getStats();
@@ -100,6 +102,7 @@ export const ipRotationRouter = router({
 
   /** Sidebar quick state */
   getActiveState: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings = await getSettings(ctx.user.id);
     const anyActive = settings.headerSpoofing || settings.torEnabled || settings.proxyEnabled;
     const torStatus = torSupervisor.getStatus();
@@ -116,6 +119,7 @@ export const ipRotationRouter = router({
   setHeaderSpoofing: protectedProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
       const settings = await getSettings(ctx.user.id);
       settings.headerSpoofing = input.enabled;
       await saveSettings(ctx.user.id, settings);
@@ -126,6 +130,7 @@ export const ipRotationRouter = router({
   setTorEnabled: protectedProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
       const settings = await getSettings(ctx.user.id);
       settings.torEnabled = input.enabled;
       await saveSettings(ctx.user.id, settings);
@@ -156,6 +161,7 @@ export const ipRotationRouter = router({
 
   /** Explicitly start Tor and wait for bootstrap */
   startTor: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to start Tor. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
@@ -177,6 +183,7 @@ export const ipRotationRouter = router({
 
   /** Stop Tor daemon */
   stopTor: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     await torSupervisor.stop();
     const settings = await getSettings(ctx.user.id);
     settings.torEnabled = false;
@@ -186,6 +193,7 @@ export const ipRotationRouter = router({
 
   /** Request a new Tor circuit — verifies the IP actually changed */
   newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for new Tor circuit. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
@@ -208,6 +216,7 @@ export const ipRotationRouter = router({
   setProxyEnabled: protectedProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
       const settings = await getSettings(ctx.user.id);
       settings.proxyEnabled = input.enabled;
       await saveSettings(ctx.user.id, settings);
@@ -236,6 +245,7 @@ export const ipRotationRouter = router({
 
   /** Manually trigger a proxy scrape */
   scrapeProxies: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits to scrape proxies. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
@@ -260,6 +270,7 @@ export const ipRotationRouter = router({
 
   /** Enable all layers at once */
   enableAll: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings: IPRotationSettings = {
       headerSpoofing: true,
       torEnabled: true,
@@ -284,6 +295,7 @@ export const ipRotationRouter = router({
 
   /** Disable all layers */
   disableAll: protectedProcedure.mutation(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings: IPRotationSettings = {
       headerSpoofing: false,
       torEnabled: false,

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { TRPCError } from "@trpc/server";
+import { enforceAdminFeature } from "./subscription-gate";
 import { and, eq } from "drizzle-orm";
 import { userSecrets } from "../drizzle/schema";
 import { createLogger } from "./_core/logger.js";
@@ -110,6 +111,7 @@ export const linkenSphereRouter = router({
   savePort: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535) }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       await saveLsPort(ctx.user.id, input.port);
       log.info(`[savePort] User ${ctx.user.id} saved LS port ${input.port}`);
       return { success: true, port: input.port };
@@ -119,6 +121,7 @@ export const linkenSphereRouter = router({
    * Get the saved port for this user.
    */
   getPort: protectedProcedure.query(async ({ ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
     const port = await getLsPort(ctx.user.id);
     return { port };
   }),
@@ -129,6 +132,7 @@ export const linkenSphereRouter = router({
   testConnection: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const result = await lsRequest(port, "GET", "/app") as Record<string, unknown>;
       log.info(`[testConnection] User ${ctx.user.id} connected to LS at port ${port}`);
@@ -152,6 +156,7 @@ export const linkenSphereRouter = router({
       autologin: z.boolean().optional().default(true),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const result = await lsRequest(port, "POST", "/auth/signin", {
         email: input.email,
@@ -168,6 +173,7 @@ export const linkenSphereRouter = router({
   signOut: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const result = await lsRequest(port, "POST", "/auth/signout");
       log.info(`[signOut] User ${ctx.user.id} signed out of LS`);
@@ -184,6 +190,7 @@ export const linkenSphereRouter = router({
       proxyInfo: z.boolean().optional().default(false),
     }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const body: Record<string, unknown> = {};
       if (input.status) body.status = input.status;
@@ -206,6 +213,7 @@ export const linkenSphereRouter = router({
       uuid: z.string().min(1),
     }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       return lsRequest(port, "GET", `/sessions/${input.uuid}`);
     }),
@@ -220,6 +228,7 @@ export const linkenSphereRouter = router({
       count: z.number().int().min(1).max(50).default(1),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const creditCheck = await checkCredits(ctx.user.id, "linken_quick_create");
       if (!creditCheck.allowed) {
@@ -246,6 +255,7 @@ export const linkenSphereRouter = router({
       debugPort: z.number().int().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const creditCheck = await checkCredits(ctx.user.id, "linken_session_start");
       if (!creditCheck.allowed) {
@@ -271,6 +281,7 @@ export const linkenSphereRouter = router({
       uuid: z.string().min(1),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const result = await lsRequest(port, "POST", "/sessions/stop", { uuid: input.uuid });
       log.info(`[stopSession] User ${ctx.user.id} stopped LS session ${input.uuid}`);
@@ -287,6 +298,7 @@ export const linkenSphereRouter = router({
       name: z.string().min(1).max(100),
     }))
     .mutation(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       const result = await lsRequest(port, "POST", "/sessions/set_name", {
         uuid: input.uuid,
@@ -302,6 +314,7 @@ export const linkenSphereRouter = router({
   getProviders: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       return lsRequest(port, "GET", "/providers");
     }),
@@ -312,6 +325,7 @@ export const linkenSphereRouter = router({
   getDesktops: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       return lsRequest(port, "GET", "/desktops");
     }),
@@ -322,6 +336,7 @@ export const linkenSphereRouter = router({
   getAppInfo: protectedProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
+    enforceAdminFeature(ctx.user.role, "Linken Sphere");
       const port = input.port ?? (await getLsPort(ctx.user.id));
       return lsRequest(port, "GET", "/app");
     }),
