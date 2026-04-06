@@ -183,7 +183,7 @@ function DashboardRouter() {
         <Route path="/dashboard" component={ChatPage} />
 
         {/* Developer Tools */}
-        <Route path="/replicate" component={ReplicatePage} />
+        <Route path="/replicate" component={() => <AdminRoute component={ReplicatePage} />} />
         <Route path="/sandbox" component={SandboxPage} />
         <Route path="/fetcher/smart-fetch" component={SmartFetchPage} />
         <Route path="/fetcher/new" component={FetcherNew} />
@@ -249,8 +249,8 @@ function DashboardRouter() {
         {/* Site Monitor */}
         <Route path="/site-monitor" component={SiteMonitorPage} />
 
-        {/* LinkenSphere */}
-        <Route path="/linken-sphere" component={LinkenSpherePage} />
+        {/* LinkenSphere — admin only */}
+        <Route path="/linken-sphere" component={() => <AdminRoute component={LinkenSpherePage} />} />
 
         {/* Evilginx — admin only */}
         <Route path="/evilginx" component={() => <AdminRoute component={EvilginxPage} />} />
@@ -264,22 +264,22 @@ function DashboardRouter() {
         <Route path="/content-creator" component={ContentCreatorPage} />
 
         {/* Security Tools */}
-        <Route path="/cybermcp" component={CyberMCPPage} />
+        <Route path="/cybermcp" component={() => <AdminRoute component={CyberMCPPage} />} />
         <Route path="/astra" component={AstraPage} />
         <Route path="/argus" component={ArgusPage} />
 
         {/* Titan Storage Add-on */}
         <Route path="/storage" component={TitanStoragePage} />
 
-        {/* Privacy & Anonymity Tools */}
-        <Route path="/tor" component={TorPage} />
-        <Route path="/vpn-chain" component={VpnChainPage} />
-        <Route path="/isolated-browser" component={IsolatedBrowserPage} />
-        <Route path="/proxy-maker" component={ProxyMakerPage} />
-        <Route path="/proxy-rotation" component={ProxyRotationPage} />
-        <Route path="/ip-rotation" component={IPRotationPage} />
+        {/* Privacy & Anonymity Tools — admin only */}
+        <Route path="/tor" component={() => <AdminRoute component={TorPage} />} />
+        <Route path="/vpn-chain" component={() => <AdminRoute component={VpnChainPage} />} />
+        <Route path="/isolated-browser" component={() => <AdminRoute component={IsolatedBrowserPage} />} />
+        <Route path="/proxy-maker" component={() => <AdminRoute component={ProxyMakerPage} />} />
+        <Route path="/proxy-rotation" component={() => <AdminRoute component={ProxyRotationPage} />} />
+        <Route path="/ip-rotation" component={() => <AdminRoute component={IPRotationPage} />} />
         <Route path="/bin-checker" component={() => <AdminRoute component={BinCheckerPage} />} />
-        <Route path="/web-agent" component={WebAgentPage} />
+        <Route path="/web-agent" component={() => <AdminRoute component={WebAgentPage} />} />
 
         {/* Admin — requires admin role; non-admins are redirected to /dashboard */}
         <Route path="/fetcher/releases" component={() => <AdminRoute component={ReleaseManagementPage} />} />
@@ -297,11 +297,11 @@ function DashboardRouter() {
         {/* Attack Graph */}
         <Route path="/attack-graph" component={AttackGraphPage} />
 
-        {/* Proxy Interceptor */}
-        <Route path="/proxy-interceptor" component={ProxyInterceptorPage} />
+        {/* Proxy Interceptor — admin only */}
+        <Route path="/proxy-interceptor" component={() => <AdminRoute component={ProxyInterceptorPage} />} />
 
-        {/* Red Team Playbooks */}
-        <Route path="/red-team-playbooks" component={RedTeamPlaybooksPage} />
+        {/* Red Team Playbooks — admin only */}
+        <Route path="/red-team-playbooks" component={() => <AdminRoute component={RedTeamPlaybooksPage} />} />
 
         {/* Command Centre */}
         <Route path="/command-centre" component={CommandCentrePage} />
@@ -312,11 +312,11 @@ function DashboardRouter() {
         {/* Compliance Reports */}
         <Route path="/compliance-reports" component={ComplianceReportsPage} />
 
-        {/* SIEM Integration */}
-        <Route path="/siem-integration" component={SiemIntegrationPage} />
+        {/* SIEM Integration — admin only */}
+        <Route path="/siem-integration" component={() => <AdminRoute component={SiemIntegrationPage} />} />
 
-        {/* Security Marketplace */}
-        <Route path="/security-marketplace" component={SecurityMarketplacePage} />
+        {/* Security Marketplace — admin only */}
+        <Route path="/security-marketplace" component={() => <AdminRoute component={SecurityMarketplacePage} />} />
 
         <Route component={NotFound} />
       </Switch>
