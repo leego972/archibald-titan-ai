@@ -131,12 +131,13 @@ export default function LeegoLogo({ idleClassName = "h-20 w-20" }: LeegoLogoProp
           className="pointer-events-none rounded-2xl"
           style={{
             position: "fixed",
-            // Centre on screen, sized to 70vmin × 70vmin (slightly larger than logo)
+            // Align with the bottom-anchored logo (70vmin × 70vmin, slightly larger than logo)
             width: "70vmin",
             height: "70vmin",
-            top: "50%",
+            bottom: "calc(6vh - 5vmin)",
             left: "50%",
-            transform: "translate(-50%, -50%)",
+            top: "auto",
+            transform: "translateX(-50%)",
             zIndex: 49,
             opacity: isExpanded ? 0.9 : 0,
             transition: `opacity ${transitionDuration} ${transitionEasing}`,
@@ -171,13 +172,16 @@ export default function LeegoLogo({ idleClassName = "h-20 w-20" }: LeegoLogoProp
           filter: isExpanded
             ? "drop-shadow(0 0 20px rgba(0,255,50,1)) drop-shadow(0 0 50px rgba(0,255,50,0.85)) drop-shadow(0 0 100px rgba(0,255,50,0.5))"
             : "drop-shadow(0 0 8px rgba(0,255,50,0.6)) drop-shadow(0 0 18px rgba(0,255,50,0.3))",
-          // Keep it centred on screen when expanded
+          // When idle/shrinking-back: grow upward from the logo's bottom edge
+          transformOrigin: (isExpanded || phase === "shrinking") ? undefined : "bottom center",
+          // Keep it centred on screen when fully expanded
           ...(isExpanded || phase === "shrinking"
             ? {
                 position: "fixed",
-                top: "50%",
+                bottom: "6vh",
                 left: "50%",
-                transform: "translate(-50%, -50%)",
+                top: "auto",
+                transform: "translateX(-50%)",
               }
             : {}),
         }}
