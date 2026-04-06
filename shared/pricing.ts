@@ -12,7 +12,7 @@
  *   upgrading the obvious better deal and drives conversions.
  *
  * TIER STRUCTURE:
- * Pro → Enterprise → Cyber (public tiers)
+ * Pro -> Enterprise -> Cyber (public tiers)
  * Cyber+ and Titan are internal/enterprise tiers, not shown in the public pricing UI.
  *
  * CREDIT ALLOCATION (aligned with pricing page advertising):
@@ -56,7 +56,7 @@ export interface PricingTier {
 }
 
 export const PRICING_TIERS: PricingTier[] = [
-  // ─── FREE ────────────────────────────────────────────────────────
+  // --- FREE ----
   {
     id: "free",
     name: "Free",
@@ -85,7 +85,7 @@ export const PRICING_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── PRO ─────────────────────────────────────────────────────────
+  // --- PRO ----
   {
     id: "pro",
     name: "Pro",
@@ -136,7 +136,7 @@ export const PRICING_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── ENTERPRISE ──────────────────────────────────────────────────
+  // --- ENTERPRISE ----
   {
     id: "enterprise",
     name: "Enterprise",
@@ -183,7 +183,7 @@ export const PRICING_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── CYBER ───────────────────────────────────────────────────────
+  // --- CYBER ----
   {
     id: "cyber",
     name: "Cyber",
@@ -222,12 +222,12 @@ export const PRICING_TIERS: PricingTier[] = [
 ];
 
 /**
- * Internal tiers (Cyber+, Titan) — used for admin/referral unlocks and feature gating.
+ * Internal tiers (Cyber+, Titan) -- used for admin/referral unlocks and feature gating.
  * Not shown in the public pricing UI. The PRICING_TIERS array above is the source of truth
  * for what users see on the pricing page.
  */
 export const INTERNAL_TIERS: PricingTier[] = [
-  // ─── CYBER+ (internal tier — not shown in public pricing UI) ─────
+  // --- CYBER+ (internal tier) ----
   {
     id: "cyber_plus",
     name: "Cyber+",
@@ -265,7 +265,7 @@ export const INTERNAL_TIERS: PricingTier[] = [
     },
   },
 
-  // ─── TITAN (internal tier — not shown in public pricing UI) ──────
+  // --- TITAN (internal tier) ----
   {
     id: "titan",
     name: "Titan",
@@ -304,12 +304,7 @@ export const INTERNAL_TIERS: PricingTier[] = [
   },
 ];
 
-/**
- * Stripe Price IDs — these will be created in Stripe and mapped here.
- * For test mode, we create prices dynamically via the API.
- * For production, replace these with actual Stripe Price IDs.
- */
-// ─── Credit Costs ──────────────────────────────────────────────────
+// --- Credit Costs ----
 //
 // COST PHILOSOPHY (rebalanced to match actual allocations):
 // - Pro user (50,000 credits/mo) should get ~1,000 builder tasks/mo = 50 credits/task.
@@ -317,27 +312,19 @@ export const INTERNAL_TIERS: PricingTier[] = [
 // - Chat messages are cheap so users never hesitate to ask questions.
 // - Heavy compute (image, video, security exploits) costs proportionally more.
 // - A Pro user can send ~5,000 chat messages OR ~1,000 builder tasks per month.
-// - Enterprise (250,000 credits/mo) = ~5,000 builder tasks — power user territory.
-
-// COST PHILOSOPHY — Compute-Weighted, One Charge Per Full User Action:
-//
-// Credits represent real compute units. The cost of each action reflects the
-// actual resources consumed: LLM tokens, SSH compute time, external API calls,
-// and server-side processing. This mirrors how professional AI platforms like
-// Manus, Devin, and Cursor charge — by what the system actually does, not
-// arbitrary flat rates.
+// - Enterprise (250,000 credits/mo) = ~5,000 builder tasks -- power user territory.
 //
 // WEIGHT TIERS:
-//   Micro    (5)   — Single API ping, passive lookup
-//   Light    (15)  — Simple fetch, sync, short AI call
-//   Standard (25)  — Chat message, voice, basic AI action
-//   Medium   (75)  — Full tool call, GitHub op, credential fetch
-//   Heavy    (150) — SEO run, blog gen, security scan, site monitor
-//   Intense  (300) — VPN/proxy build, marketing run, grant apply
-//   Power    (500) — Image gen, business plan, Blackeye session
-//   Elite    (750) — Evilginx full session, advanced exploit
-//   Max      (1000)— Metasploit chain, full site clone, video gen
-//   Extreme  (2000)— Full site replication job
+//   Micro    (5)   -- Single API ping, passive lookup
+//   Light    (15)  -- Simple fetch, sync, short AI call
+//   Standard (25)  -- Chat message, voice, basic AI action
+//   Medium   (75)  -- Full tool call, GitHub op, credential fetch
+//   Heavy    (150) -- SEO run, blog gen, security scan, site monitor
+//   Intense  (300) -- VPN/proxy build, marketing run, grant apply
+//   Power    (500) -- Image gen, business plan, Blackeye session
+//   Elite    (750) -- Evilginx full session, advanced exploit
+//   Max      (1000)-- Metasploit chain, full site clone, video gen
+//   Extreme  (2000)-- Full site replication job
 //
 // ONE ACTION = ONE CHARGE:
 //   Internal sub-calls (SSH hops, API retries, tool iterations) within a
@@ -346,136 +333,126 @@ export const INTERNAL_TIERS: PricingTier[] = [
 //   For complexity-scaled actions (e.g. VPN hop count), use consumeCreditsAmount().
 
 export const CREDIT_COSTS = {
-  // ── Core AI ──────────────────────────────────────────────────────────
-  chat_message: 10,                           // Standard — LLM inference + context window processing
-  builder_action: 50,                       // Medium — full tool call cycle (read/write/exec/plan)
-  voice_action: 25,              // Standard — Whisper transcription (short audio clip)
-  image_generation: 500,         // Power — DALL-E / Replicate GPU diffusion compute
-  video_generation: 1000,        // Max — video diffusion model, very high GPU cost
+  // Core AI
+  chat_message: 10,
+  builder_action: 50,
+  voice_action: 25,
+  image_generation: 500,
+  video_generation: 1000,
 
-  // ── Credential & Fetch ───────────────────────────────────────────────
-  fetch_action: 5,                            // Light — stealth browser + CAPTCHA solve + parse
-  github_action: 75,             // Medium — GitHub API call + repo mutation
-  import_action: 25,             // Standard — batch parse + validate + store
+  // Credential & Fetch
+  fetch_action: 5,
+  github_action: 75,
+  import_action: 25,
 
-  // ── Clone & Replicate ────────────────────────────────────────────────
-  clone_action: 1000,                                 // Max — full site clone pipeline (Cyber+ / Titan only)
-  replicate_action: 1000,              // Extreme — full site replication job
+  // Clone & Replicate
+  clone_action: 1000,
+  replicate_action: 1000,
 
-  // ── SEO & Content ────────────────────────────────────────────────────
-  seo_run: 150,                  // Heavy — crawl + LLM analysis + recommendations
-  blog_generate: 150,            // Heavy — long-form LLM generation + formatting
-  content_generate: 75,          // Medium — short-form AI content (social, email)
-  marketing_run: 300,            // Intense — multi-step campaign generation cycle
-  advertising_run: 300,          // Intense — ad copy + targeting + creative cycle
+  // SEO & Content
+  seo_run: 150,
+  blog_generate: 150,
+  content_generate: 75,
+  marketing_run: 300,
+  advertising_run: 300,
 
-  // ── Security Tools (Cyber tier) ──────────────────────────────────────
-  security_scan: 150,            // Heavy — active scan + AI vulnerability analysis
-  metasploit_action: 1000,       // Max — module load + exploit execution chain
-  evilginx_action: 750,          // Elite — phishlet/lure deploy + session capture
-  blackeye_action: 500,          // Power — phishing page deploy + listener setup
+  // Security Tools (Cyber tier)
+  security_scan: 150,
+  metasploit_action: 1000,
+  evilginx_action: 750,
+  blackeye_action: 500,
 
-  // ── VPN & Proxies ────────────────────────────────────────────────────
-  vpn_generate: 300,             // Intense — SSH provisioning + WireGuard/proxy config
+  // VPN & Proxies
+  vpn_generate: 300,
 
-  // ── Grants & Business ────────────────────────────────────────────────
-  grant_match: 75,               // Medium — AI grant database search + scoring
-  grant_apply: 300,              // Intense — full application generation + submit
-  business_plan_generate: 500,   // Power — multi-section LLM business plan
+  // Grants & Business
+  grant_match: 75,
+  grant_apply: 300,
+  business_plan_generate: 500,
 
-  // ── Marketplace ──────────────────────────────────────────────────────
-  marketplace_list: 25,          // Standard — listing creation + indexing
-  marketplace_feature: 150,      // Heavy — boost + promotion placement
+  // Marketplace
+  marketplace_list: 25,
+  marketplace_feature: 150,
 
-  // ── Site Monitor & Sandbox ───────────────────────────────────────────
-  site_monitor_add: 25,          // Standard — register site + first health check
-  sandbox_run: 75,               // Medium — container spawn + code execution
+  // Site Monitor & Sandbox
+  site_monitor_add: 25,
+  sandbox_run: 75,
 
-  // ── Affiliate & API ──────────────────────────────────────────────────
-  affiliate_action: 15,          // Light — link/campaign creation + tracking setup
-  api_call: 5,                   // Micro — single external API call
+  // Affiliate & API
+  affiliate_action: 15,
+  api_call: 5,
 
-  // ── Content Creator ───────────────────────────────────────────────────────
-  content_campaign_create: 50,   // Standard — AI strategy generation for new campaign
-  content_bulk_generate: 200,    // Heavy — multi-platform bulk content generation cycle
-  content_seo_brief: 100,        // Medium — SEO-driven content generation per platform
+  // Content Creator
+  content_campaign_create: 50,
+  content_bulk_generate: 200,
+  content_seo_brief: 100,
 
-  // ── Marketplace Intelligence ──────────────────────────────────────────────
-  marketplace_ai_describe: 50,   // Standard — AI listing description generation
-  marketplace_ai_price: 25,      // Light — AI price suggestion analysis
+  // Marketplace Intelligence
+  marketplace_ai_describe: 50,
+  marketplace_ai_price: 25,
 
-  // ── Security / Astra ──────────────────────────────────────────────────────
-  astra_scan: 200,               // Heavy — active vulnerability scan + AI analysis
-  exploit_exec: 500,             // Power — exploit module execution on node
-  exploit_cve_search: 50,        // Standard — CVE database search + AI enrichment
+  // Security / Astra
+  astra_scan: 200,
+  exploit_exec: 500,
+  exploit_cve_search: 50,
 
-  // ── BIN Checker ───────────────────────────────────────────────────────────────
-  bin_lookup: 5,                 // Micro — single BIN database lookup
-  bin_bulk_lookup: 50,           // Standard — bulk BIN lookup batch (up to 100)
-  bin_reverse_search: 25,        // Light — reverse BIN search by country/network
-  card_live_check: 50,           // Standard — 3-layer card check: Luhn + BIN + Stripe SetupIntent live verification
+  // BIN Checker
+  bin_lookup: 5,
+  bin_bulk_lookup: 50,
+  bin_reverse_search: 25,
+  card_live_check: 50,
 
-  // ── Proxy & IP Rotation ───────────────────────────────────────────────────
-  proxy_test: 10,                // Light — single proxy connectivity test
-  proxy_test_all: 75,            // Medium — full proxy pool health check
-  proxy_scrape: 50,              // Standard — scrape + validate fresh proxy list
-  ip_rotation_circuit: 25,       // Light — new Tor circuit / IP rotation
+  // Proxy & IP Rotation
+  proxy_test: 10,
+  proxy_test_all: 75,
+  proxy_scrape: 50,
+  ip_rotation_circuit: 25,
 
-  // ── Web Agent ─────────────────────────────────────────────────────────────────────
-  web_agent_task: 150,           // Heavy — autonomous browser task execution
+  // Web Agent
+  web_agent_task: 150,
 
-  // ── TOR / Anonymity ───────────────────────────────────────────────────────────────
-  tor_new_circuit: 25,           // Light — request new Tor exit node circuit
-  tor_run_command: 75,           // Medium — route command through Tor network
+  // TOR / Anonymity
+  tor_new_circuit: 25,
+  tor_run_command: 75,
 
-  // ── Credential Health ───────────────────────────────────────────────────────────
-  credential_breach_check: 25,   // Light — HIBP breach lookup per credential
+  // Credential Health
+  credential_breach_check: 25,
 
-  // ── TOTP Vault ───────────────────────────────────────────────────────────────────
-  totp_code_generate: 5,         // Micro — TOTP code generation (HMAC-SHA1)
+  // TOTP Vault
+  totp_code_generate: 5,
 
-  // ── VPN Chain ─────────────────────────────────────────────────────────────────────
-  vpn_chain_build: 500,          // Power — WireGuard multi-hop chain assembly
-  vpn_chain_config: 150,         // Heavy — generate + download client config
+  // VPN Chain
+  vpn_chain_build: 500,
+  vpn_chain_config: 150,
 
-  // ── Isolated Browser ─────────────────────────────────────────────────────────────
-  isolated_browser_session: 200, // Heavy — spawn isolated Chromium + fingerprint spoof
+  // Isolated Browser
+  isolated_browser_session: 200,
 
-  // ── Site Monitor ──────────────────────────────────────────────────────────────────
-  site_monitor_check: 10,        // Light — manual health check trigger
+  // Site Monitor
+  site_monitor_check: 10,
 
-  // ── Proxy ─────────────────────────────────────────────────────────────────────────
-  proxy_add: 10,                 // Light — add + validate new proxy to pool
-  // ── Linken Sphere ─────────────────────────────────────────────────────────────────
-  linken_session_start: 50,      // Standard — start a Linken Sphere stealth browser session
-  linken_quick_create: 25,       // Light — create a quick Linken Sphere session profile
-  // ── CyberMCP ──────────────────────────────────────────────────────────────────────
-  cybermcp_scan: 150,            // Heavy — full 5-check security scan with live SSE progress
+  // Proxy
+  proxy_add: 10,
 
-  // ── Red Team & Advanced Security ────────────────────────────────────────────────────────────
-  red_team_run: 500,             // Power — full multi-step red team playbook execution
-  compliance_report: 200,        // Heavy — AI-driven compliance assessment + report generation
-  siem_config: 25,               // Light — SIEM integration config create/update
-  siem_test: 75,                 // Medium — live SIEM endpoint connectivity test
-  event_bus_rule: 15,            // Light — automation rule creation in event bus
-  security_module_install: 50,   // Standard — security marketplace module install
+  // Linken Sphere
+  linken_session_start: 50,
+  linken_quick_create: 25,
+
+  // CyberMCP
+  cybermcp_scan: 150,
+
+  // Red Team & Advanced Security
+  red_team_run: 500,
+  compliance_report: 200,
+  siem_config: 25,
+  siem_test: 75,
+  event_bus_rule: 15,
+  security_module_install: 50,
 } as const;
 
 export type CreditActionType = keyof typeof CREDIT_COSTS;
 
-// ─── Credit Top-Up Packs (one-time purchases) ──────────────────────
-//
-// TOP-UP PHILOSOPHY:
-// - Top-ups exist for users who run out mid-month but don't want to upgrade yet.
-// - INTENTIONALLY more expensive per-credit than upgrading to a higher plan.
-// - This creates a natural "upgrade nudge" — after buying 2 top-ups, the user realizes
-//   upgrading would have been cheaper. This drives plan upgrades.
-// - Small packs (5,000) are priced at the same cost as Pro monthly ($29.99) to make
-//   the comparison obvious: "Why buy 5K credits once when Pro gives 5K every month?"
-// - Boost packs ($17.99) are priced at $0.0072/credit — 24% more expensive than Pro's
-//   $0.0058/credit — creating a clear upgrade nudge.
-// - Large packs (10,000) are priced above Pro's per-credit rate ($59.99 = $0.006/credit)
-//   to prevent subscription bypass. Enterprise is still the better deal.
+// --- Credit Top-Up Packs (one-time purchases) ----
 
 export interface CreditPack {
   id: string;
@@ -483,7 +460,7 @@ export interface CreditPack {
   credits: number;
   price: number; // USD
   popular?: boolean;
-  upgradeNudge?: string; // shown to user to encourage plan upgrade instead
+  upgradeNudge?: string;
 }
 
 export const CREDIT_PACKS: CreditPack[] = [
@@ -492,7 +469,7 @@ export const CREDIT_PACKS: CreditPack[] = [
     name: "Quick Top-Up",
     credits: 10000,
     price: 4.99,
-    upgradeNudge: undefined, // too small to nudge
+    upgradeNudge: undefined,
   },
   {
     id: "pack_2500",
@@ -500,52 +477,36 @@ export const CREDIT_PACKS: CreditPack[] = [
     credits: 25000,
     price: 9.99,
     popular: true,
-    upgradeNudge: "Pro gives 50,000 credits/mo for just $29 — 2x the credits every month!",
+    upgradeNudge: "Pro gives 50,000 credits/mo for just $29 -- 2x the credits every month!",
   },
   {
     id: "pack_5000",
     name: "Power Top-Up",
     credits: 50000,
     price: 17.99,
-    upgradeNudge: "Pro gives the same 50,000 credits every month for $29/mo — upgrade and save!",
+    upgradeNudge: "Pro gives the same 50,000 credits every month for $29/mo -- upgrade and save!",
   },
   {
     id: "pack_10000",
     name: "Mega Top-Up",
     credits: 150000,
     price: 49.99,
-    upgradeNudge: "Enterprise gives 250,000 credits/mo for $99 — 5x more credits! Upgrading saves you money.",
+    upgradeNudge: "Enterprise gives 250,000 credits/mo for $99 -- 5x more credits! Upgrading saves you money.",
   },
 ];
 
-// ─── Credit Escalation Funnel ─────────────────────────────────────
-//
-// ESCALATION PHILOSOPHY:
-// When a user runs out of credits mid-cycle, they are offered a progressive
-// upsell ladder rather than a hard block. This maximises revenue while keeping
-// the user experience fair and transparent.
-//
-// Step 1: Buy up to 3 boost packs (top-up credits, no plan change)
-// Step 2: Offered to double their membership (charged immediately, credits added now)
-// Step 3: Run out again → offered to double again (up to 3 doublings per cycle)
-// Step 4: Month resets → billed at current (possibly doubled) rate going forward
-//
-// DOWNGRADE RULES:
-// - User can downgrade at any time → charged new lower rate immediately via Stripe
-// - Credits do NOT refill on downgrade — only refill when billing cycle rolls over
-// - This prevents gaming the system by downgrading to get a cheap refill
+// --- Credit Escalation Funnel ----
 
 export interface PlanDoubleStep {
-  basePlanId: string;       // the plan being doubled
-  basePriceUsd: number;     // original monthly price
-  doubledPriceUsd: number;  // 2x monthly price
-  doubledCredits: number;   // 2x monthly credit allocation
-  stripePriceId?: string;   // Stripe price ID for the doubled plan (set in production)
-  label: string;            // display label, e.g. "Pro 2x"
-  description: string;      // shown in the offer modal
+  basePlanId: string;
+  basePriceUsd: number;
+  doubledPriceUsd: number;
+  doubledCredits: number;
+  stripePriceId?: string;
+  label: string;
+  description: string;
 }
 
-// Maps each plan to its doubling offer (what they get charged if they accept)
 export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
   pro: {
     basePlanId: "pro",
@@ -553,7 +514,7 @@ export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
     doubledPriceUsd: 58,
     doubledCredits: 100000,
     label: "Pro 2x",
-    description: "Double your Pro plan — 100,000 credits for $58/mo until your cycle resets",
+    description: "Double your Pro plan -- 100,000 credits for $58/mo until your cycle resets",
   },
   enterprise: {
     basePlanId: "enterprise",
@@ -561,7 +522,7 @@ export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
     doubledPriceUsd: 198,
     doubledCredits: 500000,
     label: "Enterprise 2x",
-    description: "Double your Enterprise plan — 500,000 credits for $198/mo until your cycle resets",
+    description: "Double your Enterprise plan -- 500,000 credits for $198/mo until your cycle resets",
   },
   cyber: {
     basePlanId: "cyber",
@@ -569,7 +530,7 @@ export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
     doubledPriceUsd: 398,
     doubledCredits: 1500000,
     label: "Cyber 2x",
-    description: "Double your Cyber plan — 1,500,000 credits for $398/mo until your cycle resets",
+    description: "Double your Cyber plan -- 1,500,000 credits for $398/mo until your cycle resets",
   },
   cyber_plus: {
     basePlanId: "cyber_plus",
@@ -577,7 +538,7 @@ export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
     doubledPriceUsd: 998,
     doubledCredits: 6000000,
     label: "Cyber+ 2x",
-    description: "Double your Cyber+ plan — 6,000,000 credits for $998/mo until your cycle resets",
+    description: "Double your Cyber+ plan -- 6,000,000 credits for $998/mo until your cycle resets",
   },
   titan: {
     basePlanId: "titan",
@@ -585,42 +546,20 @@ export const PLAN_DOUBLE_MAP: Record<string, PlanDoubleStep> = {
     doubledPriceUsd: 9998,
     doubledCredits: 20000000,
     label: "Titan 2x",
-    description: "Double your Titan plan — 20,000,000 credits for $9,998/mo until your cycle resets",
+    description: "Double your Titan plan -- 20,000,000 credits for $9,998/mo until your cycle resets",
   },
 };
 
-// Maximum boost packs a user can buy per billing cycle before being offered an upgrade
 export const MAX_BOOST_PACKS_PER_CYCLE = 3;
-
-// Maximum times a user can double their plan in a single billing cycle
 export const MAX_DOUBLES_PER_CYCLE = 3;
 
-// ─── Daily Free Credits (Free Tier Only) ───────────────────────────────────────────────
-//
-// Free tier users receive 375 free credits every 24 hours.
-// These credits:
-//   - Are ONLY granted to users on the "free" plan
-//   - Reset every 24 hours (do NOT accumulate — unused credits are discarded)
-//   - Are consumed BEFORE paid credits in consumeCredits()
-//   - Allow ~5 standard tasks/day (5 × 75 credits = 375)
-//   - Are granted automatically on the first action of each day
-//   - Are shown separately in the credit balance UI so users understand the system
-//   - Paid plan users do NOT get daily free credits — they have their monthly allocation
+// --- Daily Free Credits (Free Tier Only) ----
 
-export const DAILY_FREE_CREDITS_AMOUNT = 375;   // credits granted per day (free tier only)
-export const DAILY_FREE_CREDITS_RESET_HOURS = 24; // hours before daily pool resets
-export const DAILY_FREE_CREDITS_PLAN = "free";   // only this plan receives daily free credits
+export const DAILY_FREE_CREDITS_AMOUNT = 375;
+export const DAILY_FREE_CREDITS_RESET_HOURS = 24;
+export const DAILY_FREE_CREDITS_PLAN = "free";
 
-// ─── Clone Website Pricing (per-use, billed via Stripe) ────────────
-//
-// CLONE PRICING PHILOSOPHY:
-// - A fully cloned, branded website with payment integration is worth $3,500–$8,000+
-//   from a freelancer and takes 2–4 weeks. We deliver it in minutes.
-// - Pricing is tiered by complexity, auto-detected from the target site.
-// - Even at $3,500 for enterprise, it's still HALF what an agency charges.
-// - Minimum $500 ensures the feature is treated as a premium product, not a toy.
-// - Only available to Cyber+ and Titan subscribers.
-// - Titan users get a discount as part of their premium tier.
+// --- Clone Website Pricing (per-use, billed via Stripe) ----
 
 export type CloneComplexity = "simple" | "standard" | "advanced" | "enterprise";
 
@@ -628,10 +567,10 @@ export interface ClonePricingTier {
   id: CloneComplexity;
   name: string;
   description: string;
-  price: number;           // USD — base price
-  titanPrice: number;      // USD — discounted price for Titan subscribers
-  maxPages: number;        // page count threshold for auto-detection
-  features: string[];      // what's included at this tier
+  price: number;
+  titanPrice: number;
+  maxPages: number;
+  features: string[];
 }
 
 export const CLONE_PRICING: ClonePricingTier[] = [
@@ -691,7 +630,7 @@ export const CLONE_PRICING: ClonePricingTier[] = [
     description: "Complex web applications, multi-feature platforms",
     price: 3500,
     titanPrice: 2500,
-    maxPages: -1, // unlimited
+    maxPages: -1,
     features: [
       "Unlimited pages",
       "Everything in Advanced",
@@ -704,7 +643,6 @@ export const CLONE_PRICING: ClonePricingTier[] = [
   },
 ];
 
-// Helper to determine clone complexity from page count and feature analysis
 export function detectCloneComplexity(pageCount: number, hasPayments: boolean, hasAuth: boolean): CloneComplexity {
   if (hasPayments || hasAuth || pageCount > 50) return "enterprise";
   if (pageCount > 15) return "advanced";
@@ -712,8 +650,7 @@ export function detectCloneComplexity(pageCount: number, hasPayments: boolean, h
   return "simple";
 }
 
-// ─── Feature Comparison Matrix ─────────────────────────────────────
-// Used by the pricing page comparison table to show all features across all tiers.
+// --- Feature Comparison Matrix ----
 
 export interface ComparisonFeature {
   name: string;
@@ -727,7 +664,7 @@ export interface ComparisonFeature {
 }
 
 export const COMPARISON_FEATURES: ComparisonFeature[] = [
-  // ── AI & Builder ─────────────────────────────────────────────
+  // AI & Builder
   { name: "Monthly credits", category: "AI & Builder", free: "500", pro: "50,000", enterprise: "250,000", cyber: "750,000", cyber_plus: "3,000,000", titan: "10,000,000" },
   { name: "Titan Builder (AI chat & code)", category: "AI & Builder", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
   { name: "Sandbox environment", category: "AI & Builder", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
@@ -735,7 +672,7 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Clone Website", category: "AI & Builder", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
   { name: "Custom AI model fine-tuning", category: "AI & Builder", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
 
-  // ── Credential Management ────────────────────────────────────
+  // Credential Management
   { name: "Fetches per month", category: "Credential Management", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
   { name: "Providers", category: "Credential Management", pro: "15+", enterprise: "15+ & custom", cyber: "15+ & custom", cyber_plus: "15+ & custom", titan: "15+ & custom" },
   { name: "Credential storage", category: "Credential Management", pro: "Unlimited", enterprise: "Unlimited", cyber: "Unlimited", cyber_plus: "Unlimited", titan: "Unlimited" },
@@ -751,7 +688,7 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Export formats", category: "Credential Management", pro: "JSON & .ENV", enterprise: "JSON, .ENV, CSV, API", cyber: "JSON, .ENV, CSV, API", cyber_plus: "JSON, .ENV, CSV, API", titan: "JSON, .ENV, CSV, API" },
   { name: "Import credentials", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
-  // ── Security (Cyber) ─────────────────────────────────────────
+  // Security (Cyber)
   { name: "TOTP Vault (2FA management)", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
   { name: "Credential Leak Scanner", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
   { name: "Credential Health Monitor", category: "Security", pro: false, enterprise: false, cyber: true, cyber_plus: true, titan: true },
@@ -765,7 +702,7 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Offensive security tooling", category: "Security", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
   { name: "Site Monitor", category: "Security", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
-  // ── Marketplace & Business ───────────────────────────────────
+  // Marketplace & Business
   { name: "Grand Bazaar (marketplace)", category: "Marketplace & Business", pro: "Buy & sell", enterprise: "Buy & sell", cyber: "Buy & sell", cyber_plus: "Buy & sell", titan: "Buy & sell" },
   { name: "Seller Dashboard & inventory", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Browse & apply for grants", category: "Marketplace & Business", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
@@ -778,13 +715,13 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Advertising dashboard", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Affiliate dashboard", category: "Marketplace & Business", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
-  // ── Team & Collaboration ─────────────────────────────────────
+  // Team & Collaboration
   { name: "Team management", category: "Team & Collaboration", pro: false, enterprise: "Up to 25 seats", cyber: "Up to 25 seats", cyber_plus: "Unlimited seats", titan: "Unlimited seats" },
   { name: "Team Vault (shared credentials)", category: "Team & Collaboration", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Multi-org management", category: "Team & Collaboration", pro: false, enterprise: false, cyber: false, cyber_plus: true, titan: true },
   { name: "SSO / SAML authentication", category: "Team & Collaboration", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
-  // ── Developer & API ──────────────────────────────────────────
+  // Developer & API
   { name: "Developer API", category: "Developer & API", pro: "100 req/day", enterprise: "10,000 req/day", cyber: "10,000 req/day", cyber_plus: "Unlimited", titan: "Unlimited" },
   { name: "API Analytics dashboard", category: "Developer & API", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Webhooks & Notifications", category: "Developer & API", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
@@ -792,7 +729,7 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "API Docs", category: "Developer & API", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Audit logs", category: "Developer & API", pro: false, enterprise: "90-day retention", cyber: "1-year retention", cyber_plus: "1-year retention", titan: "Unlimited" },
 
-  // ── Infrastructure & Support ─────────────────────────────────
+  // Infrastructure & Support
   { name: "Support", category: "Infrastructure & Support", pro: "Priority email", enterprise: "Dedicated manager", cyber: "Priority security", cyber_plus: "Slack/Teams channel", titan: "24/7 phone + white-glove" },
   { name: "SLA guarantee", category: "Infrastructure & Support", pro: false, enterprise: "99.9%", cyber: "99.9%", cyber_plus: "99.9%", titan: "99.99%" },
   { name: "White-label option", category: "Infrastructure & Support", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
