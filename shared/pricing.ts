@@ -101,7 +101,7 @@ export const PRICING_TIERS: PricingTier[] = [
       "Unlimited credential storage",
       "Advanced stealth browser + CAPTCHA solving",
       "5 proxy slots",
-      "JSON, .ENV & CSV export",
+      "JSON & .ENV export",
       "Scheduled fetches & advanced automation",
       "Sandbox + unlimited projects",
       "Grand Bazaar (buy & sell)",
@@ -748,7 +748,7 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Expiry Watchdog", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Provider Health monitoring", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
   { name: "Provider Onboarding wizard", category: "Credential Management", pro: false, enterprise: true, cyber: true, cyber_plus: true, titan: true },
-  { name: "Export formats", category: "Credential Management", pro: "JSON, .ENV, CSV", enterprise: "JSON, .ENV, CSV, API", cyber: "JSON, .ENV, CSV, API", cyber_plus: "JSON, .ENV, CSV, API", titan: "JSON, .ENV, CSV, API" },
+  { name: "Export formats", category: "Credential Management", pro: "JSON & .ENV", enterprise: "JSON, .ENV, CSV, API", cyber: "JSON, .ENV, CSV, API", cyber_plus: "JSON, .ENV, CSV, API", titan: "JSON, .ENV, CSV, API" },
   { name: "Import credentials", category: "Credential Management", pro: true, enterprise: true, cyber: true, cyber_plus: true, titan: true },
 
   // ── Security (Cyber) ─────────────────────────────────────────
