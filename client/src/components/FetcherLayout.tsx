@@ -83,7 +83,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       title: "Builder",
       items: [
         { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
-        { icon: Terminal, label: "Titan Builder", path: "/builder" },
+        { icon: Terminal, label: "Titan Builder", path: "/dashboard" },
         { icon: Monitor, label: "Command Centre", path: "/command-centre" },
         { icon: FolderOpen, label: "Project Files", path: "/project-files" },
       ],
@@ -117,7 +117,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
     {
       title: t("group.specialised"),
       items: [
-        // ── Offensive Security ────────────────────────────────────────────
+        // Offensive Security
         { icon: Crosshair, label: "Evilginx 3", path: "/evilginx", adminOnly: true, isCyber: true },
         { icon: Bug, label: "Metasploit", path: "/metasploit", adminOnly: true, isCyber: true },
         { icon: Eye, label: "BlackEye", path: "/blackeye", adminOnly: true, isCyber: true },
@@ -125,7 +125,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Shield, label: "Red Team Playbooks", path: "/red-team-playbooks", adminOnly: true, isCyber: true },
         { icon: Network, label: "Proxy Interceptor", path: "/proxy-interceptor", adminOnly: true, isCyber: true },
         { icon: Activity, label: "SIEM Integration", path: "/siem-integration", adminOnly: true, isCyber: true },
-        // ── Privacy & Anonymity ───────────────────────────────────────────
+        // Privacy & Anonymity
         { icon: Globe2, label: "Tor Browser", path: "/tor", adminOnly: true },
         { icon: Lock, label: "VPN Chain", path: "/vpn-chain", adminOnly: true },
         { icon: Network, label: "Proxy Maker", path: "/proxy-maker", adminOnly: true },
@@ -133,14 +133,14 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Zap, label: "IP Rotation", path: "/ip-rotation", adminOnly: true },
         { icon: Monitor, label: "Isolated Browser", path: "/isolated-browser", adminOnly: true },
         { icon: Globe2, label: "Linken Sphere", path: "/linken-sphere", adminOnly: true },
-        // ── Web & Recon ───────────────────────────────────────────────────
+        // Web & Recon
         { icon: FolderOpen, label: "Clone Website", path: "/replicate", adminOnly: true },
         { icon: Search, label: "Web Agent", path: "/web-agent", adminOnly: true },
         { icon: Terminal, label: "CyberMCP", path: "/cybermcp", adminOnly: true, isCyber: true },
         { icon: Activity, label: "Security Marketplace", path: "/security-marketplace", adminOnly: true, isCyber: true },
-        // ── Card & Finance Tools ──────────────────────────────────────────
+        // Card & Finance Tools
         { icon: CreditCard, label: "BIN Checker", path: "/bin-checker", adminOnly: true },
-        // ── Business & Funding ────────────────────────────────────────────
+        // Business & Funding
         { icon: Users, label: "Browse Grants", path: "/grants" },
         { icon: FolderOpen, label: "Grant Applications", path: "/grant-applications" },
         { icon: Database, label: "Companies", path: "/companies" },
@@ -148,14 +148,14 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Boxes, label: "Crowdfunding", path: "/crowdfunding" },
         { icon: CreditCard, label: "Affiliate Dashboard", path: "/affiliate" },
         { icon: Bell, label: "Referrals", path: "/referrals" },
-        // ── Marketing & SEO ───────────────────────────────────────────────
+        // Marketing & SEO
         { icon: Webhook, label: "SEO Command Centre", path: "/seo" },
         { icon: ScrollText, label: "Blog Engine", path: "/blog-admin" },
         { icon: Activity, label: "Marketing Engine", path: "/marketing" },
         { icon: Terminal, label: "Content Creator", path: "/content-creator" },
         { icon: Zap, label: "Master Growth", path: "/master-growth" },
         { icon: Monitor, label: "Advertising", path: "/advertising" },
-        // ── Admin Tools (hidden extras) ───────────────────────────────────
+        // Admin Tools (hidden extras)
         { icon: Terminal, label: "CLI Tool", path: "/fetcher/cli" },
         { icon: Terminal, label: "Git Bash", path: "/fetcher/git-bash" },
         { icon: Activity, label: "API Analytics", path: "/fetcher/api-analytics" },
@@ -332,8 +332,8 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
             <div className="flex items-center gap-4">
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
                 <Zap className="h-3.5 w-3.5 text-amber-400/60" />
-                <span className="text-xs font-bold text-white/60">{(sub?.fetchesRemaining === -1 ? "∞" : sub?.fetchesRemaining?.toLocaleString()) ?? 0}</span>
-                <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">Credits</span>
+                <span className="text-xs font-bold text-white/60">{(sub?.fetchesRemaining === -1 ? "\u221e" : sub?.fetchesRemaining?.toLocaleString()) ?? 0}</span>
+                <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">Fetches</span>
               </div>
               <Button 
                 variant="ghost" 
