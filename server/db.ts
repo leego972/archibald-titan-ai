@@ -1,7 +1,7 @@
 import { eq, and, or, gte, lte, like, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
-import { InsertUser, users, companies, InsertCompany, businessPlans, InsertBusinessPlan, grantOpportunities, InsertGrantOpportunity, grantApplications, InsertGrantApplication, grantMatches, InsertGrantMatch, crowdfundingCampaigns, InsertCrowdfundingCampaign, crowdfundingRewards, InsertCrowdfundingReward, crowdfundingContributions, InsertCrowdfundingContribution, crowdfundingUpdates, InsertCrowdfundingUpdate, crowdfundingComments, InsertCrowdfundingComment, marketplaceListings, InsertMarketplaceListing, marketplacePurchases, InsertMarketplacePurchase, marketplaceReviews, InsertMarketplaceReview, sellerProfiles, InsertSellerProfile, sellerPayoutMethods, InsertSellerPayoutMethod } from "../drizzle/schema";
+import { InsertUser, users, companies, InsertCompany, businessPlans, InsertBusinessPlan, grantOpportunities, InsertGrantOpportunity, grantApplications, InsertGrantApplication, grantMatches, InsertGrantMatch, crowdfundingCampaigns, InsertCrowdfundingCampaign, crowdfundingRewards, InsertCrowdfundingReward, crowdfundingContributions, InsertCrowdfundingContribution, crowdfundingUpdates, InsertCrowdfundingUpdate, crowdfundingComments, InsertCrowdfundingComment, marketplaceListings, InsertMarketplaceListing, marketplacePurchases, InsertMarketplacePurchase, marketplaceReviews, InsertMarketplaceReview, sellerProfiles, InsertSellerProfile, sellerPayoutMethods, InsertSellerPayoutMethod, securityModules, InsertSecurityModule, securityModuleInstalls, InsertSecurityModuleInstall, securityModuleReviews, InsertSecurityModuleReview } from "../drizzle/schema";
 import * as schema from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createLogger } from "./_core/logger.js";
@@ -491,4 +491,112 @@ export async function getSellerStats(userId: number) {
     avgRating: profile?.avgRating || 0,
     ratingCount: profile?.ratingCount || 0,
   };
+}
+
+// ==========================================
+// SECURITY MODULE MARKETPLACE DB FUNCTIONS
+// ==========================================
+
+export async function listSecurityModules(filters?: {
+  category?: string;
+  search?: string;
+  featured?: boolean;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb(); if (!db) return [];
+  const conditions: any[] = [eq(securityModules.status, 'published')];
+  if (filters?.category && filters.category !== 'all') conditions.push(eq(securityModules.category, filters.category as any));
+  if (filters?.search) conditions.push(like(securityModules.name, `%${filters.search}%`));
+  if (filters?.featured) conditions.push(eq(securityModules.featured, true));
+  const query = db.select().from(securityModules).where(and(...conditions)).orderBy(desc(securityModules.featured), desc(securityModules.downloads));
+  if (filters?.limit) return (query as any).limit(filters.limit).offset(filters?.offset ?? 0);
+  return query;
+}
+
+export async function getSecurityModuleBySlug(slug: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const result = await db.select().from(securityModules).where(eq(securityModules.slug, slug)).limit(1);
+  return result[0];
+}
+
+export async function createSecurityModule(data: InsertSecurityModule) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  const result = await db.insert(securityModules).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function updateSecurityModule(slug: string, data: Partial<InsertSecurityModule>) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  await db.update(securityModules).set(data).where(eq(securityModules.slug, slug));
+}
+
+export async function incrementSecurityModuleDownloads(slug: string) {
+  const db = await getDb(); if (!db) return;
+  await db.update(securityModules).set({ downloads: sql`downloads + 1` }).where(eq(securityModules.slug, slug));
+}
+
+export async function getSecurityModuleInstalls(userId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(securityModuleInstalls).where(eq(securityModuleInstalls.userId, userId)).orderBy(desc(securityModuleInstalls.installedAt));
+}
+
+export async function isSecurityModuleInstalled(userId: number, moduleSlug: string) {
+  const db = await getDb(); if (!db) return false;
+  const result = await db.select().from(securityModuleInstalls).where(and(eq(securityModuleInstalls.userId, userId), eq(securityModuleInstalls.moduleSlug, moduleSlug))).limit(1);
+  return result.length > 0;
+}
+
+export async function installSecurityModule(data: InsertSecurityModuleInstall) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  const result = await db.insert(securityModuleInstalls).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function uninstallSecurityModule(userId: number, moduleSlug: string) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  await db.delete(securityModuleInstalls).where(and(eq(securityModuleInstalls.userId, userId), eq(securityModuleInstalls.moduleSlug, moduleSlug)));
+}
+
+export async function getSecurityModuleReviews(moduleSlug: string) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(securityModuleReviews).where(eq(securityModuleReviews.moduleSlug, moduleSlug)).orderBy(desc(securityModuleReviews.createdAt));
+}
+
+export async function addSecurityModuleReview(data: InsertSecurityModuleReview) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  const result = await db.insert(securityModuleReviews).values(data);
+  // Recalculate average rating
+  const reviews = await db.select().from(securityModuleReviews).where(eq(securityModuleReviews.moduleSlug, data.moduleSlug));
+  const avg = Math.round(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length);
+  await db.update(securityModules).set({ rating: avg, ratingCount: reviews.length }).where(eq(securityModules.slug, data.moduleSlug));
+  return { id: result[0].insertId };
+}
+
+export async function getSecurityModuleStats(userId?: number) {
+  const db = await getDb(); if (!db) return { totalModules: 0, freeModules: 0, featuredModules: 0, installedCount: 0 };
+  const all = await db.select().from(securityModules).where(eq(securityModules.status, 'published'));
+  const installedCount = userId
+    ? (await db.select().from(securityModuleInstalls).where(eq(securityModuleInstalls.userId, userId))).length
+    : 0;
+  return {
+    totalModules: all.length,
+    freeModules: all.filter(m => m.license === 'free').length,
+    featuredModules: all.filter(m => m.featured).length,
+    installedCount,
+  };
+}
+
+export async function seedSecurityModulesIfEmpty(modules: InsertSecurityModule[]) {
+  const db = await getDb(); if (!db) return;
+  const existing = await db.select().from(securityModules).limit(1);
+  if (existing.length > 0) return; // already seeded
+  for (const mod of modules) {
+    try {
+      await db.insert(securityModules).values(mod);
+    } catch (_) {
+      // ignore duplicate slug errors on re-seed
+    }
+  }
 }

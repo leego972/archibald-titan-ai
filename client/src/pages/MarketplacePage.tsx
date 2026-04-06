@@ -307,10 +307,6 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
                 <div className="text-lg font-bold text-emerald-400">{stats.totalCategories}</div>
                 <div className="text-xs text-muted-foreground">Categories</div>
               </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-blue-400">{stats.totalSales}</div>
-                <div className="text-xs text-muted-foreground">Total Sales</div>
-              </div>
             </div>
           )}
         </div>

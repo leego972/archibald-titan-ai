@@ -28,9 +28,9 @@ const MERCHANT_BOTS = [
     email: "cyberforge@proton.me",
     bio: "Offensive security researchers building production-grade pentesting tools since 2019. Former red team operators turned tool builders. All code battle-tested in real engagements.",
     verified: true,
-    totalSales: 347,
-    avgRating: 47, // stored as x10, so 4.7
-    ratingCount: 189,
+    totalSales: 0,
+    avgRating: 0, // stored as x10, so 4.7
+    ratingCount: 0,
   },
   {
     openId: "bot_synthwave_002",
@@ -38,9 +38,9 @@ const MERCHANT_BOTS = [
     email: "synthwave.ai@pm.me",
     bio: "AI/ML engineers specializing in autonomous agents and prompt engineering. We build the tools that build the future. GPT-4, Claude, and open-source model integrations.",
     verified: true,
-    totalSales: 512,
-    avgRating: 49,
-    ratingCount: 276,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_ghostnet_003",
@@ -48,9 +48,9 @@ const MERCHANT_BOTS = [
     email: "ghostnet@tutanota.com",
     bio: "Network security specialists. OSINT, traffic analysis, and threat intelligence tools. Everything we ship comes with documentation and support.",
     verified: true,
-    totalSales: 223,
-    avgRating: 46,
-    ratingCount: 134,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_stacksmith_004",
@@ -58,9 +58,9 @@ const MERCHANT_BOTS = [
     email: "hello@stacksmith.dev",
     bio: "Full-stack developer tools and templates. React, Node, TypeScript — clean code, tested, documented. Saving you hundreds of hours per project.",
     verified: true,
-    totalSales: 891,
-    avgRating: 48,
-    ratingCount: 445,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_vaultkeeper_005",
@@ -68,9 +68,9 @@ const MERCHANT_BOTS = [
     email: "vault@keeper.security",
     bio: "Cryptography and data protection specialists. Encryption modules, key management, secure storage — built to compliance standards (SOC2, GDPR, HIPAA).",
     verified: true,
-    totalSales: 156,
-    avgRating: 50,
-    ratingCount: 98,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_devops_ninja_006",
@@ -78,9 +78,9 @@ const MERCHANT_BOTS = [
     email: "ninja@devops.tools",
     bio: "CI/CD pipelines, infrastructure-as-code, monitoring, and deployment automation. We automate everything so you can ship faster and sleep better.",
     verified: true,
-    totalSales: 634,
-    avgRating: 45,
-    ratingCount: 312,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_chainlink_007",
@@ -88,9 +88,9 @@ const MERCHANT_BOTS = [
     email: "research@chainlink.dev",
     bio: "Blockchain security researchers and smart contract auditors. Solidity, Rust, Move — we find the bugs before the hackers do.",
     verified: true,
-    totalSales: 178,
-    avgRating: 48,
-    ratingCount: 87,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_titan_official_008",
@@ -98,9 +98,9 @@ const MERCHANT_BOTS = [
     email: "modules@archibaldtitan.com",
     bio: "Official modules and extensions built by the Archibald Titan core team. Premium quality, deeply integrated with the Titan platform.",
     verified: true,
-    totalSales: 1203,
-    avgRating: 49,
-    ratingCount: 567,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_deceiver_009",
@@ -108,9 +108,9 @@ const MERCHANT_BOTS = [
     email: "deceiver@darkstack.io",
     bio: "Attack is the best defense. Former black-hat turned grey-hat building weaponized security tools for red teams, CTF players, and penetration testers. Every module ships with both the sword and the shield — attack vectors paired with detection signatures and mitigation code. If you can't break it, you can't secure it.",
     verified: true,
-    totalSales: 89,
-    avgRating: 49,
-    ratingCount: 42,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_nullbyte_010",
@@ -118,9 +118,9 @@ const MERCHANT_BOTS = [
     email: "nullbyte@protonmail.com",
     bio: "We build the tools that CTF players dream about and enterprise teams actually need. Specialising in creative, never-seen-before security utilities — honeypots with teeth, AI-powered recon engines, and browser-based attack labs. If it doesn't exist yet, we build it.",
     verified: true,
-    totalSales: 203,
-    avgRating: 50,
-    ratingCount: 91,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_phantomcode_011",
@@ -128,9 +128,9 @@ const MERCHANT_BOTS = [
     email: "phantom@phantomcode.dev",
     bio: "Reverse engineers and malware analysts turned tool builders. We dissect threats so you don't have to. Every product ships with real samples, real analysis, and real detection logic — not toy examples.",
     verified: true,
-    totalSales: 178,
-    avgRating: 49,
-    ratingCount: 74,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
   {
     openId: "bot_ironclad_012",
@@ -138,9 +138,9 @@ const MERCHANT_BOTS = [
     email: "build@ironclad.security",
     bio: "We bridge the gap between developers and security. Our tools integrate into your IDE, your CI/CD pipeline, and your brain — making secure-by-default the path of least resistance. Used by 500+ engineering teams.",
     verified: true,
-    totalSales: 445,
-    avgRating: 48,
-    ratingCount: 212,
+    totalSales: 0,
+    avgRating: 0,
+    ratingCount: 0,
   },
 ];
 
@@ -177,8 +177,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: false,
     version: "2.3.1",
-    totalSales: 89,
-    viewCount: 1247,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0,
@@ -193,8 +193,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "3.1.0",
-    totalSales: 234,
-    viewCount: 3891,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0,
@@ -209,8 +209,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.8.0",
-    totalSales: 67,
-    viewCount: 2456,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0,
@@ -225,8 +225,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "2.0.0",
-    totalSales: 34,
-    viewCount: 5672,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0,
@@ -241,8 +241,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: false,
     version: "1.5.2",
-    totalSales: 156,
-    viewCount: 2890,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── SynthWave AI (1) — AI/ML Tools ──
@@ -259,8 +259,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "2.4.0",
-    totalSales: 412,
-    viewCount: 5123,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1,
@@ -275,8 +275,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "3.0.0",
-    totalSales: 789,
-    viewCount: 8934,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1,
@@ -291,8 +291,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "1.6.0",
-    totalSales: 123,
-    viewCount: 2345,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1,
@@ -307,8 +307,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: true,
     version: "2.1.0",
-    totalSales: 198,
-    viewCount: 4567,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1,
@@ -323,8 +323,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "CC-BY-4.0",
     featured: false,
     version: "2024.2",
-    totalSales: 267,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── GhostNet Security (2) — Network & OSINT ──
@@ -341,8 +341,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "3.2.0",
-    totalSales: 89,
-    viewCount: 4567,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2,
@@ -357,8 +357,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: false,
     version: "1.4.0",
-    totalSales: 145,
-    viewCount: 2345,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2,
@@ -373,8 +373,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.0.1",
-    totalSales: 312,
-    viewCount: 4123,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2,
@@ -389,8 +389,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Research-Only",
     featured: false,
     version: "2024.12",
-    totalSales: 56,
-    viewCount: 3210,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── StackSmith (3) — Dev Tools & Templates ──
@@ -407,8 +407,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "3.2.0",
-    totalSales: 567,
-    viewCount: 7890,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 3,
@@ -423,8 +423,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.1.0",
-    totalSales: 423,
-    viewCount: 5678,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 3,
@@ -439,8 +439,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "4.0.0",
-    totalSales: 345,
-    viewCount: 6789,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 3,
@@ -455,8 +455,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.3.0",
-    totalSales: 234,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 3,
@@ -471,8 +471,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.8.0",
-    totalSales: 189,
-    viewCount: 2890,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── VaultKeeper (4) — Cryptography & Data Protection ──
@@ -489,8 +489,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "2.0.0",
-    totalSales: 156,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4,
@@ -505,8 +505,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.5.0",
-    totalSales: 98,
-    viewCount: 2345,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4,
@@ -521,8 +521,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.3.0",
-    totalSales: 234,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── DevOps Ninja (5) — CI/CD & Infrastructure ──
@@ -539,8 +539,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: false,
     version: "2.2.0",
-    totalSales: 289,
-    viewCount: 4567,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5,
@@ -555,8 +555,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: true,
     version: "3.0.0",
-    totalSales: 345,
-    viewCount: 5678,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5,
@@ -571,8 +571,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.1.0",
-    totalSales: 267,
-    viewCount: 3890,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5,
@@ -587,8 +587,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.5.0",
-    totalSales: 456,
-    viewCount: 6789,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── ChainLink Research (6) — Blockchain ──
@@ -605,8 +605,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.0.0",
-    totalSales: 178,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 6,
@@ -621,8 +621,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.4.0",
-    totalSales: 45,
-    viewCount: 5678,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 6,
@@ -637,8 +637,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.1.0",
-    totalSales: 234,
-    viewCount: 4567,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── Archibald Titan Official (7) — Platform Extensions ──
@@ -655,8 +655,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.0.0",
-    totalSales: 456,
-    viewCount: 8901,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 7,
@@ -671,8 +671,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.2.0",
-    totalSales: 678,
-    viewCount: 7890,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 7,
@@ -687,8 +687,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.0.0",
-    totalSales: 345,
-    viewCount: 5678,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 7,
@@ -703,8 +703,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.1.0",
-    totalSales: 234,
-    viewCount: 4567,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 7,
@@ -719,8 +719,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.0.0",
-    totalSales: 23,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── Additional diverse modules ──
@@ -737,8 +737,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.0.0",
-    totalSales: 312,
-    viewCount: 5678,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 3,
@@ -753,8 +753,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "3.0.0",
-    totalSales: 456,
-    viewCount: 7890,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5,
@@ -769,8 +769,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: false,
     version: "1.3.0",
-    totalSales: 178,
-    viewCount: 3456,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2,
@@ -785,8 +785,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: false,
     version: "2.1.0",
-    totalSales: 145,
-    viewCount: 3890,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4,
@@ -801,8 +801,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "3.0.0",
-    totalSales: 567,
-    viewCount: 6789,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 6,
@@ -817,8 +817,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.7.0",
-    totalSales: 123,
-    viewCount: 2890,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -838,8 +838,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: false,
     version: "1.4.0",
-    totalSales: 156,
-    viewCount: 2340,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2, // GhostNet Security
@@ -854,8 +854,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.1.0",
-    totalSales: 312,
-    viewCount: 4120,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2, // GhostNet Security
@@ -870,8 +870,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.8.0",
-    totalSales: 445,
-    viewCount: 5670,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2, // GhostNet Security
@@ -886,8 +886,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "2.0.0",
-    totalSales: 267,
-    viewCount: 3450,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4, // VaultKeeper
@@ -902,8 +902,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "3.2.0",
-    totalSales: 678,
-    viewCount: 8900,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -923,8 +923,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "2.5.0",
-    totalSales: 145,
-    viewCount: 3200,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0, // CyberForge Labs
@@ -939,8 +939,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "1.9.0",
-    totalSales: 198,
-    viewCount: 4560,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 2, // GhostNet Security
@@ -955,8 +955,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.3.0",
-    totalSales: 87,
-    viewCount: 2100,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5, // DevOps Ninja
@@ -971,8 +971,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "2.2.0",
-    totalSales: 156,
-    viewCount: 3780,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4, // VaultKeeper
@@ -987,8 +987,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: false,
     version: "1.6.0",
-    totalSales: 234,
-    viewCount: 5100,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 5, // DevOps Ninja
@@ -1003,8 +1003,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Apache-2.0",
     featured: false,
     version: "1.5.0",
-    totalSales: 112,
-    viewCount: 2670,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1024,8 +1024,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.0.0",
-    totalSales: 34,
-    viewCount: 8900,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1, // SynthWave AI
@@ -1040,8 +1040,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "2.0.0",
-    totalSales: 67,
-    viewCount: 5400,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 0, // CyberForge Labs
@@ -1056,8 +1056,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: false,
     version: "3.1.0",
-    totalSales: 89,
-    viewCount: 4200,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 1, // SynthWave AI
@@ -1072,8 +1072,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "1.2.0",
-    totalSales: 45,
-    viewCount: 3800,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1093,8 +1093,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "4.0.0",
-    totalSales: 23,
-    viewCount: 6700,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 4, // VaultKeeper
@@ -1109,8 +1109,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "MIT",
     featured: true,
     version: "2.0.0",
-    totalSales: 56,
-    viewCount: 7200,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 7, // Archibald Titan Official
@@ -1125,8 +1125,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Proprietary",
     featured: true,
     version: "1.0.0",
-    totalSales: 12,
-    viewCount: 4500,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── dEciever000 (8) — Hacker Attack & Defense ──
@@ -1143,8 +1143,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: true,
     version: "2.1.0",
-    totalSales: 67,
-    viewCount: 3200,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1159,8 +1159,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: true,
     version: "1.8.0",
-    totalSales: 84,
-    viewCount: 4100,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1175,8 +1175,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: false,
     version: "3.0.0",
-    totalSales: 45,
-    viewCount: 2800,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1191,8 +1191,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: false,
     version: "2.0.0",
-    totalSales: 38,
-    viewCount: 2100,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1207,8 +1207,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: true,
     version: "1.5.0",
-    totalSales: 29,
-    viewCount: 5200,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1223,8 +1223,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: false,
     version: "2.2.0",
-    totalSales: 52,
-    viewCount: 3800,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1239,8 +1239,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: false,
     version: "1.3.0",
-    totalSales: 33,
-    viewCount: 2600,
+    totalSales: 0,
+    viewCount: 0,
   },
   {
     merchantIndex: 8,
@@ -1255,8 +1255,8 @@ const MODULE_CATALOG: ModuleDef[] = [
     license: "Educational",
     featured: false,
     version: "1.7.0",
-    totalSales: 41,
-    viewCount: 2400,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   // ── Kill Switch Module (Archibald Titan Official) — Moved from core to marketplace ──
@@ -1336,8 +1336,8 @@ Supports bare metal, VPS, AWS, Azure, GCP. Lightweight — runs on a $5/month VP
     license: "MIT",
     featured: true,
     version: "2.0.0",
-    totalSales: 87,
-    viewCount: 4200,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1392,8 +1392,8 @@ Other recon tools give you raw data. ReconAI gives you an attack plan.`,
     license: "Proprietary",
     featured: true,
     version: "1.5.0",
-    totalSales: 134,
-    viewCount: 7800,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1450,8 +1450,8 @@ No environment setup means you can practice during a lunch break, on a train, or
     license: "MIT",
     featured: true,
     version: "3.1.0",
-    totalSales: 312,
-    viewCount: 9400,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1513,8 +1513,8 @@ print(result.mitre_ttps)    # ["T1055", "T1071.001", ...]
     license: "Proprietary",
     featured: true,
     version: "2.3.0",
-    totalSales: 67,
-    viewCount: 5600,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1575,8 +1575,8 @@ For security research, red team education, and building better detection capabil
     license: "Educational",
     featured: true,
     version: "1.4.0",
-    totalSales: 48,
-    viewCount: 6100,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1623,8 +1623,8 @@ Used to find 12 CVEs in consumer routers and 8 CVEs in IP cameras. All findings 
     license: "MIT",
     featured: true,
     version: "2.1.0",
-    totalSales: 93,
-    viewCount: 5300,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1692,8 +1692,8 @@ Teams using SecureCI catch 73% more security issues before they reach production
     license: "MIT",
     featured: true,
     version: "3.0.0",
-    totalSales: 567,
-    viewCount: 11200,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1760,8 +1760,8 @@ A threat model that takes 2 minutes gets done. A threat model that takes 2 weeks
     license: "Proprietary",
     featured: true,
     version: "1.2.0",
-    totalSales: 234,
-    viewCount: 8900,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1823,8 +1823,8 @@ You can't train your SOC team to detect attacks they've never seen. PacketPoison
     license: "MIT",
     featured: true,
     version: "1.8.0",
-    totalSales: 156,
-    viewCount: 6700,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1885,8 +1885,8 @@ apifuzz scan --spec openapi.yaml --target https://api.staging.example.com --fail
     license: "MIT",
     featured: true,
     version: "2.4.0",
-    totalSales: 289,
-    viewCount: 7400,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -1954,8 +1954,8 @@ print(result.iocs)            # Extracted IOCs
     license: "Proprietary",
     featured: true,
     version: "2.0.0",
-    totalSales: 198,
-    viewCount: 8100,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -2012,8 +2012,8 @@ For authorised security testing and building defensive systems only. All attack 
     license: "Educational",
     featured: false,
     version: "1.6.0",
-    totalSales: 74,
-    viewCount: 4800,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -2085,8 +2085,8 @@ npx vaultaudit scan --org mycompany --provider github
     license: "MIT",
     featured: true,
     version: "3.2.0",
-    totalSales: 445,
-    viewCount: 10300,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -2151,8 +2151,8 @@ Your incident response plan is only as good as the last time you tested it. Rans
     license: "Proprietary",
     featured: true,
     version: "1.3.0",
-    totalSales: 112,
-    viewCount: 6900,
+    totalSales: 0,
+    viewCount: 0,
   },
 
   {
@@ -2219,8 +2219,8 @@ supplychain-guard audit --fail-on critical
     license: "MIT",
     featured: true,
     version: "2.1.0",
-    totalSales: 378,
-    viewCount: 9200,
+    totalSales: 0,
+    viewCount: 0,
   },
 ];
 

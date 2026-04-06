@@ -2449,3 +2449,56 @@ export const marketplaceVersionHistory = mysqlTable("marketplace_version_history
 });
 export type MarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferSelect;
 export type InsertMarketplaceVersionHistory = typeof marketplaceVersionHistory.$inferInsert;
+
+// ─── Security Module Marketplace ──────────────────────────────────────────────
+export const securityModules = mysqlTable("security_modules", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 128 }).notNull().unique(),
+  name: varchar("name", { length: 128 }).notNull(),
+  description: text("description").notNull(),
+  longDescription: text("longDescription"),
+  category: mysqlEnum("category", ["osint", "scanning", "exploitation", "phishing", "anonymity", "automation", "reporting", "playbook", "wordlist", "template"]).notNull(),
+  tags: text("tags"),
+  authorId: varchar("authorId", { length: 64 }).notNull().default("platform"),
+  authorLabel: varchar("authorLabel", { length: 128 }),
+  version: varchar("version", { length: 32 }).notNull().default("1.0.0"),
+  license: mysqlEnum("license", ["free", "credits", "subscription"]).notNull().default("free"),
+  creditCost: int("creditCost"),
+  readme: text("readme"),
+  downloads: int("downloads").notNull().default(0),
+  rating: int("rating").notNull().default(0),
+  ratingCount: int("ratingCount").notNull().default(0),
+  featured: boolean("featured").notNull().default(false),
+  verified: boolean("verified").notNull().default(false),
+  status: mysqlEnum("status", ["draft", "published", "archived", "rejected"]).notNull().default("draft"),
+  requirements: text("requirements"),
+  compatibleWith: text("compatibleWith"),
+  screenshots: text("screenshots"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SecurityModule = typeof securityModules.$inferSelect;
+export type InsertSecurityModule = typeof securityModules.$inferInsert;
+
+export const securityModuleInstalls = mysqlTable("security_module_installs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  moduleSlug: varchar("moduleSlug", { length: 128 }).notNull(),
+  moduleName: varchar("moduleName", { length: 128 }).notNull(),
+  version: varchar("version", { length: 32 }).notNull().default("1.0.0"),
+  installedAt: timestamp("installedAt").defaultNow().notNull(),
+});
+export type SecurityModuleInstall = typeof securityModuleInstalls.$inferSelect;
+export type InsertSecurityModuleInstall = typeof securityModuleInstalls.$inferInsert;
+
+export const securityModuleReviews = mysqlTable("security_module_reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  moduleSlug: varchar("moduleSlug", { length: 128 }).notNull(),
+  userId: int("userId").notNull(),
+  username: varchar("username", { length: 128 }).notNull(),
+  rating: int("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SecurityModuleReview = typeof securityModuleReviews.$inferSelect;
+export type InsertSecurityModuleReview = typeof securityModuleReviews.$inferInsert;
