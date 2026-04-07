@@ -24,14 +24,22 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encryptedText: string): string {
-  const [ivHex, tagHex, encrypted] = encryptedText.split(":");
-  const iv = Buffer.from(ivHex, "hex");
-  const tag = Buffer.from(tagHex, "hex");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
-  decipher.setAuthTag(tag);
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
+  try {
+    const parts = encryptedText.split(":");
+    if (parts.length !== 3) throw new Error("Invalid encrypted format");
+    const [ivHex, tagHex, encrypted] = parts;
+    const iv = Buffer.from(ivHex, "hex");
+    const tag = Buffer.from(tagHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
+    decipher.setAuthTag(tag);
+    let decrypted = decipher.update(encrypted, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch {
+    // Decryption failed — credential was encrypted with a different key
+    // (e.g., before JWT_SECRET was set). Return a placeholder so export doesn't crash.
+    return "[decryption-error: re-fetch this credential]";
+  }
 }
 
 // ─── Kill Switch ────────────────────────────────────────────────────
@@ -295,6 +303,12 @@ export async function getDecryptedCredentials(userId: number) {
 
 export async function exportCredentials(userId: number, format: "json" | "env" | "csv") {
   const creds = await getDecryptedCredentials(userId);
+  // If no credentials exist, return empty but valid output
+  if (creds.length === 0) {
+    if (format === "env") return "# No credentials stored";
+    if (format === "csv") return "Provider,Provider ID,Key Type,Label,Value\n# No credentials stored";
+    return JSON.stringify([], null, 2);
+  }
   if (format === "env") {
     return creds.map(c => `${c.providerId.toUpperCase()}_${c.keyType.toUpperCase()}=${c.value}`).join("\n");
   }
