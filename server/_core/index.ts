@@ -52,6 +52,7 @@ import compression from "compression";
 import { csrfCookieMiddleware, csrfValidationMiddleware } from "./csrf";
 import { correlationMiddleware } from "./correlation";
 import { createLogger } from "./logger";
+import helmet from "helmet";
 import { getErrorMessage } from "../_core/errors.js";
 
 const log = createLogger('Startup');
@@ -110,6 +111,9 @@ async function startServer() {
     }
     next();
   });
+
+  // ── Helmet Security Headers ────────────────────────────────────
+  app.use(helmet({ contentSecurityPolicy: false })); // CSP is handled manually below
 
   // ── Security Headers ──────────────────────────────────────────
   app.use((_req, res, next) => {

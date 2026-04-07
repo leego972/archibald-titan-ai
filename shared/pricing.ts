@@ -127,7 +127,7 @@ export const PRICING_TIERS: PricingTier[] = [
       providers: -1,
       credentialStorage: -1,
       proxySlots: 5,
-      exportFormats: ["json", "env"],
+      exportFormats: ["json", "env", "csv"],
       support: "priority_email",
     },
     credits: {

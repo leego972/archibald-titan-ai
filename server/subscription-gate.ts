@@ -196,7 +196,7 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
     scheduled_fetches: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     proxy_pool: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     env_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
-    csv_export: ["enterprise", "cyber", "cyber_plus", "titan"],
+    csv_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     api_export: ["enterprise", "cyber", "cyber_plus", "titan"],
     team_management: ["enterprise", "cyber", "cyber_plus", "titan"],
     api_access: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],

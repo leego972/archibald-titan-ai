@@ -82,6 +82,7 @@
     "express-rate-limit": "^8.2.1",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.22",
+    "helmet": "^8.1.0",
     "https-proxy-agent": "^7.0.6",
     "input-otp": "^1.4.2",
     "jose": "6.1.0",

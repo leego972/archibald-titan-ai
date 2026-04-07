@@ -1,31 +1,15 @@
 {
   "name": "Archibald Titan",
   "short_name": "Titan",
-  "description": "AI-Powered Cybersecurity Agent \u2014 Autonomous credential retrieval, AI builder, encrypted vault, and 60+ professional tools.",
+  "description": "World's Most Advanced AI Agent and Builder Platform",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0a0a1a",
   "theme_color": "#0a0a1a",
-  "orientation": "any",
-  "categories": [
-    "security",
-    "developer",
-    "productivity"
-  ],
   "icons": [
-    {
-      "src": "/logos/at-icon-64.png",
-      "sizes": "64x64",
-      "type": "image/png"
-    },
     {
       "src": "/logos/at-icon-128.png",
       "sizes": "128x128",
-      "type": "image/png"
-    },
-    {
-      "src": "/logos/at-icon-256.png",
-      "sizes": "256x256",
       "type": "image/png"
     }
   ]
