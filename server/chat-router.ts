@@ -1838,10 +1838,11 @@ Do NOT attempt any tool calls or builds.`;
       // - External build: selectToolsForRequest(msg, true) returns ALL EXTERNAL_BUILD_TOOLS (full Builder access)
       // - Titan: TITAN_TOOLS (full tool suite)
       // NOTE: isBuildRequest=true bypasses keyword filtering — Builder gets every tool, no exceptions.
-      // For non-build chat mode, use the minimal CHAT_TOOLS set (~16 tools, ~2K tokens)
-      // instead of TITAN_TOOLS (164 tools, ~40K tokens) to keep LLM responses fast.
+      // For non-build chat mode, use NO tools (empty array) to force direct responses.
+      // This eliminates multi-round agentic loops for simple questions and keeps
+      // response times under 10 seconds. Tools are only needed for build requests.
       // TITAN_TOOLS is still used for Titan-mode requests that need full tool access.
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : (isBuildRequest ? TITAN_TOOLS : CHAT_TOOLS));
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : (isBuildRequest ? TITAN_TOOLS : []));
 
       // For general chat: if user attached a file, force read_uploaded_file first
       // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
