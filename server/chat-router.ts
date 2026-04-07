@@ -1838,11 +1838,10 @@ Do NOT attempt any tool calls or builds.`;
       // - External build: selectToolsForRequest(msg, true) returns ALL EXTERNAL_BUILD_TOOLS (full Builder access)
       // - Titan: TITAN_TOOLS (full tool suite)
       // NOTE: isBuildRequest=true bypasses keyword filtering — Builder gets every tool, no exceptions.
-      // For non-build chat mode, use NO tools (empty array) to force direct responses.
-      // This eliminates multi-round agentic loops for simple questions and keeps
-      // response times under 10 seconds. Tools are only needed for build requests.
-      // TITAN_TOOLS is still used for Titan-mode requests that need full tool access.
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : (isBuildRequest ? TITAN_TOOLS : []));
+      // All chat modes use TITAN_TOOLS — Titan is a builder and needs all tools.
+      // Self-build uses BUILDER_TOOLS (self_modify_file, no sandbox tools).
+      // External build uses selectToolsForRequest for context-aware tool selection.
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : TITAN_TOOLS);
 
       // For general chat: if user attached a file, force read_uploaded_file first
       // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
@@ -1889,7 +1888,11 @@ Do NOT attempt any tool calls or builds.`;
       // Titan is actively processing — causing the "Could not inject message" error.
       registerBuild(conversationId!, userId);
 
-      try {
+      // ── FIRE-AND-FORGET: Run the agentic loop in the background ──────────
+      // The tRPC mutation returns immediately with { status: 'running' }.
+      // The final response is delivered via SSE 'done' event.
+      // This prevents Railway's 90s HTTP timeout from killing long builds.
+      setImmediate(async () => { try {
 
         // ── Tool-calling loop ──────────────────────────────────────
         let finalText = "";
@@ -3634,16 +3637,19 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
             }))
           : undefined;
 
-        return {
-          conversationId,
-          response: finalText,
-          actions: trimmedActions,
-          creditBalance: postBalance.isUnlimited ? undefined : {
-            remaining: postBalance.credits,
-            used: creditsUsed,
+        // Deliver the final response via SSE 'done' event (fire-and-forget pattern)
+        emitChatEvent(conversationId!, {
+          type: 'done',
+          data: {
+            response: finalText,
+            actions: trimmedActions,
+            creditBalance: postBalance.isUnlimited ? undefined : {
+              remaining: postBalance.credits,
+              used: creditsUsed,
+            },
+            upsell,
           },
-          upsell,
-        };
+        });
       } catch (err: unknown) {
         // Clean up deferred mode and release build slot on error
         disableDeferredMode();
@@ -3679,12 +3685,30 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
         } catch {
           // ignore save error
         }
-        return {
-          conversationId,
-          response: errorText,
-          actions: undefined,
-        };
+        // Deliver the error response via SSE 'done' event (fire-and-forget pattern)
+        emitChatEvent(conversationId!, {
+          type: 'done',
+          data: { response: errorText, actions: undefined },
+        });
       }
+      } catch (bgErr: unknown) {
+        // Background task crashed — emit error via SSE
+        const bgErrMsg = bgErr instanceof Error ? bgErr.message : String(bgErr);
+        log.error('[Chat] Background agentic loop crashed:', { error: bgErrMsg });
+        emitChatEvent(conversationId!, {
+          type: 'done',
+          data: { response: 'Connection blip on my end — the AI service dropped out. Please try again.', actions: undefined },
+        });
+      }});
+
+      // Return immediately — the client listens to SSE for the actual response
+      return {
+        conversationId,
+        status: 'running' as const,
+        response: '',
+        actions: undefined,
+      };
+
      } catch (outerErr: unknown) {
        // Re-throw known tRPC errors (rate limit, forbidden, etc.) as-is
        if (outerErr instanceof TRPCError) throw outerErr;

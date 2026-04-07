@@ -1858,6 +1858,9 @@ export default function ChatPage() {
     setBuildLog([]);
     reasoningStepsRef.current = []; // reset reasoning steps for this new message
 
+    // Flag: when server uses fire-and-forget, the SSE 'done' handler manages loading state
+    let fireAndForget = false;
+
     // Pre-create conversation if this is a new chat, so we can connect SSE before sending
     let convIdForStream = activeConversationId;
     if (!convIdForStream) {
@@ -1941,9 +1944,91 @@ export default function ChatPage() {
             }
           } catch {}
         });
-        es.addEventListener('done', () => { es.close(); eventSourceRef.current = null; });
-        es.addEventListener('error', () => { es.close(); eventSourceRef.current = null; setBuildProgress(null); });
-        es.addEventListener('aborted', () => { es.close(); eventSourceRef.current = null; setBuildProgress(null); });
+        es.addEventListener('done', (e: MessageEvent) => {
+          try {
+            // Fire-and-forget: the server delivers the final response via SSE 'done' event
+            const data = e.data ? JSON.parse(e.data) : {};
+            if (data.response) {
+              // Build the assistant message from SSE done data
+              const assistantMsg: ChatMsg = {
+                id: -Date.now() - 1,
+                role: 'assistant',
+                content: data.response,
+                createdAt: Date.now(),
+                actionsTaken: data.actions
+                  ? (data.actions as any[]).map((a: any) => {
+                      let summary = a.success ? `Executed ${a.tool}` : `Failed ${a.tool}`;
+                      const d = a.result as any;
+                      if (d) {
+                        switch (a.tool) {
+                          case 'self_type_check': summary = d.passed ? 'TypeScript: 0 errors' : `TypeScript: ${d.errorCount} error(s)`; break;
+                          case 'self_run_tests': summary = d.passed ? `Tests: ${d.totalTests} passed` : `Tests: ${d.failedTests}/${d.totalTests} failed`; break;
+                          case 'self_modify_file': summary = a.success ? `Modified ${a.args?.filePath || 'file'}` : `Failed to modify ${a.args?.filePath || 'file'}`; break;
+                          case 'self_multi_file_modify': summary = d.summary || (a.success ? `${(d.modifications || []).length} file(s) modified` : 'Multi-file modify failed'); break;
+                          case 'self_health_check': summary = d.healthy ? 'All systems healthy' : `${(d.checks || []).filter((c: any) => !c.passed).length} issue(s) detected`; break;
+                          case 'self_rollback': summary = a.success ? `Rolled back (${d.filesRestored || 0} files restored)` : 'Rollback failed'; break;
+                          case 'self_restart': summary = a.success ? 'Server restart triggered' : 'Restart failed'; break;
+                          case 'self_read_file': summary = `Read ${a.args?.filePath || 'file'} (${d.length || 0} chars)`; break;
+                          case 'self_list_files': summary = `Listed ${d.count || 0} files in ${a.args?.dirPath || 'directory'}`; break;
+                          case 'create_file': summary = a.success ? `Created ${d.fileName || a.args?.fileName || 'file'} (${d.size ? (d.size < 1024 ? d.size + 'B' : (d.size / 1024).toFixed(1) + 'KB') : ''})` : `Failed to create ${a.args?.fileName || 'file'}`; break;
+                          case 'create_github_repo': summary = a.success ? `Created repo: ${d.repoFullName || a.args?.name}` : 'Failed to create repo'; break;
+                          case 'push_to_github': summary = a.success ? `Pushed ${d.filesPushed || 0} files to ${d.repoFullName || a.args?.repoFullName}` : 'Failed to push to GitHub'; break;
+                          case 'read_uploaded_file': summary = a.success ? `Read uploaded file (${d.size || 0} chars)` : 'Failed to read file'; break;
+                        }
+                      }
+                      return { tool: a.tool, success: a.success, summary };
+                    })
+                  : null,
+                thinkingSteps: reasoningStepsRef.current.length > 0 ? [...reasoningStepsRef.current] : undefined,
+              };
+              optimisticIdsRef.current.add(assistantMsg.id);
+              setLocalMessages(prev => [...prev, assistantMsg]);
+              // Voice mode
+              if (voiceModeRef.current && data.response) speakText(data.response);
+              // Track created files
+              if (data.actions && (data.actions as any[]).length > 0) {
+                const newFiles = (data.actions as any[])
+                  .filter((a: any) => a.tool === 'create_file' && a.success && a.result)
+                  .map((a: any) => { const d = a.result as any; return { name: d.fileName || a.args?.fileName || 'unknown', url: d.url || '', size: d.size || 0, language: d.language || 'text' }; });
+                if (newFiles.length > 0) {
+                  setCreatedFiles(prev => { const updated = [...prev]; for (const nf of newFiles) { const idx = updated.findIndex(f => f.name === nf.name); if (idx >= 0) updated[idx] = nf; else updated.push(nf); } return updated; });
+                  setShowProjectFiles(true);
+                }
+                // Action toasts
+                let hasSpecificToast = false;
+                for (const a of data.actions as any[]) {
+                  if (a.tool === 'navigate_to_page' && a.success) { const d = a.result as any; if (d?.action === 'navigate' && d?.path) { setTimeout(() => setLocation(d.path), 800); toast.info(`Navigating to ${d.path}`, { duration: 2500 }); hasSpecificToast = true; } }
+                  if (a.tool === 'perform_page_action' && a.success) { const d = a.result as any; if (d?.message) { toast.success(d.message, { duration: 4000 }); hasSpecificToast = true; } }
+                }
+                const successCount = (data.actions as any[]).filter((a: any) => a.success).length;
+                const failCount = (data.actions as any[]).length - successCount;
+                if (!hasSpecificToast) { if (failCount === 0) toast.success(`${successCount} action${successCount > 1 ? 's' : ''} completed`); else toast.warning(`${successCount} succeeded, ${failCount} failed`); }
+                else if (failCount > 0) toast.warning(`${failCount} action${failCount > 1 ? 's' : ''} failed`);
+              }
+              utils.chat.listConversations.invalidate();
+              setTimeout(() => utils.chat.listConversations.invalidate(), 3000);
+            }
+          } catch { /* ignore parse errors */ }
+          // Clean up loading state
+          setStreamEvents([]);
+          setBuildProgress(null);
+          setIsLoading(false);
+          es.close();
+          eventSourceRef.current = null;
+          // Refetch conversation to reconcile optimistic messages with DB
+          try { await refetchConv(); } catch { /* ignore */ }
+        });
+        es.addEventListener('error', (e: Event) => {
+          // SSE error while in fire-and-forget mode — clear loading state
+          es.close(); eventSourceRef.current = null; setBuildProgress(null);
+          setIsLoading(false);
+          setStreamEvents([]);
+        });
+        es.addEventListener('aborted', () => {
+          es.close(); eventSourceRef.current = null; setBuildProgress(null);
+          setIsLoading(false);
+          setStreamEvents([]);
+        });
       } catch {
         // SSE connection failed — continue without streaming
       }
@@ -1980,6 +2065,16 @@ export default function ChatPage() {
         utils.chat.listConversations.invalidate();
       }
 
+      // Fire-and-forget mode: server returned immediately, response will come via SSE 'done' event
+      // The done event handler above will render the message and call setIsLoading(false)
+      if ((result as any).status === 'running') {
+        fireAndForget = true;
+        // Do not render anything here — wait for SSE done event
+        // Note: setIsLoading(false) is intentionally NOT called here; the SSE done handler does it
+        return;
+      }
+
+      // Legacy path: server returned the response directly (backward compat)
       const assistantMsg: ChatMsg = {
         id: -Date.now() - 1,
         role: "assistant",
@@ -2209,21 +2304,24 @@ export default function ChatPage() {
         setBuildLog([...streamEvents]);
       }
     } finally {
-      setStreamEvents([]);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      // Refetch conversation so the DB sync effect can reconcile optimistic messages.
-      // Even if this fails, optimistic messages remain visible until the next successful sync.
-      if (activeConversationId || convIdForStream) {
-        try {
-          await refetchConv();
-        } catch {
-          // Refetch failed — optimistic messages will remain until next sync
+      // In fire-and-forget mode, the SSE 'done' handler manages loading state and SSE cleanup.
+      // Only clean up here for the legacy synchronous path or on error.
+      if (!fireAndForget) {
+        setStreamEvents([]);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
         }
+        // Refetch conversation so the DB sync effect can reconcile optimistic messages.
+        if (activeConversationId || convIdForStream) {
+          try {
+            await refetchConv();
+          } catch {
+            // Refetch failed — optimistic messages will remain until next sync
+          }
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 

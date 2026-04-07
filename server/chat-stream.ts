@@ -191,7 +191,13 @@ export function emitChatEvent(
   conversationId: number,
   event: {
     type: "thinking" | "tool_start" | "tool_result" | "text_chunk" | "done" | "error" | "status" | "verification" | "mid_run_acknowledged" | "build_progress" | "build_complete";
-    data: Record<string, unknown>;
+    data: Record<string, unknown> & {
+      // For 'done' events: final response and actions from the agentic loop
+      response?: string;
+      actions?: Array<{ tool: string; args?: unknown; success: boolean; result?: unknown }> | undefined;
+      creditBalance?: { remaining: number; used: number } | undefined;
+      upsell?: unknown;
+    };
   }
 ): void {
   // Update build status with latest event
