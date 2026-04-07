@@ -1278,6 +1278,16 @@ export async function detectBuildIntentAsync(
   if (isSelfBuild) return { isSelfBuild: true, isExternalBuild: false, needsClarification: false };
   if (isExternalBuild) return { isSelfBuild: false, isExternalBuild: true, needsClarification: false };
 
+  // ── FAST-PATH: obvious chat/question messages — skip LLM classifier ──────────
+  // If the message has no ambiguous build/research signals and is clearly conversational,
+  // skip the expensive LLM classifier call entirely to avoid 45s+ Venice latency.
+  const msgLowerFast = message.toLowerCase().trim();
+  const hasAnyBuildSignal = /\b(build|create|make|generate|write|code|script|app|tool|website|project|implement|develop|set up|setup|install|deploy|add feature|fix bug|update|modify|change|improve|refactor|research|compare|analyse|analyze|audit|report|pdf|scrape|crawl|visit|inspect|examine|summarize|summarise|document|overview|breakdown)\b/.test(msgLowerFast);
+  if (!hasAnyBuildSignal && message.length < 300) {
+    // Short message with no build/research keywords → definitely chat
+    return { isSelfBuild: false, isExternalBuild: false, needsClarification: false };
+  }
+
   // ── UNCERTAIN ZONE: keyword matching returned false for both ──────────────
   // Use the LLM classifier to make a smarter decision.
   // This handles edge cases like:
