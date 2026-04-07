@@ -333,6 +333,24 @@ async function startServer() {
     }
 
     health.builderTools = toolChecks;
+
+    // Check LLM provider availability (no API call — just check key presence)
+    try {
+      const { hasKeys } = await import('./key-pool.js');
+      const veniceKeySet = !!process.env.VENICE_API_KEY;
+      const openaiKeysSet = hasKeys() || !!process.env.OPENAI_API_KEY;
+      if (veniceKeySet) {
+        health.llm = 'venice-primary';
+      } else if (openaiKeysSet) {
+        health.llm = 'openai-primary';
+      } else {
+        health.llm = 'no-key-configured';
+        health.status = 'degraded';
+      }
+    } catch {
+      health.llm = 'unknown';
+    }
+
     const statusCode = health.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(health);
   });
@@ -361,7 +379,7 @@ async function startServer() {
     const envVars = [
       'DATABASE_URL', 'OPENAI_API_KEY', 'OPENAI_API_KEY_1', 'OPENAI_API_KEY_2',
       'OPENAI_API_KEY_3', 'OPENAI_API_KEY_4', 'OPENAI_API_KEY_5',
-      'BUILT_IN_FORGE_API_URL', 'BUILT_IN_FORGE_API_KEY',
+      'VENICE_API_KEY', 'TITAN_API_URL',
     ];
     diag.envVars = {};
     for (const v of envVars) {

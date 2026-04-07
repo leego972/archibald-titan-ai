@@ -9,8 +9,6 @@ export const ENV = {
   // HEAD_ADMIN_EMAIL: the primary admin account — set via environment variable only
   headAdminEmail: (process.env.HEAD_ADMIN_EMAIL ?? "").trim().toLowerCase(),
   isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   // Platform Stripe Connect account — all bot/platform sellers route payouts here

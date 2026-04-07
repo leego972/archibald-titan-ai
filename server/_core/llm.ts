@@ -333,33 +333,24 @@ const normalizeToolChoice = (
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// API URL resolution — always uses OpenAI direct, or Forge fallback
+// API URL resolution — TitanAI → Venice → OpenAI chain
 // ═══════════════════════════════════════════════════════════════════════════
 
 const resolveApiUrl = () => {
-  // If any OpenAI keys exist (via key pool), use OpenAI directly
-  if (hasKeys()) {
-    return "https://api.openai.com/v1/chat/completions";
-  }
-  // Fall back to Manus Forge API
-  if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
-    return `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
-  }
+  // Always use OpenAI direct endpoint (key pool or single key)
   return "https://api.openai.com/v1/chat/completions";
 };
 
-/** Legacy single-key getter — only used as fallback when key pool has no keys */
+/** Single-key getter — used as fallback when key pool has no keys */
 const getLegacyApiKey = () => {
-  // Tier 3 key — used when OPENAI_API_KEY env var is not set in Railway
-  const _fallback = Buffer.from("c2stcHJvai16Q1VLQWJOWFUtZzduYW5MbERuTmx4N1lIRFFPM1JhdlQ5Q3Eta001c085cWhQU3VSdzA2RHF0dXB0bnc5dGNtUnZlMEtRRHZzT1QzQmxia0ZKc1d0YklsTEpwWk1RVkJtZHpTYm5OZlUxR3VrZlBRVjdiNkRBa3Jwd2JGRng2ZFdqdFI5RjZoWVBvMk9WOTZrX09Kd29qU0pMRUE=", "base64").toString("utf-8");
-  return process.env.OPENAI_API_KEY || ENV.forgeApiKey || _fallback;
+  return process.env.OPENAI_API_KEY || "";
 };
 
 const assertApiKey = () => {
   // Venice Pro key counts as a valid provider — no OpenAI key required
   if (VENICE_API_KEY) return;
   if (!hasKeys() && !getLegacyApiKey()) {
-    throw new Error("No API keys configured. Set VENICE_API_KEY, OPENAI_API_KEY, or OPENAI_API_KEY_2..N");
+    throw new Error("No API keys configured. Set VENICE_API_KEY or OPENAI_API_KEY in Railway environment variables.");
   }
 };
 
@@ -632,7 +623,11 @@ async function _invokeGeneral(
   }
 
   // ── Fetch ──
-  const fetchTimeoutMs = priority === "chat" ? 300_000 : 120_000;
+  // Venice gets a tighter timeout so it fails fast and falls back to OpenAI.
+  // OpenAI/Gemini keep the full chat timeout for long-running builds.
+  const fetchTimeoutMs = useSharedVenice
+    ? (priority === "chat" ? 45_000 : 60_000)   // Venice: 45s chat, 60s background
+    : (priority === "chat" ? 300_000 : 120_000); // OpenAI/Gemini: 5min chat, 2min bg
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
 

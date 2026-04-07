@@ -81,7 +81,6 @@ import {
 } from "./self-improvement-engine";
 import { queryAuditLogs } from "./audit-log-db";
 import { logAudit } from "./audit-log-db";
-import { callDataApi } from "./_core/dataApi";
 import crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";

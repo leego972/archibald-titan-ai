@@ -7,13 +7,10 @@ import { scanFileForMalware, trackIncident } from "./security-fortress";
 const log = createLogger("ChatUpload");
 
 /**
- * Check if external storage (S3 or Forge) is configured.
+ * Check if external storage (S3) is configured.
  */
 function hasExternalStorage(): boolean {
-  return !!(
-    process.env.AWS_S3_BUCKET ||
-    (process.env.BUILT_IN_FORGE_API_URL && process.env.BUILT_IN_FORGE_API_KEY)
-  );
+  return !!process.env.AWS_S3_BUCKET;
 }
 
 /**

@@ -1,7 +1,6 @@
 /**
- * Voice transcription helper — supports OpenAI Whisper API and Manus Forge proxy
+ * Voice transcription helper — OpenAI Whisper API
  */
-import { ENV } from "./env";
 
 export type TranscribeOptions = {
   audioUrl: string;
@@ -39,18 +38,11 @@ export type TranscriptionError = {
 };
 
 function getTranscriptionUrl(): string {
-  if (process.env.OPENAI_API_KEY) {
-    return "https://api.openai.com/v1/audio/transcriptions";
-  }
-  if (ENV.forgeApiUrl) {
-    const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
-    return new URL("v1/audio/transcriptions", baseUrl).toString();
-  }
   return "https://api.openai.com/v1/audio/transcriptions";
 }
 
 function getTranscriptionKey(): string {
-  return process.env.OPENAI_API_KEY || ENV.forgeApiKey || "";
+  return process.env.OPENAI_API_KEY || "";
 }
 
 export async function transcribeAudio(

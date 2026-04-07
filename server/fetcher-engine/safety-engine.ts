@@ -575,11 +575,14 @@ export async function getSystemHealth(): Promise<HealthStatus> {
 
   // Check LLM availability
   try {
-    const { ENV } = await import("../_core/env");
+    const veniceKey = !!process.env.VENICE_API_KEY;
+    const openaiKey = !!process.env.OPENAI_API_KEY;
+    const llmConfigured = veniceKey || openaiKey;
+    const llmProvider = veniceKey ? "Venice" : openaiKey ? "OpenAI" : "none";
     components.push({
       name: "LLM Service",
-      status: ENV.forgeApiKey ? "healthy" : "unhealthy",
-      message: ENV.forgeApiKey ? "API key configured" : "API key missing",
+      status: llmConfigured ? "healthy" : "unhealthy",
+      message: llmConfigured ? `${llmProvider} API key configured` : "No LLM API key set (VENICE_API_KEY or OPENAI_API_KEY required)",
       lastChecked: now,
     });
   } catch {
