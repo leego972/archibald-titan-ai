@@ -560,14 +560,16 @@ async function _invokeGeneral(
 
   // ── Model selection ──
   // Venice Pro models:
-  //   Chat (no tools): qwen3-235b-a22b-instruct-2507 — 235B MoE, best reasoning
-  //   Tools fast:      mistral-31-24b — 128K ctx, fast fn-calling
+  //   Chat fast:       llama-3.3-70b — 5-10s, best everyday chat
+  //   Chat premium:    qwen3-235b-a22b-instruct-2507 — 235B MoE, max reasoning (slow)
+  //   Tools fast:      mistral-small-3-2-24b-instruct — 128K ctx, fast fn-calling
   //   Tools strong:    kimi-k2-5 — 256K ctx, code + fn-call, best value
   //   Tools premium:   qwen3-235b-a22b-instruct-2507 — max capability
-  const VENICE_CHAT_MODEL = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_CHAT_MODEL =
+    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" : "llama-3.3-70b";
   const VENICE_TOOLS_MODEL =
     modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
-    modelPreference === "fast"    ? "mistral-31-24b" :
+    modelPreference === "fast"    ? "mistral-small-3-2-24b-instruct" :
                                     "kimi-k2-5";
   const VENICE_MODEL = hasToolsDefined ? VENICE_TOOLS_MODEL : VENICE_CHAT_MODEL;
 
@@ -806,10 +808,11 @@ async function _invokeUncensored(
   // step 2 (or no uncensored keys): fall through to OpenAI
 
   // ── Model selection ──
-  const VENICE_DOLPHIN_CHAT  = "qwen3-235b-a22b-instruct-2507";
+  const VENICE_DOLPHIN_CHAT  =
+    modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" : "llama-3.3-70b";
   const VENICE_DOLPHIN_TOOLS =
     modelPreference === "premium" ? "qwen3-235b-a22b-instruct-2507" :
-    modelPreference === "fast"    ? "mistral-31-24b" :
+    modelPreference === "fast"    ? "mistral-small-3-2-24b-instruct" :
                                     "kimi-k2-5";
   const VENICE_DOLPHIN_MODEL = hasToolsDefined ? VENICE_DOLPHIN_TOOLS : VENICE_DOLPHIN_CHAT;
   const OPENROUTER_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
