@@ -2060,7 +2060,10 @@ Do NOT attempt any tool calls or builds.`;
           // CRITICAL: Venice API key is ADMIN-ONLY. Non-admin users NEVER use Venice.
           // Non-admin users who trigger security keywords are blocked by NON_ADMIN_RESTRICTIONS
           // in the system prompt — they do NOT get routed to the uncensored model.
-          const useOpenRouterForSecurity = isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
+          // forceOpenRouter routes to Venice Dolphin (uncensored) which does NOT support tool-calling.
+          // Only use it for actual security builds where uncensored output is needed.
+          // Using it for all admin requests causes "Unable to transform response" errors.
+          const useOpenRouterForSecurity = isAdmin && isSecurityBuild && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
           if (isAdmin) {
             // Admin users: use strong (kimi-k2-5) for all requests — fast, capable, and reliable.
             // qwen3-235b (premium) is too slow for Venice's 45s timeout and causes connection blips.
@@ -2285,7 +2288,8 @@ Do NOT attempt any tool calls or builds.`;
                   { role: 'user', content: input.message },
                 ],
                 ...(userApiKey ? { userApiKey } : {}),
-                ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}),
+                // No forceOpenRouter here — this is a plain text fallback with no tools.
+                // Venice Dolphin doesn't support tool-calling and would fail.
                 userId,
                 planId: userPlanId,
               });
@@ -3172,7 +3176,8 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
 
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
-          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "premium" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), ...(isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY) ? { forceOpenRouter: true } : {}), userId, planId: userPlanId });
+          // No forceOpenRouter here — Venice Dolphin doesn't support tool-calling.
+          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "strong" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), userId, planId: userPlanId });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
