@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useSubscription } from "@/hooks/useSubscription";
-import { PRICING_TIERS, type PlanId } from "@shared/pricing";
+import { PRICING_TIERS, INTERNAL_TIERS, type PlanId } from "@shared/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +95,9 @@ export default function SubscriptionPage() {
   const [selectedNewPlan, setSelectedNewPlan] = useState<PlanId | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<BillingInterval>("month");
 
-  const currentTier = PRICING_TIERS.find((t) => t.id === sub.planId);
+  // Search both public and internal tiers (cyber_plus and titan live in INTERNAL_TIERS)
+  const ALL_TIERS = [...PRICING_TIERS, ...INTERNAL_TIERS];
+  const currentTier = ALL_TIERS.find((t) => t.id === sub.planId);
   const isActive = stripeSub?.status === "active";
   const isCanceled = stripeSub?.status === "canceled";
   const isPastDue = stripeSub?.status === "past_due";
