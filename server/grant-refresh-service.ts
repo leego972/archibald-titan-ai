@@ -1536,7 +1536,7 @@ export async function getMatchingGrants(
     if (!db) return [];
     const { grantOpportunities } = await import("../drizzle/schema");
     const { and, like, or } = await import("drizzle-orm");
-    const conditions = [];
+    const conditions: import("drizzle-orm").SQL<unknown>[] = [];
     if (countryCode) {
       conditions.push(
         or(

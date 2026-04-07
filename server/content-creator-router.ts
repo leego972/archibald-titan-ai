@@ -208,7 +208,7 @@ export const contentCreatorRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input?.campaignId) conditions.push(eq(contentCreatorPieces.campaignId, input.campaignId));
       if (input?.platform) conditions.push(eq(contentCreatorPieces.platform, input.platform as any));
       if (input?.status) conditions.push(eq(contentCreatorPieces.status, input.status as any));
@@ -442,7 +442,7 @@ export const contentCreatorRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input?.status) conditions.push(eq(contentCreatorSchedules.status, input.status as any));
       return db.select().from(contentCreatorSchedules)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -520,7 +520,7 @@ export const contentCreatorRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
-      const results = [];
+      const results: Array<{ platform: string; pieceId: any; seoScore: number } | { platform: string; error: string }> = [];
       for (const platform of input.recommendedPlatforms.slice(0, 4)) {
         const config = PLATFORM_CONFIG[platform];
         if (!config) continue;
@@ -573,7 +573,7 @@ export const contentCreatorRouter = router({
         log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
 
-      return { success: true, generated: results.filter(r => !r.error).length, results };
+      return { success: true, generated: results.filter(r => !(r as any).error).length, results };
     }),
 
   // ─── Analytics ────────────────────────────────────────────────────────────

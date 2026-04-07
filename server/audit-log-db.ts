@@ -58,7 +58,7 @@ export async function queryAuditLogs(query: AuditLogQuery) {
   const db = await getDb();
   if (!db) return { logs: [], total: 0 };
 
-  const conditions = [];
+  const conditions: import("drizzle-orm").SQL<unknown>[] = [];
 
   if (query.userId) {
     conditions.push(eq(auditLogs.userId, query.userId));

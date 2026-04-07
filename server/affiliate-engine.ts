@@ -577,7 +577,7 @@ export async function getContextualRecommendations(
   const domains = CONTEXTUAL_PLACEMENTS[context] || CONTEXTUAL_PLACEMENTS["dashboard"];
   if (!domains || domains.length === 0) return [];
 
-  const results = [];
+  const results: Array<{ id: number; name: string; domain: string | null; affiliateUrl: string | null; commissionType: string; vertical: string }> = [];
   for (const domain of domains) {
     const [partner] = await db.select({
       id: affiliatePartners.id,
@@ -593,7 +593,7 @@ export async function getContextualRecommendations(
       ))
       .limit(1);
 
-    if (partner) results.push(partner);
+    if (partner) results.push(partner as any);
     if (results.length >= limit) break;
   }
 

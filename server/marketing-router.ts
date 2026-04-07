@@ -229,7 +229,7 @@ export const marketingRouter = router({
       const db = await getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input.status) conditions.push(eq(marketingContent.status, input.status));
       if (input.channel) conditions.push(eq(marketingContent.channel, input.channel as any));
 

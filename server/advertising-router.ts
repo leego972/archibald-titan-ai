@@ -161,7 +161,7 @@ export const advertisingRouter = router({
       const db = await getDb();
       if (!db) return [];
 
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input?.status) conditions.push(eq(marketingContent.status, input.status as any));
       if (input?.platform) conditions.push(eq(marketingContent.channel, input.platform as any));
 

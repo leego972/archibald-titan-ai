@@ -97,7 +97,7 @@ export const blogRouter = router({
       const limit = input?.limit ?? 20;
       const offset = (page - 1) * limit;
 
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input?.status) {
         conditions.push(eq(blogPosts.status, input.status));
       }

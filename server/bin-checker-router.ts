@@ -249,7 +249,7 @@ export const binCheckerRouter = router({
       const bin = clean.slice(0, 6);
       const localBin = await searchBins({ bin });
       const localRow = localBin.length > 0 ? localBin[0] : null;
-      let binData = null;
+      let binData: BinApiResult | null = null;
       if (!localRow) {
         binData = await lookupBinApi(bin);
         if (!binData) binData = await lookupBinFallback(bin);
@@ -374,7 +374,7 @@ export const binCheckerRouter = router({
         // Try local DB first
         const localResults = await searchBins({ bin });
         const localRow = localResults.length > 0 ? localResults[0] : null;
-        let apiData = null;
+        let apiData: BinApiResult | null = null;
         if (!localRow) {
           apiData = await lookupBinApi(bin);
           if (!apiData) apiData = await lookupBinFallback(bin);

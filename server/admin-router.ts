@@ -55,7 +55,7 @@ export const adminRouter = router({
       const offset = (input.page - 1) * input.limit;
 
       // Build where conditions
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
 
       if (input.search) {
         const searchPattern = `%${input.search}%`;
@@ -64,7 +64,7 @@ export const adminRouter = router({
             like(users.name, searchPattern),
             like(users.email, searchPattern),
             like(users.openId, searchPattern)
-          )
+          )!
         );
       }
 
@@ -72,7 +72,7 @@ export const adminRouter = router({
         conditions.push(eq(users.role, input.role));
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const whereClause: import("drizzle-orm").SQL<unknown> | undefined = conditions.length > 0 ? and(...conditions) : undefined;
 
       // Get total count
       const [countResult] = await db

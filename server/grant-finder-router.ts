@@ -262,7 +262,7 @@ Return ONLY a JSON object with a "matches" array.`;
 
     const matches = allMatches;
 
-    const results = [];
+    const results: Array<{ id: number }> = [];
     for (const m of matches) {
       if (m.matchScore > 30) {
         const result = await db.createGrantMatch({

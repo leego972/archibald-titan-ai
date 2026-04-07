@@ -104,7 +104,7 @@ export async function queryAdminActivityLogs(opts: QueryAdminLogsOptions = {}) {
     offset = 0,
   } = opts;
 
-  const conditions = [];
+  const conditions: import("drizzle-orm").SQL<unknown>[] = [];
 
   if (category) conditions.push(eq(adminActivityLog.category, category));
   if (action) conditions.push(like(adminActivityLog.action, `%${action}%`));

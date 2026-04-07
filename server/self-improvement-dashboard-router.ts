@@ -103,7 +103,7 @@ export const selfImprovementDashboardRouter = router({
       const db = await getDb();
       if (!db) return { snapshots: [], total: 0 };
 
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input.status) {
         conditions.push(eq(systemSnapshots.status, input.status));
       }
@@ -191,7 +191,7 @@ export const selfImprovementDashboardRouter = router({
       const db = await getDb();
       if (!db) return { modifications: [], total: 0 };
 
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input.action) {
         conditions.push(eq(selfModificationLog.action, input.action));
       }

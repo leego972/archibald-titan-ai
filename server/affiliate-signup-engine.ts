@@ -442,7 +442,7 @@ async function signupForProgram(
   captchaConfig: CaptchaConfig,
   onStatus: (status: string) => void
 ): Promise<SignupResult> {
-  let browser = null;
+  let browser: import("playwright").Browser | null = null;
 
   try {
     onStatus(`Launching stealth browser for ${programName}...`);

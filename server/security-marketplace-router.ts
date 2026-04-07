@@ -73,6 +73,7 @@ export const securityMarketplaceRouter = router({
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
+      if (!module) throw new Error(`Security module not found: ${input.moduleId}`);
       const installed = await db.isSecurityModuleInstalled(ctx.user.id as number, module.slug);
       const reviews = await db.getSecurityModuleReviews(module.slug);
       return { module: { ...module, tags: tryParse(module.tags), requirements: tryParse(module.requirements), compatibleWith: tryParse(module.compatibleWith), screenshots: tryParse(module.screenshots), installed }, reviews };
@@ -86,6 +87,7 @@ export const securityMarketplaceRouter = router({
       enforceFeature(plan.planId, "security_tools", "Security Module Marketplace");
       const isAdmin = ctx.user.role === "admin" || ctx.user.role === "head_admin";
       const module = await db.getSecurityModuleBySlug(input.moduleId);
+      if (!module) throw new Error(`Security module not found: ${input.moduleId}`);
       if (await db.isSecurityModuleInstalled(ctx.user.id as number, module.slug)) return { success: true, message: module.name + " is already installed" };
       await db.installSecurityModule({ userId: ctx.user.id as number, moduleSlug: module.slug, moduleName: module.name, version: module.version });
       await db.incrementSecurityModuleDownloads(module.slug);
@@ -114,6 +116,7 @@ export const securityMarketplaceRouter = router({
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
+      if (!module) throw new Error(`Security module not found: ${input.moduleId}`);
       const existing = (await db.getSecurityModuleReviews(input.moduleId)).find(r => r.userId === (ctx.user.id as number));
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already reviewed this module" });
       const review = await db.addSecurityModuleReview({ moduleSlug: input.moduleId, userId: ctx.user.id as number, username: (ctx.user as any).username ?? "Anonymous", rating: input.rating, comment: input.comment });
@@ -125,6 +128,7 @@ export const securityMarketplaceRouter = router({
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const module = await db.getSecurityModuleBySlug(input.moduleId);
+      if (!module) throw new Error(`Security module not found: ${input.moduleId}`);
       const existing = (await db.getSecurityModuleReviews(input.moduleId)).find(r => r.userId === (ctx.user.id as number));
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already reviewed this module" });
       const review = await db.addSecurityModuleReview({ moduleSlug: input.moduleId, userId: ctx.user.id as number, username: (ctx.user as any).username ?? "Anonymous", rating: input.rating, comment: input.comment });

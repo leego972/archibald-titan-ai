@@ -1969,7 +1969,7 @@ async function execGetSystemStatus(userId: number): Promise<ToolExecutionResult>
     .where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)));
 
   // ─── Autonomous Systems Status ──────────────────────────────────
-  let autonomousStatus = null;
+  let autonomousStatus: Awaited<ReturnType<typeof import('./autonomous-sync').getAutonomousSystemStatus>> | null = null;
   try {
     const { getAutonomousSystemStatus } = await import("./autonomous-sync");
     autonomousStatus = await getAutonomousSystemStatus();
@@ -3917,7 +3917,7 @@ async function execWebsiteReplicate(
       branding: brandName ? { brandName, brandTagline } : undefined,
     });
 
-    let researchData = null;
+    let researchData: Awaited<ReturnType<typeof researchTarget>> | null = null;
     if (autoResearch) {
       try {
         researchData = await researchTarget(project.id, userId);

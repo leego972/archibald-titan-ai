@@ -1343,7 +1343,7 @@ export const marketplaceRouter = router({
 
       // List all sellers with file counts
       const allProfiles = await database.select().from(sellerProfiles);
-      const userFiles = [];
+      const userFiles: Array<{ userId: number; sellerId: number; displayName: string; totalListings: number; totalFiles: number; s3BasePath: string; backupBasePath: string }> = [];
       for (const profile of allProfiles) {
         const listings = await database.select().from(marketplaceListings)
           .where(eq(marketplaceListings.sellerId, profile.id));

@@ -51,7 +51,7 @@ function generateTOTP(secret: string, algorithm = "SHA1", digits = 6, period = 3
     if (val === -1) continue;
     bits += val.toString(2).padStart(5, "0");
   }
-  const bytes = [];
+  const bytes: number[] = [];
   for (let i = 0; i + 8 <= bits.length; i += 8) {
     bytes.push(parseInt(bits.substring(i, i + 8), 2));
   }

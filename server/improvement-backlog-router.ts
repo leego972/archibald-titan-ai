@@ -298,7 +298,7 @@ export const improvementBacklogRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = [];
+      const conditions: import("drizzle-orm").SQL<unknown>[] = [];
       if (input?.category) conditions.push(eq(improvementTasks.category, input.category));
       if (input?.status) conditions.push(eq(improvementTasks.status, input.status));
       if (input?.priority) conditions.push(eq(improvementTasks.priority, input.priority));
