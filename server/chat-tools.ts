@@ -3850,3 +3850,34 @@ export const EXTERNAL_BUILD_TOOLS: Tool[] = [
   autoFixAll,
   suggestFix,
 ];
+
+/**
+ * CHAT_TOOLS — minimal tool set for non-build chat mode.
+ * Used when the user is asking a general question (not building anything).
+ * Keeps the tool schema small (~2K tokens vs ~40K for TITAN_TOOLS) so
+ * LLM responses are fast (5-10s) instead of slow (15-20s per round).
+ */
+export const CHAT_TOOLS: Tool[] = [
+  // Web research
+  webSearch,
+  webPageRead,
+  // Navigation
+  navigateToPage,
+  performPageAction,
+  // Credentials (read-only)
+  listCredentials,
+  revealCredential,
+  // System info
+  getSystemStatus,
+  getPlanUsage,
+  checkProviderHealth,
+  getRecommendations,
+  // Memory
+  memorySaveFactTool,
+  memoryListFactsTool,
+  memoryDeleteFactTool,
+  // Vault (read-only)
+  listVaultEntries,
+  // Audit
+  getAuditLogs,
+];

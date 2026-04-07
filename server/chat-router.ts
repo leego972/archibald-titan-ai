@@ -27,7 +27,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { PROVIDERS } from "../shared/fetcher";
-import { TITAN_TOOLS, BUILDER_TOOLS } from "./chat-tools";
+import { TITAN_TOOLS, BUILDER_TOOLS, CHAT_TOOLS } from "./chat-tools";
 import { selectToolsForRequest } from "./tool-selector";
 // NOTE: selectToolsForRequest picks a context-aware subset of EXTERNAL_BUILD_TOOLS per request (max 128)
 import { emitChatEvent, isAborted, cleanupRequest, registerBuild, updateBuildStatus, completeBuild, consumePendingInjections } from "./chat-stream";
@@ -1829,7 +1829,10 @@ Do NOT attempt any tool calls or builds.`;
       // - External build: selectToolsForRequest(msg, true) returns ALL EXTERNAL_BUILD_TOOLS (full Builder access)
       // - Titan: TITAN_TOOLS (full tool suite)
       // NOTE: isBuildRequest=true bypasses keyword filtering — Builder gets every tool, no exceptions.
-      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : TITAN_TOOLS);
+      // For non-build chat mode, use the minimal CHAT_TOOLS set (~16 tools, ~2K tokens)
+      // instead of TITAN_TOOLS (164 tools, ~40K tokens) to keep LLM responses fast.
+      // TITAN_TOOLS is still used for Titan-mode requests that need full tool access.
+      const activeTools = isSelfBuild ? BUILDER_TOOLS : (isExternalBuild ? selectToolsForRequest(input.message, true) : (isBuildRequest ? TITAN_TOOLS : CHAT_TOOLS));
 
       // For general chat: if user attached a file, force read_uploaded_file first
       // Safety guard: only force if the tool is actually in the active tools list to avoid 400 errors
