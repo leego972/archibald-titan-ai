@@ -2062,9 +2062,10 @@ Do NOT attempt any tool calls or builds.`;
           // in the system prompt — they do NOT get routed to the uncensored model.
           const useOpenRouterForSecurity = isAdmin && (!!process.env.VENICE_API_KEY || !!process.env.OPENROUTER_API_KEY);
           if (isAdmin) {
-            // Admin users always use premium tier — Venice mistral-31-24b handles tools
-            // and venice-uncensored-role-play handles pure chat (no tools).
-            modelTier = "premium";
+            // Admin users: use strong (kimi-k2-5) for all requests — fast, capable, and reliable.
+            // qwen3-235b (premium) is too slow for Venice's 45s timeout and causes connection blips.
+            // Reserve premium only for explicitly complex builds where latency is acceptable.
+            modelTier = isComplexBuild ? "premium" : "strong";
           } else if (isSecurityBuild) {
             // Non-admin security builds: premium tier (will be blocked by NON_ADMIN_RESTRICTIONS)
             modelTier = "premium";
