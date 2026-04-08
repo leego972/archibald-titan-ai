@@ -554,7 +554,8 @@ export async function checkCanaryToken(): Promise<{
     const canary = rows[0];
 
     // Check if values were modified
-    if (canary.credits !== 999999 || canary.lifetimeCreditsUsed !== 0 || canary.lifetimeCreditsAdded !== 999999) {
+    // Use Number() coercion to handle MySQL returning integers as strings via raw sql`...` queries
+    if (Number(canary.credits) !== 999999 || Number(canary.lifetimeCreditsUsed) !== 0 || Number(canary.lifetimeCreditsAdded) !== 999999) {
       await logSecurityEvent(0, "canary_token_tampered", {
         marker: CANARY_MARKER,
         severity: "CRITICAL",
