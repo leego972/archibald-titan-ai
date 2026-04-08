@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
 import { createLogger } from "./_core/logger";
@@ -191,7 +191,7 @@ export const BUILTIN_PLAYBOOKS = [
 export const redTeamPlaybooksRouter = router({
 
   // ── List all available playbooks ─────────────────────────────────────────
-  listPlaybooks: protectedProcedure
+  listPlaybooks: adminProcedure
     .input(z.object({
       category: z.string().optional(),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
@@ -221,7 +221,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Get a specific playbook ───────────────────────────────────────────────
-  getPlaybook: protectedProcedure
+  getPlaybook: adminProcedure
     .input(z.object({ playbookId: z.string() }))
     .query(({ input }) => {
       const playbook = BUILTIN_PLAYBOOKS.find((p) => p.id === input.playbookId);
@@ -232,7 +232,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Start a playbook run ──────────────────────────────────────────────────
-  startRun: protectedProcedure
+  startRun: adminProcedure
     .input(z.object({
       playbookId: z.string(),
       target: z.string().min(1).max(500),
@@ -297,7 +297,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Get run status ────────────────────────────────────────────────────────
-  getRun: protectedProcedure
+  getRun: adminProcedure
     .input(z.object({ runId: z.string() }))
     .query(({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
@@ -309,7 +309,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── List runs for current user ────────────────────────────────────────────
-  listRuns: protectedProcedure
+  listRuns: adminProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).optional().default(20),
     }).optional())
@@ -324,7 +324,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Cancel a running playbook ─────────────────────────────────────────────
-  cancelRun: protectedProcedure
+  cancelRun: adminProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
@@ -347,7 +347,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Delete a run ──────────────────────────────────────────────────────────
-  deleteRun: protectedProcedure
+  deleteRun: adminProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Red Team Playbooks");
@@ -360,7 +360,7 @@ export const redTeamPlaybooksRouter = router({
     }),
 
   // ── Get available categories ──────────────────────────────────────────────
-  getCategories: protectedProcedure.query(() => {
+  getCategories: adminProcedure.query(() => {
     const categories = [...new Set(BUILTIN_PLAYBOOKS.map((p) => p.category))];
     return { categories };
   }),

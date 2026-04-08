@@ -20,7 +20,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits, consumeCreditsAmount } from "./credit-service";
@@ -213,7 +213,7 @@ export async function execTorCommandPublic(command: string, userId: number, time
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const torRouter = router({
 
-  listNodes: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -222,7 +222,7 @@ export const torRouter = router({
     return { nodes: nodes.map(sanitize), activeNodeId: activeId };
   }),
 
-  addNode: protectedProcedure
+  addNode: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -258,7 +258,7 @@ export const torRouter = router({
       return { success: true, node: sanitize(node) };
     }),
 
-  deployNode: protectedProcedure
+  deployNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -295,7 +295,7 @@ export const torRouter = router({
       }
     }),
 
-  checkNode: protectedProcedure
+  checkNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -323,7 +323,7 @@ export const torRouter = router({
       }
     }),
 
-  setActiveNode: protectedProcedure
+  setActiveNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -335,7 +335,7 @@ export const torRouter = router({
       return { success: true };
     }),
 
-  removeNode: protectedProcedure
+  removeNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -356,7 +356,7 @@ export const torRouter = router({
     }),
 
   /** Get status of the active node */
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -374,7 +374,7 @@ export const torRouter = router({
   }),
 
   /** Request a new Tor circuit (new exit IP) */
-  newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
+  newCircuit: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -402,7 +402,7 @@ export const torRouter = router({
   }),
 
   /** Start Tor on the active node */
-  startTor: protectedProcedure.mutation(async ({ ctx }) => {
+  startTor: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -419,7 +419,7 @@ export const torRouter = router({
   }),
 
   /** Stop Tor on the active node */
-  stopTor: protectedProcedure.mutation(async ({ ctx }) => {
+  stopTor: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -433,7 +433,7 @@ export const torRouter = router({
   }),
 
   /** Toggle kill-switch firewall */
-  toggleFirewall: protectedProcedure
+  toggleFirewall: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -467,7 +467,7 @@ export const torRouter = router({
     }),
 
   /** Get whether Tor is currently active — does a live SSH check, not just DB status */
-  getActiveState: protectedProcedure.query(async ({ ctx }) => {
+  getActiveState: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Tor");
     enforceFeature(plan.planId, "offensive_tooling", "Tor");
@@ -491,7 +491,7 @@ export const torRouter = router({
   }),
 
   /** Toggle Tor active state (start/stop Tor on the active node) */
-  setActive: protectedProcedure
+  setActive: adminProcedure
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -523,7 +523,7 @@ export const torRouter = router({
     }),
 
   /** Run a command through Tor on the active node */
-  runThroughTor: protectedProcedure
+  runThroughTor: adminProcedure
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);

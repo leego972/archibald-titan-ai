@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
 import { getDb } from "./db";
@@ -33,7 +33,7 @@ const activeRunners = new Map<number, Promise<any>>();
 
 export const webAgentRouter = router({
   // ─── Submit a new task ──────────────────────────────────────────────────────
-  submitTask: protectedProcedure
+  submitTask: adminProcedure
     .input(
       z.object({
         instruction: z.string().min(5).max(2000),
@@ -75,7 +75,7 @@ export const webAgentRouter = router({
     }),
 
   // ─── Get task status and result ─────────────────────────────────────────────
-  getTask: protectedProcedure
+  getTask: adminProcedure
     .input(z.object({ taskId: z.number() }))
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");
@@ -97,7 +97,7 @@ export const webAgentRouter = router({
     }),
 
   // ─── List all tasks for user ────────────────────────────────────────────────
-  listTasks: protectedProcedure
+  listTasks: adminProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(20),
@@ -116,7 +116,7 @@ export const webAgentRouter = router({
     }),
 
   // ─── Confirm an awaiting task (allow it to proceed) ─────────────────────────
-  confirmTask: protectedProcedure
+  confirmTask: adminProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");
@@ -155,7 +155,7 @@ export const webAgentRouter = router({
     }),
 
   // ─── Cancel a task ──────────────────────────────────────────────────────────
-  cancelTask: protectedProcedure
+  cancelTask: adminProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");
@@ -174,7 +174,7 @@ export const webAgentRouter = router({
     }),
 
   // ─── Delete a task from history ─────────────────────────────────────────────
-  deleteTask: protectedProcedure
+  deleteTask: adminProcedure
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");
@@ -192,12 +192,12 @@ export const webAgentRouter = router({
     }),
 
   // ─── Credential Management ───────────────────────────────────────────────────
-  listCredentials: protectedProcedure.query(async ({ ctx }) => {
+  listCredentials: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");
     return listCredentials(ctx.user.id);
   }),
 
-  saveCredential: protectedProcedure
+  saveCredential: adminProcedure
     .input(
       z.object({
         siteName: z.string().min(1).max(255),
@@ -222,7 +222,7 @@ export const webAgentRouter = router({
       return { id };
     }),
 
-  deleteCredential: protectedProcedure
+  deleteCredential: adminProcedure
     .input(z.object({ credentialId: z.number() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Web Agent");

@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
 import { getDb } from "./db";
@@ -72,7 +72,7 @@ async function saveSettings(userId: number, settings: IPRotationSettings): Promi
 export const ipRotationRouter = router({
 
   /** Full state for the IP Rotation Manager page */
-  getState: protectedProcedure.query(async ({ ctx }) => {
+  getState: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings = await getSettings(ctx.user.id);
     const torStatus = torSupervisor.getStatus();
@@ -101,7 +101,7 @@ export const ipRotationRouter = router({
   }),
 
   /** Sidebar quick state */
-  getActiveState: protectedProcedure.query(async ({ ctx }) => {
+  getActiveState: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings = await getSettings(ctx.user.id);
     const anyActive = settings.headerSpoofing || settings.torEnabled || settings.proxyEnabled;
@@ -116,7 +116,7 @@ export const ipRotationRouter = router({
   }),
 
   /** Toggle header spoofing */
-  setHeaderSpoofing: protectedProcedure
+  setHeaderSpoofing: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
@@ -127,7 +127,7 @@ export const ipRotationRouter = router({
     }),
 
   /** Toggle Tor routing */
-  setTorEnabled: protectedProcedure
+  setTorEnabled: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
@@ -160,7 +160,7 @@ export const ipRotationRouter = router({
     }),
 
   /** Explicitly start Tor and wait for bootstrap */
-  startTor: protectedProcedure.mutation(async ({ ctx }) => {
+  startTor: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
@@ -182,7 +182,7 @@ export const ipRotationRouter = router({
   }),
 
   /** Stop Tor daemon */
-  stopTor: protectedProcedure.mutation(async ({ ctx }) => {
+  stopTor: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     await torSupervisor.stop();
     const settings = await getSettings(ctx.user.id);
@@ -192,7 +192,7 @@ export const ipRotationRouter = router({
   }),
 
   /** Request a new Tor circuit — verifies the IP actually changed */
-  newCircuit: protectedProcedure.mutation(async ({ ctx }) => {
+  newCircuit: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
@@ -208,12 +208,12 @@ export const ipRotationRouter = router({
   }),
 
   /** Get live Tor status (for polling during bootstrap) */
-  getTorStatus: protectedProcedure.query(async () => {
+  getTorStatus: adminProcedure.query(async () => {
     return torSupervisor.getStatus();
   }),
 
   /** Toggle auto proxy pool */
-  setProxyEnabled: protectedProcedure
+  setProxyEnabled: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
@@ -244,7 +244,7 @@ export const ipRotationRouter = router({
     }),
 
   /** Manually trigger a proxy scrape */
-  scrapeProxies: protectedProcedure.mutation(async ({ ctx }) => {
+  scrapeProxies: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const creditCheck = await checkCredits(ctx.user.id, "ip_rotation_circuit");
     if (!creditCheck.allowed) {
@@ -262,14 +262,14 @@ export const ipRotationRouter = router({
   }),
 
   /** Get current proxy pool */
-  getProxyPool: protectedProcedure.query(async () => {
+  getProxyPool: adminProcedure.query(async () => {
     const proxies = proxyPool.getProxies(100);
     const stats = proxyPool.getStats();
     return { proxies, stats };
   }),
 
   /** Enable all layers at once */
-  enableAll: protectedProcedure.mutation(async ({ ctx }) => {
+  enableAll: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings: IPRotationSettings = {
       headerSpoofing: true,
@@ -294,7 +294,7 @@ export const ipRotationRouter = router({
   }),
 
   /** Disable all layers */
-  disableAll: protectedProcedure.mutation(async ({ ctx }) => {
+  disableAll: adminProcedure.mutation(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "IP Rotation");
     const settings: IPRotationSettings = {
       headerSpoofing: false,

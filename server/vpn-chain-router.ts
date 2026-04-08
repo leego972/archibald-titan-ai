@@ -20,7 +20,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits, consumeCreditsAmount } from "./credit-service";
@@ -405,7 +405,7 @@ async function teardownChainTunnels(userId: number, hops: VpnHop[]): Promise<voi
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const vpnChainRouter = router({
 
-  listHops: protectedProcedure.query(async ({ ctx }) => {
+  listHops: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -419,7 +419,7 @@ export const vpnChainRouter = router({
     };
   }),
 
-  addHop: protectedProcedure
+  addHop: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -454,7 +454,7 @@ export const vpnChainRouter = router({
       return { success: true, hop: sanitize(hop) };
     }),
 
-  deployHop: protectedProcedure
+  deployHop: adminProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -500,7 +500,7 @@ export const vpnChainRouter = router({
    * correct [Peer] sections and brings up the WireGuard interface.
    * Returns a client .conf file the user imports into their WireGuard app.
    */
-  buildChain: protectedProcedure.mutation(async ({ ctx }) => {
+  buildChain: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -530,7 +530,7 @@ export const vpnChainRouter = router({
    * Generate a fresh WireGuard client config without rebuilding the chain.
    * Use this if the user loses their config or wants to add a new device.
    */
-  generateClientConfig: protectedProcedure.mutation(async ({ ctx }) => {
+  generateClientConfig: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -589,7 +589,7 @@ export const vpnChainRouter = router({
     return { success: true, clientConfig, clientPubKey, message: "Client config generated. Import the .conf file into your WireGuard app." };
   }),
 
-  checkHop: protectedProcedure
+  checkHop: adminProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -623,7 +623,7 @@ export const vpnChainRouter = router({
       }
     }),
 
-  reorderHops: protectedProcedure
+  reorderHops: adminProcedure
     .input(z.object({ orderedIds: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -640,7 +640,7 @@ export const vpnChainRouter = router({
       return { success: true, hops: reordered.map(sanitize), message: "Hops reordered. Rebuild the chain to apply the new order." };
     }),
 
-  removeHop: protectedProcedure
+  removeHop: adminProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -660,7 +660,7 @@ export const vpnChainRouter = router({
       return { success: true, message: `Hop "${label}" removed. Rebuild the chain if other hops remain.` };
     }),
 
-  testChain: protectedProcedure.mutation(async ({ ctx }) => {
+  testChain: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -692,7 +692,7 @@ export const vpnChainRouter = router({
     };
   }),
 
-  setChainActive: protectedProcedure
+  setChainActive: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -728,7 +728,7 @@ export const vpnChainRouter = router({
       return { success: true, chainActive: input.enabled };
     }),
 
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -745,7 +745,7 @@ export const vpnChainRouter = router({
     };
   }),
 
-  getChain: protectedProcedure.query(async ({ ctx }) => {
+  getChain: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -763,7 +763,7 @@ export const vpnChainRouter = router({
     };
   }),
 
-  getActiveState: protectedProcedure.query(async ({ ctx }) => {
+  getActiveState: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -790,7 +790,7 @@ export const vpnChainRouter = router({
     }
   }),
 
-  setActive: protectedProcedure
+  setActive: adminProcedure
     .input(z.object({ active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -823,7 +823,7 @@ export const vpnChainRouter = router({
       return { success: true, active: input.active };
     }),
 
-  testHop: protectedProcedure
+  testHop: adminProcedure
     .input(z.object({ hopId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -841,7 +841,7 @@ export const vpnChainRouter = router({
       }
     }),
 
-  clearChain: protectedProcedure.mutation(async ({ ctx }) => {
+  clearChain: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "VPN Chain");
     enforceFeature(plan.planId, "offensive_tooling", "VPN Chain");
@@ -852,7 +852,7 @@ export const vpnChainRouter = router({
     return { success: true };
   }),
 
-  setUseTitanEntry: protectedProcedure
+  setUseTitanEntry: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async () => {
       return { success: true };

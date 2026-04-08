@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { publicProcedure, router,  } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { contactSubmissions } from "../drizzle/schema";
@@ -44,7 +44,7 @@ export const contactRouter = router({
   /**
    * Admin: list all contact submissions
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: adminProcedure.query(async ({ ctx }) => {
     if (!isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
     }
@@ -56,7 +56,7 @@ export const contactRouter = router({
   /**
    * Admin: update submission status
    */
-  updateStatus: protectedProcedure
+  updateStatus: adminProcedure
     .input(
       z.object({
         id: z.number(),

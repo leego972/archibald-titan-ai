@@ -7,7 +7,7 @@
  * this endpoint or table exists.
  */
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import {
   queryAdminActivityLogs,
   requireAdminRole,
@@ -29,7 +29,7 @@ export const adminActivityLogRouter = router({
    * List admin activity log entries with optional filtering.
    * Admin/head_admin only.
    */
-  list: protectedProcedure
+  list: adminProcedure
     .input(
       z.object({
         category: categoryEnum.optional(),
@@ -62,7 +62,7 @@ export const adminActivityLogRouter = router({
    * Summary stats for the admin activity log.
    * Admin/head_admin only.
    */
-  stats: protectedProcedure.query(async ({ ctx }) => {
+  stats: adminProcedure.query(async ({ ctx }) => {
     requireAdminRole(ctx.user.role);
     const now = new Date();
     const day = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -88,7 +88,7 @@ export const adminActivityLogRouter = router({
    * Export admin activity log as CSV.
    * Admin/head_admin only.
    */
-  exportCsv: protectedProcedure
+  exportCsv: adminProcedure
     .input(
       z.object({
         category: categoryEnum.optional(),

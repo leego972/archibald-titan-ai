@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { userSecrets } from "../drizzle/schema";
@@ -155,7 +155,7 @@ function sanitize(n: ProxyNode): Omit<ProxyNode, "sshPassword" | "sshKey"> {
 export const proxyMakerRouter = router({
 
   /** List all proxy nodes (SSH credentials stripped) */
-  listNodes: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Proxy Maker");
     enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
@@ -171,7 +171,7 @@ export const proxyMakerRouter = router({
   }),
 
   /** Add a new proxy node (saves SSH credentials encrypted in DB) */
-  addNode: protectedProcedure
+  addNode: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -207,7 +207,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Deploy 3proxy + firewall on a node via SSH */
-  deployNode: protectedProcedure
+  deployNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -245,7 +245,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Check if a node's proxy is alive */
-  checkNode: protectedProcedure
+  checkNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -274,7 +274,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Check all nodes at once */
-  checkAllNodes: protectedProcedure.mutation(async ({ ctx }) => {
+  checkAllNodes: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Proxy Maker");
     enforceFeature(plan.planId, "offensive_tooling", "Proxy Maker");
@@ -302,7 +302,7 @@ export const proxyMakerRouter = router({
   }),
 
   /** Stop 3proxy on a node */
-  stopNode: protectedProcedure
+  stopNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -323,7 +323,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Remove a node from DB (optionally stop first) */
-  removeNode: protectedProcedure
+  removeNode: adminProcedure
     .input(z.object({ nodeId: z.string(), stopFirst: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -342,7 +342,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Update node label/country */
-  updateNodeLabel: protectedProcedure
+  updateNodeLabel: adminProcedure
     .input(z.object({ nodeId: z.string(), label: z.string().min(1).max(64), country: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const nodes = await getNodes(ctx.user.id);
@@ -355,7 +355,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Toggle rotation on/off */
-  setRotation: protectedProcedure
+  setRotation: adminProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -368,7 +368,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Get next proxy in round-robin rotation */
-  getNextProxy: protectedProcedure.query(async ({ ctx }) => {
+  getNextProxy: adminProcedure.query(async ({ ctx }) => {
     const nodes = await getNodes(ctx.user.id);
     const rotation = await getRotation(ctx.user.id);
     const online = nodes.filter(n => n.status === "online" && n.publicIp);
@@ -381,7 +381,7 @@ export const proxyMakerRouter = router({
   }),
 
   /** Test a node's proxy by curling through it */
-  testProxy: protectedProcedure
+  testProxy: adminProcedure
     .input(z.object({ nodeId: z.string(), testUrl: z.string().default("https://api.ipify.org") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -404,7 +404,7 @@ export const proxyMakerRouter = router({
     }),
 
   /** Export all online proxy endpoints as a list */
-  exportProxies: protectedProcedure
+  exportProxies: adminProcedure
     .input(z.object({ type: z.enum(["socks5", "http", "all"]).default("socks5"), onlineOnly: z.boolean().default(true) }))
     .query(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);

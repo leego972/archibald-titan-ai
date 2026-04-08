@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
@@ -182,7 +182,7 @@ export async function execMetasploitCommandPublic(command: string, userId: numbe
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const metasploitRouter = router({
 
-  listNodes: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -191,7 +191,7 @@ export const metasploitRouter = router({
     return { nodes: nodes.map(sanitize), activeNodeId: activeId };
   }),
 
-  addNode: protectedProcedure
+  addNode: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -229,7 +229,7 @@ export const metasploitRouter = router({
       return { success: true, node: sanitize(node) };
     }),
 
-  deployNode: protectedProcedure
+  deployNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -264,7 +264,7 @@ export const metasploitRouter = router({
       }
     }),
 
-  checkNode: protectedProcedure
+  checkNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -291,7 +291,7 @@ export const metasploitRouter = router({
       }
     }),
 
-  setActiveNode: protectedProcedure
+  setActiveNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -303,7 +303,7 @@ export const metasploitRouter = router({
       return { success: true };
     }),
 
-  removeNode: protectedProcedure
+  removeNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -323,7 +323,7 @@ export const metasploitRouter = router({
     }),
 
   /** Get connection status */
-  getConnection: protectedProcedure.query(async ({ ctx }) => {
+  getConnection: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -344,7 +344,7 @@ export const metasploitRouter = router({
   }),
 
   /** Run any msfconsole command on the active node */
-  runCommand: protectedProcedure
+  runCommand: adminProcedure
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -358,7 +358,7 @@ export const metasploitRouter = router({
     }),
 
   /** List active sessions */
-  listSessions: protectedProcedure.mutation(async ({ ctx }) => {
+  listSessions: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -399,16 +399,18 @@ export const metasploitRouter = router({
   }),
 
   /** Search modules */
-  searchModules: protectedProcedure
-    .input(z.object({ query: z.string().min(1), type: z.string().optional() }))
+  searchModules: adminProcedure
+    .input(z.object({ query: z.string().min(1).max(200).regex(/^[a-zA-Z0-9 .\-_/]+$/, "Query must contain only alphanumeric characters and basic punctuation"), type: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node." });
-      const typeFilter = input.type ? ` type:${input.type}` : '';
-      const output = await execMsfCommand(node, `search ${input.query}${typeFilter}`, 30000, ctx.user.id);
+      const safeQuery = input.query.replace(/[`$\\|;&<>(){}!"']/g, '');
+      const safeType = input.type ? input.type.replace(/[^a-zA-Z_]/g, '') : '';
+      const typeFilter = safeType ? ` type:${safeType}` : '';
+      const output = await execMsfCommand(node, `search ${safeQuery}${typeFilter}`, 30000, ctx.user.id);
       // Parse output into modules array for MetasploitPage
       const lines = output.split('\n').filter(l => l.match(/^\s+\d+\s+/));
       const modules = lines.map(l => {
@@ -419,7 +421,7 @@ export const metasploitRouter = router({
     }),
 
   /** Legacy: connect (now just checks active node) */
-  connect: protectedProcedure
+  connect: adminProcedure
     .input(z.object({ host: z.string().optional(), port: z.number().optional(), password: z.string().optional() }))
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -430,7 +432,7 @@ export const metasploitRouter = router({
       return { success: true, message: `Using node "${node.label}" at ${node.publicIp ?? node.sshHost}` };
     }),
 
-  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+  disconnect: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -439,7 +441,7 @@ export const metasploitRouter = router({
   }),
 
   // ── Backward-compatible aliases for existing MetasploitPage UI ───────────────
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(z.object({ host: z.string().optional(), port: z.number().default(55553).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -453,14 +455,14 @@ export const metasploitRouter = router({
       } catch (e: any) { return { success: false, message: e.message }; }
     }),
 
-  saveConnection: protectedProcedure
+  saveConnection: adminProcedure
     .input(z.object({ host: z.string().optional(), port: z.number().default(55553).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       // Connection is now managed via dedicated nodes — no-op alias
       return { success: true, message: "Connection managed via dedicated VPS nodes." };
     }),
 
-  getStatus: protectedProcedure.mutation(async ({ ctx }) => {
+  getStatus: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -475,7 +477,7 @@ export const metasploitRouter = router({
     } catch (e: any) { return { running: false, version: null, raw: e.message, message: e.message }; }
   }),
 
-  install: protectedProcedure.mutation(async ({ ctx }) => {
+  install: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -515,7 +517,7 @@ export const metasploitRouter = router({
     }
   }),
 
-  update: protectedProcedure.mutation(async ({ ctx }) => {
+  update: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -528,7 +530,7 @@ export const metasploitRouter = router({
     } catch (e: any) { return { success: false, output: e.message, message: e.message }; }
   }),
 
-  startRpcd: protectedProcedure
+  startRpcd: adminProcedure
     .input(z.object({ rpcPassword: z.string().optional(), rpcPort: z.number().optional(), ssl: z.boolean().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
     const plan = await getUserPlan(ctx.user.id);
@@ -554,7 +556,7 @@ export const metasploitRouter = router({
     } catch (e: any) { return { success: false, message: e.message }; }
   }),
 
-  stopRpcd: protectedProcedure.mutation(async ({ ctx }) => {
+  stopRpcd: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -567,7 +569,7 @@ export const metasploitRouter = router({
     } catch (e: any) { return { success: false, message: e.message }; }
   }),
 
-  getModuleInfo: protectedProcedure
+  getModuleInfo: adminProcedure
     .input(z.object({ module: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -580,7 +582,7 @@ export const metasploitRouter = router({
       return { info: out, output: out };
     }),
 
-  killSession: protectedProcedure
+  killSession: adminProcedure
     .input(z.object({ sessionId: z.union([z.string(), z.number()]).transform(v => String(v)) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -593,7 +595,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  runModule: protectedProcedure
+  runModule: adminProcedure
     .input(z.object({ module: z.string(), options: z.record(z.string(), z.unknown()).optional(), payload: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -610,7 +612,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  generatePayload: protectedProcedure
+  generatePayload: adminProcedure
     .input(z.object({ payload: z.string(), lhost: z.string(), lport: z.number(), format: z.string().default("raw"), encoder: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -627,7 +629,7 @@ export const metasploitRouter = router({
       return { success: true, output: out, outputFile };
     }),
 
-  listWorkspaces: protectedProcedure.mutation(async ({ ctx }) => {
+  listWorkspaces: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -642,7 +644,7 @@ export const metasploitRouter = router({
     return { raw: out, workspaces };
   }),
 
-  createWorkspace: protectedProcedure
+  createWorkspace: adminProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -654,7 +656,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  switchWorkspace: protectedProcedure
+  switchWorkspace: adminProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -666,7 +668,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  listHosts: protectedProcedure.mutation(async ({ ctx }) => {
+  listHosts: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -676,7 +678,7 @@ export const metasploitRouter = router({
     return { output: out };
   }),
 
-  listServices: protectedProcedure.mutation(async ({ ctx }) => {
+  listServices: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -686,7 +688,7 @@ export const metasploitRouter = router({
     return { output: out };
   }),
 
-  listVulns: protectedProcedure.mutation(async ({ ctx }) => {
+  listVulns: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -696,7 +698,7 @@ export const metasploitRouter = router({
     return { output: out };
   }),
 
-  listLoot: protectedProcedure.mutation(async ({ ctx }) => {
+  listLoot: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -706,7 +708,7 @@ export const metasploitRouter = router({
     return { output: out };
   }),
 
-  listCreds: protectedProcedure.mutation(async ({ ctx }) => {
+  listCreds: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Metasploit");
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
@@ -716,7 +718,7 @@ export const metasploitRouter = router({
     return { output: out };
   }),
 
-  dbNmap: protectedProcedure
+  dbNmap: adminProcedure
     .input(z.object({
       target: z.string().min(1),
       flags: z.string().optional().default("-sV -sC -O --script=vuln"),
@@ -732,7 +734,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  startListener: protectedProcedure
+  startListener: adminProcedure
     .input(z.object({
       lhost: z.string().min(1),
       lport: z.number().min(1).max(65535),
@@ -750,7 +752,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  sessionInteract: protectedProcedure
+  sessionInteract: adminProcedure
     .input(z.object({
       sessionId: z.union([z.string(), z.number()]).transform(v => String(v)),
       command: z.string().min(1),
@@ -767,7 +769,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  runPost: protectedProcedure
+  runPost: adminProcedure
     .input(z.object({
       module: z.string().min(1),
       sessionId: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -786,7 +788,7 @@ export const metasploitRouter = router({
       return { success: true, output: out };
     }),
 
-  generatePayloadObfuscated: protectedProcedure
+  generatePayloadObfuscated: adminProcedure
     .input(z.object({
       payload: z.string(),
       lhost: z.string(),
@@ -813,7 +815,7 @@ export const metasploitRouter = router({
       return { success: true, output: out, outputFile };
     }),
 
-  runAutoExploit: protectedProcedure
+  runAutoExploit: adminProcedure
     .input(z.object({
       target: z.string().min(1),
       lhost: z.string().min(1),
@@ -835,7 +837,7 @@ export const metasploitRouter = router({
       return { success: true, output: out, target: input.target };
     }),
 
-  exportReport: protectedProcedure
+  exportReport: adminProcedure
     .input(z.object({ format: z.enum(["xml", "html", "pdf", "csv"]).default("xml") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);

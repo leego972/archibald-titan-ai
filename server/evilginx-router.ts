@@ -25,7 +25,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
@@ -316,7 +316,7 @@ function parseSessionList(raw: string): Array<{ id: number; phishlet: string; us
 export const evilginxRouter = router({
 
   /** List all Evilginx nodes */
-  listNodes: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -326,7 +326,7 @@ export const evilginxRouter = router({
   }),
 
   /** Add a new dedicated Evilginx VPS node */
-  addNode: protectedProcedure
+  addNode: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -365,7 +365,7 @@ export const evilginxRouter = router({
     }),
 
   /** Deploy Evilginx3 on a node via SSH — installs binary + systemd service */
-  deployNode: protectedProcedure
+  deployNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -403,7 +403,7 @@ export const evilginxRouter = router({
     }),
 
   /** Start the Evilginx service on the active node */
-  startServer: protectedProcedure.mutation(async ({ ctx }) => {
+  startServer: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -429,7 +429,7 @@ export const evilginxRouter = router({
     }
   }),
   /** Stop the Evilginx service on the active node */
-  stopServer: protectedProcedure.mutation(async ({ ctx }) => {
+  stopServer: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -450,7 +450,7 @@ export const evilginxRouter = router({
     }
   }),
   /** Check if Evilginx is installed and running on a node */
-  checkNode: protectedProcedure
+  checkNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -482,7 +482,7 @@ export const evilginxRouter = router({
     }),
 
   /** Set the active node for all Evilginx operations */
-  setActiveNode: protectedProcedure
+  setActiveNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -495,7 +495,7 @@ export const evilginxRouter = router({
     }),
 
   /** Remove a node */
-  removeNode: protectedProcedure
+  removeNode: adminProcedure
     .input(z.object({ nodeId: z.string(), stopFirst: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -518,7 +518,7 @@ export const evilginxRouter = router({
     }),
 
   /** Get status of the active node */
-  checkInstall: protectedProcedure.query(async ({ ctx }) => {
+  checkInstall: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -537,7 +537,7 @@ export const evilginxRouter = router({
   }),
 
   /** Execute any Evilginx command on the active node */
-  exec: protectedProcedure
+  exec: adminProcedure
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -551,7 +551,7 @@ export const evilginxRouter = router({
     }),
 
   /** List phishlets on the active node */
-  listPhishlets: protectedProcedure.mutation(async ({ ctx }) => {
+  listPhishlets: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -562,7 +562,7 @@ export const evilginxRouter = router({
     return { phishlets: parsePhishletList(raw), raw };
   }),
 
-  enablePhishlet: protectedProcedure
+  enablePhishlet: adminProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -575,7 +575,7 @@ export const evilginxRouter = router({
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
-  disablePhishlet: protectedProcedure
+  disablePhishlet: adminProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -587,7 +587,7 @@ export const evilginxRouter = router({
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
-  hidePhishlet: protectedProcedure
+  hidePhishlet: adminProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -599,7 +599,7 @@ export const evilginxRouter = router({
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
-  setPhishletHostname: protectedProcedure
+  setPhishletHostname: adminProcedure
     .input(z.object({ name: z.string().min(1), hostname: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -611,7 +611,7 @@ export const evilginxRouter = router({
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
 
-  listLures: protectedProcedure.mutation(async ({ ctx }) => {
+  listLures: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -621,7 +621,7 @@ export const evilginxRouter = router({
     return { lures: parseLureList(raw), raw };
   }),
 
-  createLure: protectedProcedure
+  createLure: adminProcedure
     .input(z.object({
       phishlet: z.string().min(1),
       hostname: z.string().optional(),
@@ -651,7 +651,7 @@ export const evilginxRouter = router({
       return { output: createRaw, lureId, success: !createRaw.includes("error") };
     }),
 
-  deleteLure: protectedProcedure
+  deleteLure: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -663,7 +663,7 @@ export const evilginxRouter = router({
       return { output: raw, success: !raw.includes("error") };
     }),
 
-  getLureUrl: protectedProcedure
+  getLureUrl: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -676,7 +676,7 @@ export const evilginxRouter = router({
       return { url: urlMatch?.[0] ?? null, output: raw };
     }),
 
-  listSessions: protectedProcedure.mutation(async ({ ctx }) => {
+  listSessions: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -686,7 +686,7 @@ export const evilginxRouter = router({
     return { sessions: parseSessionList(raw), raw };
   }),
 
-  getSession: protectedProcedure
+  getSession: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -698,7 +698,7 @@ export const evilginxRouter = router({
       return { output: raw };
     }),
 
-  deleteSession: protectedProcedure
+  deleteSession: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -711,7 +711,7 @@ export const evilginxRouter = router({
     }),
 
   /** Set a config value (e.g. domain, redirect_key, unauth_url) */
-  setConfig: protectedProcedure
+  setConfig: adminProcedure
     .input(z.object({ key: z.string().min(1), value: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -724,7 +724,7 @@ export const evilginxRouter = router({
     }),
 
   /** Get current config */
-  getConfig: protectedProcedure.mutation(async ({ ctx }) => {
+  getConfig: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -735,7 +735,7 @@ export const evilginxRouter = router({
   }),
 
   /** Get Evilginx logs from the VPS */
-  getLogs: protectedProcedure
+  getLogs: adminProcedure
     .input(z.object({ lines: z.number().min(1).max(500).default(100) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -749,7 +749,7 @@ export const evilginxRouter = router({
     }),
 
   /** Export all captured sessions as JSON */
-  exportSessions: protectedProcedure.mutation(async ({ ctx }) => {
+  exportSessions: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -761,7 +761,7 @@ export const evilginxRouter = router({
   }),
 
   /** Clear all captured sessions */
-  clearSessions: protectedProcedure.mutation(async ({ ctx }) => {
+  clearSessions: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -777,7 +777,7 @@ export const evilginxRouter = router({
   }),
 
   /** Set redirect URL for unauthenticated traffic */
-  setRedirectUrl: protectedProcedure
+  setRedirectUrl: adminProcedure
     .input(z.object({ url: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -790,7 +790,7 @@ export const evilginxRouter = router({
     }),
 
   /** Get per-phishlet session statistics */
-  getPhishletStats: protectedProcedure.mutation(async ({ ctx }) => {
+  getPhishletStats: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -811,7 +811,7 @@ export const evilginxRouter = router({
   }),
 
   /** Run any raw evilginx command */
-  runCommand: protectedProcedure
+  runCommand: adminProcedure
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional().default(30000) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -824,7 +824,7 @@ export const evilginxRouter = router({
     }),
 
   // ── Legacy compatibility procedures (kept for existing UI) ────────────────
-  connectLocal: protectedProcedure.mutation(async ({ ctx }) => {
+  connectLocal: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -833,7 +833,7 @@ export const evilginxRouter = router({
     return { success: true, message: `Connected to "${node.label}" at ${node.publicIp ?? node.sshHost}`, mode: "node", nodeLabel: node.label };
   }),
 
-  getConnection: protectedProcedure.query(async ({ ctx }) => {
+  getConnection: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
@@ -857,7 +857,7 @@ export const evilginxRouter = router({
     };
   }),
 
-  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+  disconnect: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "Evilginx");
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");

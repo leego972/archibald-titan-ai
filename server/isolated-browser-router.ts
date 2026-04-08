@@ -22,7 +22,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { consumeCreditsAmount, getCreditBalance } from "./credit-service";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
@@ -278,7 +278,7 @@ export function registerIsolatedBrowserSSE(app: import("express").Express): void
 export const isolatedBrowserRouter = router({
 
   // ── Launch a new session ──────────────────────────────────────────────────
-  launch: protectedProcedure
+  launch: adminProcedure
     .input(z.object({
       url: z.string().url().optional().default("https://www.google.com"),
       notes: z.string().max(200).optional().default(""),
@@ -400,7 +400,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Navigate to a URL ─────────────────────────────────────────────────────
-  navigate: protectedProcedure
+  navigate: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       url: z.string().url(),
@@ -425,7 +425,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Click at coordinates ──────────────────────────────────────────────────
-  click: protectedProcedure
+  click: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       x: z.number(),
@@ -452,7 +452,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Type text ────────────────────────────────────────────────────────────
-  type: protectedProcedure
+  type: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       text: z.string().max(2000),
@@ -480,7 +480,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Scroll ───────────────────────────────────────────────────────────────
-  scroll: protectedProcedure
+  scroll: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       direction: z.enum(["up", "down"]),
@@ -506,7 +506,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Go back / forward ────────────────────────────────────────────────────
-  goBack: protectedProcedure
+  goBack: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -526,7 +526,7 @@ export const isolatedBrowserRouter = router({
       }
     }),
 
-  goForward: protectedProcedure
+  goForward: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -547,7 +547,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Reload page ──────────────────────────────────────────────────────────
-  reload: protectedProcedure
+  reload: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -566,7 +566,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Take & save screenshot ────────────────────────────────────────────────
-  takeScreenshot: protectedProcedure
+  takeScreenshot: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       label: z.string().max(100).optional(),
@@ -585,7 +585,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Get screenshot gallery ────────────────────────────────────────────────
-  getScreenshots: protectedProcedure
+  getScreenshots: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -597,7 +597,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Heartbeat — keeps session alive + bills per-minute ───────────────────
-  heartbeat: protectedProcedure
+  heartbeat: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -685,7 +685,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── End session manually ─────────────────────────────────────────────────
-  end: protectedProcedure
+  end: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -732,7 +732,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Get current session status ───────────────────────────────────────────
-  getSession: protectedProcedure
+  getSession: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -765,7 +765,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── List user's recent sessions ──────────────────────────────────────────
-  listSessions: protectedProcedure.query(({ ctx }) => {
+  listSessions: adminProcedure.query(({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
     const user = ctx.user!;
     const userSessions = Array.from(sessions.values())
@@ -792,7 +792,7 @@ export const isolatedBrowserRouter = router({
   }),
 
   // ── Get available device profiles ────────────────────────────────────────
-  getDeviceProfiles: protectedProcedure.query(() => {
+  getDeviceProfiles: adminProcedure.query(() => {
     return {
       profiles: DEVICE_PROFILES.map(p => ({
         name: p.name,
@@ -804,7 +804,7 @@ export const isolatedBrowserRouter = router({
   }),
 
   // ── Enable / disable traffic capture for a session ────────────────────────
-  enableTrafficCapture: protectedProcedure
+  enableTrafficCapture: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       enabled: z.boolean(),
@@ -867,7 +867,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Get captured traffic log for a session ───────────────────────────────
-  getTrafficLog: protectedProcedure
+  getTrafficLog: adminProcedure
     .input(z.object({
       sessionId: z.string(),
       method: z.string().optional(),
@@ -894,7 +894,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Clear traffic log ────────────────────────────────────────────────────
-  clearTrafficLog: protectedProcedure
+  clearTrafficLog: adminProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
@@ -907,7 +907,7 @@ export const isolatedBrowserRouter = router({
     }),
 
   // ── Get credit cost info for current plan ────────────────────────────────
-  getCostInfo: protectedProcedure.query(async ({ ctx }) => {
+  getCostInfo: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Isolated Browser");
     const user = ctx.user!;
     const planId = (user as any).planId ?? "free";

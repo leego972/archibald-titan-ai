@@ -2,7 +2,7 @@
  * Security Module Marketplace - DB-backed version
  * Replaces in-memory MODULES array with DB persistence
  */
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
@@ -43,7 +43,7 @@ const SEED: InsertSecurityModule[] = [
 db.seedSecurityModulesIfEmpty(SEED).catch(() => {});
 
 export const securityMarketplaceRouter = router({
-  listModules: protectedProcedure
+  listModules: adminProcedure
     .input(z.object({
       category: z.enum(["osint","scanning","exploitation","phishing","anonymity","automation","reporting","playbook","wordlist","template","all"]).default("all"),
       search: z.string().optional(),
@@ -68,7 +68,7 @@ export const securityMarketplaceRouter = router({
       return { modules: paginated.map(m => ({ ...m, tags: tryParse(m.tags), requirements: tryParse(m.requirements), compatibleWith: tryParse(m.compatibleWith), screenshots: tryParse(m.screenshots), installed: installedSlugs.has(m.slug) })), total: filtered.length, hasMore: input.offset + input.limit < filtered.length };
     }),
 
-  getModule: protectedProcedure
+  getModule: adminProcedure
     .input(z.object({ moduleId: z.string() }))
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -79,7 +79,7 @@ export const securityMarketplaceRouter = router({
       return { module: { ...module, tags: tryParse(module.tags), requirements: tryParse(module.requirements), compatibleWith: tryParse(module.compatibleWith), screenshots: tryParse(module.screenshots), installed }, reviews };
     }),
 
-  installModule: protectedProcedure
+  installModule: adminProcedure
     .input(z.object({ moduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -94,7 +94,7 @@ export const securityMarketplaceRouter = router({
       return { success: true, message: module.name + " installed successfully" };
     }),
 
-  uninstallModule: protectedProcedure
+  uninstallModule: adminProcedure
     .input(z.object({ moduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -102,7 +102,7 @@ export const securityMarketplaceRouter = router({
       return { success: true };
     }),
 
-  getInstalled: protectedProcedure.query(async ({ ctx }) => {
+  getInstalled: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
     const installs = await db.getSecurityModuleInstalls(ctx.user.id as number);
     if (installs.length === 0) return { modules: [] };
@@ -111,7 +111,7 @@ export const securityMarketplaceRouter = router({
     return { modules: all.filter(m => slugs.has(m.slug)).map(m => ({ ...m, tags: tryParse(m.tags), requirements: tryParse(m.requirements), compatibleWith: tryParse(m.compatibleWith), screenshots: tryParse(m.screenshots), installed: true })) };
   }),
 
-  addReview: protectedProcedure
+  addReview: adminProcedure
     .input(z.object({ moduleId: z.string(), rating: z.number().min(1).max(5), comment: z.string().min(10).max(1000) }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -123,7 +123,7 @@ export const securityMarketplaceRouter = router({
       return { success: true, review };
     }),
 
-  rateModule: protectedProcedure
+  rateModule: adminProcedure
     .input(z.object({ moduleId: z.string(), rating: z.number().min(1).max(5), comment: z.string().min(10).max(1000) }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -135,7 +135,7 @@ export const securityMarketplaceRouter = router({
       return { success: true, review };
     }),
 
-  publishModule: protectedProcedure
+  publishModule: adminProcedure
     .input(z.object({ name: z.string().min(3).max(80), description: z.string().min(10).max(300), category: z.enum(["osint","scanning","exploitation","phishing","anonymity","automation","reporting","playbook","wordlist","template"]), version: z.string().default("1.0.0"), tags: z.string().optional(), code: z.string().optional(), readme: z.string().optional(), price: z.number().min(0).default(0) }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
@@ -144,13 +144,13 @@ export const securityMarketplaceRouter = router({
       return { success: true, message: "Your module has been submitted for review. It will appear in the marketplace once approved by the Archibald Titan team." };
     }),
 
-  getCategories: protectedProcedure.query(async () => {
+  getCategories: adminProcedure.query(async () => {
     const modules = await db.listSecurityModules({ limit: 500 });
     const counts = modules.reduce((acc: Record<string,number>, m) => { acc[m.category] = (acc[m.category] ?? 0) + 1; return acc; }, {});
     return { categories: [{ id:"all", label:"All Modules", count:modules.length },{ id:"osint", label:"OSINT", count:counts.osint??0 },{ id:"scanning", label:"Scanning", count:counts.scanning??0 },{ id:"exploitation", label:"Exploitation", count:counts.exploitation??0 },{ id:"phishing", label:"Phishing", count:counts.phishing??0 },{ id:"anonymity", label:"Anonymity", count:counts.anonymity??0 },{ id:"automation", label:"Automation", count:counts.automation??0 },{ id:"reporting", label:"Reporting", count:counts.reporting??0 },{ id:"playbook", label:"Playbooks", count:counts.playbook??0 },{ id:"wordlist", label:"Wordlists", count:counts.wordlist??0 },{ id:"template", label:"Templates", count:counts.template??0 }] };
   }),
 
-  getStats: protectedProcedure.query(async ({ ctx }) => {
+  getStats: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
     return db.getSecurityModuleStats(ctx.user.id as number);
   }),

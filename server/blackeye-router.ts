@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
@@ -159,7 +159,7 @@ export async function execBlackeyeCommandPublic(command: string, userId: number,
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const blackeyeRouter = router({
 
-  listNodes: protectedProcedure.query(async ({ ctx }) => {
+  listNodes: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -168,7 +168,7 @@ export const blackeyeRouter = router({
     return { nodes: nodes.map(sanitize), activeNodeId: activeId };
   }),
 
-  addNode: protectedProcedure
+  addNode: adminProcedure
     .input(z.object({
       label: z.string().min(1).max(64),
       sshHost: z.string().min(1),
@@ -204,7 +204,7 @@ export const blackeyeRouter = router({
       return { success: true, node: sanitize(node) };
     }),
 
-  deployNode: protectedProcedure
+  deployNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -239,7 +239,7 @@ export const blackeyeRouter = router({
       }
     }),
 
-  checkNode: protectedProcedure
+  checkNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -266,7 +266,7 @@ export const blackeyeRouter = router({
       }
     }),
 
-  setActiveNode: protectedProcedure
+  setActiveNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -278,7 +278,7 @@ export const blackeyeRouter = router({
       return { success: true };
     }),
 
-  removeNode: protectedProcedure
+  removeNode: adminProcedure
     .input(z.object({ nodeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -297,7 +297,7 @@ export const blackeyeRouter = router({
       return { success: true, message: `Node "${label}" removed` };
     }),
 
-  getConnection: protectedProcedure.query(async ({ ctx }) => {
+  getConnection: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -316,7 +316,7 @@ export const blackeyeRouter = router({
   }),
 
   /** Run any shell command on the active node's BlackEye directory */
-  runCommand: protectedProcedure
+  runCommand: adminProcedure
     .input(z.object({ command: z.string().min(1), timeoutMs: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -330,7 +330,7 @@ export const blackeyeRouter = router({
     }),
 
   /** List available phishing templates */
-  listTemplates: protectedProcedure.query(async ({ ctx }) => {
+  listTemplates: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -376,7 +376,7 @@ export const blackeyeRouter = router({
   }),
 
   // ── Backward-compatible aliases for existing BlackEyePage UI ────────────────
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(z.object({ host: z.string().optional(), port: z.number().default(22).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -390,13 +390,13 @@ export const blackeyeRouter = router({
       } catch (e: any) { return { success: false, message: e.message }; }
     }),
 
-  saveConnection: protectedProcedure
+  saveConnection: adminProcedure
     .input(z.object({ host: z.string().optional(), port: z.number().default(22).optional(), username: z.string().optional(), password: z.string().optional(), privateKey: z.string().optional() }).optional())
     .mutation(async ({ ctx }) => {
       return { success: true, message: "Connection managed via dedicated VPS nodes." };
     }),
 
-  getStatus: protectedProcedure.mutation(async ({ ctx }) => {
+  getStatus: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -413,7 +413,7 @@ export const blackeyeRouter = router({
     } catch (e: any) { return { running: false, installed: false, message: e.message, lastCommit: null, templateCount: 0 }; }
   }),
 
-  install: protectedProcedure.mutation(async ({ ctx }) => {
+  install: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -447,7 +447,7 @@ export const blackeyeRouter = router({
     }
   }),
 
-  launch: protectedProcedure
+  launch: adminProcedure
     .input(z.object({ template: z.string().optional(), port: z.number().default(80).optional(), customDomain: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -498,7 +498,7 @@ export const blackeyeRouter = router({
       };
     }),
 
-  stop: protectedProcedure.mutation(async ({ ctx }) => {
+  stop: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -509,7 +509,7 @@ export const blackeyeRouter = router({
     return { success: true, message: "BlackEye stopped." };
   }),
 
-  getCaptured: protectedProcedure.mutation(async ({ ctx }) => {
+  getCaptured: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -537,7 +537,7 @@ export const blackeyeRouter = router({
     return { data: out, captures };
   }),
 
-  getLogs: protectedProcedure
+  getLogs: adminProcedure
     .input(z.object({ lines: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
     const plan = await getUserPlan(ctx.user.id);
@@ -551,7 +551,7 @@ export const blackeyeRouter = router({
     return { logs: out, output: out };
   }),
 
-  update: protectedProcedure.mutation(async ({ ctx }) => {
+  update: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -562,7 +562,7 @@ export const blackeyeRouter = router({
   }),
 
   /** Clear all captured credentials */
-  clearCaptures: protectedProcedure.mutation(async ({ ctx }) => {
+  clearCaptures: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -573,7 +573,7 @@ export const blackeyeRouter = router({
   }),
 
   /** Export captures as structured JSON with metadata */
-  exportCaptures: protectedProcedure.mutation(async ({ ctx }) => {
+  exportCaptures: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -597,7 +597,7 @@ export const blackeyeRouter = router({
   }),
 
   /** List all currently running PHP phishing servers on the node */
-  getActiveServers: protectedProcedure.mutation(async ({ ctx }) => {
+  getActiveServers: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceAdminFeature(ctx.user.role, "BlackEye");
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
@@ -621,7 +621,7 @@ export const blackeyeRouter = router({
   }),
 
   /** Stop a specific template server by port */
-  stopTemplate: protectedProcedure
+  stopTemplate: adminProcedure
     .input(z.object({ port: z.number().min(1).max(65535) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);

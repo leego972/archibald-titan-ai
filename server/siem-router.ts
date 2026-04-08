@@ -6,7 +6,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
 import axios from "axios";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
@@ -163,7 +163,7 @@ export async function dispatchSiemEvent(
 // ─── tRPC Router ─────────────────────────────────────────────────────────────
 export const siemRouter = router({
   // ── List configs ──────────────────────────────────────────────────────────
-  getConfigs: protectedProcedure.query(({ ctx }) => {
+  getConfigs: adminProcedure.query(({ ctx }) => {
     const configs = siemConfigs.filter((c) => c.userId === (ctx.user.id as number)).map((c) => ({
       ...c,
       apiKey: c.apiKey ? "••••••••" : undefined, // mask key
@@ -172,7 +172,7 @@ export const siemRouter = router({
   }),
 
   // ── Create config ─────────────────────────────────────────────────────────
-  createConfig: protectedProcedure
+  createConfig: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -210,7 +210,7 @@ export const siemRouter = router({
     }),
 
   // ── Update config ─────────────────────────────────────────────────────────
-  updateConfig: protectedProcedure
+  updateConfig: adminProcedure
     .input(
       z.object({
         configId: z.string(),
@@ -235,7 +235,7 @@ export const siemRouter = router({
     }),
 
   // ── Delete config ─────────────────────────────────────────────────────────
-  deleteConfig: protectedProcedure
+  deleteConfig: adminProcedure
     .input(z.object({ configId: z.string() }))
     .mutation(({ input, ctx }) => {
       const idx = siemConfigs.findIndex((c) => c.id === input.configId && c.userId === (ctx.user.id as number));
@@ -245,7 +245,7 @@ export const siemRouter = router({
     }),
 
   // ── Test a config ─────────────────────────────────────────────────────────
-  testConfig: protectedProcedure
+  testConfig: adminProcedure
     .input(z.object({ configId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       // ── Plan gate ──
@@ -275,7 +275,7 @@ export const siemRouter = router({
     }),
 
   // ── Get event log ─────────────────────────────────────────────────────────
-  getEventLog: protectedProcedure
+  getEventLog: adminProcedure
     .input(z.object({ limit: z.number().min(1).max(200).default(50), configId: z.string().optional() }))
     .query(({ ctx, input }) => {
       let events = siemEventLog.filter((e) => e.userId === (ctx.user.id as number));
@@ -284,7 +284,7 @@ export const siemRouter = router({
     }),
 
   // ── Get available event types ─────────────────────────────────────────────
-  getEventTypes: protectedProcedure.query(() => {
+  getEventTypes: adminProcedure.query(() => {
     return {
       eventTypes: [
         { id: "security.scan.completed", label: "Security Scan Completed", category: "Security" },
@@ -306,7 +306,7 @@ export const siemRouter = router({
   }),
 
   // ── Get stats ─────────────────────────────────────────────────────────────
-  getStats: protectedProcedure.query(({ ctx }) => {
+  getStats: adminProcedure.query(({ ctx }) => {
     const userConfigs = siemConfigs.filter((c) => c.userId === (ctx.user.id as number));
     const userEvents = siemEventLog.filter((e) => e.userId === (ctx.user.id as number));
     const totalSent = userEvents.filter((e) => e.status === "sent").length;

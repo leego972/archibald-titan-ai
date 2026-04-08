@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { publicProcedure, router,  } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { releases } from "../drizzle/schema";
@@ -147,7 +147,7 @@ export const releasesRouter = router({
   // ─── Admin Endpoints ──────────────────────────────────────────────
 
   /** Create a new release (admin only) */
-  create: protectedProcedure
+  create: adminProcedure
     .input(
       z.object({
         version: z.string().min(1),
@@ -189,7 +189,7 @@ export const releasesRouter = router({
     }),
 
   /** Update a release (admin only) */
-  update: protectedProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.number(),
@@ -229,7 +229,7 @@ export const releasesRouter = router({
     }),
 
   /** Delete a release (admin only) */
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (!isAdminRole(ctx.user.role)) {
@@ -244,7 +244,7 @@ export const releasesRouter = router({
     }),
 
   /** Admin: get full release list with download URLs visible */
-  adminList: protectedProcedure.query(async ({ ctx }) => {
+  adminList: adminProcedure.query(async ({ ctx }) => {
     if (!isAdminRole(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
     }

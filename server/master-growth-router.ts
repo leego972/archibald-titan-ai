@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc.js";
+import { router, adminProcedure } from "./_core/trpc.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
@@ -27,7 +27,7 @@ const log = createLogger("MasterGrowthRouter");
 
 export const masterGrowthRouter = router({
   // Run a full growth cycle immediately
-  runCycle: protectedProcedure.mutation(async ({ ctx }) => {
+  runCycle: adminProcedure.mutation(async ({ ctx }) => {
     const creditCheck = await checkCredits(ctx.user.id, "advertising_run");
     if (!creditCheck.allowed) {
       throw new Error(`Insufficient credits for master growth cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
@@ -42,59 +42,59 @@ export const masterGrowthRouter = router({
   }),
 
   // Start the daily scheduler
-  startOrchestrator: protectedProcedure.mutation(() => {
+  startOrchestrator: adminProcedure.mutation(() => {
     startMasterOrchestrator();
     return { success: true, message: "Master Growth Orchestrator started — daily cycle at 6:00 AM" };
   }),
 
   // Stop the scheduler
-  stopOrchestrator: protectedProcedure.mutation(() => {
+  stopOrchestrator: adminProcedure.mutation(() => {
     stopMasterOrchestrator();
     return { success: true, message: "Master Growth Orchestrator stopped" };
   }),
 
   // Get orchestrator status
-  getStatus: protectedProcedure.query(() => {
+  getStatus: adminProcedure.query(() => {
     return getMasterOrchestratorStatus();
   }),
 
   // Get the latest weekly growth report
-  getLatestReport: protectedProcedure.query(() => {
+  getLatestReport: adminProcedure.query(() => {
     return getLatestGrowthReport();
   }),
 
   // Get all historical reports (last 52 weeks)
-  getReportHistory: protectedProcedure.query(() => {
+  getReportHistory: adminProcedure.query(() => {
     return getGrowthReportHistory();
   }),
 
   // Get all anomaly alerts
-  getAnomalies: protectedProcedure.query(() => {
+  getAnomalies: adminProcedure.query(() => {
     return getAnomalyLog();
   }),
 
   // Get metrics history for charts
-  getMetricsHistory: protectedProcedure.query(() => {
+  getMetricsHistory: adminProcedure.query(() => {
     return getMetricsHistory();
   }),
 
   // Get the latest growth context (keyword signals, briefs, channels)
-  getLatestContext: protectedProcedure.query(() => {
+  getLatestContext: adminProcedure.query(() => {
     return getLatestContext();
   }),
 
   // Get cross-system insights from the latest cycle
-  getCrossSystemInsights: protectedProcedure.query(() => {
+  getCrossSystemInsights: adminProcedure.query(() => {
     return getCrossSystemInsights();
   }),
 
   // Get next cycle adjustments
-  getNextCycleAdjustments: protectedProcedure.query(() => {
+  getNextCycleAdjustments: adminProcedure.query(() => {
     return getNextCycleAdjustments();
   }),
 
   // Resolve an anomaly
-  resolveAnomaly: protectedProcedure
+  resolveAnomaly: adminProcedure
     .input(z.object({ anomalyId: z.string() }))
     .mutation(({ input }) => {
       const resolved = resolveAnomaly(input.anomalyId);

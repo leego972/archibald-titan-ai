@@ -11,7 +11,7 @@
  * - Full session lifecycle management exposed via tRPC
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "./_core/trpc";
+import { , router } from "./_core/trpc";
 import { getDb } from "./db";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
@@ -108,7 +108,7 @@ export const linkenSphereRouter = router({
   /**
    * Save the Linken Sphere API port for this user.
    */
-  savePort: protectedProcedure
+  savePort: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535) }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
@@ -120,7 +120,7 @@ export const linkenSphereRouter = router({
   /**
    * Get the saved port for this user.
    */
-  getPort: protectedProcedure.query(async ({ ctx }) => {
+  getPort: adminProcedure.query(async ({ ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
     const port = await getLsPort(ctx.user.id);
     return { port };
@@ -129,7 +129,7 @@ export const linkenSphereRouter = router({
   /**
    * Test connectivity to Linken Sphere.
    */
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
@@ -148,7 +148,7 @@ export const linkenSphereRouter = router({
   /**
    * Sign in to Linken Sphere.
    */
-  signIn: protectedProcedure
+  signIn: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       email: z.string().email(),
@@ -170,7 +170,7 @@ export const linkenSphereRouter = router({
   /**
    * Sign out of Linken Sphere.
    */
-  signOut: protectedProcedure
+  signOut: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .mutation(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
@@ -183,7 +183,7 @@ export const linkenSphereRouter = router({
   /**
    * List all sessions.
    */
-  getSessions: protectedProcedure
+  getSessions: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       status: z.string().optional(),
@@ -207,7 +207,7 @@ export const linkenSphereRouter = router({
   /**
    * Get a single session by UUID.
    */
-  getSession: protectedProcedure
+  getSession: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       uuid: z.string().min(1),
@@ -222,7 +222,7 @@ export const linkenSphereRouter = router({
    * Create quick sessions.
    * Deducts credits: linken_quick_create per session.
    */
-  createQuickSessions: protectedProcedure
+  createQuickSessions: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       count: z.number().int().min(1).max(50).default(1),
@@ -247,7 +247,7 @@ export const linkenSphereRouter = router({
    * Start a session.
    * Deducts credits: linken_session_start.
    */
-  startSession: protectedProcedure
+  startSession: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       uuid: z.string().min(1),
@@ -275,7 +275,7 @@ export const linkenSphereRouter = router({
   /**
    * Stop a session.
    */
-  stopSession: protectedProcedure
+  stopSession: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       uuid: z.string().min(1),
@@ -291,7 +291,7 @@ export const linkenSphereRouter = router({
   /**
    * Rename a session.
    */
-  setSessionName: protectedProcedure
+  setSessionName: adminProcedure
     .input(z.object({
       port: z.number().int().min(1024).max(65535).optional(),
       uuid: z.string().min(1),
@@ -311,7 +311,7 @@ export const linkenSphereRouter = router({
   /**
    * Get all providers.
    */
-  getProviders: protectedProcedure
+  getProviders: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
@@ -322,7 +322,7 @@ export const linkenSphereRouter = router({
   /**
    * Get all desktops.
    */
-  getDesktops: protectedProcedure
+  getDesktops: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");
@@ -333,7 +333,7 @@ export const linkenSphereRouter = router({
   /**
    * Get app info (version, build, etc.).
    */
-  getAppInfo: protectedProcedure
+  getAppInfo: adminProcedure
     .input(z.object({ port: z.number().int().min(1024).max(65535).optional() }))
     .query(async ({ input, ctx }) => {
     enforceAdminFeature(ctx.user.role, "Linken Sphere");

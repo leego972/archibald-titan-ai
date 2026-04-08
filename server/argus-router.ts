@@ -15,7 +15,7 @@
  * Results are streamed back and parsed into structured JSON.
  */
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
@@ -178,7 +178,7 @@ export const ARGUS_MODULES = [
 export const argusRouter = router({
 
   // ── Setup: Test SSH connection ────────────────────────────────
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(z.object({
       host: z.string().min(1),
       port: z.number().default(22),
@@ -197,7 +197,7 @@ export const argusRouter = router({
     }),
 
   // ── Setup: Save SSH credentials ───────────────────────────────
-  saveConnection: protectedProcedure
+  saveConnection: adminProcedure
     .input(z.object({
       host: z.string().min(1),
       port: z.number().default(22),
@@ -224,7 +224,7 @@ export const argusRouter = router({
     }),
 
   // ── Setup: Install Argus on VPS ───────────────────────────────
-  install: protectedProcedure
+  install: adminProcedure
     .input(z.object({ method: z.enum(["pip", "git", "docker"]).default("git") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -258,7 +258,7 @@ export const argusRouter = router({
     }),
 
   // ── Setup: Configure API keys ─────────────────────────────────
-  setApiKeys: protectedProcedure
+  setApiKeys: adminProcedure
     .input(z.object({
       virustotalKey: z.string().optional(),
       shodanKey: z.string().optional(),
@@ -286,7 +286,7 @@ export const argusRouter = router({
     }),
 
   // ── Modules: Get module catalogue ────────────────────────────
-  getModules: protectedProcedure
+  getModules: adminProcedure
     .input(z.object({ category: z.enum(["all", "network", "web", "security"]).default("all") }))
     .query(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -296,7 +296,7 @@ export const argusRouter = router({
     }),
 
   // ── Scan: Run a single Argus module ──────────────────────────
-  runModule: protectedProcedure
+  runModule: adminProcedure
     .input(z.object({
       moduleId: z.number().min(1).max(135),
       target: z.string().min(1),
@@ -340,7 +340,7 @@ export const argusRouter = router({
     }),
 
   // ── Scan: Run multiple modules (batch, up to 30, optional parallel) ───
-  runBatch: protectedProcedure
+  runBatch: adminProcedure
     .input(z.object({
       moduleIds: z.array(z.number()).min(1).max(30),
       target: z.string().min(1),
@@ -376,7 +376,7 @@ export const argusRouter = router({
     }),
 
   // ── Scan: Run a full category scan ────────────────────────────
-  runCategory: protectedProcedure
+  runCategory: adminProcedure
     .input(z.object({
       category: z.enum(["infra", "web", "security"]),
       target: z.string().min(1),
@@ -395,7 +395,7 @@ export const argusRouter = router({
     }),
 
   // ── Scan: Quick recon (top 5 essential modules) ───────────────
-  quickRecon: protectedProcedure
+  quickRecon: adminProcedure
     .input(z.object({
       target: z.string().min(1),
       depth: z.enum(["fast", "standard", "deep"]).optional().default("standard"),
@@ -431,7 +431,7 @@ export const argusRouter = router({
     }),
 
    // ── Scan: Full recon — all 135 modules in parallel batches ───────
-  fullRecon: protectedProcedure
+  fullRecon: adminProcedure
     .input(z.object({
       target: z.string().min(1),
       batchSize: z.number().min(1).max(20).optional().default(10),
@@ -474,7 +474,7 @@ export const argusRouter = router({
     }),
 
   // ── Status: Check Argus installation ─────────────────────
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Argus");
     const ssh = await getSshConfig(ctx.user.id);
@@ -497,7 +497,7 @@ export const argusRouter = router({
   }),
 
   // ── Update: Pull latest Argus ─────────────────────────────────
-  update: protectedProcedure.mutation(async ({ ctx }) => {
+  update: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Argus");
     const ssh = await getSshConfig(ctx.user.id);

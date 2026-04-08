@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getTitanServerConfig, execSSHCommand } from "./titan-server";
 
@@ -8,7 +8,7 @@ export const titanServerRouter = router({
    * Check if the Titan Server is configured in environment variables.
    * Only admins can see the full details, regular users just get a boolean.
    */
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const config = getTitanServerConfig();
     const isConfigured = config !== null;
     
@@ -29,7 +29,7 @@ export const titanServerRouter = router({
   /**
    * Test connection to the Titan Server (Admins only)
    */
-  testConnection: protectedProcedure.mutation(async ({ ctx }) => {
+  testConnection: adminProcedure.mutation(async ({ ctx }) => {
     if (ctx.user.role !== "admin" && ctx.user.role !== "head_admin") {
       throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
     }

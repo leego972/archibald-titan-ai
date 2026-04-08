@@ -13,7 +13,7 @@
  * All HTTP requests are proxied server-side to avoid CORS issues.
  */
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { consumeCredits } from "./credit-service";
 import { getUserPlan, enforceFeature, enforceAdminFeature } from "./subscription-gate";
@@ -198,7 +198,7 @@ const PATH_TRAVERSAL_PAYLOADS = [
 export const cybermcpRouter = router({
 
   // ── Authentication: Set & test basic auth ──────────────────────
-  testBasicAuth: protectedProcedure
+  testBasicAuth: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       username: z.string(),
@@ -222,7 +222,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Authentication: Token / Bearer auth ───────────────────────
-  testTokenAuth: protectedProcedure
+  testTokenAuth: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       token: z.string(),
@@ -246,7 +246,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Authentication: JWT vulnerability check ───────────────────
-  checkJwtVulnerability: protectedProcedure
+  checkJwtVulnerability: adminProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ ctx, input }) => {
     enforceAdminFeature(ctx.user.role, "CyberMCP");
@@ -266,7 +266,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Authentication: Auth bypass check ─────────────────────────
-  checkAuthBypass: protectedProcedure
+  checkAuthBypass: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
@@ -311,7 +311,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Injection: SQL injection check ────────────────────────────
-  checkSqlInjection: protectedProcedure
+  checkSqlInjection: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
@@ -346,7 +346,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Injection: XSS check ──────────────────────────────────────
-  checkXss: protectedProcedure
+  checkXss: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET",),
@@ -380,7 +380,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Data Protection: Sensitive data exposure ──────────────────
-  checkSensitiveData: protectedProcedure
+  checkSensitiveData: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
@@ -412,7 +412,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Data Protection: Path traversal check ─────────────────────
-  checkPathTraversal: protectedProcedure
+  checkPathTraversal: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       paramName: z.string().default("file"),
@@ -442,7 +442,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Infrastructure: Rate limit check ──────────────────────────
-  checkRateLimit: protectedProcedure
+  checkRateLimit: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),
@@ -486,7 +486,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Infrastructure: Security headers check ────────────────────
-  checkSecurityHeaders: protectedProcedure
+  checkSecurityHeaders: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       includeAuth: z.boolean().default(false),
@@ -522,7 +522,7 @@ export const cybermcpRouter = router({
     }),
 
   // ── Full Scan: Run all checks against a target ─────────────────
-  runFullScan: protectedProcedure
+  runFullScan: adminProcedure
     .input(z.object({
       endpoint: z.string().url(),
       method: z.enum(["GET", "POST"]).default("GET"),

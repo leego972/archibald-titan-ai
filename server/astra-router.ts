@@ -15,7 +15,7 @@
  * and also supports direct HTTP mode when Astra is network-accessible.
  */
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
 import { getDb } from "./db";
@@ -155,7 +155,7 @@ export async function runAstraSecurityHeadersCheck(userId: number, targetUrl: st
 export const astraRouter = router({
 
   // ── Server: Test SSH connection and check Astra status ─────────
-  testConnection: protectedProcedure
+  testConnection: adminProcedure
     .input(z.object({
       host: z.string().min(1),
       port: z.number().default(22),
@@ -176,7 +176,7 @@ export const astraRouter = router({
     }),
 
   // ── Server: Save SSH credentials ──────────────────────────────
-  saveConnection: protectedProcedure
+  saveConnection: adminProcedure
     .input(z.object({
       host: z.string().min(1),
       port: z.number().default(22),
@@ -204,7 +204,7 @@ export const astraRouter = router({
     }),
 
   // ── Server: Install Astra on VPS ──────────────────────────────
-  install: protectedProcedure.mutation(async ({ ctx }) => {
+  install: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -221,7 +221,7 @@ export const astraRouter = router({
   }),
 
   // ── Server: Start Astra service ───────────────────────────────
-  start: protectedProcedure.mutation(async ({ ctx }) => {
+  start: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -244,7 +244,7 @@ export const astraRouter = router({
   }),
 
   // ── Server: Stop Astra service ────────────────────────────────
-  stop: protectedProcedure.mutation(async ({ ctx }) => {
+  stop: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -253,7 +253,7 @@ export const astraRouter = router({
   }),
 
   // ── Server: Get Astra logs ─────────────────────────────────────
-  getLogs: protectedProcedure
+  getLogs: adminProcedure
     .input(z.object({ lines: z.number().min(10).max(200).default(50), logType: z.enum(["api", "celery"]).default("api") }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -265,7 +265,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: Start a new API scan ────────────────────────────────
-  startScan: protectedProcedure
+  startScan: adminProcedure
     .input(z.object({
       appname: z.string().min(1).max(100),
       url: z.string().url(),
@@ -315,7 +315,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: List all scan IDs ───────────────────────────────────
-  listScans: protectedProcedure.query(async ({ ctx }) => {
+  listScans: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -324,7 +324,7 @@ export const astraRouter = router({
   }),
 
   // ── Scan: Get alerts/vulnerabilities for a scan ───────────────
-  getAlerts: protectedProcedure
+  getAlerts: adminProcedure
     .input(z.object({ scanId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -345,7 +345,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: Start a Postman collection scan ─────────────────────
-  startPostmanScan: protectedProcedure
+  startPostmanScan: adminProcedure
     .input(z.object({
       collectionUrl: z.string().url().describe("Public URL of the Postman collection JSON"),
       appname: z.string().min(1).max(100),
@@ -374,7 +374,7 @@ export const astraRouter = router({
     }),
 
   // ── Status: Check if Astra is running ─────────────────────────
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -399,7 +399,7 @@ export const astraRouter = router({
   }),
 
   //  // ── Update: Pull latest Astra from GitHub ─────────────────
-  update: protectedProcedure.mutation(async ({ ctx }) => {
+  update: adminProcedure.mutation(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -408,7 +408,7 @@ export const astraRouter = router({
   }),
 
   // ── Scan: Delete a scan by ID ───────────────────────────────────
-  deleteScan: protectedProcedure
+  deleteScan: adminProcedure
     .input(z.object({ scanId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
@@ -419,7 +419,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: Get vulnerability summary across all scans ─────────────────
-  getVulnSummary: protectedProcedure.query(async ({ ctx }) => {
+  getVulnSummary: adminProcedure.query(async ({ ctx }) => {
     const plan = await getUserPlan(ctx.user.id);
     enforceFeature(plan.planId, "security_tools", "Astra");
     const ssh = await getSshConfig(ctx.user.id);
@@ -444,7 +444,7 @@ export const astraRouter = router({
   }),
 
   // ── Scan: Run Gobuster directory fuzzer on target ───────────────────
-  startFuzzer: protectedProcedure
+  startFuzzer: adminProcedure
     .input(z.object({
       targetUrl: z.string().url(),
       wordlist: z.string().optional().default("/usr/share/wordlists/dirb/common.txt"),
@@ -462,7 +462,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: Run Wfuzz parameter fuzzer on target ─────────────────────
-  startWfuzz: protectedProcedure
+  startWfuzz: adminProcedure
     .input(z.object({
       targetUrl: z.string().url(),
       wordlist: z.string().optional().default("/usr/share/wordlists/dirb/common.txt"),
@@ -480,7 +480,7 @@ export const astraRouter = router({
     }),
 
   // ── Scan: Export scan report as structured text ───────────────────
-  exportReport: protectedProcedure
+  exportReport: adminProcedure
     .input(z.object({ scanId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
