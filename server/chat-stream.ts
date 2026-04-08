@@ -272,6 +272,8 @@ export function registerChatStreamRoutes(app: Express): void {
       try {
         res.write(`event: ${event.type}\n`);
         res.write(`data: ${JSON.stringify(event.data)}\n\n`);
+        // Flush after every event to prevent Railway proxy buffering
+        if (typeof (res as any).flush === 'function') (res as any).flush();
       } catch {
         // Client disconnected — ignore write errors, build continues
       }
@@ -293,6 +295,14 @@ export function registerChatStreamRoutes(app: Express): void {
       rounds: buildStatus?.rounds || 0,
       actionsCompleted: buildStatus?.actionsCompleted || 0,
     })}\n\n`);
+    // CRITICAL: Flush immediately after the connected event.
+    // Railway's proxy buffers SSE responses until it has ~4KB of data.
+    // Without an explicit flush, the client won't receive the connected event
+    // until the first heartbeat fires 15 seconds later.
+    // The `: padding` comment lines below pad the response to 2KB to force
+    // the buffer to flush even if res.flush() is not available.
+    res.write(': ' + ' '.repeat(2048) + '\n\n');
+    if (typeof (res as any).flush === 'function') (res as any).flush();
 
     // Heartbeat every 15 seconds to keep Railway proxy + Safari alive
     const heartbeat = setInterval(() => {

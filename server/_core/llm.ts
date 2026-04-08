@@ -683,6 +683,13 @@ async function _invokeGeneral(
     return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
   }
 
+  // User personal API key 429: fall back to Venice (if available) instead of retrying the same key.
+  // This prevents admin users with rate-limited personal keys from being stuck in retry loops.
+  if (response.status === 429 && usingUserKey && VENICE_API_KEY && attempt === 0) {
+    log.warn(`[LLM] ${systemTag}: User personal API key rate-limited (429), falling back to Venice shared tier`);
+    return _invokeGeneral({ ...params, userApiKey: undefined }, priority, 0);
+  }
+
   // OpenAI 429: retry with backoff, then nano fallback, then Gemini emergency
   if (response.status === 429) {
     if (keyHandle) reportRateLimit(keyHandle.index, keyHandle.envVar);
