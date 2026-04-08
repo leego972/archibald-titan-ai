@@ -628,7 +628,7 @@ async function _invokeGeneral(
   // Venice gets a tighter timeout so it fails fast and falls back to OpenAI.
   // OpenAI/Gemini keep the full chat timeout for long-running builds.
   const fetchTimeoutMs = useSharedVenice
-    ? (priority === "chat" ? 45_000 : 60_000)   // Venice: 45s chat, 60s background
+    ? (priority === "chat" ? 90_000 : 120_000)  // Venice: 90s chat, 120s background
     : (priority === "chat" ? 300_000 : 120_000); // OpenAI/Gemini: 5min chat, 2min bg
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
