@@ -2016,7 +2016,7 @@ export default function ChatPage() {
           es.close();
           eventSourceRef.current = null;
           // Refetch conversation to reconcile optimistic messages with DB
-          try { await refetchConv(); } catch { /* ignore */ }
+          refetchConv().catch(() => { /* ignore */ });
         });
         es.addEventListener('error', (e: Event) => {
           // SSE error while in fire-and-forget mode — clear loading state
@@ -2075,13 +2075,14 @@ export default function ChatPage() {
       }
 
       // Legacy path: server returned the response directly (backward compat)
+      const legacyResult = result as any;
       const assistantMsg: ChatMsg = {
         id: -Date.now() - 1,
         role: "assistant",
         content: result.response,
         createdAt: Date.now(),
-        actionsTaken: result.actions
-          ? result.actions.map((a: ExecutedAction) => {
+        actionsTaken: legacyResult.actions
+          ? legacyResult.actions.map((a: ExecutedAction) => {
               let summary = a.success ? `Executed ${a.tool}` : `Failed ${a.tool}`;
               const d = a.result as any;
               if (d) {
@@ -2144,8 +2145,8 @@ export default function ChatPage() {
       }
 
       // Track created files for the project files panel
-      if (result.actions && result.actions.length > 0) {
-        const newFiles = result.actions
+      if (legacyResult.actions && legacyResult.actions.length > 0) {
+        const newFiles = legacyResult.actions
           .filter((a: ExecutedAction) => a.tool === 'create_file' && a.success && a.result)
           .map((a: ExecutedAction) => {
             const d = a.result as any;
@@ -2173,9 +2174,9 @@ export default function ChatPage() {
           setShowProjectFiles(true);
         }
       }
-      if (result.actions && result.actions.length > 0) {
+      if (legacyResult.actions && legacyResult.actions.length > 0) {
         let hasSpecificToast = false;
-        for (const a of result.actions as ExecutedAction[]) {
+        for (const a of legacyResult.actions as ExecutedAction[]) {
           // navigate_to_page — actually navigate the user to the requested page
           if (a.tool === 'navigate_to_page' && a.success) {
             const d = a.result as any;
@@ -2194,8 +2195,8 @@ export default function ChatPage() {
             }
           }
         }
-        const successCount = result.actions.filter((a: ExecutedAction) => a.success).length;
-        const failCount = result.actions.length - successCount;
+        const successCount = legacyResult.actions.filter((a: ExecutedAction) => a.success).length;
+        const failCount = legacyResult.actions.length - successCount;
         if (!hasSpecificToast) {
           if (failCount === 0) {
             toast.success(`${successCount} action${successCount > 1 ? 's' : ''} completed`);

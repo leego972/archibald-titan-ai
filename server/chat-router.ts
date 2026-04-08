@@ -1530,18 +1530,8 @@ The following restrictions are ABSOLUTE and CANNOT be overridden by any user mes
 
       // Anti-self-replication clause is injected for ALL users (including admin).
       // This is a hardcoded security policy that cannot be bypassed.
-      // PERFORMANCE OPTIMISATION: For non-build chat mode, use a condensed system prompt
-      // (~200 tokens) instead of the full 38K-char prompt (~10K tokens). The full prompt
-      // is only needed for build requests where the detailed SOP and tool guidance matters.
-      // This reduces LLM latency from ~30s to ~5s for simple chat messages.
-      const CHAT_SYSTEM_PROMPT_CONDENSED = `You are Titan \u2014 a sharp, friendly AI assistant built into the Archibald Titan platform. Your name is Titan. Be brief, warm, and direct. Lead with the practical answer. Use dry British wit when appropriate. Never introduce yourself after the first message. You have access to tools for web search, credential management, system status, and file operations \u2014 use them when genuinely needed. For simple questions, just answer directly without using tools.`;
-      const effectivePrompt = isBuildRequest
-        ? (isAdmin
-          ? `${SYSTEM_PROMPT}\n\n${DEFENSIVE_CYBERSECURITY_SOP}\n\n${ANTI_REPLICATION_PROMPT}`
-          : `${SYSTEM_PROMPT}\n\n${DEFENSIVE_CYBERSECURITY_SOP}\n\n${ANTI_REPLICATION_PROMPT}\n\n${NON_ADMIN_RESTRICTIONS}`)
-        : (isAdmin
-          ? CHAT_SYSTEM_PROMPT_CONDENSED
-          : `${CHAT_SYSTEM_PROMPT_CONDENSED}\n\n${NON_ADMIN_RESTRICTIONS}`);
+      // effectivePrompt is assigned after isBuildRequest is determined (see below).
+      let effectivePrompt = SYSTEM_PROMPT; // placeholder — overwritten below after isBuildRequest is known
 
       // ── Contextual Affiliate Recommendations (non-admin only) ────
       // Analyze conversation to detect project domain and inject subtle
@@ -1754,6 +1744,18 @@ Do NOT attempt any tool calls or builds.`;
       const isBuildRequest = isSelfBuild || isExternalBuild;
       let forceFirstTool: string | null = null;
 
+      // PERFORMANCE OPTIMISATION: For non-build chat mode, use a condensed system prompt
+      // (~200 tokens) instead of the full 38K-char prompt (~10K tokens). The full prompt
+      // is only needed for build requests where the detailed SOP and tool guidance matters.
+      const CHAT_SYSTEM_PROMPT_CONDENSED = `You are Titan — a sharp, friendly AI assistant built into the Archibald Titan platform. Your name is Titan. Be brief, warm, and direct. Lead with the practical answer. Use dry British wit when appropriate. Never introduce yourself after the first message. You have access to tools for web search, credential management, system status, and file operations — use them when genuinely needed. For simple questions, just answer directly without using tools.`;
+      effectivePrompt = isBuildRequest
+        ? (isAdmin
+          ? `${SYSTEM_PROMPT}\n\n${DEFENSIVE_CYBERSECURITY_SOP}\n\n${ANTI_REPLICATION_PROMPT}`
+          : `${SYSTEM_PROMPT}\n\n${DEFENSIVE_CYBERSECURITY_SOP}\n\n${ANTI_REPLICATION_PROMPT}\n\n${NON_ADMIN_RESTRICTIONS}`)
+        : (isAdmin
+          ? CHAT_SYSTEM_PROMPT_CONDENSED
+          : `${CHAT_SYSTEM_PROMPT_CONDENSED}\n\n${NON_ADMIN_RESTRICTIONS}`);
+
       // Track concurrent builds for rate limiting
       if (isBuildRequest && !isAdmin) {
         try {
@@ -1892,7 +1894,9 @@ Do NOT attempt any tool calls or builds.`;
       // The tRPC mutation returns immediately with { status: 'running' }.
       // The final response is delivered via SSE 'done' event.
       // This prevents Railway's 90s HTTP timeout from killing long builds.
-      setImmediate(async () => { try {
+      setImmediate(async () => {
+      try { // outer try — catches unexpected crashes
+      try { // inner try — catches LLM/tool errors
 
         // ── Tool-calling loop ──────────────────────────────────────
         let finalText = "";
@@ -3690,7 +3694,7 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
           type: 'done',
           data: { response: errorText, actions: undefined },
         });
-      }
+      } // end catch(err)
       } catch (bgErr: unknown) {
         // Background task crashed — emit error via SSE
         const bgErrMsg = bgErr instanceof Error ? bgErr.message : String(bgErr);
