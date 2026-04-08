@@ -1,9 +1,5 @@
 import { z } from "zod";
-<<<<<<< HEAD
 import { publicProcedure, router, adminProcedure } from "./_core/trpc";
-=======
-import { publicProcedure, adminProcedure, router } from "./_core/trpc";
->>>>>>> 44e38174a632bc820d35f1e2dc8d24aec0d4d15b
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { contactSubmissions } from "../drizzle/schema";
