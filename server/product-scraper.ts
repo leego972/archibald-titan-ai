@@ -360,7 +360,7 @@ function extractSiteMetadata(html: string, url: string): CatalogResult["siteMeta
   if (logo && logo.startsWith("/")) logo = new URL(url).origin + logo;
 
   // Phone
-  const phoneMatch = html.match(/(?:tel:|phone|call)[^"']*["']?\s*:?\s*([\+\d\s\-\(\)]{7,20})/i)
+  const phoneMatch = html.match(/(?:tel:|phone|call)[^"']*["']?\s*:?\s*([+\d\s-()]{7,20})/i)
     || html.match(/href=["']tel:([^"']+)["']/i);
 
   // Email

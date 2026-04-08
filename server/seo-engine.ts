@@ -963,6 +963,7 @@ export async function optimizeBlogPostSeo(
   // Generate optimized meta tags with LLM
   let metaTitle = `${title} | ${SITE_NAME}`;
   let metaDescription = excerpt;
+  // eslint-disable-next-line no-useless-assignment
   let keywords: string[] = [];
 
   try {
@@ -1437,9 +1438,9 @@ export async function analyzeSeoHealth(): Promise<SeoScore> {
   let keywordsScore = 100;
   let structuredDataScore = 100;
   let technicalScore = 100;
-  let contentScore = 100;
+  const contentScore = 100;
   let internalLinkScore = 100;
-  let mobileScore = 100;
+  const mobileScore = 100;
 
   // ── Title checks ──
   for (const page of PUBLIC_PAGES) {

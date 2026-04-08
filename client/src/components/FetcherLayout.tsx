@@ -91,10 +91,10 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
     {
       title: "Security",
       items: [
-        { icon: ShieldCheck, label: "Astra Scanner", path: "/astra", isCyber: true },
-        { icon: Search, label: "Argus OSINT", path: "/argus", isCyber: true },
+        { icon: ShieldCheck, label: "Astra Scanner", path: "/astra", isCyber: true, adminOnly: true },
+        { icon: Search, label: "Argus OSINT", path: "/argus", isCyber: true, adminOnly: true },
         { icon: ShieldAlert, label: "Leak Scanner", path: "/fetcher/leak-scanner", isCyber: true },
-        { icon: Network, label: "Attack Graph", path: "/attack-graph", isCyber: true },
+        { icon: Network, label: "Attack Graph", path: "/attack-graph", isCyber: true, adminOnly: true },
       ],
     },
     {

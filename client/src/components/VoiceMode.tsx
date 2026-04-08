@@ -107,7 +107,7 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
     if (standbyTimer.current) clearTimeout(standbyTimer.current);
     standbyTimer.current = setTimeout(() => {
       if (phaseRef.current === "active") {
-        enterStandby(); // eslint-disable-line
+        enterStandby();  
       }
     }, STANDBY_TIMEOUT);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -351,7 +351,7 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
       }
     };
     try { sr.start(); } catch { /* ignore */ }
-  }, [playChime, resetStandbyTimer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [playChime, resetStandbyTimer]);  
 
   // ── Enable / Disable ──────────────────────────────────────────────────────────
   const setEnabled = useCallback(async (v: boolean) => {
@@ -361,12 +361,12 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
       if (vadFrameRef.current)    { cancelAnimationFrame(vadFrameRef.current); vadFrameRef.current = null; }
       if (standbyTimer.current)   { clearTimeout(standbyTimer.current); standbyTimer.current = null; }
       if (maxRecordTimer.current) { clearTimeout(maxRecordTimer.current); maxRecordTimer.current = null; }
-      if (srRef.current)          { try { srRef.current.stop(); } catch {} srRef.current = null; }
+      if (srRef.current)          { try { srRef.current.stop(); } catch { /* ignore */ } srRef.current = null; }
       if (mediaRecorderRef.current?.state !== "inactive") {
-        try { mediaRecorderRef.current?.stop(); } catch {}
+        try { mediaRecorderRef.current?.stop(); } catch { /* ignore */ }
       }
       if (streamRef.current)      { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-      if (audioCtxRef.current)    { try { audioCtxRef.current.close(); } catch {} audioCtxRef.current = null; }
+      if (audioCtxRef.current)    { try { audioCtxRef.current.close(); } catch { /* ignore */ } audioCtxRef.current = null; }
       if (audioRef.current)       { audioRef.current.pause(); audioRef.current = null; }
       setPhase("off");
       setTranscript("");
@@ -420,9 +420,9 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
       if (vadFrameRef.current)    cancelAnimationFrame(vadFrameRef.current);
       if (standbyTimer.current)   clearTimeout(standbyTimer.current);
       if (maxRecordTimer.current) clearTimeout(maxRecordTimer.current);
-      if (srRef.current)          { try { srRef.current.stop(); } catch {} }
+      if (srRef.current)          { try { srRef.current.stop(); } catch { /* ignore */ } }
       if (streamRef.current)      streamRef.current.getTracks().forEach(t => t.stop());
-      if (audioCtxRef.current)    { try { audioCtxRef.current.close(); } catch {} }
+      if (audioCtxRef.current)    { try { audioCtxRef.current.close(); } catch { /* ignore */ } }
     };
   }, []);
 

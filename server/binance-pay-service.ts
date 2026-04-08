@@ -202,7 +202,7 @@ export async function createCryptoPaymentOrder(
     return result;
   } catch (error: unknown) {
     log.error("Binance Pay API call failed:", { error: String(error) });
-    throw new Error(`Failed to create crypto payment: ${getErrorMessage(error)}`);
+    throw new Error(`Failed to create crypto payment: ${getErrorMessage(error)}`, { cause: error });
   }
 }
 
@@ -231,7 +231,7 @@ export async function queryOrderStatus(merchantTradeNo: string): Promise<any> {
     return await response.json();
   } catch (error: unknown) {
     log.error("Binance Pay query failed:", { error: String(error) });
-    throw new Error(`Failed to query order: ${getErrorMessage(error)}`);
+    throw new Error(`Failed to query order: ${getErrorMessage(error)}`, { cause: error });
   }
 }
 

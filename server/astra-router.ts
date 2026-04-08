@@ -438,7 +438,7 @@ export const astraRouter = router({
           else if (sev === 'low') low++;
           else info++;
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
     return { critical, high, medium, low, info, totalScans: scans.length };
   }),
@@ -455,7 +455,7 @@ export const astraRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
       const ssh = await getSshConfig(ctx.user.id);
-      try { await consumeCredits(ctx.user.id, "astra_scan", `Fuzzer: ${input.targetUrl}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "astra_scan", `Fuzzer: ${input.targetUrl}`); } catch { /* ignore */ }
       const cmd = `gobuster dir -u '${input.targetUrl}' -w '${input.wordlist}' -x '${input.extensions}' -t ${input.threads} --no-error 2>&1 | head -200`;
       const output = await execSSHCommand(ssh, cmd, 120000);
       return { success: true, output, target: input.targetUrl };
@@ -473,7 +473,7 @@ export const astraRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
       const ssh = await getSshConfig(ctx.user.id);
-      try { await consumeCredits(ctx.user.id, "astra_scan", `Wfuzz: ${input.targetUrl}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "astra_scan", `Wfuzz: ${input.targetUrl}`); } catch { /* ignore */ }
       const cmd = `wfuzz -c -w '${input.wordlist}' --hc ${input.filterCode} -t ${input.threads} '${input.targetUrl}/FUZZ' 2>&1 | head -200`;
       const output = await execSSHCommand(ssh, cmd, 120000);
       return { success: true, output, target: input.targetUrl };

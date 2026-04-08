@@ -1413,7 +1413,7 @@ export async function refreshGrantsFromAPIs(): Promise<{
   sources: { name: string; count: number }[];
 }> {
   const sources: { name: string; count: number }[] = [];
-  let allGrants: DiscoveredGrant[] = [];
+  const allGrants: DiscoveredGrant[] = [];
 
   // 1. Fetch live US grants from Grants.gov API
   try {
@@ -1573,7 +1573,7 @@ export async function refreshGrantsForCountry(
   _industryFilter?: string
 ): Promise<{ totalDiscovered: number; totalUpdated: number }> {
   const getter = COUNTRY_MAP[countryCode.toUpperCase()];
-  let grants: DiscoveredGrant[] = [];
+  const grants: DiscoveredGrant[] = [];
 
   if (countryCode.toUpperCase() === "US") {
     // Also fetch live grants from Grants.gov API

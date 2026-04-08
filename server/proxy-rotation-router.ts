@@ -199,7 +199,6 @@ async function testProxy(proxy: RotationProxy): Promise<{ healthy: boolean; late
     const timeout = setTimeout(() => controller.abort(), 12000);
     const res = await fetch("https://api.ipify.org?format=json", {
       signal: controller.signal,
-      // @ts-ignore
       agent,
     } as any);
     clearTimeout(timeout);

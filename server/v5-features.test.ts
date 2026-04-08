@@ -251,7 +251,7 @@ describe("Webhooks", () => {
     });
 
     it("should support active/paused toggle", () => {
-      let hook = { active: true };
+      const hook = { active: true };
       expect(hook.active).toBe(true);
       hook.active = false;
       expect(hook.active).toBe(false);

@@ -82,6 +82,16 @@ export function registerBinancePayWebhook(app: Express): void {
             return;
           }
 
+          // Idempotency: check if already processed
+          const [existingPayment] = await db.select({ status: cryptoPayments.status })
+            .from(cryptoPayments)
+            .where(eq(cryptoPayments.merchantTradeNo, merchantTradeNo))
+            .limit(1);
+          if (existingPayment?.status === "completed") {
+            log.info(`[BinancePay Webhook] Idempotency skip: ${merchantTradeNo} already completed`);
+            res.json({ returnCode: "SUCCESS", returnMessage: null });
+            return;
+          }
           // Update crypto payment record
           await db.update(cryptoPayments)
             .set({

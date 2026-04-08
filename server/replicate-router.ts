@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, adminProcedure } from "./_core/trpc";
 import { canUseCloneWebsite, enforceAdminFeature } from "./subscription-gate";
 import { consumeCredits } from "./credit-service";
 import { enforceCloneSafety, checkScrapedContent } from "./clone-safety";
@@ -12,6 +12,7 @@ import { detectCloneComplexity, type CloneComplexity } from "../shared/pricing";
 import { searchDomains, getDomainPrice, purchaseDomain, configureDNS } from "./domain-service";
 import { deployProject, getDeploymentStatus, selectPlatform } from "./deploy-service";
 import { getErrorMessage } from "./_core/errors.js";
+import { log } from "./_core/logger.js";
 import { getUserOpenAIKey, getUserGithubPat } from "./user-secrets-router";
 import {
   validateExternalUrl,
@@ -36,18 +37,16 @@ export const replicateRouter = router({
   /**
    * List all replicate projects for the current user
    */
-  list: protectedProcedure.query(async ({ ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
+  list: adminProcedure.query(async ({ ctx }) => {
     return listProjects(ctx.user.id);
   }),
 
   /**
    * Get a specific replicate project
    */
-  get: protectedProcedure
+  get: adminProcedure
     .input(z.object({ projectId: z.number().int() }))
     .query(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new Error("Project not found");
       return project;
@@ -56,7 +55,7 @@ export const replicateRouter = router({
   /**
    * Create a new replicate project and start research
    */
-  create: protectedProcedure
+  create: adminProcedure
     .input(
       z.object({
         targetUrl: z.string().min(1),
@@ -80,7 +79,6 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       // ═══ REQUIRED API KEYS: Pull from vault or use per-project input ═══
       // Users must have their own API keys saved — the platform does not subsidize API costs.
 
@@ -202,7 +200,7 @@ export const replicateRouter = router({
         return project;
       } catch (e: unknown) {
         const msg = getErrorMessage(e);
-        console.error("[Clone] createProject failed:", msg, e);
+        log.error("[Clone] createProject failed:", { msg, error: e });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to create clone project: ${msg || "Database error. Please try again."}`,
@@ -213,17 +211,16 @@ export const replicateRouter = router({
   /**
    * Run research on the target website
    */
-  research: protectedProcedure
+  research: adminProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       return researchTarget(input.projectId, ctx.user.id);
     }),
 
   /**
    * Generate build plan from research results
    */
-  plan: protectedProcedure
+  plan: adminProcedure
     .input(
       z.object({
         projectId: z.number().int(),
@@ -232,7 +229,6 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       return generateBuildPlan(input.projectId, ctx.user.id, {
         features: input.features,
         techStack: input.techStack,
@@ -242,17 +238,16 @@ export const replicateRouter = router({
   /**
    * Execute the build plan in the sandbox
    */
-  build: protectedProcedure
+  build: adminProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       return executeBuild(input.projectId, ctx.user.id);
     }),
 
   /**
    * Update branding configuration
    */
-  updateBranding: protectedProcedure
+  updateBranding: adminProcedure
     .input(
       z.object({
         projectId: z.number().int(),
@@ -271,7 +266,6 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       await updateBranding(input.projectId, ctx.user.id, {
         brandName: input.brandName,
         brandColors: input.brandColors,
@@ -284,7 +278,7 @@ export const replicateRouter = router({
   /**
    * Update Stripe configuration
    */
-  updateStripe: protectedProcedure
+  updateStripe: adminProcedure
     .input(
       z.object({
         projectId: z.number().int(),
@@ -294,7 +288,6 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       await updateStripeConfig(input.projectId, ctx.user.id, {
         publishableKey: input.publishableKey,
         secretKey: input.secretKey,
@@ -306,7 +299,7 @@ export const replicateRouter = router({
   /**
    * Push built project to GitHub
    */
-  pushToGithub: protectedProcedure
+  pushToGithub: adminProcedure
     .input(
       z.object({
         projectId: z.number().int(),
@@ -314,13 +307,12 @@ export const replicateRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       return pushToGithub(input.projectId, ctx.user.id, input.repoName);
     }),
   /**
    * Search for available domains based on brand name
    */
-  searchDomains: protectedProcedure
+  searchDomains: adminProcedure
     .input(z.object({ keyword: z.string().min(1), maxResults: z.number().int().min(1).max(10).optional() }))
     .mutation(async ({ input }) => {
       try {
@@ -334,7 +326,7 @@ export const replicateRouter = router({
   /**
    * Get price for a specific domain
    */
-  getDomainPrice: protectedProcedure
+  getDomainPrice: adminProcedure
     .input(z.object({ domain: z.string().min(1) }))
     .query(async ({ input }) => {
       return getDomainPrice(input.domain);
@@ -343,7 +335,7 @@ export const replicateRouter = router({
   /**
    * Purchase a domain via GoDaddy
    */
-  purchaseDomain: protectedProcedure
+  purchaseDomain: adminProcedure
     .input(z.object({
       projectId: z.number().int(),
       domain: z.string().min(1),
@@ -363,7 +355,6 @@ export const replicateRouter = router({
       privacy: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       // Verify project belongs to user
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
@@ -381,7 +372,7 @@ export const replicateRouter = router({
   /**
    * Deploy project to Vercel or Railway (auto-selected based on complexity)
    */
-  deploy: protectedProcedure
+  deploy: adminProcedure
     .input(z.object({
       projectId: z.number().int(),
       repoFullName: z.string().min(1),
@@ -390,7 +381,6 @@ export const replicateRouter = router({
       envVars: z.record(z.string(), z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       const project = await getProject(input.projectId, ctx.user.id);
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
 
@@ -435,7 +425,7 @@ export const replicateRouter = router({
   /**
    * Check deployment status
    */
-  deploymentStatus: protectedProcedure
+  deploymentStatus: adminProcedure
     .input(z.object({
       deploymentId: z.string().min(1),
       platform: z.enum(["vercel", "railway"]),
@@ -447,10 +437,9 @@ export const replicateRouter = router({
   /**
    * Delete a replicate project
    */
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ projectId: z.number().int() }))
     .mutation(async ({ input, ctx }) => {
-    enforceAdminFeature(ctx.user.role, "Clone Website");
       const deleted = await deleteProject(input.projectId, ctx.user.id);
       return { success: deleted };
     }),

@@ -428,8 +428,8 @@ async function liveVerify(card: CardCheckRequest): Promise<LiveCheckResult> {
       metadata: { purpose: "card_check", autoDelete: "true" },
     });
   } catch (err: any) {
-    try { await stripe.paymentMethods.detach(paymentMethod.id); } catch {}
-    throw new Error(`Failed to create temp customer: ${err.message}`);
+    try { await stripe.paymentMethods.detach(paymentMethod.id); } catch { /* ignore */ }
+    throw new Error(`Failed to create temp customer: ${err.message}`, { cause: err });
   }
 
   // ── Step 3: Confirm SetupIntent (contacts issuing bank) ──────────────────
@@ -445,8 +445,8 @@ async function liveVerify(card: CardCheckRequest): Promise<LiveCheckResult> {
     });
   } catch (err: any) {
     // Cleanup
-    try { await stripe.paymentMethods.detach(paymentMethod.id); } catch {}
-    try { await stripe.customers.del(customer.id); } catch {}
+    try { await stripe.paymentMethods.detach(paymentMethod.id); } catch { /* ignore */ }
+    try { await stripe.customers.del(customer.id); } catch { /* ignore */ }
 
     const code = err.decline_code || err.code || "setup_failed";
     const info = getDeclineInfo(code);
@@ -488,8 +488,8 @@ async function liveVerify(card: CardCheckRequest): Promise<LiveCheckResult> {
   }
 
   // ── Step 5: Cleanup — detach payment method and delete temp customer ──────
-  try { await stripe.paymentMethods.detach(paymentMethod.id); } catch {}
-  try { await stripe.customers.del(customer.id); } catch {}
+  try { await stripe.paymentMethods.detach(paymentMethod.id); } catch { /* ignore */ }
+  try { await stripe.customers.del(customer.id); } catch { /* ignore */ }
 
   return result;
 }

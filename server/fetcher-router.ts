@@ -132,7 +132,7 @@ export const fetcherRouter = router({
 
       // Deduct 1 credit per provider being fetched
       for (const _p of providerCheck.valid) {
-        try { await consumeCredits(ctx.user.id, "fetch_action", `Credential fetch: ${_p}`); } catch {}
+        try { await consumeCredits(ctx.user.id, "fetch_action", `Credential fetch: ${_p}`); } catch { /* ignore */ }
       }
 
       // Start the real browser automation asynchronously
@@ -400,7 +400,7 @@ export const fetcherRouter = router({
     // Get job stats per provider from database
     const db = (await import("./db")).getDb;
     const database = await db();
-    let providerStats: Record<string, { total: number; completed: number; failed: number }> = {};
+    const providerStats: Record<string, { total: number; completed: number; failed: number }> = {};
 
     if (database) {
       const { fetcherTasks } = await import("../drizzle/schema");

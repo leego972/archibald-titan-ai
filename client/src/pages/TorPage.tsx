@@ -42,13 +42,13 @@ export default function TorPage() {
   const statusQuery = trpc.tor.getStatus.useQuery();
 
   const addNode = trpc.tor.addNode.useMutation({ onSuccess: () => { utils.tor.listNodes.invalidate(); toast.success("Node added"); setAddOpen(false); resetForm(); } });
-  const deployNode = trpc.tor.deployNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const deployNode = trpc.tor.deployNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); void (r.success ? toast.success(r.message) : toast.error(r.message)); } });
   const checkNode = trpc.tor.checkNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); toast.info(r.message); } });
   const setActive = trpc.tor.setActiveNode.useMutation({ onSuccess: () => { utils.tor.listNodes.invalidate(); utils.tor.getStatus.invalidate(); toast.success("Active node updated"); } });
   const removeNode = trpc.tor.removeNode.useMutation({ onSuccess: (r) => { utils.tor.listNodes.invalidate(); toast.success(r.message); } });
-  const startTor = trpc.tor.startTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
-  const stopTor = trpc.tor.stopTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
-  const newCircuit = trpc.tor.newCircuit.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); r.success ? toast.success(r.message) : toast.error(r.message); } });
+  const startTor = trpc.tor.startTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); void (r.success ? toast.success(r.message) : toast.error(r.message)); } });
+  const stopTor = trpc.tor.stopTor.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); void (r.success ? toast.success(r.message) : toast.error(r.message)); } });
+  const newCircuit = trpc.tor.newCircuit.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); void (r.success ? toast.success(r.message) : toast.error(r.message)); } });
   const toggleFirewall = trpc.tor.toggleFirewall.useMutation({ onSuccess: (r) => { utils.tor.getStatus.invalidate(); toast.success(r.message); } });
   const activeStateQuery = trpc.tor.getActiveState.useQuery();
   const setTorActive = trpc.tor.setActive.useMutation({ onSuccess: (r: any) => { utils.tor.getStatus.invalidate(); activeStateQuery.refetch(); r.success ? toast.success(r.message) : toast.error(r.message); }, onError: (e: any) => toast.error(e.message) });

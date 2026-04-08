@@ -57,7 +57,7 @@ export const securityMarketplaceRouter = router({
     enforceAdminFeature(ctx.user.role, "Security Marketplace");
       const modules = await db.listSecurityModules({ category: input.category, search: input.search, featured: input.featured, limit: 500 });
       const installedSlugs = new Set((await db.getSecurityModuleInstalls(ctx.user.id as number)).map(i => i.moduleSlug));
-      let filtered = input.license !== "all" ? modules.filter(m => m.license === input.license) : [...modules];
+      const filtered = input.license !== "all" ? modules.filter(m => m.license === input.license) : [...modules];
       switch (input.sortBy) {
         case "rating": filtered.sort((a, b) => b.rating - a.rating); break;
         case "newest": filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); break;

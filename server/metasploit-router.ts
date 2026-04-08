@@ -352,7 +352,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Metasploit node. Add and deploy a dedicated VPS node first." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit command: ${input.command.substring(0, 60)}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit command: ${input.command.substring(0, 60)}`); } catch { /* ignore */ }
       const output = await execMsfCommand(node, input.command, input.timeoutMs ?? 30000, ctx.user.id);
       return { output, nodeLabel: node.label, publicIp: node.publicIp };
     }),
@@ -400,7 +400,7 @@ export const metasploitRouter = router({
 
   /** Search modules */
   searchModules: adminProcedure
-    .input(z.object({ query: z.string().min(1).max(200).regex(/^[a-zA-Z0-9 .\-_/]+$/, "Query must contain only alphanumeric characters and basic punctuation"), type: z.string().optional() }))
+    .input(z.object({ query: z.string().min(1).max(200).regex(/^[a-zA-Z0-9 .-_/]+$/, "Query must contain only alphanumeric characters and basic punctuation"), type: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceAdminFeature(ctx.user.role, "Metasploit");
@@ -606,7 +606,7 @@ export const metasploitRouter = router({
       // Build a multi-line msfconsole resource script — execMsfCommand handles the wrapping
       const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('\n');
       const payloadLine = input.payload ? `set PAYLOAD ${input.payload}\n` : '';
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit module: ${input.module}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit module: ${input.module}`); } catch { /* ignore */ }
       const cmd = `use ${input.module}\n${setOpts}\n${payloadLine}run`;
       const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
       return { success: true, output: out };
@@ -623,7 +623,7 @@ export const metasploitRouter = router({
       const encoderFlag = input.encoder ? `-e ${input.encoder}` : '';
       const outputFile = `/tmp/payload_${Date.now()}.${input.format}`;
       // msfvenom is a standalone shell binary — use execSSHCommand directly, NOT execMsfCommand
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit payload: ${input.payload}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Metasploit payload: ${input.payload}`); } catch { /* ignore */ }
       const cmd = `msfvenom -p '${input.payload}' LHOST='${input.lhost}' LPORT=${input.lport} -f '${input.format}' ${encoderFlag} -o '${outputFile}' 2>&1; echo OUTPUT_FILE:${outputFile}`;
       const out = await execSSHCommand(nodeToSSH(node), cmd, 60000, ctx.user.id);
       return { success: true, output: out, outputFile };
@@ -729,7 +729,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `db_nmap: ${input.target}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `db_nmap: ${input.target}`); } catch { /* ignore */ }
       const out = await execMsfCommand(node, `db_nmap ${input.flags} ${input.target}`, 180000, ctx.user.id);
       return { success: true, output: out };
     }),
@@ -746,7 +746,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Start listener: ${input.lhost}:${input.lport}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Start listener: ${input.lhost}:${input.lport}`); } catch { /* ignore */ }
       const cmd = `use exploit/multi/handler\nset PAYLOAD ${input.listenerPayload}\nset LHOST ${input.lhost}\nset LPORT ${input.lport}\nset ExitOnSession false\nexploit -j -z`;
       const out = await execMsfCommand(node, cmd, 30000, ctx.user.id);
       return { success: true, output: out };
@@ -763,7 +763,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Session interact: ${input.sessionId}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Session interact: ${input.sessionId}`); } catch { /* ignore */ }
       const cmd = `sessions -i ${input.sessionId}\n${input.command}`;
       const out = await execMsfCommand(node, cmd, 60000, ctx.user.id);
       return { success: true, output: out };
@@ -781,7 +781,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Post module: ${input.module}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Post module: ${input.module}`); } catch { /* ignore */ }
       const setOpts = Object.entries(input.options ?? {}).map(([k, v]) => `set ${k} ${v}`).join('\n');
       const cmd = `use ${input.module}\nset SESSION ${input.sessionId}\n${setOpts}\nrun`;
       const out = await execMsfCommand(node, cmd, 120000, ctx.user.id);
@@ -806,7 +806,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `Obfuscated payload: ${input.payload}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `Obfuscated payload: ${input.payload}`); } catch { /* ignore */ }
       const outputFile = `/tmp/payload_obf_${Date.now()}.${input.format}`;
       const encoderFlag = input.encoder ? `-e ${input.encoder} -i ${input.iterations}` : '';
       const badcharsFlag = input.badchars ? `-b '${input.badchars}'` : '';
@@ -827,7 +827,7 @@ export const metasploitRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Metasploit");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "metasploit_action", `AutoExploit: ${input.target}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "metasploit_action", `AutoExploit: ${input.target}`); } catch { /* ignore */ }
       const cmd = [
         `db_nmap -sV --script=vuln ${input.target}`,
         `vulns`,

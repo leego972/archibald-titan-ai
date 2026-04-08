@@ -763,7 +763,7 @@ export async function performHealthCheck(
   db: any,
 ): Promise<HealthCheckResult> {
   const startTime = Date.now();
-  let result: HealthCheckResult = {
+  const result: HealthCheckResult = {
     status: "error",
     httpStatusCode: null,
     responseTimeMs: 0,

@@ -101,10 +101,11 @@ export default function CommandCentrePage() {
       case "argus": return argusStatus ? `${(argusStatus as any).totalScans ?? 0} scans` : null;
       case "astra": return astraStatus ? `${(astraStatus as any).totalAlerts ?? 0} alerts` : null;
       case "siteMonitor": return siteMonitorStats ? `${(siteMonitorStats as any).totalSites ?? 0} sites` : null;
-      case "titanStorage": 
+      case "titanStorage": {
         if (!storageStats) return null;
         const gb = ((storageStats as any).usedBytes ?? 0) / (1024 ** 3);
         return `${gb.toFixed(1)} GB used`;
+      }
       case "affiliate": return affiliateStats ? `${(affiliateStats as any).totalPartners ?? 0} partners` : null;
       case "contentCreator": return contentCreatorStats ? `${(contentCreatorStats as any).totalPieces ?? 0} pieces` : null;
       default: return null;

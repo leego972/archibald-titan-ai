@@ -281,7 +281,7 @@ export default function ProjectFilesViewer() {
       const data = await res.json();
       const content = data?.result?.data?.json?.content;
       if (content) return { name: fileName, content };
-    } catch {}
+    } catch { /* ignore */ }
     // Fallback: try S3 signed URL (may fail due to CORS)
     if (file.s3Key) {
       try {
@@ -295,7 +295,7 @@ export default function ProjectFilesViewer() {
             return { name: fileName, content };
           }
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
     return null;
   }, []);
@@ -339,7 +339,7 @@ export default function ProjectFilesViewer() {
             zip.file(filePath, result.content);
             addedCount++;
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
 
       if (addedCount === 0) {

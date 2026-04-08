@@ -199,6 +199,17 @@ async function startServer() {
     message: { error: 'Too many checkout attempts. Please wait a moment.' },
   });
   app.use('/api/trpc/stripe.', stripeLimiter);
+  // Offensive/admin tool endpoints: 15 per minute per IP (prevents abuse)
+  const offensiveLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 15,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests to this endpoint. Please slow down.' },
+  });
+  for (const path of ['evilginx', 'metasploit', 'blackeye', 'exploitpack', 'cyberMcp', 'linkenSphere', 'torProxy', 'vpnChain', 'proxyMaker', 'ipRotation', 'isolatedBrowser', 'argus', 'astra', 'siem']) {
+    app.use(`/api/trpc/${path}.`, offensiveLimiter);
+  }
 
   // File upload limit: 20 per minute per IP
   const uploadLimiter = rateLimit({
@@ -285,7 +296,9 @@ async function startServer() {
     } catch (dbErr: unknown) {
       health.database = 'error';
       health.status = 'degraded';
-      health.dbError = getErrorMessage(dbErr);
+      // Sanitize error message to avoid leaking connection string or credentials
+      const rawDbErr = getErrorMessage(dbErr);
+      health.dbError = rawDbErr.replace(/mysql:\/\/[^@]*@[^\s/]*/gi, 'mysql://***@***').replace(/password=[^&\s]*/gi, 'password=***');
     }
     // Check new builder tools are loadable
     const toolChecks: Record<string, string> = {};
@@ -865,7 +878,7 @@ async function startServer() {
       log.error('Raw SQL migration failed', { error: getErrorMessage(err) });
     }
     // Always close the migration pool
-    try { await pool.promise().end(); } catch (_) {}
+    try { await pool.promise().end(); } catch (_) { /* ignore */ }
   } else {
     log.warn('No DATABASE_URL - skipping migrations');
   }
@@ -890,6 +903,8 @@ async function startServer() {
     // The processMonthlyRefill function is idempotent — it checks lastRefillAt
     // and only refills if the user hasn't been refilled this calendar month.
     scheduleMonthlyRefill();
+    // ─── Warm up Venice usage limiter from DB ────────────────────────
+    import("../venice-usage-limiter.js").then(m => m.loadVeniceUsageFromDb()).catch(() => {});
 
        // ─── Auto-Promote Owner to Admin ────────────────────────
     // Ensures the platform owner always has admin role, even if

@@ -488,7 +488,22 @@ export function registerUpdateFeedRoutes(app: Express) {
 // POST /api/releases/sync-github — triggers a sync from GitHub releases
 // Can be used as a GitHub webhook or called manually
 export function registerGitHubSyncRoute(app: Express) {
-  app.post("/api/releases/sync-github", async (_req: Request, res: Response) => {
+  app.post("/api/releases/sync-github", async (req: Request, res: Response) => {
+    // Auth: require admin session OR valid GitHub webhook secret
+    const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+    const hubSignature = req.headers["x-hub-signature-256"] as string | undefined;
+    const isGitHubWebhook = webhookSecret && hubSignature;
+    if (!isGitHubWebhook) {
+      // Manual call — require admin session
+      try {
+        const user = await sdk.authenticateRequest(req);
+        if (!isAdminRole(user.role)) {
+          return res.status(403).json({ error: "Admin access required" });
+        }
+      } catch {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+    }
     try {
       const db = await getDb();
       if (!db) return res.status(503).json({ error: "Database unavailable" });

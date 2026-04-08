@@ -287,7 +287,7 @@ export const SEED_IMPROVEMENT_TASKS = [
 
 export const improvementBacklogRouter = router({
   /** List all improvement tasks with optional filters */
-  list: protectedProcedure
+  list: adminProcedure
     .input(
       z.object({
         category: z.enum(["performance", "security", "ux", "feature", "reliability", "testing", "infrastructure"]).optional(),
@@ -314,7 +314,7 @@ export const improvementBacklogRouter = router({
     }),
 
   /** Get stats overview */
-  stats: protectedProcedure.query(async () => {
+  stats: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return { total: 0, pending: 0, inProgress: 0, completed: 0, failed: 0, skipped: 0, byCategory: {}, byPriority: {} };
     const [total] = await db.select({ count: sql<number>`count(*)` }).from(improvementTasks);
@@ -533,7 +533,7 @@ ${task.description}`,
       }
 
       log.info(`[analyzeTask] Analysis complete for task #${task.id}. canAutoApply=${analysis.canAutoApply}`);
-      try { await consumeCredits(ctx.user.id, "advertising_run", `Self-improvement task analysis: #${task.id} ${task.title}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "advertising_run", `Self-improvement task analysis: #${task.id} ${task.title}`); } catch { /* ignore */ }
       return { taskId: task.id, title: task.title, ...analysis };
     }),
 
@@ -771,7 +771,7 @@ Generate the code changes needed to implement this task. Read any relevant exist
         }).where(eq(improvementTasks.id, task.id));
 
         log.info(`[executeTask] Task #${task.id} completed successfully. Pushed=${pushed}`);
-        try { await consumeCredits(ctx.user.id, "marketing_run", `Self-improvement task executed: #${task.id} ${task.title}`); } catch {}
+        try { await consumeCredits(ctx.user.id, "marketing_run", `Self-improvement task executed: #${task.id} ${task.title}`); } catch { /* ignore */ }
 
         return {
           success: true,

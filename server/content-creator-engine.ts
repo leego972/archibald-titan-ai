@@ -570,7 +570,7 @@ export async function generateCreatorContent(
     if (strategy) {
       adContext = `\nActive campaign budget: $${strategy.monthlyBudget}/month. Current focus: ${strategy.strategies?.[0]?.channel || "brand awareness"}. Top performing channel: ${strategy.contentPillars?.[0]?.name || "organic"}.`;
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // Select a viral hook
   const viralHook = params.useViralHook !== false
@@ -1425,7 +1425,7 @@ export async function getContentCreatorDashboard() {
   try {
     const overview = getStrategyOverview();
     advertisingLinked = !!(overview && overview.monthlyBudget > 0);
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     totalCampaigns: campaigns.length,

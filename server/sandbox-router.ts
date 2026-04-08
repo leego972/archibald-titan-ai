@@ -69,7 +69,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", "Sandbox created"); } catch {}
+      try { await consumeCredits(ctx.user.id, "sandbox_run", "Sandbox created"); } catch { /* ignore */ }
       return createSandbox(ctx.user.id, input.name, {
         memoryMb: input.memoryMb,
         diskMb: input.diskMb,
@@ -100,7 +100,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", `Sandbox exec: ${input.command.slice(0, 60)}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "sandbox_run", `Sandbox exec: ${input.command.slice(0, 60)}`); } catch { /* ignore */ }
       return executeCommand(input.sandboxId, ctx.user.id, input.command, {
         timeoutMs: input.timeoutMs,
         triggeredBy: "user",
@@ -329,7 +329,7 @@ export const sandboxRouter = router({
   securityScan: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Security scan: ${input.url}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Security scan: ${input.url}`); } catch { /* ignore */ }
       return runPassiveWebScan(input.url);
     }),
 
@@ -343,7 +343,7 @@ export const sandboxRouter = router({
       concurrency: z.number().int().min(1).max(200).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`); } catch { /* ignore */ }
       return runPortScan(input.host, input.ports, input.concurrency);
     }),
 
@@ -368,7 +368,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", "Code security review"); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", "Code security review"); } catch { /* ignore */ }
       return analyzeCodeSecurity([{ filename: input.filename || "code.txt", content: input.code }]);
     }),
 
@@ -382,7 +382,7 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Code review: ${input.files.length} files`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Code review: ${input.files.length} files`); } catch { /* ignore */ }
       return analyzeCodeSecurity(input.files);
     }),
 
@@ -392,7 +392,7 @@ export const sandboxRouter = router({
   dnsAudit: protectedProcedure
     .input(z.object({ domain: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `DNS audit: ${input.domain}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `DNS audit: ${input.domain}`); } catch { /* ignore */ }
       return auditDNSSecurity(input.domain);
     }),
 
@@ -402,7 +402,7 @@ export const sandboxRouter = router({
   fingerprint: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Fingerprint: ${input.url}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Fingerprint: ${input.url}`); } catch { /* ignore */ }
       return fingerprintTarget(input.url);
     }),
 
@@ -412,7 +412,7 @@ export const sandboxRouter = router({
   headerAnalysis: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Header analysis: ${input.url}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Header analysis: ${input.url}`); } catch { /* ignore */ }
       return analyzeHeaders(input.url);
     }),
 
@@ -427,7 +427,7 @@ export const sandboxRouter = router({
       includeSsl: z.boolean().optional().default(true),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Full report: ${input.target}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "security_scan", `Full report: ${input.target}`); } catch { /* ignore */ }
       const host = input.target.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
       const url = input.target.startsWith("http") ? input.target : `https://${input.target}`;
       const [scanResult, sslResult, dnsResult, portScanResult] = await Promise.allSettled([
@@ -625,7 +625,7 @@ export const sandboxRouter = router({
             const content = await res.text();
             return { content, path: file.filePath };
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
 
       return { content: null, error: "Content unavailable" };
@@ -653,7 +653,7 @@ export const sandboxRouter = router({
           const { storageGet } = await import("./storage");
           const { url } = await storageGet(file.s3Key);
           return { url, fileName: file.filePath.split("/").pop() || "file" };
-        } catch {}
+        } catch { /* ignore */ }
       }
       return { url: null, error: "No download available" };
     }),
@@ -681,7 +681,7 @@ export const sandboxRouter = router({
           try {
             const { storageDelete } = await import("./storage");
             await storageDelete(file.s3Key);
-          } catch {}
+          } catch { /* ignore */ }
         }
         await db.delete(sandboxFiles).where(eq(sandboxFiles.id, input.fileId));
         return { success: true };
@@ -756,7 +756,7 @@ export const sandboxRouter = router({
             try {
               const { storageDelete } = await import("./storage");
               await storageDelete(file.s3Key);
-            } catch {}
+            } catch { /* ignore */ }
           }
         }
         // Delete from DB
@@ -797,7 +797,7 @@ export const sandboxRouter = router({
             try {
               const { storageDelete } = await import("./storage");
               await storageDelete(file.s3Key);
-            } catch {}
+            } catch { /* ignore */ }
           }
         }
         // Delete from DB
@@ -1014,7 +1014,7 @@ export const sandboxRouter = router({
       timeoutMs: z.number().int().min(5000).max(300_000).optional().default(120_000),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", "Run tests"); } catch {}
+      try { await consumeCredits(ctx.user.id, "sandbox_run", "Run tests"); } catch { /* ignore */ }
       let cmd = input.testCommand;
       if (!cmd) {
         // Auto-detect test runner
@@ -1148,7 +1148,7 @@ export const sandboxRouter = router({
               try {
                 const { storageDelete } = await import("./storage");
                 await storageDelete(file.s3Key);
-              } catch {}
+              } catch { /* ignore */ }
             }
           }
           // Delete from DB

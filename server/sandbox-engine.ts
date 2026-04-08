@@ -314,7 +314,9 @@ export async function executeCommand(
   );
 
   const startTime = Date.now();
+  // eslint-disable-next-line no-useless-assignment
   let output = "";
+  // eslint-disable-next-line no-useless-assignment
   let exitCode = 0;
   let newWorkingDirectory = requestedCwd;
 

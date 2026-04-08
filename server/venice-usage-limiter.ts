@@ -3,9 +3,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Per-tier daily Venice Pro shared-key usage limiter.
  *
- * When a user has NO personal API key, all their LLM calls route through the
- * owner's Venice Pro key. This module enforces a daily request budget per tier
- * to prevent a small number of users exhausting the shared key.
+ * Uses a write-through in-memory cache backed by the `venice_daily_usage`
+ * database table so limits survive server restarts.
+ *
+ * Hot path: in-memory Map (O(1) read/write, no DB round-trip on check).
+ * Persistence: DB upsert on every recordVeniceRequest call.
+ * Warm-up: loadVeniceUsageFromDb() is called at server startup.
  *
  * Budget design (daily requests on shared Venice key):
  * ┌─────────────┬──────────────┬───────────────────────────────────────────┐
@@ -19,11 +22,11 @@
  * │ titan       │ unlimited    │ ~$4999/mo — no cap                        │
  * │ admin       │ unlimited    │ Owner accounts — no cap                   │
  * └─────────────┴──────────────┴───────────────────────────────────────────┘
- *
- * Storage: in-memory Map keyed by userId, reset at UTC midnight.
- * A DB-backed version can replace this later for multi-instance deployments.
  */
 
+import { getDb } from "./db";
+import { venicelDailyUsage } from "../drizzle/schema";
+import { eq, sql } from "drizzle-orm";
 import { log } from "./_core/logger";
 import type { PlanId } from "../shared/pricing";
 
@@ -41,7 +44,7 @@ export const VENICE_DAILY_LIMITS: Record<string, number> = {
   head_admin:  -1,
 };
 
-// ─── In-Memory Usage Store ────────────────────────────────────────────────────
+// ─── In-Memory Cache (hot path) ───────────────────────────────────────────────
 
 interface DailyUsage {
   /** UTC date string YYYY-MM-DD for which this count applies */
@@ -53,20 +56,66 @@ interface DailyUsage {
 const usageStore = new Map<number, DailyUsage>();
 
 function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10); // "2026-03-28"
+  return new Date().toISOString().slice(0, 10);
 }
 
 function getUsage(userId: number): DailyUsage {
   const today = todayUTC();
   const existing = usageStore.get(userId);
   if (existing && existing.date === today) return existing;
-  // New day or new user — reset
   const fresh: DailyUsage = { date: today, count: 0 };
   usageStore.set(userId, fresh);
   return fresh;
 }
 
-// Cleanup stale entries every hour (entries older than today)
+// ─── DB Persistence ───────────────────────────────────────────────────────────
+
+/**
+ * Warm up the in-memory store from today's DB rows.
+ * Call once at server startup so limits survive restarts.
+ */
+export async function loadVeniceUsageFromDb(): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const today = todayUTC();
+    const rows = await db
+      .select()
+      .from(venicelDailyUsage)
+      .where(eq(venicelDailyUsage.date, today));
+    let loaded = 0;
+    for (const row of rows) {
+      usageStore.set(row.userId, { date: row.date, count: row.count });
+      loaded++;
+    }
+    if (loaded > 0) {
+      log.info(`[VeniceUsage] Loaded ${loaded} usage records from DB for ${today}`);
+    }
+  } catch (err) {
+    log.warn(`[VeniceUsage] Failed to load usage from DB (will use fresh counts): ${err}`);
+  }
+}
+
+/**
+ * Persist the current in-memory count to the DB (upsert).
+ * Called after every successful Venice request (non-blocking).
+ */
+async function persistUsage(userId: number, count: number): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const today = todayUTC();
+    await db
+      .insert(venicelDailyUsage)
+      .values({ userId, date: today, count })
+      .onDuplicateKeyUpdate({ set: { count, updatedAt: sql`NOW()` } });
+  } catch (err) {
+    // Non-fatal — in-memory limit still enforced
+    log.warn(`[VeniceUsage] Failed to persist usage to DB for user ${userId}: ${err}`);
+  }
+}
+
+// Cleanup stale in-memory entries every hour
 setInterval(() => {
   const today = todayUTC();
   let cleaned = 0;
@@ -86,10 +135,6 @@ setInterval(() => {
 /**
  * Check if a user is within their daily Venice shared-tier budget.
  * Does NOT consume a slot — call `recordVeniceRequest` after the call succeeds.
- *
- * @param userId  - The user's numeric ID
- * @param planId  - Their current plan (e.g. "free", "pro", "titan")
- * @returns { allowed: boolean; used: number; limit: number; message?: string }
  */
 export function checkVeniceLimit(
   userId: number,
@@ -97,7 +142,6 @@ export function checkVeniceLimit(
 ): { allowed: boolean; used: number; limit: number; message?: string } {
   const limit = VENICE_DAILY_LIMITS[planId] ?? VENICE_DAILY_LIMITS.free;
 
-  // Unlimited tiers always pass
   if (limit === -1) {
     const usage = getUsage(userId);
     return { allowed: true, used: usage.count, limit: -1 };
@@ -128,12 +172,14 @@ export function checkVeniceLimit(
 
 /**
  * Record a successful Venice shared-tier request for a user.
- * Call this AFTER the LLM call completes (success or failure — it was still consumed).
+ * Updates the in-memory cache immediately and persists to DB asynchronously.
  */
 export function recordVeniceRequest(userId: number): void {
   const usage = getUsage(userId);
   usage.count++;
-  log.debug(`[VeniceUsage] User ${userId} Venice usage: ${usage.count}/${VENICE_DAILY_LIMITS.free}`);
+  log.debug(`[VeniceUsage] User ${userId} Venice usage: ${usage.count}`);
+  // Persist asynchronously — do not await to keep the hot path fast
+  void persistUsage(userId, usage.count);
 }
 
 /**
@@ -149,7 +195,6 @@ export function getVeniceUsage(userId: number, planId: string): {
   const usage = getUsage(userId);
   const remaining = limit === -1 ? -1 : Math.max(0, limit - usage.count);
 
-  // Next UTC midnight
   const now = new Date();
   const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 
@@ -182,5 +227,6 @@ export function getAllVeniceUsage(): Array<{
 export function resetVeniceUsage(userId: number): void {
   const today = todayUTC();
   usageStore.set(userId, { date: today, count: 0 });
+  void persistUsage(userId, 0);
   log.info(`[VeniceUsage] Admin reset Venice usage for user ${userId}`);
 }

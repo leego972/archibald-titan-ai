@@ -346,20 +346,6 @@ export default function ArchibaldWizard() {
     setDragPos({ x, y });
   }, [isDragging, dragOffset]);
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-
-    // If it was a short tap (< 200ms), treat as click
-    if (Date.now() - dragStartTime.current < 200) {
-      setDragPos(null); // Reset drag so it can roam again
-      handleWizardClick();
-    } else {
-      playDragEndSound();
-    }
-  }, [isDragging]);
-
   // Click wizard → toggle between marketplace and Titan chat
   const handleWizardClick = useCallback(() => {
     if (isMinimized) {
@@ -379,6 +365,20 @@ export default function ArchibaldWizard() {
       setLocation(isOnMarketplace ? "/dashboard" : "/marketplace");
     }, 1500);
   }, [isMinimized, isOnMarketplace, setLocation]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+
+    // If it was a short tap (< 200ms), treat as click
+    if (Date.now() - dragStartTime.current < 200) {
+      setDragPos(null); // Reset drag so it can roam again
+      handleWizardClick();
+    } else {
+      playDragEndSound();
+    }
+  }, [isDragging, handleWizardClick]);
 
   const handleDismiss = useCallback(() => {
     setShowBubble(false);

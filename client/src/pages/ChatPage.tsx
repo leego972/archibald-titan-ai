@@ -1010,7 +1010,7 @@ export default function ChatPage() {
         }
       }
     } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   // Strip markdown for TTS (remove links, bold, code blocks, etc.)
@@ -1563,12 +1563,12 @@ export default function ChatPage() {
           // Reconnect SSE stream
           const es = new EventSource(`/api/chat/stream/${activeConversationId}`, { withCredentials: true });
           eventSourceRef.current = es;
-          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message, reasoning: d.reasoning, phase: d.phase, round: d.round, timestamp: Date.now() }]); if (!d.reasoning) setLoadingPhase(d.message || 'Thinking...'); } catch {} });
-          es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description, timestamp: Date.now() }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch {} });
-          es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary, timestamp: Date.now() }]); } catch {} });
-          es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Processing...'); } catch {} });
-          es.addEventListener('build_progress', (e) => { try { const d = JSON.parse(e.data); setBuildProgress({ phase: d.phase as BuildPhase, detail: d.detail, filesCreated: d.filesCreated, buildType: d.buildType, round: d.round }); setLoadingPhase(d.detail || d.phase || 'Building...'); } catch {} });
-          es.addEventListener('build_complete', (e) => { try { const d = JSON.parse(e.data); setBuildReport({ totalRounds: d.totalRounds, successCount: d.successCount, failedCount: d.failedCount, filesCreated: d.filesCreated, deliverables: d.deliverables || [], buildType: d.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined }); setBuildProgress(null); } catch {} });
+          es.addEventListener('thinking', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'thinking', message: d.message, reasoning: d.reasoning, phase: d.phase, round: d.round, timestamp: Date.now() }]); if (!d.reasoning) setLoadingPhase(d.message || 'Thinking...'); } catch { /* ignore */ } });
+          es.addEventListener('tool_start', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_start', tool: d.tool, description: d.description, timestamp: Date.now() }]); setLoadingPhase(d.description || `Running ${d.tool}...`); } catch { /* ignore */ } });
+          es.addEventListener('tool_result', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'tool_result', tool: d.tool, success: d.success, summary: d.summary, timestamp: Date.now() }]); } catch { /* ignore */ } });
+          es.addEventListener('status', (e) => { try { const d = JSON.parse(e.data); setStreamEvents(prev => [...prev.slice(-20), { type: 'status', message: d.message, timestamp: Date.now() }]); setLoadingPhase(d.message || 'Processing...'); } catch { /* ignore */ } });
+          es.addEventListener('build_progress', (e) => { try { const d = JSON.parse(e.data); setBuildProgress({ phase: d.phase as BuildPhase, detail: d.detail, filesCreated: d.filesCreated, buildType: d.buildType, round: d.round }); setLoadingPhase(d.detail || d.phase || 'Building...'); } catch { /* ignore */ } });
+          es.addEventListener('build_complete', (e) => { try { const d = JSON.parse(e.data); setBuildReport({ totalRounds: d.totalRounds, successCount: d.successCount, failedCount: d.failedCount, filesCreated: d.filesCreated, deliverables: d.deliverables || [], buildType: d.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined }); setBuildProgress(null); } catch { /* ignore */ } });
           es.addEventListener('done', () => {
             es.close(); eventSourceRef.current = null;
             setIsLoading(false); setStreamEvents([]);
@@ -1637,7 +1637,7 @@ export default function ChatPage() {
       ro.disconnect();
     };
   // Re-run when the conversation changes so we scroll to the bottom of the new chat
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [activeConversationId]);
 
   // Cycle loading phase text
@@ -1926,7 +1926,7 @@ export default function ChatPage() {
             setBuildProgress({ phase: data.phase as BuildPhase, detail: data.detail, filesCreated: data.filesCreated, buildType: data.buildType, round: data.round });
             setLoadingPhase(data.detail || data.phase || 'Building...');
             if (buildStartTimeRef.current === null) buildStartTimeRef.current = Date.now();
-          } catch {}
+          } catch { /* ignore */ }
         });
         es.addEventListener('build_complete', (e) => {
           try {
@@ -1942,7 +1942,7 @@ export default function ChatPage() {
             } else {
               toast.warning(`Build finished with ${data.failedCount} error${data.failedCount !== 1 ? 's' : ''}${durationStr}`, { duration: 6000 });
             }
-          } catch {}
+          } catch { /* ignore */ }
         });
         es.addEventListener('done', (e: MessageEvent) => {
           try {

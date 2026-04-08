@@ -177,7 +177,7 @@ export async function startTorDaemon(): Promise<{ success: boolean; message: str
     fs.writeFileSync(torrcPath, TORRC_CONTENT);
 
     // Stop any existing tor
-    try { await execAsync("pkill -f 'tor -f /tmp/titan-torrc' 2>/dev/null || true"); } catch {}
+    try { await execAsync("pkill -f 'tor -f /tmp/titan-torrc' 2>/dev/null || true"); } catch { /* ignore */ }
     await new Promise(r => setTimeout(r, 500));
 
     // Start tor
@@ -351,7 +351,6 @@ async function testScrapedProxy(proxy: { host: string; port: number; protocol: "
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch("https://api.ipify.org?format=json", {
       signal: controller.signal,
-      // @ts-ignore
       agent,
     } as any);
     clearTimeout(timeout);

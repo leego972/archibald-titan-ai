@@ -29,8 +29,8 @@ const BLOCKED_DOMAINS = [
 // ─── Blocked URL Patterns ────────────────────────────────────────
 // Regex patterns that match Titan deployment URLs
 const BLOCKED_URL_PATTERNS = [
-  /archibald[\-_]?titan/i,
-  /titan[\-_]?ai\.(?:com|io|dev|app|net|org)/i,
+  /archibald[-_]?titan/i,
+  /titan[-_]?ai\.(?:com|io|dev|app|net|org)/i,
   /localhost:\d+/i,
   /127\.0\.0\.1/i,
   /0\.0\.0\.0/i,
@@ -58,12 +58,12 @@ const SELF_REPLICATION_SIGNATURES = [
 
 // ─── Blocked Repo Names ─────────────────────────────────────────
 const BLOCKED_REPO_PATTERNS = [
-  /archibald[\-_]?titan/i,
-  /titan[\-_]?ai/i,
-  /titan[\-_]?clone/i,
-  /titan[\-_]?copy/i,
-  /titan[\-_]?replica/i,
-  /titan[\-_]?mirror/i,
+  /archibald[-_]?titan/i,
+  /titan[-_]?ai/i,
+  /titan[-_]?clone/i,
+  /titan[-_]?copy/i,
+  /titan[-_]?replica/i,
+  /titan[-_]?mirror/i,
 ];
 
 // ─── Guard Functions ─────────────────────────────────────────────

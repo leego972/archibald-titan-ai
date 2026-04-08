@@ -119,7 +119,7 @@ async function loginWithBotCheck(
         if (!pwFound) throw new Error("Could not find password input field after two-step login");
       } catch (e: unknown) {
         if (getErrorMessage(e)?.includes("Could not find password")) throw e;
-        throw new Error("Could not find password input field");
+        throw new Error("Could not find password input field", { cause: e });
       }
     }
   }
@@ -318,7 +318,7 @@ async function automateGeneric(
       const cells = row.querySelectorAll("td");
       cells.forEach((cell) => {
         const text = cell.textContent?.trim() || "";
-        if (text.length > 10 && /^[a-zA-Z0-9_\-]+$/.test(text)) {
+        if (text.length > 10 && /^[a-zA-Z0-9_-]+$/.test(text)) {
           results.push({ text, context: row.textContent?.trim()?.substring(0, 100) || "" });
         }
       });
@@ -326,14 +326,14 @@ async function automateGeneric(
     // Look in code elements
     document.querySelectorAll("code, pre, [class*='key'], [class*='token'], [class*='secret']").forEach((el) => {
       const text = el.textContent?.trim() || "";
-      if (text.length > 10 && text.length < 200 && /^[a-zA-Z0-9_\-\.]+$/.test(text)) {
+      if (text.length > 10 && text.length < 200 && /^[a-zA-Z0-9_\.-]+$/.test(text)) {
         results.push({ text, context: el.parentElement?.textContent?.trim()?.substring(0, 100) || "" });
       }
     });
     // Look in readonly inputs
     document.querySelectorAll('input[readonly], input[disabled], input[type="text"]').forEach((el) => {
       const val = (el as HTMLInputElement).value?.trim() || "";
-      if (val.length > 10 && /^[a-zA-Z0-9_\-\.]+$/.test(val)) {
+      if (val.length > 10 && /^[a-zA-Z0-9_\.-]+$/.test(val)) {
         results.push({ text: val, context: el.parentElement?.textContent?.trim()?.substring(0, 100) || "" });
       }
     });
@@ -708,7 +708,7 @@ async function automateGoDaddy(page: Page, email: string, password: string, capt
       const values: string[] = [];
       elements.forEach((el) => {
         const text = el.textContent?.trim() || (el as HTMLInputElement).value?.trim() || "";
-        if (text.length > 10 && /^[a-zA-Z0-9_\-]+$/.test(text)) {
+        if (text.length > 10 && /^[a-zA-Z0-9_-]+$/.test(text)) {
           values.push(text);
         }
       });
@@ -1040,7 +1040,7 @@ async function automateDiscord(page: Page, email: string, password: string, capt
     const postCaptcha = await detectAndSolveCaptcha(page, captchaConfig);
     if (postCaptcha.solved) await humanDelay(2000, 3000);
   } catch (e) {
-    throw new Error(`Discord login failed: ${e instanceof Error ? getErrorMessage(e) : String(e)}`);
+    throw new Error(`Discord login failed: ${e instanceof Error ? getErrorMessage(e) : String(e)}`, { cause: e });
   }
 
   // Navigate to Developer Portal Applications

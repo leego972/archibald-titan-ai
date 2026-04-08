@@ -65,7 +65,7 @@ async function getFileContent(file: { content: string | null; s3Key: string | nu
       const { url } = await storageGet(file.s3Key);
       const res = await fetch(url);
       if (res.ok) return await res.text();
-    } catch {}
+    } catch { /* ignore */ }
   }
 
   return null;

@@ -110,7 +110,7 @@ export const businessPlanRouter = router({
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
     }
-    try { await consumeCredits(ctx.user.id, "business_plan_generate", "Business plan generation"); } catch {}
+    try { await consumeCredits(ctx.user.id, "business_plan_generate", "Business plan generation"); } catch { /* ignore */ }
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -180,7 +180,7 @@ export const grantRouter = router({
     return db.getGrantOpportunityById(input.id);
   }),
   match: protectedProcedure.input(z.object({ companyId: z.number() })).mutation(async ({ input, ctx }) => {
-    try { await consumeCredits(ctx.user.id, "grant_match", "Grant matching analysis"); } catch {}
+    try { await consumeCredits(ctx.user.id, "grant_match", "Grant matching analysis"); } catch { /* ignore */ }
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -212,7 +212,7 @@ export const grantRouter = router({
 
     // Batch into chunks of 40 to avoid token limits
     const BATCH_SIZE = 40;
-    let allMatches: any[] = [];
+    const allMatches: any[] = [];
 
     for (let i = 0; i < grants.length; i += BATCH_SIZE) {
       const batch = grants.slice(i, i + BATCH_SIZE);
@@ -256,7 +256,7 @@ Return ONLY a JSON object with a "matches" array.`;
           allMatches.push(...(parsed.matches || parsed));
         } catch { /* skip bad batch */ }
       } catch (e) {
-        console.error(`Grant match batch ${i}-${i + BATCH_SIZE} failed:`, e);
+        log.error(`Grant match batch ${i}-${i + BATCH_SIZE} failed:`, { error: e });
       }
     }
 
@@ -302,7 +302,7 @@ export const grantApplicationRouter = router({
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
     }
-    try { await consumeCredits(ctx.user.id, "grant_match", "Grant application generation"); } catch {}
+    try { await consumeCredits(ctx.user.id, "grant_match", "Grant application generation"); } catch { /* ignore */ }
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -738,7 +738,7 @@ Be realistic — most first-time applications score 40-65. Strong applications w
     if (regenerated > 0) {
       await db.updateGrantApplication(input.applicationId, updates as any);
       log.info(`[GrantRegen] Regenerated ${regenerated} sections for application ${input.applicationId}`);
-      try { await consumeCredits(ctx.user.id, "grant_match", `Grant sections regenerated: ${regenerated}/9 for application #${input.applicationId}`); } catch {}
+      try { await consumeCredits(ctx.user.id, "grant_match", `Grant sections regenerated: ${regenerated}/9 for application #${input.applicationId}`); } catch { /* ignore */ }
     }
 
     return { success: true, regenerated, total: 9 };
@@ -1279,7 +1279,7 @@ Write in first person plural ("we"). Keep it under 800 words. Use markdown forma
       userApiKey,
       messages: [{ role: "user", content: prompt }],
     });
-    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`); } catch {}
+    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`); } catch { /* ignore */ }
     return { story: String(response.choices[0]?.message?.content || "") };
   }),
 
@@ -1308,7 +1308,7 @@ Example: [{"title":"Early Bird","description":"Get early access","minAmount":25,
       messages: [{ role: "user", content: prompt }],
     });
     const content = String(response.choices[0]?.message?.content || "[]");
-    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding reward tiers suggested: ${input.title}`); } catch {}
+    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding reward tiers suggested: ${input.title}`); } catch { /* ignore */ }
     try {
       const jsonMatch = content.match(/\[\s\S\]*\]/);
       return { rewards: jsonMatch ? JSON.parse(jsonMatch[0]) : [] };

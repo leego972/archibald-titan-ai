@@ -2635,7 +2635,7 @@ async function execSelfCodeStats(
     }
 
     // Count files and lines by extension
-    const cmd = `find ${targetDir} -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' \) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
+    const cmd = `find ${targetDir} -type f ( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' ) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
     const files = execSync(cmd, { encoding: "utf-8", timeout: 10000 }).trim().split("\n").filter(Boolean);
 
     const stats: Record<string, { files: number; lines: number; largest: { file: string; lines: number } }> = {};
@@ -4721,7 +4721,7 @@ async function pushFilesToGithub(
       const refData = await refResp.json() as any;
       sha = refData.object?.sha;
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // Create blobs for each file
   const treeItems: Array<{ path: string; mode: string; type: string; sha: string }> = [];
@@ -7045,7 +7045,7 @@ async function execEvilginxRunCommand(userId: number, args: Record<string, unkno
     // 2. Use user's saved SSH config (or global Titan Server fallback)
     const { execSSHCommand: execTitanSSH } = await import("./titan-server");
     const sshConfig = await getUserToolSSHConfig(userId, "__evilginx_ssh", "Evilginx");
-    const safeCmd = command.replace(/'/g, "'\\'\''");
+    const safeCmd = command.replace(/'/g, "'\'''");
     const sshCmd = `evilginx -p /opt/evilginx/phishlets -c /opt/evilginx/config -developer -x '${safeCmd}' 2>&1 | head -80`;
     const output = await execTitanSSH(sshConfig, sshCmd, 15000, userId);
     return { success: true, data: { command, output: output.trim() || "(no output)" } };
@@ -7061,7 +7061,7 @@ async function execMetasploitRunCommand(userId: number, args: Record<string, unk
     if (!command) return { success: false, error: "command is required" };
     const { execSSHCommand: execTitanSSH } = await import("./titan-server");
     const sshConfig = await getUserToolSSHConfig(userId, "__metasploit_ssh", "Metasploit");
-    const safeCmd = command.replace(/'/g, "'\\'\''");
+    const safeCmd = command.replace(/'/g, "'\'''");
     const sshCmd = `msfconsole -q -x '${safeCmd}; exit' 2>/dev/null`;
     const output = await execTitanSSH(sshConfig, sshCmd, timeout, userId);
     return { success: true, data: { command, output: output.trim() || "(no output)" } };

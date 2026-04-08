@@ -278,7 +278,7 @@ describe("marketing router", () => {
       ).rejects.toThrow();
     });
 
-    it("accepts valid campaign creation params", async () => {  // eslint-disable-next-line
+    it("accepts valid campaign creation params", async () => {   
     }, 15000);
 
     it.skip("accepts valid campaign creation params (long-running LLM)", async () => {

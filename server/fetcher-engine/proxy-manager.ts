@@ -247,7 +247,6 @@ export async function checkProxyHealth(proxy: FetcherProxy): Promise<HealthCheck
 
     const response = await fetch("https://ipapi.co/json/", {
       signal: controller.signal,
-      // @ts-ignore - agent is not in the standard fetch types
       agent,
     } as any);
 

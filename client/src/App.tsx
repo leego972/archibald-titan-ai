@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import FetcherLayout from "./components/FetcherLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ArchibaldProvider } from "./contexts/ArchibaldContext";
@@ -178,6 +179,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 function DashboardRouter() {
   return (
     <FetcherLayout>
+      <RouteErrorBoundary>
       <Switch>
         {/* Main Dashboard - Builder Chat */}
         <Route path="/dashboard" component={ChatPage} />
@@ -265,8 +267,8 @@ function DashboardRouter() {
 
         {/* Security Tools */}
         <Route path="/cybermcp" component={() => <AdminRoute component={CyberMCPPage} />} />
-        <Route path="/astra" component={AstraPage} />
-        <Route path="/argus" component={ArgusPage} />
+        <Route path="/astra" component={() => <AdminRoute component={AstraPage} />} />
+        <Route path="/argus" component={() => <AdminRoute component={ArgusPage} />} />
 
         {/* Titan Storage Add-on */}
         <Route path="/storage" component={TitanStoragePage} />
@@ -295,7 +297,7 @@ function DashboardRouter() {
         <Route path="/builder-templates" component={BuilderTemplatesPage} />
 
         {/* Attack Graph */}
-        <Route path="/attack-graph" component={AttackGraphPage} />
+        <Route path="/attack-graph" component={() => <AdminRoute component={AttackGraphPage} />} />
 
         {/* Proxy Interceptor — admin only */}
         <Route path="/proxy-interceptor" component={() => <AdminRoute component={ProxyInterceptorPage} />} />
@@ -320,6 +322,7 @@ function DashboardRouter() {
 
         <Route component={NotFound} />
       </Switch>
+      </RouteErrorBoundary>
     </FetcherLayout>
   );
 }

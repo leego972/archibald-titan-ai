@@ -35,6 +35,7 @@ import { enforceCloneSafety, checkScrapedContent } from "./clone-safety";
 import { storagePut } from "./storage";
 import { scrapeProductCatalog, type CatalogResult, type ScrapedProduct, type SiteType } from "./product-scraper";
 import { getErrorMessage } from "./_core/errors.js";
+import { log } from "./_core/logger.js";
 import { getUserOpenAIKey, getUserGithubPat } from "./user-secrets-router";
 import { isBlockedCloneTarget } from "./anti-replication-guard";
 
@@ -115,7 +116,7 @@ export async function createProject(
   try {
     await db.execute(sql`SELECT 1 FROM replicate_projects LIMIT 1`);
   } catch {
-    console.log("[Clone] replicate_projects table missing, creating...");
+    log.info("[Clone] replicate_projects table missing, creating...");
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS replicate_projects (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -181,8 +182,8 @@ export async function createProject(
     return project;
   } catch (e: unknown) {
     const msg = getErrorMessage(e);
-    console.error("[Clone] createProject DB error:", msg, e);
-    throw new Error(`Database error creating clone project: ${msg}`);
+    log.error("[Clone] createProject DB error:", { msg, error: e });
+    throw new Error(`Database error creating clone project: ${msg}`, { cause: e });
   }
 }
 
@@ -573,7 +574,9 @@ export async function researchTarget(
     }
   }
 
+  // eslint-disable-next-line no-useless-assignment
   let pageContent = "";
+  // eslint-disable-next-line no-useless-assignment
   let pageTitle = "";
   let rawHtml = "";
   try {
@@ -1804,7 +1807,7 @@ Return ONLY: {"path": "${filePath}", "content": "..."}`,
       }
     } catch (err: unknown) {
       if (attempt === maxRetries) {
-        console.error(`[replicate] Failed to generate ${filePath} after ${maxRetries} attempts: ${getErrorMessage(err)}`);
+        log.error(`[replicate] Failed to generate ${filePath} after ${maxRetries} attempts: ${getErrorMessage(err)}`);
         return null;
       }
     }

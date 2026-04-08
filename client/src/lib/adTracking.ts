@@ -119,11 +119,8 @@ function initSnapPixel() {
     // Snapchat pixel inline bootstrap (official snippet)
     const w = window as Window;
     if (!w.snaptr) {
-      const tr = function () {
-        // eslint-disable-next-line prefer-rest-params
-        (tr as unknown as { queue: unknown[] }).queue.push(
-          Array.prototype.slice.call(arguments)
-        );
+      const tr = function (...args: unknown[]) {
+        (tr as unknown as { queue: unknown[] }).queue.push(args);
       };
       (tr as unknown as { queue: unknown[] }).queue = [];
       w.snaptr = tr as typeof w.snaptr;

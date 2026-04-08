@@ -511,7 +511,7 @@ export const vpnChainRouter = router({
     }
     // Intense base (300) + 100 per hop — scales with real SSH compute work
     const buildCost = 300 + (readyHops.length * 100);
-    try { await consumeCreditsAmount(ctx.user.id, buildCost, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain (${buildCost} credits)`); } catch {}
+    try { await consumeCreditsAmount(ctx.user.id, buildCost, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain (${buildCost} credits)`); } catch { /* ignore */ }
     const result = await buildChainTunnels(ctx.user.id, readyHops);
     if (result.success) {
       await saveHops(ctx.user.id, hops);
@@ -545,7 +545,7 @@ export const vpnChainRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "First hop has no WireGuard public key. Re-deploy the hop." });
     }
     // Intense (300) — WireGuard key generation + SSH peer registration
-    try { await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config"); } catch {}
+    try { await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config"); } catch { /* ignore */ }
     const { execSync } = await import("child_process");
     let clientPrivKey: string;
     let clientPubKey: string;
@@ -651,7 +651,7 @@ export const vpnChainRouter = router({
       if (idx === -1) throw new TRPCError({ code: "NOT_FOUND", message: "Hop not found." });
       const hop = hops[idx];
       // Tear down WireGuard on the removed hop
-      try { await execSSHCommand(hopToSSH(hop), TEARDOWN_WG, 10000, ctx.user.id); } catch {}
+      try { await execSSHCommand(hopToSSH(hop), TEARDOWN_WG, 10000, ctx.user.id); } catch { /* ignore */ }
       const label = hop.label;
       hops.splice(idx, 1);
       hops.forEach((h, i) => { h.hopIndex = i; h.chainLinked = false; });
@@ -709,7 +709,7 @@ export const vpnChainRouter = router({
         if (!allLinked) {
           // Scaled cost: 300 base + 100/hop — single charge covers build + activate
           const activateBuildCost = 300 + (readyHops.length * 100);
-          try { await consumeCreditsAmount(ctx.user.id, activateBuildCost, "vpn_generate", `VPN Chain: activate + build ${readyHops.length}-hop chain (${activateBuildCost} credits)`); } catch {}
+          try { await consumeCreditsAmount(ctx.user.id, activateBuildCost, "vpn_generate", `VPN Chain: activate + build ${readyHops.length}-hop chain (${activateBuildCost} credits)`); } catch { /* ignore */ }
           const result = await buildChainTunnels(ctx.user.id, readyHops);
           if (!result.success) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Chain build failed: ${result.message}` });
@@ -717,7 +717,7 @@ export const vpnChainRouter = router({
           await saveHops(ctx.user.id, hops);
         } else {
           // Chain already built — just toggling active state, flat 75 credits
-          try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", "VPN Chain: activate (already built)"); } catch {}
+          try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", "VPN Chain: activate (already built)"); } catch { /* ignore */ }
         }
       } else {
         const hops = await getHops(ctx.user.id);

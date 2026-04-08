@@ -57,7 +57,7 @@ describe("Auto-Renewal Billing — Invoice Handling", () => {
 
 describe("Auto-Renewal Billing — Cancellation", () => {
   it("cancelled user keeps remaining credits (not zeroed)", () => {
-    let balance = 150;
+    const balance = 150;
     const isCancelled = true;
     // On cancellation, we do NOT zero the balance
     // We just stop monthly refills
@@ -237,7 +237,7 @@ describe("Auto-Renewal Billing — Payment Failure", () => {
   });
 
   it("past_due subscription preserves existing credits", () => {
-    let balance = 50;
+    const balance = 50;
     const status = "past_due";
     // Credits are NOT removed on payment failure
     expect(balance).toBe(50);
@@ -398,7 +398,7 @@ describe("Auto-Renewal Billing — E2E Scenarios", () => {
   });
 
   it("payment failure: credits preserved, no refill until resolved", () => {
-    let balance = 50;
+    const balance = 50;
     let status = "active";
 
     // Payment fails

@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Coins,
   Sparkles,
-  Infinity,
+  Infinity as InfinityIcon,
   ShoppingCart,
   ArrowUpRight,
   TrendingUp,
@@ -135,7 +135,7 @@ export default function CreditsPage() {
               <span className="text-4xl font-bold tabular-nums">
                 {isUnlimited ? (
                   <span className="flex items-center gap-2 text-amber-400">
-                    <Infinity className="h-8 w-8" /> Unlimited
+                    <InfinityIcon className="h-8 w-8" /> Unlimited
                   </span>
                 ) : (
                   credits.toLocaleString()

@@ -6,6 +6,7 @@
  */
 
 import { getDb } from "./db";
+import { log } from "./_core/logger.js";
 import { marketplaceListings } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { storagePut } from "./storage";
@@ -316,7 +317,7 @@ class OSINTToolkit:
             )
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
                 body = r.read().decode("utf-8", errors="ignore")
-            found = re.findall(r"[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", body)
+            found = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", body)
             emails.update(found)
         except Exception:
             pass
@@ -1471,7 +1472,7 @@ class SEOAnalyzer:
             issues.append({"type": f"Title too long ({len(title)}ch)", "severity": "MEDIUM"}); score -= 5
 
         # Meta description
-        desc_m = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']*)["\']', html, re.I)
+        desc_m = re.search(r'<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']', html, re.I)
         desc   = desc_m.group(1) if desc_m else ""
         if not desc:
             issues.append({"type": "Missing meta description", "severity": "HIGH"}); score -= 15
@@ -2406,7 +2407,7 @@ def extract_iocs(strings_list: list[str]) -> dict:
     ip_re     = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
     domain_re = re.compile(r"\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|io|ru|cn|xyz|top)\b")
     url_re    = re.compile(r"https?://[^\s\"'<>]{10,}")
-    email_re  = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+    email_re  = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
     hash_re   = re.compile(r"\b[a-fA-F0-9]{32,64}\b")
     for s in strings_list:
         if ip_re.search(s):     iocs["ips"].extend(ip_re.findall(s))
@@ -3127,7 +3128,7 @@ export async function generateAndUploadPayload(listingId: number): Promise<strin
       .where(eq(marketplaceListings.id, listingId));
     return storageKey;
   } catch (err) {
-    console.error("[PayloadGen] Upload failed:", err);
+    log.error("[PayloadGen] Upload failed:", { error: err });
     return null;
   }
 }

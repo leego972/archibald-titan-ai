@@ -656,7 +656,7 @@ async function _invokeGeneral(
         log.warn(`[LLM] ${systemTag}: Venice timed out after ${fetchTimeoutMs / 1000}s, falling back to OpenAI`);
         return _invokeGeneral({ ...params, _sharedVeniceFailed: true }, priority, 0);
       }
-      throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`);
+      throw new Error(`LLM request timed out after ${fetchTimeoutMs / 1000}s`, { cause: err });
     }
 
     if (useSharedVenice) {
@@ -787,7 +787,7 @@ async function _invokeGeneral(
       await new Promise((r) => setTimeout(r, waitMs));
       return _invokeGeneral(params, priority, attempt + 1);
     }
-    throw new Error(`LLM response JSON parse failed: ${(parseErr as Error).message}`);
+    throw new Error(`LLM response JSON parse failed: ${(parseErr as Error).message}`, { cause: parseErr });
   }
   return body;
 }
@@ -932,7 +932,7 @@ async function _invokeUncensored(
       log.warn(`[LLM] ${systemTag}: Uncensored step ${step} JSON parse error, advancing: ${(parseErr as Error).message}`);
       return _invokeUncensored({ ...params, _uncensoredFallbackStep: step + 1 }, priority, 0);
     }
-    throw new Error(`Uncensored LLM JSON parse failed: ${(parseErr as Error).message}`);
+    throw new Error(`Uncensored LLM JSON parse failed: ${(parseErr as Error).message}`, { cause: parseErr });
   }
   return body;
 }

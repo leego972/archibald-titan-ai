@@ -1449,7 +1449,7 @@ const fuzzerRun: Tool = {
         },
         options: {
           type: "string",
-          description: "Additional fuzzer options (e.g. '-mc 200,301,302', '-H \'Authorization: Bearer token\'', '-X POST -d \'user=FUZZ\'')",
+          description: "Additional fuzzer options (e.g. '-mc 200,301,302', '-H 'Authorization: Bearer token'', '-X POST -d 'user=FUZZ'')",
         },
         sandboxId: {
           type: "number",
@@ -1863,7 +1863,7 @@ const selfGrepCodebase: Tool = {
       properties: {
         pattern: {
           type: "string",
-          description: "Regex pattern to search for (e.g., 'TODO|FIXME|HACK', 'password.*=.*[\"\']', 'console\\.log')",
+          description: "Regex pattern to search for (e.g., 'TODO|FIXME|HACK', 'password.*=.*[\"']', 'console\\.log')",
         },
         filePattern: {
           type: "string",

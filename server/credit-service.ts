@@ -7,6 +7,7 @@
  */
 
 import { eq, sql, desc } from "drizzle-orm";
+import { log } from "./_core/logger";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions, users } from "../drizzle/schema";
 import {
@@ -415,6 +416,25 @@ export async function addCredits(
     return { success: false, balanceAfter: 0 };
   }
 
+  // ── Idempotency: prevent double-crediting on Stripe webhook retries ──────
+  if (stripePaymentIntentId) {
+    const { creditTransactions: ctTable } = await import("../drizzle/schema.js");
+    const existing = await db
+      .select({ id: ctTable.id })
+      .from(ctTable)
+      .where(eq(ctTable.stripePaymentIntentId, stripePaymentIntentId))
+      .limit(1);
+    if (existing.length > 0) {
+      const bal = await db
+        .select({ credits: creditBalances.credits })
+        .from(creditBalances)
+        .where(eq(creditBalances.userId, userId))
+        .limit(1);
+      const currentBalance = bal[0]?.credits ?? 0;
+      log.info(`[Credits] Idempotency skip: payment_intent=${stripePaymentIntentId} already credited for user=${userId}`);
+      return { success: true, balanceAfter: currentBalance };
+    }
+  }
   // Wrap in a transaction to ensure balance update + transaction log are atomic
   return await db.transaction(async (tx) => {
     // Add credits atomically within the transaction

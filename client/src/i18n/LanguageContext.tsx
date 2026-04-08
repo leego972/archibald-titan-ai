@@ -27,7 +27,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (stored && SUPPORTED_LANGUAGES.some((l) => l.code === stored)) {
         return stored as LanguageCode;
       }
-    } catch {}
+    } catch { /* ignore */ }
     return detectBrowserLanguage();
   });
 
@@ -37,7 +37,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLanguageState(code);
     try {
       localStorage.setItem(STORAGE_KEY, code);
-    } catch {}
+    } catch { /* ignore */ }
   }, []);
 
   const t = useCallback(

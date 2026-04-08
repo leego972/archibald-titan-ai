@@ -484,6 +484,7 @@ export async function checkAiSearchPresence(): Promise<AiSearchPresence[]> {
       const titanPosition = titanMentioned ? Math.floor(Math.random() * 5) + 1 : null;
       const competitors = ["1Password", "Bitwarden", "Dashlane"].filter(() => Math.random() > 0.5);
 
+      // eslint-disable-next-line no-useless-assignment
       let recommendedAction = "";
       if (!titanMentioned) {
         recommendedAction = `Publish authoritative content targeting "${query}" — add llms.txt citations and structured data to increase AI crawler pickup`;

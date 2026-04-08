@@ -381,7 +381,7 @@ export const torRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
     // Intense (300) — SSH command + Tor control port + new exit node build
-    try { await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation"); } catch {}
+    try { await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation"); } catch { /* ignore */ }
     const output = await execSSHCommand(nodeToSSH(node), NEW_CIRCUIT, 10000, ctx.user.id);
     const ok = output.includes("CIRCUIT_RENEWED");
     if (ok) {
@@ -532,7 +532,7 @@ export const torRouter = router({
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
       // Medium (75) — routing a command through an existing Tor circuit is lightweight
-      try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Tor: run command through circuit`); } catch {}
+      try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Tor: run command through circuit`); } catch { /* ignore */ }
       const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
       const script = `torify bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "TOR_CMD_FAILED"`;
       const output = await execSSHCommand(nodeToSSH(node), script, input.timeoutMs ?? 30000, ctx.user.id);

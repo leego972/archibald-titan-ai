@@ -107,9 +107,9 @@ class TorSupervisor {
     this.shouldRun = false;
     this._clearTimers();
     if (this.process) {
-      try { this.process.kill("SIGTERM"); } catch {}
+      try { this.process.kill("SIGTERM"); } catch { /* ignore */ }
       await new Promise(r => setTimeout(r, 1000));
-      try { this.process.kill("SIGKILL"); } catch {}
+      try { this.process.kill("SIGKILL"); } catch { /* ignore */ }
       this.process = null;
     }
     this.state = "stopped";
@@ -143,8 +143,8 @@ class TorSupervisor {
     fs.writeFileSync(TORRC_PATH, TORRC);
 
     // Kill any stale tor process on our ports
-    try { await execAsync(`fuser -k ${SOCKS_PORT}/tcp 2>/dev/null || true`); } catch {}
-    try { await execAsync(`fuser -k ${CONTROL_PORT}/tcp 2>/dev/null || true`); } catch {}
+    try { await execAsync(`fuser -k ${SOCKS_PORT}/tcp 2>/dev/null || true`); } catch { /* ignore */ }
+    try { await execAsync(`fuser -k ${CONTROL_PORT}/tcp 2>/dev/null || true`); } catch { /* ignore */ }
     await new Promise(r => setTimeout(r, 800));
 
     this.state = "starting";
@@ -271,7 +271,6 @@ class TorSupervisor {
       const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch("https://api.ipify.org?format=json", {
         signal: controller.signal,
-        // @ts-ignore
         agent,
       } as any);
       clearTimeout(timeout);

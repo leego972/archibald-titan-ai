@@ -1,4 +1,4 @@
-import { boolean, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, json, mysqlEnum, mysqlTable, primaryKey, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -2502,3 +2502,19 @@ export const securityModuleReviews = mysqlTable("security_module_reviews", {
 });
 export type SecurityModuleReview = typeof securityModuleReviews.$inferSelect;
 export type InsertSecurityModuleReview = typeof securityModuleReviews.$inferInsert;
+
+// ─── Venice Daily Usage (DB-backed for restart persistence) ─────────────────
+export const venicelDailyUsage = mysqlTable(
+  "venice_daily_usage",
+  {
+    userId: int("userId").notNull(),
+    date: varchar("date", { length: 10 }).notNull(),
+    count: int("count").default(0).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.date] }),
+  })
+);
+export type VeniceDailyUsage = typeof venicelDailyUsage.$inferSelect;
+export type InsertVeniceDailyUsage = typeof venicelDailyUsage.$inferInsert;

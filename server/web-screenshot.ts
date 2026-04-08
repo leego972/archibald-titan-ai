@@ -83,7 +83,7 @@ export async function takeWebScreenshot(
     ],
   });
 
-  let screenshotBuffer: Buffer;
+  let screenshotBuffer!: Buffer;
   let pageTitle = "Untitled";
 
   try {

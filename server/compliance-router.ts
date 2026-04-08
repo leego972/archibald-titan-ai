@@ -390,7 +390,7 @@ export const complianceRouter = router({
         case "gdpr":
           controls = await evaluateGDPRControls(userId);
           break;
-        case "security_posture":
+        case "security_posture": {
           // Combined assessment
           const [soc2, iso, gdpr] = await Promise.all([
             evaluateSOC2Controls(userId),
@@ -399,6 +399,7 @@ export const complianceRouter = router({
           ]);
           controls = [...soc2, ...iso, ...gdpr];
           break;
+        }
         case "red_team_summary":
           controls = [
             { id: "RT.1", category: "Reconnaissance", title: "OSINT Coverage", description: "Argus OSINT modules available for target reconnaissance", status: "pass", evidence: "135 Argus modules across DNS, WHOIS, email, social, breach, and geolocation categories", severity: "info" },

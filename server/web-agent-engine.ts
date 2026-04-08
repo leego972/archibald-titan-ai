@@ -381,7 +381,7 @@ async function executeStep(
             loggedIn = true;
             break;
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
 
       if (loggedIn) {
@@ -400,7 +400,7 @@ async function executeStep(
               await humanDelay(300, 600);
               break;
             }
-          } catch {}
+          } catch { /* ignore */ }
         }
 
         // Submit
@@ -409,7 +409,7 @@ async function executeStep(
         );
         if (submitBtn) {
           await submitBtn.click();
-          await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+          await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => { /* ignore */ });
           await humanDelay(1500, 3000);
         }
       }
@@ -439,12 +439,12 @@ async function executeStep(
             await humanType(page, sel, step.value || "");
             await humanDelay(300, 600);
             await page.keyboard.press("Enter");
-            await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
+            await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => { /* ignore */ });
             await humanDelay(1000, 2000);
             searched = true;
             break;
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
       steps.push({
         action: "search",
@@ -467,7 +467,7 @@ async function executeStep(
           await el.click();
           await humanDelay(500, 1200);
         }
-      } catch {}
+      } catch { /* ignore */ }
       steps.push({ action: "click", detail: `Clicked: ${step.description}`, timestamp });
       break;
     }
@@ -476,7 +476,7 @@ async function executeStep(
       if (!step.selector || !step.value) break;
       try {
         await humanType(page, step.selector, step.value);
-      } catch {}
+      } catch { /* ignore */ }
       steps.push({ action: "type", detail: `Typed into ${step.description}: ${step.value}`, timestamp });
       break;
     }
@@ -634,7 +634,7 @@ export async function runWebAgentTask(
             timestamp: new Date().toISOString(),
           });
         }
-      } catch {}
+      } catch { /* ignore */ }
 
       const stepResult = await executeStep(page, step, credentials, steps, extractedData);
 
@@ -697,7 +697,7 @@ export async function runWebAgentTask(
     if (browser) {
       try {
         await browser.close();
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     await db

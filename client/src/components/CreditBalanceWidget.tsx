@@ -9,7 +9,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Coins, Sparkles, ArrowUpRight, Infinity, ShoppingCart, Zap } from "lucide-react";
+import { Coins, Sparkles, ArrowUpRight, Infinity as InfinityIcon, ShoppingCart, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -56,7 +56,7 @@ export function CreditBalanceWidget() {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${getBgColor()} ${getCreditColor()}`}
         >
           {isUnlimited ? (
-            <Infinity className="h-4 w-4" />
+            <InfinityIcon className="h-4 w-4" />
           ) : (
             <Coins className="h-4 w-4" />
           )}

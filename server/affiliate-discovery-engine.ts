@@ -741,7 +741,7 @@ export async function getDiscoveries(filters?: {
   const db = await getDb();
   if (!db) return [];
 
-  let query = db.select().from(affiliateDiscoveries)
+  const query = db.select().from(affiliateDiscoveries)
     .orderBy(desc(affiliateDiscoveries.overallScore))
     .limit(filters?.limit || 100);
 

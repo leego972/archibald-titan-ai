@@ -270,7 +270,7 @@ export const siemRouter = router({
       } catch (err: any) {
         config.lastTestedAt = new Date();
         config.lastTestStatus = "failed";
-        throw new Error(`Test failed: ${err?.message}`);
+        throw new Error(`Test failed: ${err?.message}`, { cause: err });
       }
     }),
 

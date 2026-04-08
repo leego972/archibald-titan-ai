@@ -821,7 +821,7 @@ export async function advancedSearch(params: AdvancedSearchParams) {
       .limit(500);
 
     // Sort
-    let sorted = [...allResults];
+    const sorted = [...allResults];
     switch (params.sortBy) {
       case "price_asc": sorted.sort((a, b) => a.priceCredits - b.priceCredits); break;
       case "price_desc": sorted.sort((a, b) => b.priceCredits - a.priceCredits); break;

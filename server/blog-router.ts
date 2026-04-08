@@ -300,7 +300,7 @@ Tone: ${input.tone}`
       });
 
       const generated = JSON.parse(response.choices[0].message.content as string);
-      try { await consumeCredits(ctx.user.id, "blog_generate", "AI blog post generation"); } catch {}
+      try { await consumeCredits(ctx.user.id, "blog_generate", "AI blog post generation"); } catch { /* ignore */ }
       return {
         ...generated,
         category: input.category,

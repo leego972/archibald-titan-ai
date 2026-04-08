@@ -765,8 +765,8 @@ export async function runSecuritySweep(): Promise<{
 }> {
   log.info("Running periodic security sweep...");
 
-  let creditAudits = 0;
-  let anomaliesDetected = 0;
+  const creditAudits = 0;
+  const anomaliesDetected = 0;
   let rateLimitWindowsCleaned = 0;
 
   // 1. Clean up expired rate limit windows

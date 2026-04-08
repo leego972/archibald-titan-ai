@@ -29,7 +29,9 @@ describe("Scheduled Auto-Sync", () => {
       for (const day of validDays) {
         expect(day >= 0 && day <= 6).toBe(true);
       }
+      // eslint-disable-next-line no-constant-binary-expression
       expect(7 >= 0 && 7 <= 6).toBe(false);
+      // eslint-disable-next-line no-constant-binary-expression
       expect(-1 >= 0 && -1 <= 6).toBe(false);
     });
 
@@ -98,7 +100,7 @@ describe("Scheduled Auto-Sync", () => {
 
   describe("Schedule Toggle", () => {
     it("should toggle schedule enabled/disabled", () => {
-      let schedule = { enabled: true, providerId: "aws" };
+      const schedule = { enabled: true, providerId: "aws" };
       schedule.enabled = false;
       expect(schedule.enabled).toBe(false);
       schedule.enabled = true;
@@ -318,7 +320,9 @@ describe("Provider Health Trends", () => {
       for (const range of validRanges) {
         expect(range >= 7 && range <= 90).toBe(true);
       }
+      // eslint-disable-next-line no-constant-binary-expression
       expect(3 >= 7 && 3 <= 90).toBe(false);
+      // eslint-disable-next-line no-constant-binary-expression
       expect(120 >= 7 && 120 <= 90).toBe(false);
     });
   });

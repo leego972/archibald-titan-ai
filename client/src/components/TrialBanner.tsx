@@ -27,7 +27,7 @@ export default function TrialBanner() {
     refetchInterval: 120_000,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    // @ts-ignore — suppress any missing-endpoint errors during deploy
+    // @ts-expect-error — suppress any missing-endpoint errors during deploy
     onError: () => {},
   });
 
@@ -35,7 +35,7 @@ export default function TrialBanner() {
     retry: false,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    // @ts-ignore
+    // @ts-expect-error — tRPC endpoint may not be available in all build configurations
     onError: () => {},
   });
 

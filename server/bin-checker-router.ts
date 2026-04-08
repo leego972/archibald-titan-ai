@@ -194,7 +194,7 @@ export const binCheckerRouter = router({
 
       // ── Layer 1: Try local 343k-row BIN database first (instant, no rate limits) ──
       const localResults = await searchBins({ bin: bin.slice(0, 6) });
-      let localRow = localResults.length > 0 ? localResults[0] : null;
+      const localRow = localResults.length > 0 ? localResults[0] : null;
 
       // ── Layer 2: Fall back to external API only if not found locally ──
       let apiData: BinApiResult | null = null;

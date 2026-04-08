@@ -1,16 +1,57 @@
 {
   "name": "Archibald Titan",
   "short_name": "Titan",
-  "description": "World's Most Advanced AI Agent and Builder Platform",
+  "description": "World's Most Advanced AI Agent and Builder Platform — security tools, credential management, AI builder, and the Grand Bazaar marketplace.",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0a0a1a",
   "theme_color": "#0a0a1a",
+  "categories": ["productivity", "utilities", "security"],
+  "lang": "en",
   "icons": [
+    {
+      "src": "/logos/at-icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/logos/at-icon-64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
     {
       "src": "/logos/at-icon-128.png",
       "sizes": "128x128",
       "type": "image/png"
+    },
+    {
+      "src": "/logos/at-icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/logos/full-logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Titan Builder",
+      "short_name": "Builder",
+      "description": "Open the AI command center",
+      "url": "/dashboard",
+      "icons": [{ "src": "/logos/at-icon-128.png", "sizes": "128x128" }]
+    },
+    {
+      "name": "Marketplace",
+      "short_name": "Bazaar",
+      "description": "Browse the Grand Bazaar",
+      "url": "/marketplace",
+      "icons": [{ "src": "/logos/bazaar-logo-128.png", "sizes": "128x128" }]
     }
   ]
 }

@@ -132,7 +132,6 @@ async function _fetchWithLayer(
           ...options,
           headers: mergedHeaders,
           signal: controller.signal,
-          // @ts-ignore
           agent,
         } as any);
         clearTimeout(timeout);
@@ -169,7 +168,6 @@ async function _fetchWithLayer(
           ...options,
           headers: mergedHeaders,
           signal: controller.signal,
-          // @ts-ignore
           agent,
         } as any);
         clearTimeout(timeout);

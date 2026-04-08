@@ -1090,7 +1090,7 @@ export function calculateAttribution(
       attribution.set(touchpoints[touchpoints.length - 1].partnerId, 1.0);
       break;
 
-    case "linear":
+    case "linear": {
       // Equal credit to all touchpoints
       const equalShare = 1.0 / touchpoints.length;
       for (const tp of touchpoints) {
@@ -1098,6 +1098,7 @@ export function calculateAttribution(
         attribution.set(tp.partnerId, current + equalShare);
       }
       break;
+    }
 
     case "time_decay": {
       // More recent touchpoints get more credit (half-life of 7 days)

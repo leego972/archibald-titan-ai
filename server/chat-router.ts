@@ -1694,7 +1694,7 @@ Do NOT attempt any tool calls or builds.`;
         }
         if (imageUrls.length === 0) return text;
         // Strip the markdown image links and instruction line from the text
-        let cleanText = text
+        const cleanText = text
           .replace(/\[Attached image:[^\]]*\]\(https?:\/\/[^)]+\)\n?/g, '')
           .replace(/\n*I have attached image\(s\) above\. Please analyze them using the read_uploaded_file tool\.\n?/g, '')
           .trim();

@@ -31,7 +31,7 @@ const SQL_ERROR_PATTERNS = [
 ];
 
 const SENSITIVE_PATTERNS = [
-  { name: "API Key", regex: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[A-Za-z0-9_\-]{20,}/i, severity: "critical" as const },
+  { name: "API Key", regex: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}/i, severity: "critical" as const },
   { name: "AWS Key", regex: /AKIA[0-9A-Z]{16}/i, severity: "critical" as const },
   { name: "Password in response", regex: /"password"\s*:\s*"[^"]{4,}"/i, severity: "critical" as const },
   { name: "Private Key", regex: /-----BEGIN (RSA |EC )?PRIVATE KEY-----/i, severity: "critical" as const },

@@ -583,7 +583,7 @@ export default function ContentCreatorPage() {
             const ev = JSON.parse(e.data);
             setGenerationStep(ev.message || "Processing...");
             setGenerationPercent(Math.round(((ev.step || 1) / (ev.totalSteps || 5)) * 100));
-          } catch {}
+          } catch { /* ignore */ }
         });
         es.addEventListener("complete", () => { es.close(); });
         es.addEventListener("error", () => { es.close(); });
@@ -2047,7 +2047,6 @@ export default function ContentCreatorPage() {
               </div>
               <Button
                 onClick={() => {
-                  trpc.contentCreator.updatePiece.useMutation;
                   // Direct mutation call
                   const db = editingPiece;
                   toast.info("Saving...");

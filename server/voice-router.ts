@@ -60,7 +60,7 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      let audioUrl = input.audioUrl;
+      const audioUrl = input.audioUrl;
 
       // If this is a local temp URL, resolve it to an absolute URL for transcription
       // OR handle it directly by reading the file
@@ -84,7 +84,7 @@ export const voiceRouter = router({
           });
         }
         // Deduct credits for voice transcription
-      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
+      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
       return { text: result.text, language: result.language, duration: result.duration };
       }
 
@@ -102,7 +102,7 @@ export const voiceRouter = router({
         if ("error" in dataResult) {
           throw new TRPCError({ code: "BAD_REQUEST", message: dataResult.error });
         }
-        try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
+        try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
         return { text: dataResult.text, language: dataResult.language, duration: dataResult.duration };
       }
 
@@ -122,7 +122,7 @@ export const voiceRouter = router({
       }
 
       // Deduct credits for voice transcription
-      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch {}
+      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
       return {
         text: result.text,
         language: result.language,
