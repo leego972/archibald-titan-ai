@@ -2203,9 +2203,9 @@ Do NOT attempt any tool calls or builds.`;
                 // Security builds: route through OpenRouter uncensored model (Dolphin Mistral 24B Venice)
                 // This bypasses OpenAI's safety training entirely. Falls back to OpenAI if OpenRouter fails.
                 ...(useOpenRouterForSecurity ? { forceOpenRouter: true } : {}),
-                // Admin users: bypass Venice (45s timeout causes 502 gateway errors) and go directly to OpenAI.
-                // Venice kimi-k2-5 is too slow for Railway's gateway timeout on agentic multi-round calls.
-                ...(isAdmin && !useOpenRouterForSecurity ? { _sharedVeniceFailed: true } : {}),
+                // Admin users: use Venice first (kimi-k2-5 is fast and free).
+                // Previously bypassed Venice due to 45s timeout, but OpenAI rate limits cause much longer delays.
+                // Venice 45s timeout is handled gracefully by llm.ts with automatic OpenAI fallback.
                 // Venice shared-tier rate limiting: pass userId + planId so daily limits are enforced
                 userId,
                 planId: userPlanId,
