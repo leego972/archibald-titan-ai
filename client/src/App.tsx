@@ -211,12 +211,12 @@ function DashboardRouter() {
         <Route path="/crowdfunding" component={CrowdfundingPage} />
         <Route path="/crowdfunding/:rest*" component={CrowdfundingPage} />
         <Route path="/referrals" component={ReferralsPage} />
-        <Route path="/advertising" component={AdvertisingDashboard} />
-        <Route path="/master-growth" component={MasterGrowthDashboard} />
+        <Route path="/advertising" component={() => <AdminRoute component={AdvertisingDashboard} />} />
+        <Route path="/master-growth" component={() => <AdminRoute component={MasterGrowthDashboard} />} />
         <Route path="/affiliate" component={AffiliateDashboard} />
-        <Route path="/seo" component={SeoDashboard} />
-        <Route path="/blog-admin" component={BlogAdmin} />
-        <Route path="/marketing" component={MarketingPage} />
+        <Route path="/seo" component={() => <AdminRoute component={SeoDashboard} />} />
+        <Route path="/blog-admin" component={() => <AdminRoute component={BlogAdmin} />} />
+        <Route path="/marketing" component={() => <AdminRoute component={MarketingPage} />} />
 
         {/* Account & Settings */}
         <Route path="/dashboard/subscription" component={SubscriptionPage} />
@@ -307,7 +307,7 @@ function DashboardRouter() {
         <Route path="/command-centre" component={CommandCentrePage} />
 
         {/* Event Bus */}
-        <Route path="/event-bus"><AdminRoute><EventBusPage /></AdminRoute></Route>
+        <Route path="/event-bus" component={() => <AdminRoute component={EventBusPage} />} />
 
         {/* Compliance Reports */}
         <Route path="/compliance-reports" component={ComplianceReportsPage} />

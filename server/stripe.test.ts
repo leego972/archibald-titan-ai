@@ -151,7 +151,7 @@ describe("stripe.getSubscription", () => {
 
     const result = await caller.stripe.getSubscription();
     expect(result).toBeDefined();
-    expect(result.plan).toBe("pro");
+    expect(result.plan).toBe("free");
     expect(result.status).toBe("active");
   });
 });

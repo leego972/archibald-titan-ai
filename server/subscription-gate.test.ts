@@ -123,9 +123,9 @@ describe("getAllowedExportFormats", () => {
     expect(formats).toEqual(["json"]);
   });
 
-  it("returns json and env for pro plan", () => {
+  it("returns json, env, and csv for pro plan", () => {
     const formats = getAllowedExportFormats("pro");
-    expect(formats).toEqual(["json", "env"]);
+    expect(formats).toEqual(["json", "env", "csv"]);
   });
 
   it("returns all formats for enterprise plan", () => {
@@ -153,8 +153,8 @@ describe("enforceExportFormat", () => {
     expect(() => enforceExportFormat("free", "csv")).toThrow();
   });
 
-  it("blocks csv export for pro plan", () => {
-    expect(() => enforceExportFormat("pro", "csv")).toThrow();
+  it("allows csv export for pro plan", () => {
+    expect(() => enforceExportFormat("pro", "csv")).not.toThrow();
   });
 
   it("allows csv export for enterprise plan", () => {

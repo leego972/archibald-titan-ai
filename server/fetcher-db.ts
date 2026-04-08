@@ -35,7 +35,12 @@ export function decrypt(encryptedText: string): string {
     let decrypted = decipher.update(encrypted, "hex", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
-  } catch {
+  } catch (err: unknown) {
+    // Rethrow GCM auth tag failures (tampered/corrupted data) — these must not be silenced
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Unsupported state") || msg.includes("auth tag") || msg.includes("bad decrypt") || msg.includes("wrong final block length")) {
+      throw err;
+    }
     // Decryption failed — credential was encrypted with a different key
     // (e.g., before JWT_SECRET was set). Return a placeholder so export doesn't crash.
     return "[decryption-error: re-fetch this credential]";
