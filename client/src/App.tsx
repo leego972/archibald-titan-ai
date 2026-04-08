@@ -307,7 +307,7 @@ function DashboardRouter() {
         <Route path="/command-centre" component={CommandCentrePage} />
 
         {/* Event Bus */}
-        <Route path="/event-bus"><AdminRoute><EventBusPage /></AdminRoute></Route>
+        <Route path="/event-bus" component={() => <AdminRoute component={EventBusPage} />} />
 
         {/* Compliance Reports */}
         <Route path="/compliance-reports" component={ComplianceReportsPage} />

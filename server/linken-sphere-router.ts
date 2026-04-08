@@ -11,7 +11,7 @@
  * - Full session lifecycle management exposed via tRPC
  */
 import { z } from "zod";
-import { , router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { TRPCError } from "@trpc/server";
 import { enforceAdminFeature } from "./subscription-gate";
