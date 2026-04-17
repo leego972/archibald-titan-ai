@@ -38,6 +38,9 @@ const AVAILABLE_SCOPES = [
   "totp:generate",
   "audit:read",
   "audit:export",
+  // Titan AI public access — lets the user use the self-hosted Titan model
+  // through this API key, OpenAI-compatible.
+  "titan:chat",
 ] as const;
 
 // ─── Validate API Key (for REST endpoints) ──────────────────────────
@@ -345,5 +348,68 @@ export function registerApiRoutes(app: Express) {
     } catch (err) {
       res.status(500).json({ error: "Failed to export credentials" });
     }
+  });
+
+  // ─── Titan AI public proxy — OpenAI-compatible /v1/chat/completions ──
+  // Lets users plug Titan into their own apps the same way they use OpenAI:
+  //   curl https://archibald.app/api/v1/chat/completions \
+  //     -H "Authorization: Bearer at_<archibald-api-key>" \
+  //     -H "Content-Type: application/json" \
+  //     -d '{"model":"titan-tool-v01","messages":[...]}'
+  // The Archibald API key is validated and rate-limited via authenticateApiKey,
+  // then proxied to the self-hosted Titan inference API on Vast (TITAN_API_URL).
+  app.post("/api/v1/chat/completions", authenticateApiKey, requireScope("titan:chat"), async (req, res) => {
+    const titanUrl = process.env.TITAN_API_URL || "";
+    const titanKey = process.env.TITAN_API_KEY || "";
+    if (!titanUrl) {
+      return res.status(503).json({
+        error: { message: "Titan AI is not configured on this server (TITAN_API_URL missing).", type: "service_unavailable" },
+      });
+    }
+
+    try {
+      const upstream = await fetch(`${titanUrl.replace(/\/+$/, "")}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(titanKey ? { Authorization: `Bearer ${titanKey}` } : {}),
+        },
+        body: JSON.stringify(req.body ?? {}),
+      });
+
+      const text = await upstream.text();
+      res.status(upstream.status);
+      const ct = upstream.headers.get("content-type");
+      if (ct) res.setHeader("Content-Type", ct);
+      res.send(text);
+    } catch (err: any) {
+      res.status(502).json({
+        error: {
+          message: `Titan AI upstream error: ${err?.message || "unknown"}`,
+          type: "bad_gateway",
+        },
+      });
+    }
+  });
+
+  // GET /api/v1/models — OpenAI-compatible model list (only Titan models exposed)
+  app.get("/api/v1/models", authenticateApiKey, requireScope("titan:chat"), async (_req, res) => {
+    res.json({
+      object: "list",
+      data: [
+        {
+          id: "titan-tool-v01",
+          object: "model",
+          created: Math.floor(Date.now() / 1000),
+          owned_by: "archibald",
+        },
+        {
+          id: "titan-sft-v01",
+          object: "model",
+          created: Math.floor(Date.now() / 1000),
+          owned_by: "archibald",
+        },
+      ],
+    });
   });
 }

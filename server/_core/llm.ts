@@ -411,15 +411,32 @@ const MAX_429_RETRIES_BACKGROUND = 2;
 
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  // ── TitanAI provider fast-path ─────────────────────────────────────────────
-  // If TITAN_API_URL is set AND the caller explicitly requests a titan-* model,
-  // route directly to the self-hosted TitanAI API server (OpenAI-compatible).
-  // Falls back to normal Venice/OpenAI routing if TitanAI API is unavailable.
+  // ── TitanAI provider — DEFAULT BUILDER ─────────────────────────────────────
+  // Routing rules:
+  //   1. If user supplied their own OpenAI key (params.userApiKey), bypass Titan
+  //      and use OpenAI directly — they paid for their own quota.
+  //   2. If the caller explicitly requests a "titan-*" model, force Titan.
+  //   3. If TITAN_API_URL is set AND we have no user key, route to Titan as
+  //      the DEFAULT for all builder traffic (chat, tools, background).
+  //   4. On any Titan failure, fall back to Venice → OpenRouter → OpenAI chain.
+  //
+  // Set TITAN_FORCE_DEFAULT=false to disable the default-Titan behaviour
+  // (Titan will then only fire on explicit "titan-*" model requests, the legacy
+  // opt-in behaviour). Useful for incidents or A/B testing.
   const requestedModel = typeof params.model === "string" ? params.model : "";
-  if (TITAN_API_URL && requestedModel.startsWith("titan-")) {
-    log.info(`[LLM] Routing to TitanAI API: ${requestedModel}`);
+  const explicitTitan = requestedModel.startsWith("titan-");
+  const titanForceDefault = process.env.TITAN_FORCE_DEFAULT !== "false";
+  const usingUserOpenAIKey = !!params.userApiKey;
+  const shouldUseTitan =
+    !!TITAN_API_URL &&
+    !usingUserOpenAIKey &&
+    (explicitTitan || titanForceDefault);
+
+  if (shouldUseTitan) {
+    const titanModel = explicitTitan ? requestedModel : "titan-tool-v01";
+    log.info(`[LLM] Routing to TitanAI (default builder): ${titanModel}`);
     try {
-      const titanResult = await _invokeTitanAI(params, requestedModel);
+      const titanResult = await _invokeTitanAI(params, titanModel);
       return titanResult;
     } catch (titanErr: unknown) {
       // If TitanAI is down or returns an error, fall through to the normal
