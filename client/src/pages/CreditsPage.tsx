@@ -14,7 +14,6 @@ import {
 import { useLocation, useSearch } from "wouter";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { useSubscription } from "@/hooks/useSubscription";
 
 function getTypeIcon(type: string) {
   const map: Record<string, React.ReactNode> = {
@@ -171,7 +170,6 @@ export default function CreditsPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
-  const sub = useSubscription();
 
   const { data: balance } = trpc.credits.getBalance.useQuery(undefined, { enabled: !!user });
   const { data: history, isLoading: historyLoading } = trpc.credits.getHistory.useQuery(
@@ -179,6 +177,12 @@ export default function CreditsPage() {
   );
   const { data: packs } = trpc.credits.getPacks.useQuery(undefined, { enabled: !!user });
   const { data: costs } = trpc.credits.getCosts.useQuery(undefined, { enabled: !!user });
+    const { data: subData } = trpc.stripe.getSubscription.useQuery(undefined, { enabled: !!user });
+    const PLAN_NAMES: Record<string, string> = {
+      free: "Free", pro: "Pro", enterprise: "Enterprise",
+      cyber: "Cyber", cyber_plus: "Cyber+", titan: "Titan",
+    };
+    const planName = PLAN_NAMES[subData?.plan ?? "free"] ?? "Free";
 
   const purchaseMutation = trpc.credits.purchasePack.useMutation({
     onSuccess: (data) => {
@@ -238,7 +242,7 @@ export default function CreditsPage() {
               </div>
             )}
             <p className="text-xs text-white/25 mt-2">
-              Plan: <span className="text-white/50 font-semibold">{sub?.planName ?? "Free"}</span>
+              Plan: <span className="text-white/50 font-semibold">{planName}</span>
               {!isUnlimited && " · Credits refill monthly"}
             </p>
           </div>
