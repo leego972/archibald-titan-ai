@@ -977,6 +977,21 @@ async function startServer() {
       }
     }, 5000);
 
+    // ─── Auto-seed Marketplace Bots ───────────────────────────
+    // Seeds 12 merchant bot profiles + 82 listings on first boot (idempotent)
+    setTimeout(async () => {
+      try {
+        const result = await seedMarketplace();
+        if (result.merchants > 0 || result.listings > 0) {
+          log.info(`Marketplace seeded: ${result.merchants} merchants, ${result.listings} listings`);
+        } else {
+          log.debug('Marketplace bots already seeded');
+        }
+      } catch (err) {
+        log.error('Marketplace bot seed failed', { error: String(err) });
+      }
+    }, 7000);
+
     // ─── Auto-seed Releases ──────────────────────────────────
     // Seeds the initial release with platform binaries if DB is empty
     setTimeout(async () => {
