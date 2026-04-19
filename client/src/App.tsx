@@ -177,7 +177,27 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   return <Component />;
 }
 
-function DashboardRouter() {
+/** Renders the given page only for Cyber/Enterprise/Titan subscribers + admins.
+   * Free and Pro users are redirected to /pricing to upgrade. */
+  function CyberRoute({ component: Component }: { component: React.ComponentType }) {
+    const { user, loading } = useAuth();
+    const sub = useSubscription();
+    const [, setLocation] = useLocation();
+    if (loading || sub.loading) return null;
+    if (!user) {
+      setLocation("/login");
+      return null;
+    }
+    const isAdmin = isAdminRole(user.role);
+    const hasCyberAccess = isAdmin || ["enterprise", "cyber", "cyber_plus", "titan"].includes(sub.planId);
+    if (!hasCyberAccess) {
+      setLocation("/pricing");
+      return null;
+    }
+    return <Component />;
+  }
+
+  function DashboardRouter() {
   return (
     <FetcherLayout>
       <RouteErrorBoundary>
