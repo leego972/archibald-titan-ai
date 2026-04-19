@@ -1,355 +1,392 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
-import {
-  Bell, LayoutDashboard, LogOut, PanelLeft, Users,
-  Bot, Globe, Database, ShoppingBag, FolderOpen,
-  Shield, Key, Settings, TrendingUp, Megaphone,
-  Search, BookOpen, DollarSign, Users2, Zap,
-  FileText, Activity, GitBranch, Lock, Webhook,
-  BarChart3, Download, Upload, RefreshCw, Eye,
-  CreditCard, UserCog, Share2
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
-import { CreditBalanceWidget } from "./CreditBalanceWidget";
-import { trpc } from "@/lib/trpc";
-import { TitanLogo } from "./TitanLogo";
+  import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+  } from "@/components/ui/dropdown-menu";
+  import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarInset,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarProvider,
+    SidebarTrigger,
+    useSidebar,
+  } from "@/components/ui/sidebar";
+  import { getLoginUrl } from "@/const";
+  import { useIsMobile } from "@/hooks/useMobile";
+  import {
+    Bell, LayoutDashboard, LogOut, PanelLeft, Users,
+    Bot, Globe, Database, ShoppingBag, FolderOpen,
+    Shield, Key, Settings, TrendingUp, Megaphone,
+    Search, BookOpen, DollarSign, Users2, Zap,
+    FileText, Activity, Lock, Webhook,
+    BarChart3, Eye, CreditCard, UserCog, Share2,
+    Terminal, Bug, Crosshair, Fish, Network, Cpu,
+    Shuffle, ScanSearch, Monitor, Code2, Store,
+    Radar, Radio, Fingerprint, Globe2, Server,
+    AlertTriangle, GitBranch, RefreshCw
+  } from "lucide-react";
+  import { Badge } from "@/components/ui/badge";
+  import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+  import { useLocation } from "wouter";
+  import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+  import { Button } from "./ui/button";
+  import { CreditBalanceWidget } from "./CreditBalanceWidget";
+  import { trpc } from "@/lib/trpc";
+  import { TitanLogo } from "./TitanLogo";
 
-const menuItems = [
-  // Core
-  { icon: LayoutDashboard, label: "Dashboard", path: "/", group: "Core" },
-  { icon: Bot, label: "AI Assistant", path: "/dashboard", group: "Core" },
-  { icon: ShoppingBag, label: "Marketplace", path: "/marketplace", group: "Core" },
-  { icon: FolderOpen, label: "Project Files", path: "/project-files", group: "Core" },
-  // Intelligence
-  { icon: Globe, label: "Smart Fetch", path: "/fetcher/smart-fetch", group: "Intelligence" },
-  { icon: Database, label: "Credentials", path: "/fetcher/credentials", group: "Intelligence" },
-  { icon: Activity, label: "Provider Health", path: "/fetcher/provider-health", group: "Intelligence" },
-  { icon: Eye, label: "Watchdog", path: "/fetcher/watchdog", group: "Intelligence" },
-  { icon: Lock, label: "TOTP Vault", path: "/fetcher/totp-vault", group: "Intelligence" },
-  // Growth
-  { icon: DollarSign, label: "Grants", path: "/grants", group: "Growth" },
-  { icon: TrendingUp, label: "Master Growth", path: "/master-growth", group: "Growth" },
-  { icon: Megaphone, label: "Advertising", path: "/advertising", group: "Growth" },
-  { icon: Search, label: "SEO", path: "/seo", group: "Growth" },
-  { icon: Share2, label: "Affiliate", path: "/affiliate", group: "Growth" },
-  { icon: BookOpen, label: "Blog Admin", path: "/blog-admin", group: "Growth" },
-  // Business
-  { icon: Users2, label: "Companies", path: "/companies", group: "Business" },
-  { icon: FileText, label: "Business Plans", path: "/business-plans", group: "Business" },
-  { icon: Zap, label: "Crowdfunding", path: "/crowdfunding", group: "Business" },
-  { icon: Users, label: "Referrals", path: "/referrals", group: "Business" },
-  // Account
-  { icon: CreditCard, label: "Credits", path: "/dashboard/credits", group: "Account" },
-  { icon: UserCog, label: "Account Settings", path: "/fetcher/account", group: "Account" },
-  { icon: Key, label: "API Access", path: "/fetcher/api-access", group: "Account" },
-  { icon: Settings, label: "Settings", path: "/fetcher/settings", group: "Account" },
-];
+  const menuItems = [
+    // ── Core ──────────────────────────────────────────────────────────
+    { icon: LayoutDashboard, label: "Dashboard",       path: "/",                group: "Core" },
+    { icon: Bot,             label: "Titan AI",        path: "/dashboard",        group: "Core" },
+    { icon: Terminal,        label: "Builder",         path: "/builder",          group: "Core" },
+    { icon: ShoppingBag,     label: "Marketplace",     path: "/marketplace",      group: "Core" },
+    { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
 
-const GROUPS = ["Core", "Intelligence", "Growth", "Business", "Account"] as const;
+    // ── Offensive Security ────────────────────────────────────────────
+    { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security" },
+    { icon: Bug,             label: "Astra",           path: "/astra",            group: "Offensive Security" },
+    { icon: Crosshair,       label: "Metasploit",      path: "/metasploit",       group: "Offensive Security" },
+    { icon: Fish,            label: "EvilGinx",        path: "/evilginx",         group: "Offensive Security" },
+    { icon: Globe2,          label: "BlackEye",        path: "/blackeye",         group: "Offensive Security" },
+    { icon: Cpu,             label: "CyberMCP",        path: "/cybermcp",         group: "Offensive Security" },
+    { icon: AlertTriangle,   label: "Exploit Pack",    path: "/exploitpack",      group: "Offensive Security" },
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 280;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 480;
+    // ── Privacy & Network ─────────────────────────────────────────────
+    { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network" },
+    { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network" },
+    { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network" },
+    { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network" },
+    { icon: Shuffle,         label: "Proxy Rotation",  path: "/proxy-rotation",   group: "Privacy & Network" },
+    { icon: Monitor,         label: "Isolated Browser",path: "/isolated-browser", group: "Privacy & Network" },
+    { icon: CreditCard,      label: "BIN Checker",     path: "/bin-checker",      group: "Privacy & Network" },
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-  });
-  const { loading, user } = useAuth();
+    // ── Security Ops ──────────────────────────────────────────────────
+    { icon: Terminal,        label: "Command Centre",  path: "/command-centre",   group: "Security Ops" },
+    { icon: Store,           label: "Security Market", path: "/security-marketplace", group: "Security Ops" },
+    { icon: GitBranch,       label: "Attack Graph",    path: "/attack-graph",     group: "Security Ops" },
+    { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops" },
+    { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops" },
+    { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
 
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
+    // ── Intelligence ──────────────────────────────────────────────────
+    { icon: Globe,           label: "Smart Fetch",     path: "/fetcher/smart-fetch",    group: "Intelligence" },
+    { icon: Database,        label: "Credentials",     path: "/fetcher/credentials",    group: "Intelligence" },
+    { icon: ScanSearch,      label: "Leak Scanner",    path: "/fetcher/leak-scanner",   group: "Intelligence" },
+    { icon: Activity,        label: "Provider Health", path: "/fetcher/provider-health",group: "Intelligence" },
+    { icon: Eye,             label: "Watchdog",        path: "/fetcher/watchdog",       group: "Intelligence" },
+    { icon: Lock,            label: "TOTP Vault",      path: "/fetcher/totp-vault",     group: "Intelligence" },
+    { icon: Radio,           label: "Web Agent",       path: "/web-agent",              group: "Intelligence" },
+    { icon: Monitor,         label: "Site Monitor",    path: "/site-monitor",           group: "Intelligence" },
 
-  if (loading) {
-    return <DashboardLayoutSkeleton />
-  }
+    // ── Growth ────────────────────────────────────────────────────────
+    { icon: DollarSign,      label: "Grants",          path: "/grants",           group: "Growth" },
+    { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth" },
+    { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth" },
+    { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth" },
+    { icon: Share2,          label: "Affiliate",       path: "/affiliate",        group: "Growth" },
+    { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth" },
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
-            </p>
+    // ── Business ──────────────────────────────────────────────────────
+    { icon: Users2,          label: "Companies",       path: "/companies",        group: "Business" },
+    { icon: FileText,        label: "Business Plans",  path: "/business-plans",   group: "Business" },
+    { icon: Zap,             label: "Crowdfunding",    path: "/crowdfunding",     group: "Business" },
+    { icon: Users,           label: "Referrals",       path: "/referrals",        group: "Business" },
+
+    // ── Account ───────────────────────────────────────────────────────
+    { icon: CreditCard,      label: "Credits",         path: "/dashboard/credits",group: "Account" },
+    { icon: UserCog,         label: "Account Settings",path: "/fetcher/account",  group: "Account" },
+    { icon: Key,             label: "API Access",      path: "/fetcher/api-access",group: "Account" },
+    { icon: Settings,        label: "Settings",        path: "/fetcher/settings", group: "Account" },
+  ];
+
+  const GROUPS = ["Core", "Offensive Security", "Privacy & Network", "Security Ops", "Intelligence", "Growth", "Business", "Account"] as const;
+
+  const SIDEBAR_WIDTH_KEY = "sidebar-width";
+  const DEFAULT_WIDTH = 280;
+  const MIN_WIDTH = 200;
+  const MAX_WIDTH = 480;
+
+  export default function DashboardLayout({
+    children,
+  }: {
+    children: React.ReactNode;
+  }) {
+    const [sidebarWidth, setSidebarWidth] = useState(() => {
+      const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+      return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+    });
+    const { loading, user } = useAuth();
+
+    useEffect(() => {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
+    }, [sidebarWidth]);
+
+    if (loading) {
+      return <DashboardLayoutSkeleton />
+    }
+
+    if (!user) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+            <div className="flex flex-col items-center gap-6">
+              <h1 className="text-2xl font-semibold tracking-tight text-center">
+                Sign in to continue
+              </h1>
+              <p className="text-sm text-muted-foreground text-center max-w-sm">
+                Access to this dashboard requires authentication. Continue to launch the login flow.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                window.location.href = getLoginUrl();
+              }}
+              size="lg"
+              className="w-full shadow-lg hover:shadow-xl transition-all"
+            >
+              Sign in
+            </Button>
           </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in
-          </Button>
         </div>
-      </div>
+      );
+    }
+
+    return (
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": `${sidebarWidth}px`,
+          } as CSSProperties
+        }
+      >
+        <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
+          {children}
+        </DashboardLayoutContent>
+      </SidebarProvider>
     );
   }
 
-  return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": `${sidebarWidth}px`,
-        } as CSSProperties
+  type DashboardLayoutContentProps = {
+    children: React.ReactNode;
+    setSidebarWidth: (width: number) => void;
+  };
+
+  function DashboardLayoutContent({
+    children,
+    setSidebarWidth,
+  }: DashboardLayoutContentProps) {
+    const { user, logout } = useAuth();
+    const [location, setLocation] = useLocation();
+    const { state, toggleSidebar } = useSidebar();
+    const isCollapsed = state === "collapsed";
+    const [isResizing, setIsResizing] = useState(false);
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const activeMenuItem = menuItems.find(item => item.path === location);
+    const isMobile = useIsMobile();
+
+    useEffect(() => {
+      if (isCollapsed) {
+        setIsResizing(false);
       }
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
-}
+    }, [isCollapsed]);
 
-type DashboardLayoutContentProps = {
-  children: React.ReactNode;
-  setSidebarWidth: (width: number) => void;
-};
+    useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isResizing) return;
 
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: DashboardLayoutContentProps) {
-  const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
-  const isMobile = useIsMobile();
+        const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
+        const newWidth = e.clientX - sidebarLeft;
+        if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
+          setSidebarWidth(newWidth);
+        }
+      };
 
-  useEffect(() => {
-    if (isCollapsed) {
-      setIsResizing(false);
-    }
-  }, [isCollapsed]);
+      const handleMouseUp = () => {
+        setIsResizing(false);
+      };
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = e.clientX - sidebarLeft;
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
-        setSidebarWidth(newWidth);
+      if (isResizing) {
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
       }
-    };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+    }, [isResizing, setSidebarWidth]);
 
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    }
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing, setSidebarWidth]);
-
-  return (
-    <>
-      <div className="relative" ref={sidebarRef}>
-        <Sidebar
-          collapsible="icon"
-          className="border-r-0"
-          disableTransition={isResizing}
-        >
-          <SidebarHeader className="h-16 justify-center">
-            <div className="flex items-center gap-3 px-2 transition-all w-full">
-              <button
-                onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
-                aria-label="Toggle navigation"
-              >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              {!isCollapsed ? (
-                <div
-                  className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setLocation("/")}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setLocation("/")}
-                  title="Go to home"
+    return (
+      <>
+        <div className="relative" ref={sidebarRef}>
+          <Sidebar
+            collapsible="icon"
+            className="border-r-0"
+            disableTransition={isResizing}
+          >
+            <SidebarHeader className="h-16 justify-center">
+              <div className="flex items-center gap-3 px-2 transition-all w-full">
+                <button
+                  onClick={toggleSidebar}
+                  className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                  aria-label="Toggle navigation"
                 >
-                  <TitanLogo size="sm" />
-                  <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-700 to-blue-500 dark:from-blue-400 dark:to-blue-200 bg-clip-text text-transparent">
-                    Archibald Titan
+                  <PanelLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+                {!isCollapsed ? (
+                  <div
+                    className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setLocation("/")}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && setLocation("/")}
+                    title="Go to home"
+                  >
+                    <TitanLogo size="sm" />
+                    <span className="font-semibold tracking-tight truncate bg-gradient-to-r from-blue-700 to-blue-500 dark:from-blue-400 dark:to-blue-200 bg-clip-text text-transparent">
+                      Archibald Titan
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </SidebarHeader>
+
+            <SidebarContent className="gap-0 overflow-y-auto">
+              {GROUPS.map(group => {
+                const groupItems = menuItems.filter(i => i.group === group);
+                return (
+                  <div key={group}>
+                    {!isCollapsed && (
+                      <div className="px-4 pt-3 pb-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{group}</span>
+                      </div>
+                    )}
+                    <SidebarMenu className="px-2 py-0.5">
+                      {groupItems.map(item => {
+                        const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
+                        return (
+                          <SidebarMenuItem key={item.path}>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              onClick={() => setLocation(item.path)}
+                              tooltip={item.label}
+                              className="h-9 transition-all font-normal"
+                            >
+                              <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                              <span>{item.label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </div>
+                );
+              })}
+            </SidebarContent>
+
+            <SidebarFooter className="p-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Avatar className="h-9 w-9 border shrink-0">
+                      <AvatarFallback className="text-xs font-medium">
+                        {user?.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                      <p className="text-sm font-medium truncate leading-none">
+                        {user?.name || "-"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-1.5">
+                        {user?.email || "-"}
+                      </p>
+                    </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={logout}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarFooter>
+          </Sidebar>
+          <div
+            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+            onMouseDown={() => {
+              if (isCollapsed) return;
+              setIsResizing(true);
+            }}
+            style={{ zIndex: 50 }}
+          />
+        </div>
+
+        <SidebarInset>
+          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+            <div className="flex items-center gap-2">
+              {isMobile && (
+                <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
+              )}
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="tracking-tight text-foreground">
+                    {activeMenuItem?.label ?? "Menu"}
                   </span>
                 </div>
-              ) : null}
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="gap-0 overflow-y-auto">
-            {GROUPS.map(group => {
-              const groupItems = menuItems.filter(i => i.group === group);
-              return (
-                <div key={group}>
-                  {!isCollapsed && (
-                    <div className="px-4 pt-3 pb-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{group}</span>
-                    </div>
-                  )}
-                  <SidebarMenu className="px-2 py-0.5">
-                    {groupItems.map(item => {
-                      const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
-                      return (
-                        <SidebarMenuItem key={item.path}>
-                          <SidebarMenuButton
-                            isActive={isActive}
-                            onClick={() => setLocation(item.path)}
-                            tooltip={item.label}
-                            className="h-9 transition-all font-normal"
-                          >
-                            <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
-                            <span>{item.label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </div>
-              );
-            })}
-          </SidebarContent>
-
-          <SidebarFooter className="p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-        <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => {
-            if (isCollapsed) return;
-            setIsResizing(true);
-          }}
-          style={{ zIndex: 50 }}
-        />
-      </div>
-
-      <SidebarInset>
-        <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            {isMobile && (
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-            )}
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="tracking-tight text-foreground">
-                  {activeMenuItem?.label ?? "Menu"}
-                </span>
               </div>
             </div>
+            <div className="flex items-center gap-2 pr-2">
+              <NotificationBell />
+              <CreditBalanceWidget />
+            </div>
           </div>
-          <div className="flex items-center gap-2 pr-2">
-            <NotificationBell />
-            <CreditBalanceWidget />
-          </div>
-        </div>
-        <main id="main-content" className="flex-1 p-4">{children}</main>
-      </SidebarInset>
-    </>
-  );
-}
+          <main id="main-content" className="flex-1 p-4">{children}</main>
+        </SidebarInset>
+      </>
+    );
+  }
 
-// ─── Notification Bell with real data ─────────────────────────────
-function NotificationBell() {
-  const [, navigate] = useLocation();
-  const watchdogSummary = trpc.watchdog.summary.useQuery(undefined, {
-    refetchInterval: 60_000, // refresh every minute
-    retry: false,
-  });
+  function NotificationBell() {
+    const [, navigate] = useLocation();
+    const watchdogSummary = trpc.watchdog.summary.useQuery(undefined, {
+      refetchInterval: 60_000,
+      retry: false,
+    });
 
-  const expiring = watchdogSummary.data?.expiringSoon ?? 0;
-  const expired = watchdogSummary.data?.expired ?? 0;
-  const alertCount = expiring + expired;
+    const expiring = watchdogSummary.data?.expiringSoon ?? 0;
+    const expired = watchdogSummary.data?.expired ?? 0;
+    const alertCount = expiring + expired;
 
-  return (
-    <button
-      onClick={() => navigate("/fetcher/watchdog")}
-      className="relative p-1.5 rounded-lg hover:bg-accent transition-colors"
-      aria-label={alertCount > 0 ? `${alertCount} credential alerts` : "No credential alerts"}
-      title={alertCount > 0 ? `${expired} expired, ${expiring} expiring soon` : "All credentials healthy"}
-    >
-      <Bell className={`h-5 w-5 ${alertCount > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
-      {alertCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-          {alertCount > 99 ? "99+" : alertCount}
-        </span>
-      )}
-    </button>
-  );
-}
+    return (
+      <button
+        onClick={() => navigate("/fetcher/watchdog")}
+        className="relative p-1.5 rounded-lg hover:bg-accent transition-colors"
+        aria-label={alertCount > 0 ? `${alertCount} credential alerts` : "No credential alerts"}
+        title={alertCount > 0 ? `${expired} expired, ${expiring} expiring soon` : "All credentials healthy"}
+      >
+        <Bell className={`h-5 w-5 ${alertCount > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
+        {alertCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {alertCount > 99 ? "99+" : alertCount}
+          </span>
+        )}
+      </button>
+    );
+  }
+  
