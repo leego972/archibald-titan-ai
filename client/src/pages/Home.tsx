@@ -73,8 +73,8 @@ function UsageStatsWidget({ sub }: { sub: any }) {
     {
       label: "Storage Used",
       icon: Database,
-      value: "1.2 GB",
-      limit: "10 GB",
+      value: sub.storageUsedMb != null ? `${(sub.storageUsedMb / 1024).toFixed(1)} GB` : "—",
+      limit: sub.storageLimitGb != null ? `${sub.storageLimitGb} GB` : "10 GB",
       color: "from-amber-600/10 to-amber-600/5",
       iconColor: "text-amber-400",
     }
