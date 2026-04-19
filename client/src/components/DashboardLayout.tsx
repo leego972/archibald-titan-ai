@@ -31,7 +31,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     Terminal, Bug, Crosshair, Fish, Network, Cpu,
     Shuffle, ScanSearch, Monitor, Code2, Store,
     Radar, Radio, Fingerprint, Globe2, Server,
-    AlertTriangle, GitBranch, RefreshCw
+    AlertTriangle, GitBranch, RefreshCw, ShoppingCart,
   } from "lucide-react";
   import { Badge } from "@/components/ui/badge";
   import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -41,8 +41,19 @@ import { useAuth } from "@/_core/hooks/useAuth";
   import { CreditBalanceWidget } from "./CreditBalanceWidget";
   import { trpc } from "@/lib/trpc";
   import { TitanLogo } from "./TitanLogo";
+  import { isAdminRole } from "@shared/const";
 
-  const menuItems = [
+  // ── Menu item definition ─────────────────────────────────────────────────
+  type MenuItem = {
+    icon: React.ComponentType<any>;
+    label: string;
+    path: string;
+    group: string;
+    adminOnly?: boolean;
+    cyberOnly?: boolean;
+  };
+
+  const menuItems: MenuItem[] = [
     // ── Core ──────────────────────────────────────────────────────────
     { icon: LayoutDashboard, label: "Dashboard",       path: "/",                group: "Core" },
     { icon: Bot,             label: "Titan AI",        path: "/dashboard",        group: "Core" },
@@ -51,29 +62,29 @@ import { useAuth } from "@/_core/hooks/useAuth";
     { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
 
     // ── Offensive Security ────────────────────────────────────────────
-    { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security" },
-    { icon: Bug,             label: "Astra",           path: "/astra",            group: "Offensive Security" },
-    { icon: Crosshair,       label: "Metasploit",      path: "/metasploit",       group: "Offensive Security" },
-    { icon: Fish,            label: "EvilGinx",        path: "/evilginx",         group: "Offensive Security" },
-    { icon: Globe2,          label: "BlackEye",        path: "/blackeye",         group: "Offensive Security" },
-    { icon: Cpu,             label: "CyberMCP",        path: "/cybermcp",         group: "Offensive Security" },
-    { icon: AlertTriangle,   label: "Exploit Pack",    path: "/exploitpack",      group: "Offensive Security" },
+    { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security", cyberOnly: true },
+    { icon: Bug,             label: "Astra",           path: "/astra",            group: "Offensive Security", cyberOnly: true },
+    { icon: Crosshair,       label: "Metasploit",      path: "/metasploit",       group: "Offensive Security", cyberOnly: true },
+    { icon: Fish,            label: "EvilGinx",        path: "/evilginx",         group: "Offensive Security", cyberOnly: true },
+    { icon: Globe2,          label: "BlackEye",        path: "/blackeye",         group: "Offensive Security", cyberOnly: true },
+    { icon: Cpu,             label: "CyberMCP",        path: "/cybermcp",         group: "Offensive Security", cyberOnly: true },
+    { icon: AlertTriangle,   label: "Exploit Pack",    path: "/exploitpack",      group: "Offensive Security", cyberOnly: true },
 
     // ── Privacy & Network ─────────────────────────────────────────────
-    { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network" },
-    { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network" },
-    { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network" },
-    { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network" },
-    { icon: Shuffle,         label: "Proxy Rotation",  path: "/proxy-rotation",   group: "Privacy & Network" },
-    { icon: Monitor,         label: "Isolated Browser",path: "/isolated-browser", group: "Privacy & Network" },
-    { icon: CreditCard,      label: "BIN Checker",     path: "/bin-checker",      group: "Privacy & Network" },
+    { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network",  cyberOnly: true },
+    { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network",  cyberOnly: true },
+    { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network",  cyberOnly: true },
+    { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network",  cyberOnly: true },
+    { icon: Shuffle,         label: "Proxy Rotation",  path: "/proxy-rotation",   group: "Privacy & Network",  cyberOnly: true },
+    { icon: Monitor,         label: "Isolated Browser",path: "/isolated-browser", group: "Privacy & Network",  cyberOnly: true },
+    { icon: CreditCard,      label: "BIN Checker",     path: "/bin-checker",      group: "Privacy & Network",  cyberOnly: true },
 
     // ── Security Ops ──────────────────────────────────────────────────
     { icon: Terminal,        label: "Command Centre",  path: "/command-centre",   group: "Security Ops" },
-    { icon: Store,           label: "Security Market", path: "/security-marketplace", group: "Security Ops" },
-    { icon: GitBranch,       label: "Attack Graph",    path: "/attack-graph",     group: "Security Ops" },
-    { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops" },
-    { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops" },
+    { icon: Store,           label: "Security Market", path: "/security-marketplace", group: "Security Ops", adminOnly: true },
+    { icon: GitBranch,       label: "Attack Graph",    path: "/attack-graph",     group: "Security Ops",       cyberOnly: true },
+    { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops",  cyberOnly: true },
+    { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops",     adminOnly: true },
     { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
 
     // ── Intelligence ──────────────────────────────────────────────────
@@ -83,16 +94,16 @@ import { useAuth } from "@/_core/hooks/useAuth";
     { icon: Activity,        label: "Provider Health", path: "/fetcher/provider-health",group: "Intelligence" },
     { icon: Eye,             label: "Watchdog",        path: "/fetcher/watchdog",       group: "Intelligence" },
     { icon: Lock,            label: "TOTP Vault",      path: "/fetcher/totp-vault",     group: "Intelligence" },
-    { icon: Radio,           label: "Web Agent",       path: "/web-agent",              group: "Intelligence" },
+    { icon: Radio,           label: "Web Agent",       path: "/web-agent",              group: "Intelligence",  cyberOnly: true },
     { icon: Monitor,         label: "Site Monitor",    path: "/site-monitor",           group: "Intelligence" },
 
     // ── Growth ────────────────────────────────────────────────────────
     { icon: DollarSign,      label: "Grants",          path: "/grants",           group: "Growth" },
-    { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth" },
-    { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth" },
-    { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth" },
+    { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth",             adminOnly: true },
+    { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth",             adminOnly: true },
+    { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth",             adminOnly: true },
     { icon: Share2,          label: "Affiliate",       path: "/affiliate",        group: "Growth" },
-    { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth" },
+    { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth",             adminOnly: true },
 
     // ── Business ──────────────────────────────────────────────────────
     { icon: Users2,          label: "Companies",       path: "/companies",        group: "Business" },
@@ -192,6 +203,32 @@ import { useAuth } from "@/_core/hooks/useAuth";
     const activeMenuItem = menuItems.find(item => item.path === location);
     const isMobile = useIsMobile();
 
+    const isAdmin = isAdminRole(user?.role);
+
+    // Determine if user has Cyber-tier access
+    const subQuery = trpc.stripe.getSubscription.useQuery(undefined, {
+      retry: false,
+      staleTime: 60_000,
+    });
+    const plan = subQuery.data?.plan ?? "free";
+    const hasCyberAccess = isAdmin || ["enterprise", "cyber", "cyber_plus", "titan"].includes(plan);
+
+    // Visible menu items — filter adminOnly, keep cyberOnly with lock badge
+    const visibleItems = useMemo(
+      () => menuItems.filter(item => !(item.adminOnly && !isAdmin)),
+      [isAdmin]
+    );
+
+    // Low-credit warning
+    const creditQuery = trpc.credits.getBalance.useQuery(undefined, {
+      retry: false,
+      staleTime: 60_000,
+    });
+    const credits = creditQuery.data?.credits ?? 0;
+    const isUnlimited = creditQuery.data?.isUnlimited ?? false;
+    const showCreditWarning = !isUnlimited && credits < 1000 && !creditQuery.isLoading;
+    const [creditBannerDismissed, setCreditBannerDismissed] = useState(false);
+
     useEffect(() => {
       if (isCollapsed) {
         setIsResizing(false);
@@ -265,7 +302,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 
             <SidebarContent className="gap-0 overflow-y-auto">
               {GROUPS.map(group => {
-                const groupItems = menuItems.filter(i => i.group === group);
+                const groupItems = visibleItems.filter(i => i.group === group);
+                if (groupItems.length === 0) return null;
                 return (
                   <div key={group}>
                     {!isCollapsed && (
@@ -276,16 +314,20 @@ import { useAuth } from "@/_core/hooks/useAuth";
                     <SidebarMenu className="px-2 py-0.5">
                       {groupItems.map(item => {
                         const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
+                        const isLocked = item.cyberOnly && !hasCyberAccess;
                         return (
                           <SidebarMenuItem key={item.path}>
                             <SidebarMenuButton
                               isActive={isActive}
-                              onClick={() => setLocation(item.path)}
-                              tooltip={item.label}
-                              className="h-9 transition-all font-normal"
+                              onClick={() => isLocked ? setLocation("/pricing") : setLocation(item.path)}
+                              tooltip={isLocked ? `${item.label} — Cyber tier required` : item.label}
+                              className={`h-9 transition-all font-normal ${isLocked ? "opacity-50" : ""}`}
                             >
-                              <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
-                              <span>{item.label}</span>
+                              <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""} ${isLocked ? "text-muted-foreground/40" : ""}`} />
+                              <span className="flex-1">{item.label}</span>
+                              {isLocked && !isCollapsed && (
+                                <Lock className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                              )}
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -338,6 +380,37 @@ import { useAuth } from "@/_core/hooks/useAuth";
         </div>
 
         <SidebarInset>
+          {/* Low-credit warning banner */}
+          {showCreditWarning && !creditBannerDismissed && (
+            <div className="flex items-center justify-between gap-4 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-sm">
+              <div className="flex items-center gap-2 text-amber-400 font-medium">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  {credits === 0
+                    ? "You're out of credits — tools are paused."
+                    : `Low balance: ${credits.toLocaleString()} credits remaining.`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  className="h-7 bg-amber-500 hover:bg-amber-400 text-black border-0 font-bold text-xs px-3"
+                  onClick={() => setLocation("/dashboard/credits")}
+                >
+                  <ShoppingCart className="h-3 w-3 mr-1" />
+                  Top Up
+                </Button>
+                <button
+                  onClick={() => setCreditBannerDismissed(true)}
+                  className="text-amber-400/50 hover:text-amber-400 text-xs font-medium transition-colors"
+                  aria-label="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
               {isMobile && (
