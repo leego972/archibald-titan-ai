@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAuth } from "./_core/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { isAdminRole } from "@shared/const";
 import { useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
@@ -255,33 +256,33 @@ function DashboardRouter() {
         <Route path="/linken-sphere" component={() => <AdminRoute component={LinkenSpherePage} />} />
 
         {/* Evilginx — admin only */}
-        <Route path="/evilginx" component={() => <AdminRoute component={EvilginxPage} />} />
+        <Route path="/evilginx" component={() => <CyberRoute component={EvilginxPage} />} />
 
         {/* Specialised Tools — admin only */}
-        <Route path="/blackeye" component={() => <AdminRoute component={BlackEyePage} />} />
-        <Route path="/metasploit" component={() => <AdminRoute component={MetasploitPage} />} />
-        <Route path="/exploitpack" component={() => <AdminRoute component={ExploitPackPage} />} />
+        <Route path="/blackeye" component={() => <CyberRoute component={BlackEyePage} />} />
+        <Route path="/metasploit" component={() => <CyberRoute component={MetasploitPage} />} />
+        <Route path="/exploitpack" component={() => <CyberRoute component={ExploitPackPage} />} />
 
         {/* Content Creator */}
         <Route path="/content-creator" component={ContentCreatorPage} />
 
         {/* Security Tools */}
-        <Route path="/cybermcp" component={() => <AdminRoute component={CyberMCPPage} />} />
-        <Route path="/astra" component={() => <AdminRoute component={AstraPage} />} />
-        <Route path="/argus" component={() => <AdminRoute component={ArgusPage} />} />
+        <Route path="/cybermcp" component={() => <CyberRoute component={CyberMCPPage} />} />
+        <Route path="/astra" component={() => <CyberRoute component={AstraPage} />} />
+        <Route path="/argus" component={() => <CyberRoute component={ArgusPage} />} />
 
         {/* Titan Storage Add-on */}
         <Route path="/storage" component={TitanStoragePage} />
 
         {/* Privacy & Anonymity Tools — admin only */}
-        <Route path="/tor" component={() => <AdminRoute component={TorPage} />} />
-        <Route path="/vpn-chain" component={() => <AdminRoute component={VpnChainPage} />} />
-        <Route path="/isolated-browser" component={() => <AdminRoute component={IsolatedBrowserPage} />} />
-        <Route path="/proxy-maker" component={() => <AdminRoute component={ProxyMakerPage} />} />
-        <Route path="/proxy-rotation" component={() => <AdminRoute component={ProxyRotationPage} />} />
-        <Route path="/ip-rotation" component={() => <AdminRoute component={IPRotationPage} />} />
-        <Route path="/bin-checker" component={() => <AdminRoute component={BinCheckerPage} />} />
-        <Route path="/web-agent" component={() => <AdminRoute component={WebAgentPage} />} />
+        <Route path="/tor" component={() => <CyberRoute component={TorPage} />} />
+        <Route path="/vpn-chain" component={() => <CyberRoute component={VpnChainPage} />} />
+        <Route path="/isolated-browser" component={() => <CyberRoute component={IsolatedBrowserPage} />} />
+        <Route path="/proxy-maker" component={() => <CyberRoute component={ProxyMakerPage} />} />
+        <Route path="/proxy-rotation" component={() => <CyberRoute component={ProxyRotationPage} />} />
+        <Route path="/ip-rotation" component={() => <CyberRoute component={IPRotationPage} />} />
+        <Route path="/bin-checker" component={() => <CyberRoute component={BinCheckerPage} />} />
+        <Route path="/web-agent" component={() => <CyberRoute component={WebAgentPage} />} />
 
         {/* Admin — requires admin role; non-admins are redirected to /dashboard */}
         <Route path="/fetcher/releases" component={() => <AdminRoute component={ReleaseManagementPage} />} />
@@ -297,13 +298,13 @@ function DashboardRouter() {
         <Route path="/builder-templates" component={BuilderTemplatesPage} />
 
         {/* Attack Graph */}
-        <Route path="/attack-graph" component={() => <AdminRoute component={AttackGraphPage} />} />
+        <Route path="/attack-graph" component={() => <CyberRoute component={AttackGraphPage} />} />
 
         {/* Proxy Interceptor — admin only */}
-        <Route path="/proxy-interceptor" component={() => <AdminRoute component={ProxyInterceptorPage} />} />
+        <Route path="/proxy-interceptor" component={() => <CyberRoute component={ProxyInterceptorPage} />} />
 
         {/* Red Team Playbooks — admin only */}
-        <Route path="/red-team-playbooks" component={() => <AdminRoute component={RedTeamPlaybooksPage} />} />
+        <Route path="/red-team-playbooks" component={() => <CyberRoute component={RedTeamPlaybooksPage} />} />
 
         {/* Command Centre */}
         <Route path="/command-centre" component={CommandCentrePage} />
