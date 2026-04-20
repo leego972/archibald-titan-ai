@@ -67,6 +67,7 @@ import { Link, useLocation } from "wouter";
                 <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
                 <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
                 <Link href="/docs" className="text-sm text-white/60 hover:text-white transition-colors">Documentation</Link>
+                  <Link href="/blog" className="text-sm text-white/60 hover:text-white transition-colors">Blog</Link>
               </div>
               <div className="flex items-center gap-3">
                 {user ? (
@@ -95,6 +96,7 @@ import { Link, useLocation } from "wouter";
               <Link href="/security" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Security</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Pricing</Link>
               <Link href="/docs" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Documentation</Link>
+                <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-white/70">Blog</Link>
               <div className="pt-6 border-t border-white/5 flex flex-col gap-4">
                 <Button onClick={() => { window.location.href = getRegisterUrl(); }} className="w-full bg-blue-600">Get Started</Button>
                 <Button onClick={() => { window.location.href = getLoginUrl(); }} variant="outline" className="w-full">Sign In</Button>
