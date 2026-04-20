@@ -15,7 +15,10 @@ import { Link, useLocation } from "wouter";
         { text: "Security", href: "/security" },
         { text: "Changelog", href: "/changelog" },
         { text: "Download App", href: "/download" },
-      ],
+          { text: "vs GitHub Copilot", href: "/vs-copilot" },
+          { text: "vs Cloud AI", href: "/vs-cloud-ai" },
+          { text: "vs No-Code", href: "/vs-no-code" },
+        ],
     },
     {
       label: "Developers",
