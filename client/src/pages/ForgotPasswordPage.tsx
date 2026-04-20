@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Shield, Mail, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
-import { FULL_LOGO_256 } from "@/lib/logos";
+import { FULL_LOGO_DARK_512 } from "@/lib/logos";
 
 export default function ForgotPasswordPage() {
   const [, navigate] = useLocation();
@@ -49,17 +49,20 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4">
       {/* Background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-950/40 via-background to-indigo-950/30 pointer-events-none" />
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-950/60 via-[#0a0e1a] to-indigo-950/40 pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center justify-center gap-3 mb-8">
-          <img loading="eager" src={FULL_LOGO_256} alt="Archibald Titan" className="h-20 object-contain" />
+          <div className="relative">
+              <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
+              <img loading="eager" src={FULL_LOGO_DARK_512} alt="Archibald Titan" className="relative h-40 w-auto object-contain drop-shadow-2xl" />
+            </div>
         </div>
 
-        <Card className="border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl">
+        <Card className="border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl">
           <CardHeader className="text-center space-y-1 pb-4">
             <CardTitle className="text-2xl font-bold">
               {sent ? "Check your email" : "Forgot password?"}

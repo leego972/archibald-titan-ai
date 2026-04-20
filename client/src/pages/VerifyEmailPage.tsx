@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { CheckCircle, XCircle, Loader2, Mail, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { FULL_LOGO_DARK_512 } from "@/lib/logos";
 
 export default function VerifyEmailPage() {
   const [, navigate] = useLocation();
@@ -73,7 +74,13 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#0f1629] to-[#0a0e1a] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-[#111827]/90 border-white/10 backdrop-blur-xl shadow-2xl">
+      <div className="flex justify-center mb-8">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
+            <img loading="eager" src={FULL_LOGO_DARK_512} alt="Archibald Titan" className="relative h-36 w-auto object-contain drop-shadow-2xl" />
+          </div>
+        </div>
+        <Card className="w-full max-w-md bg-[#111827]/90 border-white/10 backdrop-blur-xl shadow-2xl">
         <CardHeader className="text-center space-y-3 pb-2">
           <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
             <span className="text-xl">⬡</span>

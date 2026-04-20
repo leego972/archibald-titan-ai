@@ -99,9 +99,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4">
       {/* Background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-950/40 via-background to-indigo-950/30 pointer-events-none" />
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-950/60 via-[#0a0e1a] to-indigo-950/40 pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
           </div>
         </div>
 
-        <Card className="border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl">
+        <Card className="border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl">
           {verifying ? (
             <CardContent className="py-12">
               <div className="flex flex-col items-center gap-4">
