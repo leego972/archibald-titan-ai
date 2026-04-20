@@ -12,7 +12,7 @@ export default function AboutPage() {
   const values = [
     { icon: HardDrive, title: "Local-first", desc: "Your data stays on your machine by default. We build for privacy, not convenience.", color: "text-blue-400", bg: "bg-blue-500/10" },
     { icon: Shield, title: "Security without compromise", desc: "AES-256 encryption, sandboxed execution, and zero-knowledge vault design.", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-    { icon: Zap, title: "Outcomes over features", desc: "We measure success by what users ship, not by how many features we add.", color: "text-amber-400", bg: "bg-amber-500/10" },
+    { icon: Zap, title: "Offensive by design", desc: "We build the tools professionals actually use — from red team playbooks to exploit chains — not sanitised demos.", color: "text-amber-400", bg: "bg-amber-500/10" },
     { icon: Globe, title: "Built for real work", desc: "Every feature is designed to produce something useful — not just impressive demos.", color: "text-purple-400", bg: "bg-purple-500/10" },
   ];
 
@@ -27,8 +27,6 @@ export default function AboutPage() {
 
   return (
     <MarketingLayout>
-      {/* NAV */}
-
       {/* HERO */}
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-24">
         <div className="absolute inset-0 overflow-hidden">
@@ -43,7 +41,7 @@ export default function AboutPage() {
             <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-500 bg-clip-text text-transparent">who build things.</span>
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed">
-            Archibald Titan is a local-first AI platform for founders, developers, and teams who need to build fast without compromising on security or control.
+            Archibald Titan is an AI-powered DevSecOps and offensive security platform — built for founders, developers, and security professionals who demand speed, depth, and absolute control.
           </p>
         </div>
       </section>
@@ -144,7 +142,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
     </MarketingLayout>
   );
 }
