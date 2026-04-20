@@ -44,7 +44,7 @@ import {
   ];
 
   const PLATFORM_STATS = [
-    { value: "26",   label: "Security Tools",      icon: ShieldAlert },
+    { value: "26+",  label: "Security Tools",      icon: ShieldAlert },
     { value: "176+", label: "Platform Modules",    icon: Layers },
     { value: "50+",  label: "Automation Workflows",icon: Workflow },
     { value: "100%", label: "Data Sovereign",      icon: Lock },

@@ -40,6 +40,25 @@ function getPublicOrigin(req: Request): string {
 }
 
 // ─── Rate Limiting ──────────────────────────────────────────────────
+
+  // Registration rate limit: max 10 registrations per IP per hour
+  const registerAttempts = new Map<string, { count: number; firstAttempt: number }>();
+  const MAX_REGISTER_PER_HOUR = 10;
+  const REGISTER_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+  function checkRegisterRateLimit(ip: string): { allowed: boolean; retryAfterMs?: number } {
+    const now = Date.now();
+    const record = registerAttempts.get(ip);
+    if (!record || now - record.firstAttempt > REGISTER_WINDOW_MS) {
+      registerAttempts.set(ip, { count: 1, firstAttempt: now });
+      return { allowed: true };
+    }
+    if (record.count >= MAX_REGISTER_PER_HOUR) {
+      return { allowed: false, retryAfterMs: REGISTER_WINDOW_MS - (now - record.firstAttempt) };
+    }
+    record.count++;
+    return { allowed: true };
+  }
 const loginAttempts = new Map<string, { count: number; firstAttempt: number; lockedUntil?: number }>();
 const MAX_LOGIN_ATTEMPTS = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -133,8 +152,17 @@ function generateResetToken(): string {
 export function registerEmailAuthRoutes(app: Express) {
   // ─── POST /api/auth/register ─────────────────────────────────────
   app.post("/api/auth/register", async (req: Request, res: Response) => {
-    try {
-      const { email, password, name } = req.body || {};
+      try {
+        const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "unknown";
+
+        // Per-IP registration rate limit (10/hr) — blocks account creation spam
+        const regLimit = checkRegisterRateLimit(ip);
+        if (!regLimit.allowed) {
+          const retryMins = Math.ceil((regLimit.retryAfterMs ?? REGISTER_WINDOW_MS) / 60_000);
+          return res.status(429).json({ error: `Too many registration attempts. Please try again in ${retryMins} minutes.` });
+        }
+
+        const { email, password, name } = req.body || {};
 
       // Validate inputs
       if (!email || typeof email !== "string") {
