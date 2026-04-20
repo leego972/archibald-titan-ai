@@ -12,9 +12,9 @@ const TABLE_ROWS = [
   { feature: "Sandbox testing", titan: "Yes — test before shipping", copilot: "No" },
   { feature: "Marketplace", titan: "Bot & tool marketplace included", copilot: "No" },
   { feature: "Enterprise controls", titan: "Audit logs, team vault, role management", copilot: "GitHub Enterprise only" },
-  { feature: "Pricing", titan: "Free starter, Pro $29/mo, Enterprise $99/mo", copilot: "$10–$19/mo (individual), $39/mo (enterprise)" },
+  { feature: "Pricing", titan: "Free · Pro $29/mo · Enterprise $99/mo · Cyber $199/mo", copilot: "$10–$19/mo (individual), $39/mo (enterprise)" },
   { feature: "Offline capability", titan: "Yes — desktop app works offline", copilot: "No" },
-    { feature: "Offensive security", titan: "20+ integrated engines (Metasploit, Evilginx, BlackEye, Astra, Argus...)", copilot: "None" },
+    { feature: "Offensive security", titan: "26 integrated security tools (Metasploit, Evilginx, BlackEye, Astra, Argus...)", copilot: "None" },
     { feature: "AI model", titan: "Titan Crucible (security-domain trained)", copilot: "GitHub Copilot (GPT-4o — generic coding model)" },
   ];
 
@@ -135,7 +135,7 @@ export default function VsCopilotPage() {
           <Link href="/builder" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold text-lg transition-colors">
             Start Building Free <ArrowRight className="h-5 w-5" />
           </Link>
-          <p className="text-sm text-white/30 mt-4">Free plan includes chat. Builder access from $29/mo.</p>
+          <p className="text-sm text-white/30 mt-4">Free plan includes chat. Builder access from $29/mo · Cyber tier from $199/mo.</p>
         </section>
       </div>
     </MarketingLayout>
