@@ -364,27 +364,36 @@ export const marketplaceRouter = router({
     if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "No seller profile found. Use becomeSeller first." });
 
     const balance = await getCreditBalance(ctx.user.id);
-    if (balance.credits < SELLER_ANNUAL_FEE_CREDITS && !balance.isUnlimited) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: `Renewal costs ${SELLER_ANNUAL_FEE_CREDITS} credits ($12/year). You have ${balance.credits} credits.` });
-    }
-    if (!balance.isUnlimited) {
-      const dbInstance = await getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { creditBalances, creditTransactions } = await import("../drizzle/schema");
-      const { eq, sql: sqlOp } = await import("drizzle-orm");
-      await dbInstance.update(creditBalances).set({
-        credits: sqlOp`${creditBalances.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
-        lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`,
-      }).where(eq(creditBalances.userId, ctx.user.id));
-      const updatedBal = await dbInstance.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
-      await dbInstance.insert(creditTransactions).values({
-        userId: ctx.user.id,
-        amount: -SELLER_ANNUAL_FEE_CREDITS,
-        type: "marketplace_seller_renewal",
-        description: `Bazaar Seller Renewal — $12/year annual fee`,
-        balanceAfter: updatedBal[0]?.credits ?? 0,
-      });
-    }
+      // Quick pre-check — enforced atomically inside the transaction below
+      if (balance.credits < SELLER_ANNUAL_FEE_CREDITS && !balance.isUnlimited)
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${SELLER_ANNUAL_FEE_CREDITS} credits. You have ${balance.credits}.` });
+      if (!balance.isUnlimited) {
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditBalances, creditTransactions } = await import("../drizzle/schema");
+        const { eq, sql: sqlOp } = await import("drizzle-orm");
+        // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
+        const txResult = await dbInstance.transaction(async (tx) => {
+          const lockedBal = await tx
+            .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+            .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id))
+            .for("update").limit(1);
+          if (lockedBal.length === 0 || lockedBal[0].isUnlimited) return { skipped: true };
+          if (lockedBal[0].credits < SELLER_ANNUAL_FEE_CREDITS) return { insufficient: true, credits: lockedBal[0].credits };
+          await tx.update(creditBalances).set({
+            credits: sqlOp`${creditBalances.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
+            lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`,
+          }).where(eq(creditBalances.userId, ctx.user.id));
+          const updatedBal = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+          await tx.insert(creditTransactions).values({
+            userId: ctx.user.id, amount: -SELLER_ANNUAL_FEE_CREDITS,
+            type: "marketplace_seller_renewal", description: `Bazaar Seller Renewal — $12/year annual fee`,
+            balanceAfter: updatedBal[0]?.credits ?? 0,
+          });
+          return { success: true };
+        });
+        if (txResult.insufficient) throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${SELLER_ANNUAL_FEE_CREDITS} credits. You have ${txResult.credits}.` });
+      }
 
     // Extend from current expiry or now, whichever is later
     const currentExpiry = profile.sellerSubscriptionExpiresAt ? new Date(profile.sellerSubscriptionExpiresAt) : new Date();
@@ -979,26 +988,36 @@ export const marketplaceRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "You don't own this listing" });
       if (listing.featured) throw new TRPCError({ code: "BAD_REQUEST", message: "Already featured" });
       const balance = await getCreditBalance(ctx.user.id);
-      if (balance.credits < FEATURE_COST && !balance.isUnlimited)
-        throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${FEATURE_COST} credits to feature. You have ${balance.credits}.` });
-      const dbInstance = await getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
-      const { eq, sql: sqlOp } = await import("drizzle-orm");
-      if (!balance.isUnlimited) {
-        await dbInstance.update(creditBalances).set({
-          credits: sqlOp`${creditBalances.credits} - ${FEATURE_COST}`,
-          lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${FEATURE_COST}`,
-        }).where(eq(creditBalances.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
-        await dbInstance.insert(creditTransactions).values({
-          userId: ctx.user.id,
-          amount: -FEATURE_COST,
-          type: "marketplace_feature",
-          description: `Featured listing "${listing.title}" for 30 days`,
-          balanceAfter: updatedBal[0]?.credits ?? 0,
-        });
-      }
+        // Quick pre-check — enforced atomically inside the transaction below
+        if (balance.credits < FEATURE_COST && !balance.isUnlimited)
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${FEATURE_COST} credits. You have ${balance.credits}.` });
+        if (!balance.isUnlimited) {
+          const dbInstance = await getDb();
+          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
+          const { eq, sql: sqlOp } = await import("drizzle-orm");
+          // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
+          const txResult = await dbInstance.transaction(async (tx) => {
+            const lockedBal = await tx
+              .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+              .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id))
+              .for("update").limit(1);
+            if (lockedBal.length === 0 || lockedBal[0].isUnlimited) return { skipped: true };
+            if (lockedBal[0].credits < FEATURE_COST) return { insufficient: true, credits: lockedBal[0].credits };
+            await tx.update(creditBalances).set({
+              credits: sqlOp`${creditBalances.credits} - ${FEATURE_COST}`,
+              lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${FEATURE_COST}`,
+            }).where(eq(creditBalances.userId, ctx.user.id));
+            const updatedBal = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+            await tx.insert(creditTransactions).values({
+              userId: ctx.user.id, amount: -FEATURE_COST,
+              type: "marketplace_feature", description: `Featured listing for 30 days`,
+              balanceAfter: updatedBal[0]?.credits ?? 0,
+            });
+            return { success: true };
+          });
+          if (txResult.insufficient) throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${FEATURE_COST} credits. You have ${txResult.credits}.` });
+        }
       await dbInstance.update(marketplaceListings).set({ featured: true }).where(eq(marketplaceListings.id, input.listingId));
       return { success: true, cost: FEATURE_COST, message: "Listing featured for 30 days" };
     }),
@@ -1014,26 +1033,36 @@ export const marketplaceRouter = router({
       if (listing.sellerId !== ctx.user.id && !isAdminRole(ctx.user.role))
         throw new TRPCError({ code: "FORBIDDEN", message: "You don't own this listing" });
       const balance = await getCreditBalance(ctx.user.id);
-      if (balance.credits < BOOST_COST && !balance.isUnlimited)
-        throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${BOOST_COST} credits to boost. You have ${balance.credits}.` });
-      const dbInstance = await getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
-      const { eq, sql: sqlOp } = await import("drizzle-orm");
-      if (!balance.isUnlimited) {
-        await dbInstance.update(creditBalances).set({
-          credits: sqlOp`${creditBalances.credits} - ${BOOST_COST}`,
-          lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${BOOST_COST}`,
-        }).where(eq(creditBalances.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
-        await dbInstance.insert(creditTransactions).values({
-          userId: ctx.user.id,
-          amount: -BOOST_COST,
-          type: "marketplace_boost",
-          description: `Boosted listing "${listing.title}" for 7 days`,
-          balanceAfter: updatedBal[0]?.credits ?? 0,
-        });
-      }
+        // Quick pre-check — enforced atomically inside the transaction below
+        if (balance.credits < BOOST_COST && !balance.isUnlimited)
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${BOOST_COST} credits. You have ${balance.credits}.` });
+        if (!balance.isUnlimited) {
+          const dbInstance = await getDb();
+          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
+          const { eq, sql: sqlOp } = await import("drizzle-orm");
+          // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
+          const txResult = await dbInstance.transaction(async (tx) => {
+            const lockedBal = await tx
+              .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+              .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id))
+              .for("update").limit(1);
+            if (lockedBal.length === 0 || lockedBal[0].isUnlimited) return { skipped: true };
+            if (lockedBal[0].credits < BOOST_COST) return { insufficient: true, credits: lockedBal[0].credits };
+            await tx.update(creditBalances).set({
+              credits: sqlOp`${creditBalances.credits} - ${BOOST_COST}`,
+              lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${BOOST_COST}`,
+            }).where(eq(creditBalances.userId, ctx.user.id));
+            const updatedBal = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+            await tx.insert(creditTransactions).values({
+              userId: ctx.user.id, amount: -BOOST_COST,
+              type: "marketplace_boost", description: `Marketplace listing boosted for 7 days`,
+              balanceAfter: updatedBal[0]?.credits ?? 0,
+            });
+            return { success: true };
+          });
+          if (txResult.insufficient) throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${BOOST_COST} credits. You have ${txResult.credits}.` });
+        }
       await dbInstance.update(marketplaceListings).set({
         viewCount: sqlOp`${marketplaceListings.viewCount} + 100`,
       }).where(eq(marketplaceListings.id, input.listingId));
@@ -1049,26 +1078,36 @@ export const marketplaceRouter = router({
       if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Create a seller profile first" });
       if (profile.verified) throw new TRPCError({ code: "BAD_REQUEST", message: "Already verified" });
       const balance = await getCreditBalance(ctx.user.id);
-      if (balance.credits < VERIFY_COST && !balance.isUnlimited)
-        throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${VERIFY_COST} credits for verification. You have ${balance.credits}.` });
-      const dbInstance = await getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { creditBalances, creditTransactions } = await import("../drizzle/schema");
-      const { eq, sql: sqlOp } = await import("drizzle-orm");
-      if (!balance.isUnlimited) {
-        await dbInstance.update(creditBalances).set({
-          credits: sqlOp`${creditBalances.credits} - ${VERIFY_COST}`,
-          lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${VERIFY_COST}`,
-        }).where(eq(creditBalances.userId, ctx.user.id));
-        const updatedBal = await dbInstance.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
-        await dbInstance.insert(creditTransactions).values({
-          userId: ctx.user.id,
-          amount: -VERIFY_COST,
-          type: "marketplace_verification",
-          description: "Seller verification badge — permanent",
-          balanceAfter: updatedBal[0]?.credits ?? 0,
-        });
-      }
+        // Quick pre-check — enforced atomically inside the transaction below
+        if (balance.credits < VERIFY_COST && !balance.isUnlimited)
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${VERIFY_COST} credits. You have ${balance.credits}.` });
+        if (!balance.isUnlimited) {
+          const dbInstance = await getDb();
+          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          const { creditBalances, creditTransactions } = await import("../drizzle/schema");
+          const { eq, sql: sqlOp } = await import("drizzle-orm");
+          // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
+          const txResult = await dbInstance.transaction(async (tx) => {
+            const lockedBal = await tx
+              .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+              .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id))
+              .for("update").limit(1);
+            if (lockedBal.length === 0 || lockedBal[0].isUnlimited) return { skipped: true };
+            if (lockedBal[0].credits < VERIFY_COST) return { insufficient: true, credits: lockedBal[0].credits };
+            await tx.update(creditBalances).set({
+              credits: sqlOp`${creditBalances.credits} - ${VERIFY_COST}`,
+              lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${VERIFY_COST}`,
+            }).where(eq(creditBalances.userId, ctx.user.id));
+            const updatedBal = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+            await tx.insert(creditTransactions).values({
+              userId: ctx.user.id, amount: -VERIFY_COST,
+              type: "marketplace_verification", description: `Seller verification badge — permanent`,
+              balanceAfter: updatedBal[0]?.credits ?? 0,
+            });
+            return { success: true };
+          });
+          if (txResult.insufficient) throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${VERIFY_COST} credits. You have ${txResult.credits}.` });
+        }
       await db.updateSellerProfile(ctx.user.id, { verified: true });
       return { success: true, cost: VERIFY_COST, message: "Seller verified! Badge applied permanently." };
     }),
