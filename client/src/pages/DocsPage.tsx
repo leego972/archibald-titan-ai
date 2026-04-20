@@ -34,6 +34,20 @@ const SECTIONS = [
     ],
   },
   {
+      id: "security-tools",
+      icon: ShieldAlert,
+      title: "Security Tools (Cyber Tier)",
+      color: "text-red-400",
+      bg: "bg-red-500/10",
+      steps: [
+        { n: "1", title: "Upgrade to Cyber ($199/mo)", body: "Security tools are available on the Cyber tier. Navigate to Settings → Billing and select the Cyber plan. All tools activate immediately — no configuration required." },
+        { n: "2", title: "Access tools from the dashboard", body: "All security engines appear in the dashboard sidebar under 'Cyber Tools': Argus, Astra, Metasploit, BlackEye, Evilginx2, CyberMCP, Attack Graph, VPN Chain, LinkenSphere, and more." },
+        { n: "3", title: "Run your first Argus scan", body: 'Open Argus from the sidebar. Enter a target domain (e.g. "target.example.com"), select scan depth (Light / Full / Deep), and click Run. Argus enumerates subdomains, maps exposed services, and cross-references CVEs against NVD and ExploitDB.' },
+        { n: "4", title: "Review findings in the dashboard", body: "Results appear in the Argus findings table — sorted by severity. Critical and High findings include CVE references, CVSS scores, and links to ExploitDB entries. Filter by severity, service type, or subdomain." },
+        { n: "5", title: "Generate an executive report", body: 'Use Titan Builder to format scan output into a structured report. Prompt: "Generate an executive security report from the Argus scan results for target.example.com." Titan produces a client-ready document with risk ratings, findings summary, and a remediation roadmap.' },
+      ],
+    },
+    {
     id: "prompts",
     icon: Terminal,
     title: "Example Prompts",
