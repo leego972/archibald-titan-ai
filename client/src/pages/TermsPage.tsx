@@ -7,8 +7,6 @@ export default function TermsPage() {
   return (
     <MarketingLayout>
       {/* Navigation */}
-
-      {/* Content */}
       <div className="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
           <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">Legal</span>
@@ -513,8 +511,6 @@ export default function TermsPage() {
           </section>
         </div>
       </div>
-
-      {/* Footer */}
     </MarketingLayout>
   );
 }
