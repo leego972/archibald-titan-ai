@@ -30,6 +30,6 @@ jobs:
       - name: Push to architabot mirror
         run: |
           git remote add mirror https://x-access-token:${{ secrets.ARCHITABOT_SYNC_TOKEN }}@github.com/leego972/architabot.git || true
-          git push mirror main --force
+          git push mirror main --force || echo "[sync] Push failed — ARCHITABOT_SYNC_TOKEN may be expired or missing. Skipping mirror sync."
         env:
           GIT_TERMINAL_PROMPT: 0
