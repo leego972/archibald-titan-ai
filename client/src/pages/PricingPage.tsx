@@ -1,13 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-  import { trackPurchase, trackViewContent } from "@/lib/adTracking";
-  import { Button } from "@/components/ui/button";
-  import { getRegisterUrl } from "@/const";
-  import { useLocation } from "wouter";
-  import MarketingLayout from "@/components/MarketingLayout";
-  import { trpc } from "@/lib/trpc";
-  import { useState } from "react";
-  import { toast } from "sonner";
-  import {
+import { trackPurchase, trackViewContent } from "@/lib/adTracking";
+import { Button } from "@/components/ui/button";
+import { getRegisterUrl } from "@/const";
+import { useLocation } from "wouter";
+import MarketingLayout from "@/components/MarketingLayout";
+import { trpc } from "@/lib/trpc";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
     Check, Shield, Zap, Server, Cpu, Activity,
     Database, Workflow, Globe2, Boxes,
     Vault, Terminal, Lock, BarChart3, Users,
@@ -15,7 +15,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     Fingerprint, Network, Monitor, FileText,
     ShieldAlert, History, ArrowRight, CalendarDays,
     PhoneCall, Loader2, Sparkles
-  } from "lucide-react";
+} from "lucide-react";
 
   type PlanId = "pro" | "enterprise" | "cyber" | "cyber_plus";
 
