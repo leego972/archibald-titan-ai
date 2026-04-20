@@ -15,9 +15,24 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+        version: "v4.2.0",
+        date: "April 2026",
+        label: "Latest",
+        changes: [
+          { type: "feature", text: "Red Team & Security Researchers use case — dedicated landing covering Argus, Astra, BlackEye, Evilginx2, Red Team Playbooks, and automated compliance reporting" },
+          { type: "feature", text: "Security example gallery — 3 new examples: Penetration Test Report, Red Team Playbook, and Attack Surface Report, each with full prompt/output previews" },
+          { type: "feature", text: "Demo: Attack Surface Scan scenario — live Argus-powered demo showing subdomain enumeration, CVE detection, and executive report generation" },
+          { type: "feature", text: "Competitor comparison section on Landing — direct links to Titan vs GitHub Copilot, Titan vs Cloud AI Agents, and Titan vs No-Code Builders" },
+          { type: "feature", text: "Footer: vs-comparison links added to Platform column across all marketing pages" },
+          { type: "fix", text: "DemoPage: removed stray MarketingLayout import from invoice generator codePreview string" },
+          { type: "fix", text: "ExamplesPage: added Security to Tag union type to support security example filtering" },
+          { type: "improvement", text: "All 9 remaining marketing pages cleaned of dead nav/footer comment artifacts (TermsPage, PrivacyPage, ContactPage, and 6 others)" },
+        ],
+      },
+      {
       version: "v4.1.0",
       date: "April 2026",
-      label: "Latest",
+      label: "Stable",
       changes: [
         { type: "feature", text: "Proxy Network — managed residential proxy via Decodo/Smartproxy with 18 exit countries, HTTP/HTTPS/SOCKS5/SOCKS4, and IP leak test" },
         { type: "feature", text: "Unified platform branding — all 15 marketing pages now share consistent navigation, mobile menu, and professional 4-column footer" },
