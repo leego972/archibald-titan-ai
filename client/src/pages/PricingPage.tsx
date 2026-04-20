@@ -127,7 +127,7 @@ import {
           "Direct Slack/Teams support channel",
         ],
       },
-    ];;
+    ];
 
   export default function PricingPage() {
     const { user } = useAuth();
