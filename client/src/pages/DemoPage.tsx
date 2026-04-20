@@ -76,7 +76,6 @@ export default function App() {
   }, []);
 
   return (
-    <MarketingLayout>
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-red-400">
           🛡️ Network Intrusion Detection
@@ -585,8 +584,7 @@ export default function DemoPage() {
   const [activeScenario, setActiveScenario] = useState(0);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Nav */}
+    <MarketingLayout>
 
       {/* Hero */}
       <section className="py-20 px-4 sm:px-6 text-center">
