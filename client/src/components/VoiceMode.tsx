@@ -35,8 +35,8 @@ import { toast } from "sonner";
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SPEECH_THRESHOLD  = 0.018;   // RMS above this = speech
 const SILENCE_THRESHOLD = 0.012;   // RMS below this = silence
-const MIN_SPEECH_MS     = 400;     // must be speaking this long before recording starts
-const SILENCE_MS        = 1200;    // silence this long ends the utterance
+const MIN_SPEECH_MS     = 220;     // must be speaking this long before recording starts (was 400)
+const SILENCE_MS        = 650;     // silence this long ends the utterance (was 1200)
 const MAX_RECORD_MS     = 30000;   // hard cap per utterance
 const STANDBY_TIMEOUT   = 30000;   // inactivity before entering standby/wake-word mode
 

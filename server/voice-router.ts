@@ -321,8 +321,9 @@ export function registerVoiceTTSRoute(app: Express) {
       // eleven_v3 supports up to 5,000 characters; trim to that limit
       const trimmedText = text.slice(0, 5000);
 
-      // ── ElevenLabs TTS (primary) — Eleven v3, deep English male voice "George" ──
-      // Model: eleven_v3 — most expressive, 70+ languages, 5,000 char limit (GA Mar 2026)
+      // ── ElevenLabs TTS (primary) — Flash v2.5 streaming, deep English male voice "George" ──
+      // Model: eleven_flash_v2_5 — ~75ms TTFB, optimised for real-time conversation
+      // Endpoint: /stream + optimize_streaming_latency=3 cuts time-to-first-byte further
       // Voice ID: JBFqnCBsd6RMkjVDRZzb = "George" (deep, authoritative British male)
       // Fallback voice ID: pNInz6obpgDQGcFmaJgB = "Adam" (American deep male)
       const elevenLabsKey = ENV.elevenLabsApiKey;
@@ -330,7 +331,7 @@ export function registerVoiceTTSRoute(app: Express) {
         try {
           const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // George — deep British English male
           const elRes = await fetch(
-            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream?optimize_streaming_latency=3&output_format=mp3_44100_64`,
             {
               method: "POST",
               headers: {
@@ -340,11 +341,11 @@ export function registerVoiceTTSRoute(app: Express) {
               },
               body: JSON.stringify({
                 text: trimmedText,
-                model_id: "eleven_v3",  // Eleven v3 — most expressive, GA March 2026
+                model_id: "eleven_flash_v2_5",  // Flash v2.5 — ~75ms TTFB for real-time chat
                 voice_settings: {
                   stability: 0.50,          // slightly lower = more dramatic delivery
                   similarity_boost: 0.85,   // stay true to voice
-                  style: 0.45,              // more expressive with v3's wider range
+                  style: 0.40,              // expressive but flash-friendly
                   use_speaker_boost: true,  // enhanced presence
                 },
               }),
@@ -357,7 +358,7 @@ export function registerVoiceTTSRoute(app: Express) {
             res.setHeader("Content-Length", audioBuffer.length.toString());
             res.setHeader("Accept-Ranges", "bytes");
             res.setHeader("Cache-Control", "no-cache");
-            res.setHeader("X-TTS-Provider", "elevenlabs-v3");
+            res.setHeader("X-TTS-Provider", "elevenlabs-flash-v2_5");
             return res.end(audioBuffer);
           } else {
             const errText = await elRes.text().catch(() => "");
