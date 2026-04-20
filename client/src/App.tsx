@@ -8,6 +8,7 @@ import { initAdTracking } from "@/lib/adTracking";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import MarketingLayout from "@/components/MarketingLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import FetcherLayout from "./components/FetcherLayout";
@@ -150,7 +151,7 @@ import TitanStoragePage from "./pages/TitanStoragePage";
 // Privacy & Anonymity Tools
 import TorPage from "./pages/TorPage";
 import VpnChainPage from "./pages/VpnChainPage";
-  import VpnPage from "./pages/VpnPage";
+import VpnPage from "./pages/VpnPage";
 import IsolatedBrowserPage from "./pages/IsolatedBrowserPage";
 import ProxyMakerPage from "./pages/ProxyMakerPage";
 import ProxyRotationPage from "./pages/ProxyRotationPage";
@@ -298,7 +299,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         {/* Privacy & Anonymity Tools — admin only */}
         <Route path="/tor" component={() => <CyberRoute component={TorPage} />} />
         <Route path="/vpn-chain" component={() => <CyberRoute component={VpnChainPage} />} />
-          <Route path="/vpn" component={() => <CyberRoute component={VpnPage} />} />
+        <Route path="/vpn" component={() => <CyberRoute component={VpnPage} />} />
         <Route path="/isolated-browser" component={() => <CyberRoute component={IsolatedBrowserPage} />} />
         <Route path="/proxy-maker" component={() => <CyberRoute component={ProxyMakerPage} />} />
         <Route path="/proxy-rotation" component={() => <CyberRoute component={ProxyRotationPage} />} />
@@ -389,7 +390,13 @@ function Router() {
       <Route path="/how-it-works" component={HowItWorksPage} />
       <Route path="/customers" component={CustomersPage} />
       <Route path="/demo" component={DemoPage} />
-        <Route path="/developer-docs" component={DeveloperDocsPage} />
+        <Route path="/developer-docs" component={() => (
+            <MarketingLayout>
+              <div className="pt-16 container max-w-4xl py-12">
+                <DeveloperDocsPage />
+              </div>
+            </MarketingLayout>
+          )} />
         <Route path="/cli" component={CliToolPage} />
         <Route path="/download" component={DownloadAppPage} />
 
