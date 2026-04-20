@@ -39,6 +39,27 @@ function getPublicOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
+  // Forgot-password rate limit: max 5 requests per IP per 15 min
+  // Prevents email bombing — even without an account, the endpoint can be
+  // abused to spam a mail service's rate limits and rack up send costs.
+  const forgotAttempts = new Map<string, { count: number; firstAttempt: number }>();
+  const MAX_FORGOT_REQUESTS = 5;
+  const FORGOT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+  function checkForgotRateLimit(ip: string): { allowed: boolean; retryAfterMs?: number } {
+    const now = Date.now();
+    const record = forgotAttempts.get(ip);
+    if (!record || now - record.firstAttempt > FORGOT_WINDOW_MS) {
+      forgotAttempts.set(ip, { count: 1, firstAttempt: now });
+      return { allowed: true };
+    }
+    if (record.count >= MAX_FORGOT_REQUESTS) {
+      return { allowed: false, retryAfterMs: FORGOT_WINDOW_MS - (now - record.firstAttempt) };
+    }
+    record.count++;
+    return { allowed: true };
+  }
+
 // ─── Rate Limiting ──────────────────────────────────────────────────
 
   // Registration rate limit: max 10 registrations per IP per hour
@@ -312,8 +333,18 @@ export function registerEmailAuthRoutes(app: Express) {
 
   // ─── POST /api/auth/forgot-password ──────────────────────────
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
-    try {
-      const { email, origin } = req.body || {};
+      try {
+        const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "unknown";
+
+        // Per-IP rate limit (5/15min) — prevents reset email bombing
+        const forgotLimit = checkForgotRateLimit(ip);
+        if (!forgotLimit.allowed) {
+          const retryMins = Math.ceil((forgotLimit.retryAfterMs ?? FORGOT_WINDOW_MS) / 60_000);
+          // Return generic message (not 429) to avoid leaking that rate limiting exists
+          return res.json({ success: true, message: "If an account with that email exists, a password reset link has been sent." });
+        }
+
+        const { email, origin } = req.body || {};
 
       if (!email || typeof email !== "string") {
         return res.status(400).json({ error: "Email is required" });
