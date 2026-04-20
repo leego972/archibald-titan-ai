@@ -76,7 +76,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
+    <MarketingLayout>
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-red-400">
           🛡️ Network Intrusion Detection
@@ -257,6 +257,7 @@ npm run build
     codePreview: `// src/lib/generatePdf.ts — Professional PDF Invoice Generator
 import jsPDF from 'jspdf';
 import type { Invoice } from '../types/invoice';
+import MarketingLayout from "@/components/MarketingLayout";
 
 export async function generateInvoicePdf(invoice: Invoice): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -586,29 +587,6 @@ export default function DemoPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <Link href="/">
-            <div className="flex items-center gap-2.5 cursor-pointer">
-              <img src={FULL_LOGO_256} alt="Archibald Titan" className="h-8 w-8 rounded-lg" />
-              <span className="font-bold text-white text-sm hidden sm:block">Archibald Titan</span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/builder">
-              <button className="text-sm text-slate-400 hover:text-white transition-colors hidden sm:block">Builder</button>
-            </Link>
-            <Link href="/pricing">
-              <button className="text-sm text-slate-400 hover:text-white transition-colors hidden sm:block">Pricing</button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                Get started free
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
 
       {/* Hero */}
       <section className="py-20 px-4 sm:px-6 text-center">
@@ -750,16 +728,6 @@ export default function DemoPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-          <span>© 2025 Archibald Titan. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            <Link href="/security"><span className="hover:text-white transition-colors cursor-pointer">Security</span></Link>
-            <Link href="/about"><span className="hover:text-white transition-colors cursor-pointer">About</span></Link>
-            <Link href="/pricing"><span className="hover:text-white transition-colors cursor-pointer">Pricing</span></Link>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </MarketingLayout>
   );
 }
