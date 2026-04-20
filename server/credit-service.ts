@@ -6,7 +6,7 @@
  * All users can purchase additional credit packs.
  */
 
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, and, or, isNull } from "drizzle-orm";
 import { log } from "./_core/logger";
 import { getDb } from "./db";
 import { creditBalances, creditTransactions, users, subscriptions } from "../drizzle/schema";
@@ -556,17 +556,29 @@ export async function processMonthlyRefill(userId: number): Promise<boolean> {
     return false;
   }
 
-  // Check if already refilled this month
-  const now = new Date();
-  const lastRefill = bal[0].lastRefillAt;
-  if (lastRefill) {
-    const sameMonth =
-      lastRefill.getUTCFullYear() === now.getUTCFullYear() &&
-      lastRefill.getUTCMonth() === now.getUTCMonth();
-    if (sameMonth) return false; // Already refilled this month
-  }
+  // Atomic "claim" for this calendar month — acts as a database-level mutex,
+    // preventing double-refills across concurrent Railway instances. The conditional
+    // UPDATE only stamps lastRefillAt when no other process has done so this month.
+    // affectedRows = 0 → another instance already claimed; we return false silently.
+    const claimResult = await db
+      .update(creditBalances)
+      .set({ lastRefillAt: new Date() })
+      .where(
+        and(
+          eq(creditBalances.userId, userId),
+          or(
+            isNull(creditBalances.lastRefillAt),
+            sql`(YEAR(${creditBalances.lastRefillAt}) != YEAR(NOW()) OR MONTH(${creditBalances.lastRefillAt}) != MONTH(NOW()))`
+          )
+        )
+      );
+    // MySQL returns [ResultSetHeader, ...]; affectedRows=0 means already refilled this month
+    const claimed = Array.isArray(claimResult)
+      ? ((claimResult[0] as { affectedRows?: number })?.affectedRows ?? 0) > 0
+      : true;
+    if (!claimed) return false;
 
-  // Get user's plan allocation
+    // Get user's plan allocation
   const plan = await getUserPlan(userId);
   const tier = PRICING_TIERS.find((t) => t.id === plan.planId) || INTERNAL_TIERS.find((t) => t.id === plan.planId);
   const allocation = tier?.credits.monthlyAllocation ?? 50;
