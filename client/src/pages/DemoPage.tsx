@@ -686,7 +686,7 @@ export default function DemoPage() {
               { icon: <Clock className="h-4 w-4 text-indigo-400" />, value: "~4 min", label: "average build time" },
               { icon: <Download className="h-4 w-4 text-emerald-400" />, value: "50k+", label: "builds completed" },
               { icon: <Star className="h-4 w-4 text-yellow-400" />, value: "4.9/5", label: "user rating" },
-              { icon: <Users className="h-4 w-4 text-purple-400" />, value: "2,400+", label: "active users" },
+              { icon: <Users className="h-4 w-4 text-purple-400" />, value: "5,000+", label: "active users" },
             ].map((stat, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
                 {stat.icon}
