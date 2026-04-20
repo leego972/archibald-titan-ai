@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowRight, MessageSquare, Map, Cpu, Eye, RefreshCw, Rocket, ChevronRight } from "lucide-react";
+import { ArrowRight, MessageSquare, Map, Cpu, Eye, RefreshCw, Rocket, ChevronRight, ShieldAlert } from "lucide-react";
 import MarketingLayout from "@/components/MarketingLayout";
 
 const STEPS = [
@@ -139,7 +139,47 @@ export default function HowItWorksPage() {
           </div>
         </section>
 
-        {/* CTA */}
+        {/* SECURITY OPS MODE */}
+          <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+            <div className="p-6 sm:p-8 rounded-2xl border border-red-500/20 bg-red-500/[0.03]">
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <ShieldAlert className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-400/60 mb-2">Cyber Tier</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">Security Operations Mode</h2>
+                  <p className="text-sm text-white/55 leading-relaxed mb-6">For Cyber tier subscribers, the same six steps drive red team operations — powered by Argus, Astra, Metasploit, and 23 other dedicated security engines.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    {[
+                      { n: "01–02", label: "Brief + Plan", desc: 'Describe the target: "Run OSINT and vulnerability scan on target.example.com." Titan scopes the operation — selects engines, scan depth, and report structure.' },
+                      { n: "03–04", label: "Scan + Review", desc: "Argus enumerates subdomains and maps the attack surface. Astra cross-references findings against NVD and ExploitDB. Review all findings before any exploitation step." },
+                      { n: "05–06", label: "Exploit + Report", desc: "Deep-dive confirmed CVEs with Metasploit, simulate phishing vectors with Evilginx2 or BlackEye, and generate a client-ready executive report from scan output." },
+                    ].map(item => (
+                      <div key={item.n} className="p-4 rounded-xl bg-black/30 border border-white/5">
+                        <p className="text-[10px] font-bold text-red-400/60 uppercase tracking-widest mb-1">Steps {item.n}</p>
+                        <p className="text-sm font-semibold text-white mb-2">{item.label}</p>
+                        <p className="text-xs text-white/50 leading-relaxed">{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-5">
+                    <Link href="/use-cases" className="inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 font-semibold transition-colors">
+                      Security use cases <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link href="/pricing" className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 font-medium transition-colors">
+                      View Cyber tier <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link href="/demo" className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 font-medium transition-colors">
+                      Watch it in action <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* CTA */}
         <section className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
           <h2 className="text-3xl font-bold mb-4">See it for yourself</h2>
           <p className="text-white/60 mb-8">The best way to understand Titan Builder is to use it. Start free — no credit card required for chat.</p>
