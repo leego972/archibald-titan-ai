@@ -635,6 +635,8 @@ export const advertisingRouter = router({
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits for content cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
+      const { runAutonomousContentCycle } = await import("./content-creator-engine");
+      return runAutonomousContentCycle({
         maxPieces: input?.maxPiecesPerPlatform ?? 2,
         forceGenerate: true,
       });
