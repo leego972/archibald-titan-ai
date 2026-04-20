@@ -14,7 +14,9 @@ const TABLE_ROWS = [
   { feature: "Business docs & plans", titan: "Yes — generates docs, plans, briefs", nocode: "No" },
   { feature: "Credential vault", titan: "Built-in encrypted vault", nocode: "None" },
   { feature: "Pricing", titan: "Free starter, Pro $29/mo, Enterprise $99/mo", nocode: "$14–$212/mo (Webflow), $29–$529/mo (Bubble)" },
-];
+  { feature: "Offensive security", titan: "20+ integrated security engines for DevSecOps teams", nocode: "None" },
+    { feature: "AI model", titan: "Titan Crucible (security-domain trained)", nocode: "No native AI — visual editor only" },
+  ];
 
 export default function VsNoCodePage() {
   return (
