@@ -44,8 +44,8 @@ import {
   ];
 
   const PLATFORM_STATS = [
-    { value: "15+",  label: "Security Engines",    icon: ShieldAlert },
-    { value: "119",  label: "Platform Modules",    icon: Layers },
+    { value: "20+",  label: "Security Engines",    icon: ShieldAlert },
+    { value: "176+", label: "Platform Modules",    icon: Layers },
     { value: "50+",  label: "Automation Workflows",icon: Workflow },
     { value: "100%", label: "Data Sovereign",      icon: Lock },
   ];
@@ -131,7 +131,7 @@ import {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { icon: BrainCircuit, color: "text-blue-400",   bg: "bg-blue-600/10",   border: "border-blue-500/20",   num: "01", title: "Titan AI Builder",          desc: "An autonomous AI agent that writes code, debugs, orchestrates complex workflows, and runs your engineering operations. Local-first, data-sovereign, and extensible.", tags: ["Code Generation", "Auto-Debug", "Workflow Orchestration", "Local LLM"] },
-                { icon: ShieldAlert,  color: "text-red-400",    bg: "bg-red-600/10",    border: "border-red-500/20",    num: "02", title: "Offensive Security Suite",  desc: "15+ integrated security engines — from OSINT and scanning to exploitation and phishing simulation. Professional red team operations in a managed, auditable environment.", tags: ["Red Team Ops", "Vulnerability Scanning", "OSINT", "Exploit Staging"] },
+                { icon: ShieldAlert,  color: "text-red-400",    bg: "bg-red-600/10",    border: "border-red-500/20",    num: "02", title: "Offensive Security Suite",  desc: "20+ integrated security engines — from OSINT and scanning to exploitation and phishing simulation. Professional red team operations in a managed, auditable environment.", tags: ["Red Team Ops", "Vulnerability Scanning", "OSINT", "Exploit Staging"] },
                 { icon: Vault,        color: "text-violet-400", bg: "bg-violet-600/10", border: "border-violet-500/20", num: "03", title: "Vault & Credential Ops",    desc: "AES-256-GCM encrypted credential orchestration with team vaults, TOTP management, audit logs, and provider health monitoring across 15+ credential providers.", tags: ["AES-256-GCM", "Team Vault", "TOTP", "Audit Logs"] },
               ].map((pillar) => {
                 const Icon = pillar.icon;
