@@ -14,10 +14,21 @@ interface Release {
 }
 
 const RELEASES: Release[] = [
+    {
+      version: "v4.3.0",
+      date: "April 2026",
+      label: "Latest",
+      changes: [
+        { type: "feature", text: "Telegram Connection Tester — Advertising Dashboard › Channel Health tab now includes a live Telegram diagnostic card with Verify Token and Send Test Message buttons to confirm bot token validity, channel ID, and admin posting permission without leaving the app" },
+        { type: "fix", text: "All VS comparison pages: offensive security tool count corrected from 20+ to 26 across Titan vs Cloud AI, Titan vs Copilot, and Titan vs No-Code pages" },
+        { type: "improvement", text: "VS comparison pricing rows updated to include Cyber tier at $199/mo across all three competitor comparison pages" },
+        { type: "fix", text: "advertising-router: replaced dynamic env import with static ENV import in testTelegramConnection — resolves Railway build failure" },
+      ],
+    },
   {
         version: "v4.2.0",
         date: "April 2026",
-        label: "Latest",
+        label: "Stable",
         changes: [
           { type: "feature", text: "Red Team & Security Researchers use case — dedicated landing covering Argus, Astra, BlackEye, Evilginx2, Red Team Playbooks, and automated compliance reporting" },
           { type: "feature", text: "Security example gallery — 3 new examples: Penetration Test Report, Red Team Playbook, and Attack Surface Report, each with full prompt/output previews" },
