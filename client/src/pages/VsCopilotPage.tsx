@@ -18,7 +18,6 @@ const TABLE_ROWS = [
 export default function VsCopilotPage() {
   return (
     <MarketingLayout>
-      {/* NAV */}
 
       <div className="pt-24 pb-20">
         {/* HERO */}
