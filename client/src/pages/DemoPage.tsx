@@ -8,6 +8,7 @@ import {
   Play, Pause, RotateCcw, ChevronRight, Terminal, FileCode,
   CheckCircle2, Loader2, Zap, Shield, Globe, Code2, Cpu,
   ArrowRight, Star, Users, Clock, Download, Lock, Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 
 // ─── Demo Scenarios ──────────────────────────────────────────────────────────
@@ -257,8 +258,6 @@ npm run build
     codePreview: `// src/lib/generatePdf.ts — Professional PDF Invoice Generator
 import jsPDF from 'jspdf';
 import type { Invoice } from '../types/invoice';
-import MarketingLayout from "@/components/MarketingLayout";
-
 export async function generateInvoicePdf(invoice: Invoice): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -327,7 +326,84 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<void> {
 - Exports to PDF with your company header
 - Saves invoice history in localStorage`,
   },
-];
+  {
+      id: "red-team",
+      label: "Attack Surface Scan",
+      icon: <ShieldAlert className="h-4 w-4" />,
+      color: "text-violet-400",
+      bgColor: "bg-violet-500/10",
+      borderColor: "border-violet-500/30",
+      prompt: "Run an Argus attack surface scan on target.example.com, identify exposed services and CVEs, and generate an executive summary report",
+      buildSteps: [
+        { tool: "argus_init", file: null, desc: "Initialising Argus OSINT engine (v2.4.1)", duration: 600 },
+        { tool: "sandbox_exec", file: null, desc: "Subdomain enumeration — passive DNS + cert transparency", duration: 1200 },
+        { tool: "sandbox_exec", file: null, desc: "DNS resolution + live host verification (247 hosts)", duration: 900 },
+        { tool: "sandbox_exec", file: null, desc: "Port scan + service fingerprinting (Nmap -sV)", duration: 1400 },
+        { tool: "sandbox_exec", file: null, desc: "CVE cross-reference — NVD + ExploitDB + MITRE", duration: 800 },
+        { tool: "create_file", file: "attack-surface-report.md", desc: "Generating executive summary report (18.4KB)", duration: 700 },
+        { tool: "create_file", file: "assets/attack-graph.svg", desc: "Rendering attack path visualisation", duration: 600 },
+        { tool: "sandbox_exec", file: null, desc: "Scan complete — 247 assets catalogued, 3 Critical CVEs", duration: 400 },
+      ],
+      files: [
+        { name: "attack-surface-report.md", size: "18.4KB", lang: "md", icon: "config" },
+        { name: "assets/attack-graph.svg", size: "24.7KB", lang: "svg", icon: "config" },
+        { name: "scan-logs/argus-full.json", size: "142KB", lang: "json", icon: "config" },
+      ],
+      codePreview: `# Attack Surface Report — target.example.com
+  ## Executive Summary
+  **Scan date:** 2026-04-20  |  **Engine:** Argus v2.4.1  |  **Duration:** 14m 32s
+
+  ### Risk Summary
+  | Severity    | Count | Action         |
+  |-------------|-------|----------------|
+  | Critical    | 3     | IMMEDIATE      |
+  | High        | 9     | URGENT         |
+  | Medium      | 24    | SCHEDULED      |
+  | Low         | 41    | MONITOR        |
+
+  ### Assets Discovered
+  - **247 subdomains** (312 DNS records, 247 live hosts)
+  - **14 exposed services** (HTTP / HTTPS / SSH / RDP / S3)
+  - **3 unauthenticated admin panels**
+
+  ### Critical Findings
+
+  **[CVE-2024-23897]** Jenkins RCE — admin.target.example.com:8080
+    CVSS 9.8 | Remotely exploitable | No authentication required
+    Exploit available: ExploitDB #51993
+
+  **[CVE-2025-0311]** Kubernetes API server exposed — k8s.target.example.com:6443
+    CVSS 9.4 | Allows cluster takeover via unauthenticated request
+    Public PoC available
+
+  **[CUSTOM-001]** S3 bucket misconfiguration — backups.target.example.com
+    Public read access to /backups/db-dump-2026-01.sql.gz (1.4GB)
+    No CVE — manual configuration finding
+
+  ### Recommended Immediate Actions
+  1. Patch or firewall Jenkins on admin.target.example.com:8080
+  2. Restrict Kubernetes API to internal IPs via network policy
+  3. Set S3 bucket ACL to private + enable MFA Delete`,
+      response: `Argus scan complete. Here's what was found on target.example.com:
+
+  **247 assets catalogued:**
+  - 312 DNS records resolved (247 live hosts)
+  - 14 exposed services fingerprinted
+  - 3 unauthenticated admin panels identified
+
+  **Risk summary:**
+  - 3 Critical (Jenkins RCE, exposed k8s API, S3 data exposure)
+  - 9 High (outdated TLS configs, debug endpoints, open redirect chains)
+  - 24 Medium / 41 Low
+
+  **Outputs generated:**
+  - Executive summary (attack-surface-report.md, 18.4KB)
+  - Attack path visualisation (assets/attack-graph.svg)
+  - Full scan log (scan-logs/argus-full.json, 142KB)
+
+  Recommend starting with the 3 Critical findings — all have available exploits or public PoCs.`,
+    },
+  ];
 
 // ─── File Icon Component ──────────────────────────────────────────────────────
 function FileIcon({ type }: { type: string }) {
