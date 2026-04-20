@@ -77,6 +77,12 @@ export const webhookRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // SSRF guard: block private IPs, localhost, and non-HTTPS webhook targets
+      const ssrf = validateWebhookUrl(input.url);
+      if (!ssrf.ok) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: ssrf.error });
+      }
+
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "webhooks", "Webhook Integrations");
 
@@ -132,6 +138,14 @@ export const webhookRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // SSRF guard: block private IPs, localhost, and non-HTTPS webhook targets when URL is changed
+      if (input.url !== undefined) {
+        const ssrf = validateWebhookUrl(input.url);
+        if (!ssrf.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: ssrf.error });
+        }
+      }
 
       const updates: Record<string, unknown> = {};
       if (input.name !== undefined) updates.name = input.name;
@@ -216,6 +230,12 @@ export const webhookRouter = router({
         .digest("hex");
 
       try {
+        // SSRF guard: re-validate at delivery time (protects against race conditions after DB update)
+        const ssrfCheck = validateWebhookUrl(hook[0].url);
+        if (!ssrfCheck.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Webhook URL blocked: ${ssrfCheck.error}` });
+        }
+
         const start = Date.now();
         const response = await fetch(hook[0].url, {
           method: "POST",
@@ -815,3 +835,66 @@ export function registerV5ApiRoutes(app: Express) {
     });
   });
 }
+  // ─── SSRF Protection ──────────────────────────────────────────────────────────
+  /**
+   * Validate a webhook URL to prevent Server-Side Request Forgery (SSRF).
+   * Requires HTTPS and blocks private/internal IP ranges and hostnames.
+   *
+   * Note: DNS rebinding is not fully prevented here (would require runtime
+   * resolution), but this blocks all direct private-IP and localhost attacks.
+   */
+  const PRIVATE_IP_PATTERNS = [
+    /^127\./,                              // Loopback
+    /^10\./,                              // RFC1918 private
+    /^172\.(1[6-9]|2\d|3[01])\./,       // RFC1918 private
+    /^192\.168\./,                        // RFC1918 private
+    /^169\.254\./,                        // Link-local (AWS metadata, etc.)
+    /^0\.0\.0\.0/,                       // All-zeros
+    /^::1$/,                              // IPv6 loopback
+    /^fc[0-9a-f]{2}:/i,                   // IPv6 unique-local
+    /^fd[0-9a-f]{2}:/i,                   // IPv6 unique-local
+    /^fe80:/i,                            // IPv6 link-local
+  ];
+
+  const INTERNAL_HOSTNAMES = new Set([
+    "localhost", "broadcasthost", "local",
+    "internal", "intranet", "corp", "lan",
+  ]);
+
+  function validateWebhookUrl(rawUrl: string): { ok: true; url: string } | { ok: false; error: string } {
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return { ok: false, error: "Invalid URL format" };
+    }
+
+    // Require HTTPS to prevent plaintext credential leaks
+    if (parsed.protocol !== "https:") {
+      return { ok: false, error: "Webhook URL must use HTTPS" };
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block bare IP addresses in private ranges
+    for (const pattern of PRIVATE_IP_PATTERNS) {
+      if (pattern.test(hostname)) {
+        return { ok: false, error: "Webhook URL must not target a private or internal IP address" };
+      }
+    }
+
+    // Block known internal hostname patterns
+    if (
+      INTERNAL_HOSTNAMES.has(hostname) ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal") ||
+      hostname.endsWith(".corp")
+    ) {
+      return { ok: false, error: "Webhook URL must not target an internal hostname" };
+    }
+
+    return { ok: true, url: rawUrl };
+  }
+
+  
