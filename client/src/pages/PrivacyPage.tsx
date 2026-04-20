@@ -7,8 +7,6 @@ export default function PrivacyPage() {
   return (
     <MarketingLayout>
       {/* Navigation */}
-
-      {/* Content */}
       <div className="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
           <span className="text-sm font-semibold text-red-400 tracking-widest uppercase">Legal</span>
@@ -526,8 +524,6 @@ export default function PrivacyPage() {
           </section>
         </div>
       </div>
-
-      {/* Footer */}
     </MarketingLayout>
   );
 }
