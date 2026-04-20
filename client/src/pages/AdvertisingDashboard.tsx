@@ -124,6 +124,15 @@ export default function AdvertisingDashboard() {
   const resumeChannel = trpc.advertising.resumeChannel.useMutation({
     onSuccess: (_, vars) => { channelHealth.refetch(); toast.success(`Channel ${vars.channel} resumed`); },
   });
+    const testTelegram = trpc.advertising.testTelegramConnection.useMutation({
+      onSuccess: (result) => {
+        setTelegramTestResult(result);
+        if (result.success && result.testSent) toast.success("Test message sent to " + result.channelId + "!");
+        else if (result.success) toast.success("Connected as " + result.botName);
+        else toast.error(result.error ?? "Connection test failed");
+      },
+      onError: (e) => toast.error("Test failed: " + e.message),
+    });
   const createABTest = trpc.advertising.createABTest.useMutation({
     onSuccess: () => { abTests.refetch(); toast.success("A/B test created"); },
   });
@@ -579,7 +588,70 @@ export default function AdvertisingDashboard() {
 
         {/* ── 6. CHANNEL HEALTH ───────────────────────────────────────────── */}
         <TabsContent value="health">
-          <Card className="bg-gray-900 border-gray-800">
+          
+            {/* ── Telegram Connection Tester ───────────────────────────────── */}
+            <Card className="bg-gray-900 border-gray-800 mb-4">
+              <CardHeader>
+                <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+                  <span>📡</span> Telegram Channel Connection
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-gray-400">
+                  Verify that your Telegram bot is correctly configured and can post to your channel.
+                  This checks <code className="text-cyan-400 bg-gray-800 px-1 rounded">TELEGRAM_BOT_TOKEN</code> and{" "}
+                  <code className="text-cyan-400 bg-gray-800 px-1 rounded">TELEGRAM_CHANNEL_ID</code> set in Railway.
+                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => { setTelegramTestResult(null); testTelegram.mutate({ sendTest: false }); }}
+                    disabled={testTelegram.isPending}
+                    className="bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                  >
+                    {testTelegram.isPending ? "Checking…" : "Verify Token"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => { setTelegramTestResult(null); testTelegram.mutate({ sendTest: true }); }}
+                    disabled={testTelegram.isPending}
+                    className="bg-cyan-700 hover:bg-cyan-600 text-white"
+                  >
+                    {testTelegram.isPending ? "Sending…" : "Send Test Message"}
+                  </Button>
+                </div>
+                {telegramTestResult && (
+                  <div className={telegramTestResult.success
+                    ? "bg-green-900/30 border border-green-700/40 rounded-lg p-3 text-sm space-y-1"
+                    : "bg-red-900/30 border border-red-700/40 rounded-lg p-3 text-sm space-y-1"}>
+                    {telegramTestResult.success ? (
+                      <>
+                        <div className="text-green-400 font-medium">✅ Connected</div>
+                        {telegramTestResult.botName && (
+                          <div className="text-gray-300">Bot: <span className="text-cyan-400">{telegramTestResult.botName}</span></div>
+                        )}
+                        {telegramTestResult.channelId && (
+                          <div className="text-gray-300">Channel: <span className="text-cyan-400">{telegramTestResult.channelId}</span></div>
+                        )}
+                        {telegramTestResult.testSent && (
+                          <div className="text-green-300 text-xs mt-1">Test message delivered to channel ✓</div>
+                        )}
+                        {!telegramTestResult.testSent && (
+                          <div className="text-gray-400 text-xs mt-1">Click "Send Test Message" to also verify channel posting permission.</div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-red-400 font-medium">❌ Connection Failed</div>
+                        <div className="text-gray-300 text-xs leading-relaxed">{telegramTestResult.error}</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+  <Card className="bg-gray-900 border-gray-800">
             <CardHeader><CardTitle className="text-sm text-gray-300">Channel Health Matrix</CardTitle></CardHeader>
             <CardContent>
               {health.length === 0 ? (
