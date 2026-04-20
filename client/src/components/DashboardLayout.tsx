@@ -113,6 +113,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     { icon: Users,           label: "Referrals",       path: "/referrals",        group: "Business" },
 
     // ── Account ───────────────────────────────────────────────────────
+    { icon: Crown,           label: "Subscription",    path: "/dashboard/subscription", group: "Account" },
     { icon: CreditCard,      label: "Credits",         path: "/dashboard/credits",group: "Account" },
     { icon: UserCog,         label: "Account Settings",path: "/fetcher/account",  group: "Account" },
     { icon: Key,             label: "API Access",      path: "/fetcher/api-access",group: "Account" },
@@ -358,11 +359,20 @@ import { useAuth } from "@/_core/hooks/useAuth";
                     </div>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem
-                    onClick={logout}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
+                              <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => setLocation("/dashboard/subscription")} className="cursor-pointer">
+                    <Crown className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>Subscription</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/fetcher/account")} className="cursor-pointer">
+                    <UserCog className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>Account Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/fetcher/settings")} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>Preferences</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sign out</span>
                   </DropdownMenuItem>
