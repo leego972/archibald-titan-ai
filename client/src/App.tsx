@@ -387,6 +387,9 @@ function Router() {
       <Route path="/how-it-works" component={HowItWorksPage} />
       <Route path="/customers" component={CustomersPage} />
       <Route path="/demo" component={DemoPage} />
+        <Route path="/developer-docs" component={DeveloperDocsPage} />
+        <Route path="/cli" component={CliToolPage} />
+        <Route path="/download" component={DownloadAppPage} />
 
       {/* Dashboard routes — wrapped in FetcherLayout with sidebar + auth */}
       <Route path="/dashboard/:rest*" component={DashboardRouter} />
