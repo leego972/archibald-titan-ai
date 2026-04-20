@@ -13,8 +13,8 @@ const TABLE_ROWS = [
   { feature: "Offline capability", titan: "Yes — desktop app", cloud: "No" },
   { feature: "Compliance controls", titan: "Data residency, audit trail, access controls", cloud: "Varies — limited for most plans" },
   { feature: "Structured workflows", titan: "Plan → Generate → Edit → Test → Ship", cloud: "Single-turn or multi-turn chat only" },
-  { feature: "Pricing", titan: "Free, $29/mo, $99/mo", cloud: "$20/mo (ChatGPT Plus), $25/mo (Claude Pro)" },
-  { feature: "Offensive security toolkit", titan: "20+ integrated engines (Metasploit, Evilginx, BlackEye, Astra, Argus...)", cloud: "None" },
+  { feature: "Pricing", titan: "Free · Pro $29/mo · Enterprise $99/mo · Cyber $199/mo", cloud: "$20/mo (ChatGPT Plus), $25/mo (Claude Pro)" },
+  { feature: "Offensive security toolkit", titan: "26 integrated security tools (Metasploit, Evilginx, BlackEye, Astra, Argus...)", cloud: "None" },
     { feature: "AI model", titan: "Titan Crucible (security-domain fine-tuned)", cloud: "Generic reasoning model (GPT-4o / Claude 3.5 / Gemini)" },
   ];
 
