@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import {
 import MarketingLayout from "@/components/MarketingLayout";
+import {
   Rocket, Code2, Users, Building2, FileCode, LayoutDashboard,
   Globe, Zap, ArrowRight, CheckCircle2, ChevronDown, ChevronUp,
   Layers, BookOpen, Target, Menu, X, Star,
