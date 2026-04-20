@@ -166,7 +166,6 @@ export default function ExamplesPage() {
 
   return (
     <MarketingLayout>
-      {/* NAV */}
 
       {/* HERO */}
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-20">
@@ -262,8 +261,6 @@ export default function ExamplesPage() {
           </div>
         </div>
       </section>
-
-      {/* FOOTER */}
     </MarketingLayout>
   );
 }
