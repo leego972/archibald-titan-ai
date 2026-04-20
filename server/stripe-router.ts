@@ -1560,7 +1560,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   await db
     .update(subscriptions)
     .set({
-      plan: "pro",
+      plan: (subRecord[0]?.plan ?? "free") as any, // Preserve plan for analytics; status="canceled" gates access
       status: "canceled",
       stripeSubscriptionId: null,
       currentPeriodEnd: new Date(), // Clear stale period end date
