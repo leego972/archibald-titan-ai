@@ -1213,4 +1213,18 @@ export function registerEmailAuthRoutes(app: Express) {
       return res.status(500).json({ error: "Login failed. Please try again." });
     }
   });
+    // ─── POST /api/auth/logout ─────────────────────────────────────────────────
+    // Clears the session cookie. Note: the underlying JWT remains valid until
+    // its natural expiry — full revocation requires a token blocklist (future).
+    // For web browsers, clearing the cookie is the effective logout action.
+    app.post('/api/auth/logout', (req: Request, res: Response) => {
+      const cookieOptions = getSessionCookieOptions(req);
+      res.clearCookie(COOKIE_NAME, { ...cookieOptions });
+      // Also clear without domain for backward compatibility with non-domain-scoped cookies
+      res.clearCookie(COOKIE_NAME, { path: '/', httpOnly: true });
+      log.info('[Logout] Session cookie cleared');
+      res.json({ success: true });
+    });
+
+  
 }
