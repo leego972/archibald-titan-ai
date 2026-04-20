@@ -9,7 +9,7 @@ import {
   ShieldAlert, Crosshair, ScanLine,
 } from "lucide-react";
 
-type Tag = "All" | "Web" | "App" | "Tool" | "Doc" | "Code";
+type Tag = "All" | "Web" | "App" | "Tool" | "Doc" | "Code" | "Security";
 
 const EXAMPLES = [
   {
