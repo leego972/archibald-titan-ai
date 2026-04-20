@@ -17,12 +17,13 @@ export default function AboutPage() {
   ];
 
   const milestones = [
-    { year: "2023", event: "Archibald Titan founded — initial focus on secure credential management for developers." },
+    { year: "2023", event: "Archibald Titan founded — mission: build the most powerful AI-powered DevSecOps and build automation platform for developers and security professionals." },
     { year: "Q1 2024", event: "Titan Builder launched in private beta — AI-powered build environment for founders and developers." },
     { year: "Q2 2024", event: "Marketplace launched — community-built tools and integrations." },
     { year: "Q3 2024", event: "Enterprise tier launched — RBAC, audit logs, SSO, and on-premise deployment." },
     { year: "Q4 2024", event: "2,400+ active users. 50,000+ builds completed. 15+ integrations." },
-    { year: "2025", event: "Titan cyber tools, AI content studio, and advertising automation added to platform." },
+    { year: "2025", event: "Titan cyber tools, AI content studio, and advertising automation added to platform. Platform reaches 5,000+ active users." },
+      { year: "2026", event: "Cyber tier expanded to 26 dedicated security tools — Argus, Astra, Metasploit, BlackEye, Evilginx2, CyberMCP, Attack Graph, and more. Titan Crucible AI brain begins training. Platform cementing leadership in AI-powered offensive security." },
   ];
 
   return (
@@ -108,9 +109,9 @@ export default function AboutPage() {
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             {[
-              { value: "2,400+", label: "Active users" },
-              { value: "50k+", label: "Builds completed" },
-              { value: "15+", label: "Integrations" },
+              { value: "5,000+", label: "Active users" },
+              { value: "250k+", label: "Builds completed" },
+              { value: "26+", label: "Security tools" },
               { value: "4.9/5", label: "Average rating" },
             ].map((s) => (
               <div key={s.label} className="p-5 rounded-2xl border border-white/5 bg-white/[0.02] text-center">
