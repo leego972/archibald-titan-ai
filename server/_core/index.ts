@@ -246,11 +246,12 @@ async function startServer() {
   // Compress all responses except those that are already compressed
   app.use(compression());
 
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-    // HTTP Parameter Pollution protection — normalizes duplicate query/body keys to last value
-    app.use(hpp());
+  // JSON body parser: 10 MB cap covers largest legitimate API payloads.
+  // File/voice/image uploads use multipart (busboy) and bypass this parser entirely.
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ limit: "10mb", extended: true }));
+  // HTTP Parameter Pollution protection — normalizes duplicate query/body keys to last value
+  app.use(hpp());
 
   // ── Request Correlation IDs ───────────────────────────────────
   app.use(correlationMiddleware);
