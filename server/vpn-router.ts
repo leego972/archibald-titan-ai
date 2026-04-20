@@ -11,9 +11,9 @@ import { getUserPlan } from "./subscription-gate";
 // Docs: https://help.decodo.com/reference/create-sub-user
 const DECODO_API_URL = "https://api.decodo.com/v2";
 const DECODO_API_KEY = process.env.SMARTPROXY_API_KEY || "";
-  if (!DECODO_API_KEY) {
-    log.warn("[VPN] SMARTPROXY_API_KEY is not configured — VPN proxy provisioning will fail until this is set");
-  }
+if (!DECODO_API_KEY) {
+  console.warn("[VPN] ⚠ SMARTPROXY_API_KEY is not configured — VPN proxy provisioning will fail. Set this in Railway environment variables.");
+}
 
 /**
  * Generate a Decodo-compliant password.

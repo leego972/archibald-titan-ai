@@ -72,7 +72,7 @@ import { isAdminRole } from "@shared/const";
 
     // ── Privacy & Network ─────────────────────────────────────────────
     { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network",  cyberOnly: true },
-      { icon: Wifi,            label: "Proxy Network",   path: "/vpn",              group: "Privacy & Network",  cyberOnly: true },
+    { icon: Wifi,            label: "Proxy Network",   path: "/vpn",              group: "Privacy & Network",  cyberOnly: true },
     { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network",  cyberOnly: true },
     { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network",  cyberOnly: true },
     { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network",  cyberOnly: true },
@@ -87,7 +87,7 @@ import { isAdminRole } from "@shared/const";
     { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops",  cyberOnly: true },
     { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops",     adminOnly: true },
     { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
-      { icon: ScanSearch,      label: "Proxy Interceptor",path: "/proxy-interceptor",  group: "Security Ops",       cyberOnly: true },
+    { icon: ScanSearch,      label: "Proxy Interceptor",path: "/proxy-interceptor",  group: "Security Ops",       cyberOnly: true },
 
     // ── Intelligence ──────────────────────────────────────────────────
     { icon: Globe,           label: "Smart Fetch",     path: "/fetcher/smart-fetch",    group: "Intelligence" },
@@ -429,10 +429,15 @@ import { isAdminRole } from "@shared/const";
                 <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
               )}
               <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold tracking-tight text-foreground leading-none">
+                    {activeMenuItem?.label ?? "Archibald Titan"}
                   </span>
+                  {activeMenuItem?.group && activeMenuItem.group !== "Core" && (
+                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest leading-none">
+                      {activeMenuItem.group}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

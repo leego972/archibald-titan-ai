@@ -26,15 +26,19 @@ import { trpc } from "@/lib/trpc";
     });
     const { data: costs } = trpc.credits.getCosts.useQuery(undefined, { enabled: !!user });
 
-    if (!user || isLoading) return null;
+    if (!user) return null;
+    if (isLoading) return (
+      <div className="h-8 w-24 rounded-lg bg-white/5 animate-pulse" />
+    );
 
     const isUnlimited = balance?.isUnlimited ?? false;
     const credits = balance?.credits ?? 0;
 
     const getCreditColor = () => {
       if (isUnlimited) return "text-amber-400";
-      if (credits > 10000) return "text-emerald-400";
-      if (credits > 500) return "text-amber-400";
+      if (credits > 50000) return "text-emerald-400";
+      if (credits > 5000) return "text-blue-400";
+      if (credits > 1000) return "text-amber-400";
       if (credits > 0) return "text-orange-400";
       return "text-red-400";
     };
