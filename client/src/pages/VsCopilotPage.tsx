@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Check, X, ArrowRight, Shield, Zap, Code2, Lock, Users, Globe } from "lucide-react";
-import { AT_ICON_64 } from "@/lib/logos";
+import MarketingLayout from "@/components/MarketingLayout";
 
 const TABLE_ROWS = [
   { feature: "Output type", titan: "Full working code, pages, tools, docs", copilot: "Code suggestions & completions" },
@@ -17,20 +17,8 @@ const TABLE_ROWS = [
 
 export default function VsCopilotPage() {
   return (
-    <div className="min-h-screen bg-[#060611] text-white">
+    <MarketingLayout>
       {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <img src={AT_ICON_64} alt="AT" className="h-9 w-9 object-contain" />
-            <span className="text-lg font-bold tracking-tight">Archibald Titan</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors hidden sm:block">Pricing</Link>
-            <Link href="/builder" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium transition-colors">Start Building</Link>
-          </div>
-        </div>
-      </nav>
 
       <div className="pt-24 pb-20">
         {/* HERO */}
@@ -148,6 +136,6 @@ export default function VsCopilotPage() {
           <p className="text-sm text-white/30 mt-4">Free plan includes chat. Builder access from $29/mo.</p>
         </section>
       </div>
-    </div>
+    </MarketingLayout>
   );
 }
