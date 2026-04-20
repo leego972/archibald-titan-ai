@@ -1470,13 +1470,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Grant initial monthly credit allocation + one-time signup bonus for the new subscription
-    const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
+    // Checkout session ID used as idempotency key — prevents double-grant on Stripe webhook retries
+    const checkoutIdempotencyBase = session.id || "";
+
+        const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
     if (tier && tier.credits.monthlyAllocation > 0) {
       await addCredits(
         userId,
         tier.credits.monthlyAllocation,
         "monthly_refill",
-        `Initial ${tier.name} plan credits: +${tier.credits.monthlyAllocation} credits`
+        `Initial ${tier.name} plan credits: +${tier.credits.monthlyAllocation} credits`,
+        checkoutIdempotencyBase ? `${checkoutIdempotencyBase}:monthly_refill` : undefined
       );
       log.info(`[Stripe Webhook] Initial credits granted: user=${userId}, plan=${planId}, credits=${tier.credits.monthlyAllocation}`);
     }
@@ -1487,7 +1491,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         userId,
         tier.credits.signupBonus,
         "signup_bonus",
-        `Welcome to ${tier.name}! One-time signup bonus: +${tier.credits.signupBonus} credits`
+        `Welcome to ${tier.name}! One-time signup bonus: +${tier.credits.signupBonus} credits`,
+        checkoutIdempotencyBase ? `${checkoutIdempotencyBase}:signup_bonus` : undefined
       ).catch((err) => log.warn("[Stripe Webhook] Failed to grant signup bonus", { userId, plan: planId, err: String(err) }));
       log.info(`[Stripe Webhook] Signup bonus granted: user=${userId}, plan=${planId}, bonus=${tier.credits.signupBonus}`);
     }
