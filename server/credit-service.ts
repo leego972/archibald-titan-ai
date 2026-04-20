@@ -488,14 +488,18 @@ export async function addCredits(
   // Wrap in a transaction to ensure balance update + transaction log are atomic
   return await db.transaction(async (tx) => {
     // Add credits atomically within the transaction
-    await tx
-      .update(creditBalances)
-      .set({
-        credits: sql`${creditBalances.credits} + ${amount}`,
-        lifetimeCreditsAdded: sql`${creditBalances.lifetimeCreditsAdded} + ${amount}`,
-        ...(type === "monthly_refill" ? { lastRefillAt: new Date() } : {}),
-      })
-      .where(eq(creditBalances.userId, userId));
+      // For negative admin_adjustment (credit deduction): update lifetimeCreditsUsed, not lifetimeCreditsAdded
+      const isDeduction = amount < 0 && type === "admin_adjustment";
+      await tx
+        .update(creditBalances)
+        .set({
+          credits: sql`${creditBalances.credits} + ${amount}`,
+          ...(isDeduction
+            ? { lifetimeCreditsUsed: sql`${creditBalances.lifetimeCreditsUsed} + ${Math.abs(amount)}` }
+            : { lifetimeCreditsAdded: sql`${creditBalances.lifetimeCreditsAdded} + ${amount}` }),
+          ...(type === "monthly_refill" ? { lastRefillAt: new Date() } : {}),
+        })
+        .where(eq(creditBalances.userId, userId));
 
     // Get updated balance
     const updated = await tx

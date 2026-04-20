@@ -129,13 +129,13 @@ export const creditRouter = router({
 
   /** Admin: Adjust a user's credit balance */
   adminAdjust: protectedProcedure
-    .input(
-      z.object({
-        userId: z.number(),
-        amount: z.number(),
-        reason: z.string().min(1),
-      })
-    )
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          amount: z.number().int().refine(n => n !== 0, { message: "Amount cannot be zero" }),
+          reason: z.string().min(1).max(500),
+        })
+      )
     .mutation(async ({ ctx, input }) => {
       if (!isAdminRole(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });

@@ -139,29 +139,37 @@ export const escalationRouter = router({
     }
 
     const lastGranted = bal[0].dailyFreeLastGrantedAt;
-    const now = new Date();
-    const hoursSinceLast = lastGranted
-      ? (now.getTime() - lastGranted.getTime()) / (1000 * 60 * 60)
-      : DAILY_FREE_CREDITS_RESET_HOURS + 1; // force grant on first time
+      const now = new Date();
 
-    if (hoursSinceLast < DAILY_FREE_CREDITS_RESET_HOURS) {
-      const hoursRemaining = Math.ceil(DAILY_FREE_CREDITS_RESET_HOURS - hoursSinceLast);
-      return {
-        granted: false,
-        reason: `Daily free credits already granted. Resets in ${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"}.`,
-        currentDailyFree: bal[0].dailyFreeCredits,
-        resetsInHours: hoursRemaining,
-      };
-    }
+      // Atomic conditional UPDATE — only succeeds if cooldown has elapsed.
+      // Prevents double-grant if two concurrent requests race past the time check.
+      const updateRes = await db
+        .update(creditBalances)
+        .set({
+          dailyFreeCredits: DAILY_FREE_CREDITS_AMOUNT,
+          dailyFreeLastGrantedAt: now,
+        })
+        .where(
+          and(
+            eq(creditBalances.userId, userId),
+            sql`(${creditBalances.dailyFreeLastGrantedAt} IS NULL OR
+              ${creditBalances.dailyFreeLastGrantedAt} < DATE_SUB(NOW(), INTERVAL ${DAILY_FREE_CREDITS_RESET_HOURS} HOUR))`
+          )
+        );
 
-    // Reset daily free credits to DAILY_FREE_CREDITS_AMOUNT (discard unused, set fresh)
-    await db
-      .update(creditBalances)
-      .set({
-        dailyFreeCredits: DAILY_FREE_CREDITS_AMOUNT,
-        dailyFreeLastGrantedAt: now,
-      })
-      .where(eq(creditBalances.userId, userId));
+      const affected = (updateRes as any)?.[0]?.affectedRows ?? (updateRes as any)?.affectedRows ?? 0;
+      if (affected === 0) {
+        const hoursSinceLast = lastGranted
+          ? (now.getTime() - lastGranted.getTime()) / (1000 * 60 * 60)
+          : 0;
+        const hoursRemaining = Math.max(0, Math.ceil(DAILY_FREE_CREDITS_RESET_HOURS - hoursSinceLast));
+        return {
+          granted: false,
+          reason: `Daily free credits already granted. Resets in ${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"}.`,
+          currentDailyFree: bal[0].dailyFreeCredits,
+          resetsInHours: hoursRemaining,
+        };
+      }
 
     log.info(`Granted ${DAILY_FREE_CREDITS_AMOUNT} daily free credits to free tier user ${userId}`);
 
