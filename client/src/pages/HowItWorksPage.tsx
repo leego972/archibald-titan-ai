@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { ArrowRight, MessageSquare, Map, Cpu, Eye, RefreshCw, Rocket, ChevronRight } from "lucide-react";
-import { AT_ICON_64 } from "@/lib/logos";
+import MarketingLayout from "@/components/MarketingLayout";
 
 const STEPS = [
   {
@@ -73,18 +73,7 @@ const STEPS = [
 
 export default function HowItWorksPage() {
   return (
-    <div className="min-h-screen bg-[#060611] text-white">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <img src={AT_ICON_64} alt="AT" className="h-9 w-9 object-contain" />
-            <span className="text-lg font-bold tracking-tight">Archibald Titan</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/builder" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium transition-colors">Start Building</Link>
-          </div>
-        </div>
-      </nav>
+    <MarketingLayout>
 
       <div className="pt-24 pb-20">
         {/* HERO */}
@@ -160,6 +149,6 @@ export default function HowItWorksPage() {
           <p className="text-sm text-white/30 mt-4">Builder access from $29/mo. Free plan includes full chat.</p>
         </section>
       </div>
-    </div>
+    </MarketingLayout>
   );
 }
