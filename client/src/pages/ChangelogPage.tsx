@@ -27,6 +27,11 @@ const RELEASES: Release[] = [
           { type: "fix", text: "DemoPage: removed stray MarketingLayout import from invoice generator codePreview string" },
           { type: "fix", text: "ExamplesPage: added Security to Tag union type to support security example filtering" },
           { type: "improvement", text: "All 9 remaining marketing pages cleaned of dead nav/footer comment artifacts (TermsPage, PrivacyPage, ContactPage, and 6 others)" },
+            { type: "feature", text: "HowItWorksPage: Security Operations Mode section — 3-step red team workflow (Brief+Plan / Scan+Review / Exploit+Report) for Cyber tier" },
+            { type: "feature", text: "DocsPage: Security Tools (Cyber Tier) quick start section — 5-step Argus workflow, 3 security FAQs, corrected credits (Pro 50k/Enterprise 250k/Cyber 750k)" },
+            { type: "feature", text: "DeveloperDocsPage: 4 Security API endpoints — POST scan, GET scans list, GET scan results, POST executive report (Cyber tier)" },
+            { type: "fix", text: "CustomersPage: Security Team case study rewritten — red team/Argus/Astra engagement replacing outdated credential management scenario" },
+            { type: "fix", text: "BlogPage: updated outdated positioning copy from credential management to DevSecOps + offensive security" },
         ],
       },
       {
