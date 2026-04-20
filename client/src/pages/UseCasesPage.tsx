@@ -146,7 +146,6 @@ export default function UseCasesPage() {
 
   return (
     <MarketingLayout>
-      {/* NAV */}
 
       {/* HERO */}
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-24">
@@ -244,8 +243,6 @@ export default function UseCasesPage() {
           </div>
         </div>
       </section>
-
-      {/* FOOTER */}
     </MarketingLayout>
   );
 }
