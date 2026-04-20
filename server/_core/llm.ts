@@ -22,7 +22,7 @@ const log = createLogger("LLM");
 /**
  * TitanAI Inference API — self-hosted model server (FastAPI, OpenAI-compatible).
  * Routes model: "titan-*" requests to the TitanAI API instead of OpenAI/Venice.
- * Set TITAN_API_URL in Railway env to enable (e.g. http://ssh3.vast.ai:8000).
+ * Set TITAN_API_URL in Railway env to enable (e.g. http://ssh5.vast.ai:8000 — current host: TitanAI-Verified-2).
  * Leave empty to disable — all traffic falls through to Venice/OpenAI as normal.
  */
 const TITAN_API_URL = ENV.titanApiUrl || "";
