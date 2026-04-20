@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import {
 import MarketingLayout from "@/components/MarketingLayout";
+import {
   Shield, Lock, Server, Eye, Key, Database, Cpu, Globe,
   CheckCircle2, ChevronDown, ChevronUp, ArrowRight, HardDrive,
   FileCode, Users, AlertCircle, Zap, Menu, X,
@@ -12,7 +12,6 @@ import MarketingLayout from "@/components/MarketingLayout";
 function FAQItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <MarketingLayout>
     <div className="border-b border-white/5 last:border-0">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between py-5 text-left gap-4 group">
         <span className="text-sm sm:text-base font-medium text-white/80 group-hover:text-white transition-colors">{question}</span>
@@ -95,8 +94,7 @@ export default function SecurityPage() {
   ];
 
   return (
-      {/* NAV */}
-
+    <MarketingLayout>
       {/* HERO */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28">
         <div className="absolute inset-0 overflow-hidden">
@@ -249,6 +247,7 @@ export default function SecurityPage() {
       </section>
 
       {/* FOOTER */}
+    </MarketingLayout>
     </MarketingLayout>
   );
 }
