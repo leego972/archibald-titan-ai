@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -10,15 +11,16 @@ import { getDb } from "./db";
 
 const APP_NAME = "Archibald Titan";
 
-// Generate 8 backup codes
-function makeBackupCodes(): string[] {
-  const codes: string[] = [];
-  for (let i = 0; i < 8; i++) {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    codes.push(code);
+// Generate 8 cryptographically random backup codes (8 uppercase hex chars each)
+  function makeBackupCodes(): string[] {
+    const codes: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      // randomBytes(4) → 4 bytes → 8 hex chars, 2^32 possibilities per code (CSPRNG)
+      const code = randomBytes(4).toString("hex").toUpperCase();
+      codes.push(code);
+    }
+    return codes;
   }
-  return codes;
-}
 
 // Hash backup codes for storage
 async function hashBackupCodes(codes: string[]): Promise<string[]> {
