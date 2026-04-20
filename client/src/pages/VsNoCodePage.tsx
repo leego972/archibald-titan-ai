@@ -13,8 +13,8 @@ const TABLE_ROWS = [
   { feature: "Internal tools", titan: "Yes — full-stack tool generation", nocode: "Limited (Bubble) or not supported (Webflow/Framer)" },
   { feature: "Business docs & plans", titan: "Yes — generates docs, plans, briefs", nocode: "No" },
   { feature: "Credential vault", titan: "Built-in encrypted vault", nocode: "None" },
-  { feature: "Pricing", titan: "Free starter, Pro $29/mo, Enterprise $99/mo", nocode: "$14–$212/mo (Webflow), $29–$529/mo (Bubble)" },
-  { feature: "Offensive security", titan: "20+ integrated security engines for DevSecOps teams", nocode: "None" },
+  { feature: "Pricing", titan: "Free · Pro $29/mo · Enterprise $99/mo · Cyber $199/mo", nocode: "$14–$212/mo (Webflow), $29–$529/mo (Bubble)" },
+  { feature: "Offensive security", titan: "26 integrated security tools for DevSecOps & red teams", nocode: "None" },
     { feature: "AI model", titan: "Titan Crucible (security-domain trained)", nocode: "No native AI — visual editor only" },
   ];
 
