@@ -31,7 +31,7 @@ import {
     Terminal, Bug, Crosshair, Fish, Network, Cpu,
     Shuffle, ScanSearch, Monitor, Code2, Store,
     Radar, Radio, Fingerprint, Globe2, Server,
-    AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown,
+    AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown, Wifi,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -72,6 +72,7 @@ import { isAdminRole } from "@shared/const";
 
     // ── Privacy & Network ─────────────────────────────────────────────
     { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network",  cyberOnly: true },
+      { icon: Wifi,            label: "Proxy Network",   path: "/vpn",              group: "Privacy & Network",  cyberOnly: true },
     { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network",  cyberOnly: true },
     { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network",  cyberOnly: true },
     { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network",  cyberOnly: true },
