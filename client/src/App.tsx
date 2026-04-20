@@ -150,6 +150,7 @@ import TitanStoragePage from "./pages/TitanStoragePage";
 // Privacy & Anonymity Tools
 import TorPage from "./pages/TorPage";
 import VpnChainPage from "./pages/VpnChainPage";
+  import VpnPage from "./pages/VpnPage";
 import IsolatedBrowserPage from "./pages/IsolatedBrowserPage";
 import ProxyMakerPage from "./pages/ProxyMakerPage";
 import ProxyRotationPage from "./pages/ProxyRotationPage";
@@ -297,6 +298,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         {/* Privacy & Anonymity Tools — admin only */}
         <Route path="/tor" component={() => <CyberRoute component={TorPage} />} />
         <Route path="/vpn-chain" component={() => <CyberRoute component={VpnChainPage} />} />
+          <Route path="/vpn" component={() => <CyberRoute component={VpnPage} />} />
         <Route path="/isolated-browser" component={() => <CyberRoute component={IsolatedBrowserPage} />} />
         <Route path="/proxy-maker" component={() => <CyberRoute component={ProxyMakerPage} />} />
         <Route path="/proxy-rotation" component={() => <CyberRoute component={ProxyRotationPage} />} />
@@ -426,6 +428,7 @@ function Router() {
       <Route path="/storage" component={DashboardRouter} />
       <Route path="/tor" component={DashboardRouter} />
       <Route path="/vpn-chain" component={DashboardRouter} />
+        <Route path="/vpn" component={DashboardRouter} />
       <Route path="/isolated-browser" component={DashboardRouter} />
       <Route path="/proxy-maker" component={DashboardRouter} />
       <Route path="/proxy-rotation" component={DashboardRouter} />
