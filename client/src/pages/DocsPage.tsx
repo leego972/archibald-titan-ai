@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { BookOpen, Zap, Key, Shield, Layers, Terminal, ChevronRight, Search, ArrowRight, Code2, Globe, FileText } from "lucide-react";
+import { BookOpen, Zap, Key, Shield, Layers, Terminal, ChevronRight, Search, ArrowRight, Code2, Globe, FileText, ShieldAlert, ScanLine } from "lucide-react";
 import MarketingLayout from "@/components/MarketingLayout";
 
 const SECTIONS = [
@@ -26,7 +26,7 @@ const SECTIONS = [
     bg: "bg-blue-500/10",
     concepts: [
       { term: "Workspace", def: "Your personal build environment. Each session in Titan Builder is a workspace — a sandboxed context where Titan plans, generates, and iterates on your output." },
-      { term: "Credits", def: "Credits are consumed when you run Builder sessions. Starter plan: 500 credits/month (chat only). Pro: 5,000 credits/month. Enterprise: 25,000 credits/month. One typical Builder run uses 50–200 credits depending on complexity." },
+      { term: "Credits", def: "Credits are consumed when you run Builder sessions. Starter plan: 500 credits/month (chat only). Pro: 50,000 credits/month. Enterprise: 250,000 credits/month. Cyber: 750,000 credits/month. One typical Builder run uses 50–200 credits depending on complexity." },
       { term: "Vault", def: "The Titan Vault is an encrypted credential store built into your account. Store API keys, passwords, tokens, and sensitive config — Titan can use them in builds without exposing them in plaintext." },
       { term: "Sandbox", def: "Every Builder output is generated in a sandboxed preview environment. You can test, interact with, and iterate on outputs before exporting or deploying them." },
       { term: "Integrations", def: "Titan connects to 15+ external services including GitHub, Vercel, AWS, Stripe, and more. Integrations are configured in Settings → Integrations and can be referenced in Builder prompts." },
@@ -51,7 +51,10 @@ const SECTIONS = [
 ];
 
 const FAQS = [
-  { q: "Is Titan Builder really local-first?", a: "Yes. When you use Titan Builder, your prompts and context are processed within your session environment — not sent to third-party AI providers. Your data stays in your account's secure workspace." },
+  { q: "What security tools are included in the Cyber tier?", a: "The Cyber tier ($199/mo) includes 26 dedicated security tools: Argus (OSINT + attack surface mapping), Astra (vulnerability scanning + auto-exploitation), Metasploit (exploit chain builder), BlackEye (phishing framework), Evilginx2 (MITM proxy), CyberMCP (AI-powered offensive operations), Attack Graph, Red Team Playbooks, VPN Chain, LinkenSphere, Proxy Interceptor, Isolated Browser, SIEM integration, and more." },
+    { q: "Can I use the offensive security tools against live targets?", a: "Yes — for authorised engagements only. All Cyber tier tools run in a sandboxed, auditable environment with full session logging. You are legally responsible for having written authorisation before running any scan or exploitation tool against a target. Unauthorised use is prohibited by our Terms of Service." },
+    { q: "How does Argus differ from running nmap or Shodan manually?", a: "Argus orchestrates multiple OSINT sources simultaneously — passive DNS, certificate transparency, Shodan, VirusTotal, and more — and cross-references the results against CVE databases in a single automated workflow. It outputs structured, risk-rated findings rather than raw data dumps, and can feed directly into Astra for vulnerability confirmation." },
+    { q: "Is Titan Builder really local-first?", a: "Yes. When you use Titan Builder, your prompts and context are processed within your session environment — not sent to third-party AI providers. Your data stays in your account's secure workspace." },
   { q: "What can Titan Builder actually produce?", a: "Landing pages, full websites, internal tools, dashboards, business plans, API scripts, email sequences, documentation, MVPs, and more. If you can describe it, Titan can build it." },
   { q: "How are credits calculated?", a: "Credits are consumed per Builder run. Simple outputs (a single page, a short script) use 50–100 credits. Complex outputs (full MVPs, multi-section documents) use 100–300 credits. You can see credit usage in Settings → Usage." },
   { q: "Can I use my own API keys?", a: "Yes. Store your API keys in the Titan Vault and reference them in your Builder prompts. Titan will use them in generated code without exposing them in plaintext." },
@@ -76,8 +79,8 @@ export default function DocsPage() {
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 text-blue-400 text-xs font-medium mb-6">
             Documentation
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">Titan Builder Docs</h1>
-          <p className="text-lg text-white/60 max-w-xl mx-auto">Everything you need to get started, build faster, and get the most out of Titan.</p>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">Platform Documentation</h1>
+          <p className="text-lg text-white/60 max-w-xl mx-auto">Builder quick start, key concepts, security tool guides, and platform reference for Archibald Titan.</p>
         </div>
 
         {/* QUICK LINKS */}
@@ -89,6 +92,7 @@ export default function DocsPage() {
             { icon: Key, label: "Vault & Credentials", href: "#concepts", color: "text-purple-400", bg: "bg-purple-500/10" },
             { icon: Globe, label: "Integrations", href: "#concepts", color: "text-cyan-400", bg: "bg-cyan-500/10" },
             { icon: Shield, label: "Security", href: "/security", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+            { icon: ShieldAlert, label: "Security Tools", href: "#security-tools", color: "text-red-400", bg: "bg-red-500/10" },
           ].map(({ icon: Icon, label, href, color, bg }) => (
             <a key={label} href={href} className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/5 transition-colors group">
               <div className={`h-9 w-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
