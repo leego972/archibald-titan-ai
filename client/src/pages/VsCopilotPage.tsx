@@ -14,7 +14,9 @@ const TABLE_ROWS = [
   { feature: "Enterprise controls", titan: "Audit logs, team vault, role management", copilot: "GitHub Enterprise only" },
   { feature: "Pricing", titan: "Free starter, Pro $29/mo, Enterprise $99/mo", copilot: "$10–$19/mo (individual), $39/mo (enterprise)" },
   { feature: "Offline capability", titan: "Yes — desktop app works offline", copilot: "No" },
-];
+    { feature: "Offensive security", titan: "20+ integrated engines (Metasploit, Evilginx, BlackEye, Astra, Argus...)", copilot: "None" },
+    { feature: "AI model", titan: "Titan Crucible (security-domain trained)", copilot: "GitHub Copilot (GPT-4o — generic coding model)" },
+  ];
 
 export default function VsCopilotPage() {
   return (
