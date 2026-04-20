@@ -10,7 +10,10 @@ import { getUserPlan } from "./subscription-gate";
 // Decodo (formerly Smartproxy) API — correct v2 endpoint
 // Docs: https://help.decodo.com/reference/create-sub-user
 const DECODO_API_URL = "https://api.decodo.com/v2";
-const DECODO_API_KEY = process.env.SMARTPROXY_API_KEY || "01364bc9ba149865b562098c1d60c027f997ca033f2ea9ac1c88298061875dc51a87c6c0581908572b321020a53a40f18b185b05566df372e1953478218fbf3bcf9cee190cf261c8bb15e95470c07870c65ac4db";
+const DECODO_API_KEY = process.env.SMARTPROXY_API_KEY || "";
+  if (!DECODO_API_KEY) {
+    log.warn("[VPN] SMARTPROXY_API_KEY is not configured — VPN proxy provisioning will fail until this is set");
+  }
 
 /**
  * Generate a Decodo-compliant password.
