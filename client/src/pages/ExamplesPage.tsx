@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import {
 import MarketingLayout from "@/components/MarketingLayout";
+import {
   Rocket, Code2, FileCode, LayoutDashboard, Settings, BookOpen,
   Globe, Zap, ArrowRight, Copy, CheckCircle2, Menu, X, Layers,
 } from "lucide-react";
