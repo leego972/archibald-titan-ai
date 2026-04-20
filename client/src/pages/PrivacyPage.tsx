@@ -1,27 +1,12 @@
 import { ArrowLeft } from "lucide-react";
 import { TitanLogo } from "@/components/TitanLogo";
 import { Link } from "wouter";
+import MarketingLayout from "@/components/MarketingLayout";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#060611] text-white">
+    <MarketingLayout>
       {/* Navigation */}
-      <nav aria-label="Navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
-                <TitanLogo size="sm" />
-              </div>
-              <span className="text-lg font-bold tracking-tight">Archibald Titan</span>
-            </Link>
-            <Link href="/" className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      </nav>
 
       {/* Content */}
       <div className="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -543,18 +528,6 @@ export default function PrivacyPage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-white/20">
-            &copy; {new Date().getFullYear()} Archibald Titan. All rights reserved.
-          </p>
-          <div className="flex items-center gap-6">
-            <Link href="/terms" className="text-xs text-white/20 hover:text-white/40 transition-colors">Terms & Conditions</Link>
-            <Link href="/privacy" className="text-xs text-blue-400/60 hover:text-blue-400 transition-colors">Privacy Policy</Link>
-            <Link href="/" className="text-xs text-white/20 hover:text-white/40 transition-colors">Home</Link>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </MarketingLayout>
   );
 }
