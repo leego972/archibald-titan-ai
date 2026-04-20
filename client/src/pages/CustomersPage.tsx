@@ -54,12 +54,11 @@ const CASE_STUDIES = [
     bg: "bg-purple-500/10",
     border: "border-purple-500/20",
     scenario: "Automating red team reconnaissance and reporting",
-      challenge: "A penetration testing firm was spending 2-3 days per engagement manually mapping attack surfaces, cataloguing CVEs, and writing executive risk reports. Each report was inconsistent and time-consuming to produce.",
-      solution: "Deployed Titan Cyber tier — Argus for automated OSINT and subdomain enumeration, Astra for vulnerability scanning and CVE cross-reference against NVD and ExploitDB, and Titan Builder to generate structured executive reports from raw scan output.",
-      outcome: "Full attack surface analysis, CVE report, and executive summary reduced from 3 days to under 4 hours per engagement. Consistent, client-ready format. Time saved reinvested into deeper manual testing and red team operations.",
-      metrics: [{ label: "Report time", value: "< 4 hours" }, { label: "Coverage", value: "Automated" }, { label: "Consistency", value: "100%" }],
-    },
-    {
+    challenge: "A penetration testing firm was spending 2-3 days per engagement manually mapping attack surfaces, cataloguing CVEs, and writing executive risk reports. Each report was inconsistent and time-consuming to produce.",
+    solution: "Deployed Titan Cyber tier — Argus for automated OSINT and subdomain enumeration, Astra for vulnerability scanning and CVE cross-reference against NVD and ExploitDB, and Titan Builder to generate structured executive reports from raw scan output.",
+    outcome: "Full attack surface analysis, CVE report, and executive summary reduced from 3 days to under 4 hours per engagement. Consistent, client-ready format. Time saved reinvested into deeper manual testing and red team operations.",
+    metrics: [{ label: "Report time", value: "< 4 hours" }, { label: "Coverage", value: "Automated" }, { label: "Consistency", value: "100%" }],
+  },
   {
     type: "Startup",
     icon: Clock,
