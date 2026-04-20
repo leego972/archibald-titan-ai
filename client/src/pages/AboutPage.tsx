@@ -3,6 +3,7 @@ import { AT_ICON_64, FULL_LOGO_256 } from "@/lib/logos";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import {
+import MarketingLayout from "@/components/MarketingLayout";
   Shield, Zap, Globe, Users, ArrowRight, CheckCircle2,
   Mail, Github, Twitter, Lock, HardDrive, Cpu,
 } from "lucide-react";
@@ -25,28 +26,8 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#060611] text-white overflow-x-hidden">
+    <MarketingLayout>
       {/* NAV */}
-      <nav aria-label="Navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <img loading="eager" src={AT_ICON_64} alt="AT" className="h-9 w-9 object-contain" />
-              <span className="text-lg font-bold tracking-tight">Archibald Titan</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-6">
-              <Link href="/builder" className="text-sm text-white/60 hover:text-white transition-colors">Builder</Link>
-              <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
-              <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
-              <span className="text-sm text-blue-400 font-semibold">About</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" variant="ghost" className="text-white/70 hover:text-white hidden sm:flex">Sign In</Button>
-              <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0">Get Started</Button>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       {/* HERO */}
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-24">
@@ -164,20 +145,6 @@ export default function AboutPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="relative border-t border-white/5 py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img loading="eager" src={AT_ICON_64} alt="AT" className="h-7 w-7 object-contain" />
-            <span className="text-sm font-bold tracking-tight">Archibald Titan</span>
-          </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-xs text-white/30 hover:text-white/60 transition-colors">Privacy</Link>
-            <Link href="/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors">Terms</Link>
-            <Link href="/contact" className="text-xs text-white/30 hover:text-white/60 transition-colors">Contact</Link>
-          </div>
-          <p className="text-xs text-white/20">&copy; {new Date().getFullYear()} Archibald Titan</p>
-        </div>
-      </footer>
-    </div>
+    </MarketingLayout>
   );
 }
