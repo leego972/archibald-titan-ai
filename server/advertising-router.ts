@@ -21,6 +21,7 @@
  */
 
 import { z } from "zod";
+import { ENV } from "./_core/env";
 import { router, adminProcedure } from "./_core/trpc";
 import { getAllChannelStatuses } from "./marketing-channels";
 import { getExpandedChannelStatuses } from "./expanded-channels";
@@ -767,9 +768,8 @@ export const advertisingRouter = router({
     testTelegramConnection: adminProcedure
       .input(z.object({ sendTest: z.boolean().default(false) }))
       .mutation(async ({ input }) => {
-        const { env } = await import("./_core/env");
-        const token = env.telegramBotToken;
-        const channelId = env.telegramChannelId;
+        const token = ENV.telegramBotToken;
+        const channelId = ENV.telegramChannelId;
 
         if (!token) return { success: false, error: "TELEGRAM_BOT_TOKEN is not set in Railway environment variables." };
         if (!channelId) return { success: false, error: "TELEGRAM_CHANNEL_ID is not set in Railway environment variables." };
