@@ -47,7 +47,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     { value: "15+",  label: "Security Engines",    icon: ShieldAlert },
     { value: "119",  label: "Platform Modules",    icon: Layers },
     { value: "50+",  label: "Automation Workflows",icon: Workflow },
-    { value: "100%", label: "Local Execution",     icon: Lock },
+    { value: "100%", label: "Data Sovereign",      icon: Lock },
   ];
 
   export default function LandingPage() {
@@ -285,7 +285,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
               {[
                 { name: "Free",       price: "$0",   color: "text-white/60",   border: "border-white/8",       items: ["500 credits/mo", "3 providers", "JSON export", "Community support"] },
                 { name: "Pro",        price: "$29",  color: "text-blue-300",   border: "border-blue-500/25",   items: ["50k credits/mo", "All providers", "Sandbox + Builder", "Priority support"] },
-                { name: "Enterprise", price: "$99",  color: "text-violet-300", border: "border-violet-500/25", items: ["250k credits/mo", "Team Vault", "SIEM + Compliance", "10k API req/day"] },
+                { name: "Enterprise", price: "$99",  color: "text-violet-300", border: "border-violet-500/25", items: ["250k credits/mo", "Team Vault", "SSO + Audit Logs", "10k API req/day"] },
                 { name: "Cyber",      price: "$199", color: "text-red-300",    border: "border-red-500/25",    items: ["750k credits/mo", "Security tools", "Red team engines", "Dedicated ops"] },
               ].map((tier) => (
                 <div key={tier.name} className={`p-5 rounded-2xl border ${tier.border} bg-white/[0.02] text-left`}>
