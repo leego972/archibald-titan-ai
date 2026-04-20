@@ -246,6 +246,5 @@ export default function SecurityPage() {
         </div>
       </section>
     </MarketingLayout>
-    </MarketingLayout>
   );
 }

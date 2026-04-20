@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { Check, ArrowRight, Shield, Lock, Globe, Cpu } from "lucide-react";
+import { AT_ICON_64 } from "@/lib/logos";
 import MarketingLayout from "@/components/MarketingLayout";
 
 const TABLE_ROWS = [

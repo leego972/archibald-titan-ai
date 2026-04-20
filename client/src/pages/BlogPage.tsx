@@ -189,7 +189,6 @@ export function BlogPostPage() {
           </div>
         </div>
       </div>
-      </div>
     </MarketingLayout>
     );
   }

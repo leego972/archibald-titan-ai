@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FULL_LOGO_256 } from "@/lib/logos";
+import MarketingLayout from "@/components/MarketingLayout";
 import {
   Play, Pause, RotateCcw, ChevronRight, Terminal, FileCode,
   CheckCircle2, Loader2, Zap, Shield, Globe, Code2, Cpu,
