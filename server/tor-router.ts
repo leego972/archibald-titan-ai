@@ -381,7 +381,8 @@ export const torRouter = router({
     const node = await getActiveNode(ctx.user.id);
     if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
     // Intense (300) — SSH command + Tor control port + new exit node build
-    try { await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation"); } catch { /* ignore */ }
+    const _cr1 = await consumeCredits(ctx.user.id, "vpn_generate", "Tor: new circuit / IP rotation");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const output = await execSSHCommand(nodeToSSH(node), NEW_CIRCUIT, 10000, ctx.user.id);
     const ok = output.includes("CIRCUIT_RENEWED");
     if (ok) {

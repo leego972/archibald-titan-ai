@@ -204,8 +204,8 @@ export const binCheckerRouter = router({
       }
 
       // Deduct credits after successful lookup
-      try { await consumeCredits(ctx.user.id, "bin_lookup", `BIN lookup: ${bin.slice(0, 6)}`); } catch (e) {
-        log.warn("[BinChecker] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      const _cr1 = await consumeCredits(ctx.user.id, "bin_lookup", `BIN lookup: ${bin.slice(0, 6)}`);
+      if (!_cr1.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id }););
       }
 
       // Build unified response from local DB or API data
@@ -343,8 +343,8 @@ export const binCheckerRouter = router({
       }));
 
       // Consume credits after successful search
-      try { await consumeCredits(ctx.user.id, "bin_lookup", `Reverse BIN search: ${input.query}`); } catch (e) {
-        log.warn("[BinChecker] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
+      const _cr2 = await consumeCredits(ctx.user.id, "bin_lookup", `Reverse BIN search: ${input.query}`);
+      if (!_cr2.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id }););
       }
 
       return {

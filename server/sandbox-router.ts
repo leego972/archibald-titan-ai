@@ -69,7 +69,8 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", "Sandbox created"); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "sandbox_run", "Sandbox created");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return createSandbox(ctx.user.id, input.name, {
         memoryMb: input.memoryMb,
         diskMb: input.diskMb,
@@ -100,7 +101,8 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", `Sandbox exec: ${input.command.slice(0, 60)}`); } catch { /* ignore */ }
+      const _cr2 = await consumeCredits(ctx.user.id, "sandbox_run", `Sandbox exec: ${input.command.slice(0, 60)}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return executeCommand(input.sandboxId, ctx.user.id, input.command, {
         timeoutMs: input.timeoutMs,
         triggeredBy: "user",
@@ -329,7 +331,8 @@ export const sandboxRouter = router({
   securityScan: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Security scan: ${input.url}`); } catch { /* ignore */ }
+      const _cr3 = await consumeCredits(ctx.user.id, "security_scan", `Security scan: ${input.url}`);
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return runPassiveWebScan(input.url);
     }),
 
@@ -343,7 +346,8 @@ export const sandboxRouter = router({
       concurrency: z.number().int().min(1).max(200).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`); } catch { /* ignore */ }
+      const _cr4 = await consumeCredits(ctx.user.id, "security_scan", `Port scan: ${input.host}`);
+      if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return runPortScan(input.host, input.ports, input.concurrency);
     }),
 
@@ -368,7 +372,8 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", "Code security review"); } catch { /* ignore */ }
+      const _cr5 = await consumeCredits(ctx.user.id, "security_scan", "Code security review");
+      if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return analyzeCodeSecurity([{ filename: input.filename || "code.txt", content: input.code }]);
     }),
 
@@ -382,7 +387,8 @@ export const sandboxRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Code review: ${input.files.length} files`); } catch { /* ignore */ }
+      const _cr6 = await consumeCredits(ctx.user.id, "security_scan", `Code review: ${input.files.length} files`);
+      if (!_cr6.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return analyzeCodeSecurity(input.files);
     }),
 
@@ -392,7 +398,8 @@ export const sandboxRouter = router({
   dnsAudit: protectedProcedure
     .input(z.object({ domain: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `DNS audit: ${input.domain}`); } catch { /* ignore */ }
+      const _cr7 = await consumeCredits(ctx.user.id, "security_scan", `DNS audit: ${input.domain}`);
+      if (!_cr7.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return auditDNSSecurity(input.domain);
     }),
 
@@ -402,7 +409,8 @@ export const sandboxRouter = router({
   fingerprint: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Fingerprint: ${input.url}`); } catch { /* ignore */ }
+      const _cr8 = await consumeCredits(ctx.user.id, "security_scan", `Fingerprint: ${input.url}`);
+      if (!_cr8.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return fingerprintTarget(input.url);
     }),
 
@@ -412,7 +420,8 @@ export const sandboxRouter = router({
   headerAnalysis: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Header analysis: ${input.url}`); } catch { /* ignore */ }
+      const _cr9 = await consumeCredits(ctx.user.id, "security_scan", `Header analysis: ${input.url}`);
+      if (!_cr9.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return analyzeHeaders(input.url);
     }),
 
@@ -427,7 +436,8 @@ export const sandboxRouter = router({
       includeSsl: z.boolean().optional().default(true),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "security_scan", `Full report: ${input.target}`); } catch { /* ignore */ }
+      const _cr10 = await consumeCredits(ctx.user.id, "security_scan", `Full report: ${input.target}`);
+      if (!_cr10.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const host = input.target.replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
       const url = input.target.startsWith("http") ? input.target : `https://${input.target}`;
       const [scanResult, sslResult, dnsResult, portScanResult] = await Promise.allSettled([
@@ -1014,7 +1024,8 @@ export const sandboxRouter = router({
       timeoutMs: z.number().int().min(5000).max(300_000).optional().default(120_000),
     }))
     .mutation(async ({ input, ctx }) => {
-      try { await consumeCredits(ctx.user.id, "sandbox_run", "Run tests"); } catch { /* ignore */ }
+      const _cr11 = await consumeCredits(ctx.user.id, "sandbox_run", "Run tests");
+      if (!_cr11.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       let cmd = input.testCommand;
       if (!cmd) {
         // Auto-detect test runner

@@ -324,7 +324,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active BlackEye node. Add and deploy a dedicated VPS node first." });
-      try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye command: ${input.command.substring(0, 60)}`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye command: ${input.command.substring(0, 60)}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const output = await execBlackeyeCommandPublic(input.command, ctx.user.id, input.timeoutMs ?? 15000);
       return { output, nodeLabel: node.label, publicIp: node.publicIp };
     }),
@@ -455,7 +456,8 @@ export const blackeyeRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "BlackEye");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active node." });
-      try { await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye: launch ${input.template ?? 'facebook'} phishing page`); } catch { /* ignore */ }
+      const _cr2 = await consumeCredits(ctx.user.id, "blackeye_action", `BlackEye: launch ${input.template ?? 'facebook'} phishing page`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const template = input.template ?? 'facebook';
       const port = input.port ?? 80;
       // BlackEye's blackeye.sh is interactive — bypass it entirely.

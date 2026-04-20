@@ -570,7 +570,8 @@ export const evilginxRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: enable phishlet ${input.name}`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: enable phishlet ${input.name}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const raw = await execOnNode(node, `phishlets enable ${input.name}`, 20000, ctx.user.id);
       return { output: raw, success: !raw.includes("error") && !raw.includes("FAILED") };
     }),
@@ -635,7 +636,8 @@ export const evilginxRouter = router({
     enforceFeature(plan.planId, "offensive_tooling", "Evilginx");
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Evilginx node." });
-      try { await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: create lure for ${input.phishlet}`); } catch { /* ignore */ }
+      const _cr2 = await consumeCredits(ctx.user.id, "evilginx_action", `Evilginx: create lure for ${input.phishlet}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       // Create lure
       const createRaw = await execOnNode(node, `lures create ${input.phishlet}`, 20000, ctx.user.id);
       // Extract lure ID from output

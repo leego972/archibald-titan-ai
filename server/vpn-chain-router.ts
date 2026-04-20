@@ -545,7 +545,8 @@ export const vpnChainRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "First hop has no WireGuard public key. Re-deploy the hop." });
     }
     // Intense (300) — WireGuard key generation + SSH peer registration
-    try { await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config"); } catch { /* ignore */ }
+    const _cr1 = await consumeCredits(ctx.user.id, "vpn_generate", "VPN Chain: generate client config");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const { execSync } = await import("child_process");
     let clientPrivKey: string;
     let clientPubKey: string;
