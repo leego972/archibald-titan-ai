@@ -15,9 +15,45 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+      version: "v4.1.0",
+      date: "April 2026",
+      label: "Latest",
+      changes: [
+        { type: "feature", text: "Proxy Network — managed residential proxy via Decodo/Smartproxy with 18 exit countries, HTTP/HTTPS/SOCKS5/SOCKS4, and IP leak test" },
+        { type: "feature", text: "Unified platform branding — all 15 marketing pages now share consistent navigation, mobile menu, and professional 4-column footer" },
+        { type: "improvement", text: "Public developer portal — /developer-docs, /cli, and /download now accessible pre-authentication" },
+        { type: "improvement", text: "Sidebar — Proxy Network added to Privacy & Network section alongside VPN Chain, Tor, and IP Rotation" },
+        { type: "security", text: "Proxy credentials isolated per user — each account generates a unique sub-user with encrypted credential storage" },
+      ],
+    },
+    {
+      version: "v4.0.0",
+      date: "January 2026",
+      changes: [
+        { type: "feature", text: "Red Team Playbooks — structured offensive exercises with MITRE ATT&CK mapping, step-by-step runbooks, and AI-assisted execution" },
+        { type: "feature", text: "Attack Graph — interactive kill-chain visualiser mapping vulnerabilities, entry points, and lateral movement paths" },
+        { type: "feature", text: "Command Centre — unified mission control for all active Titan operations with real-time status and cross-tool coordination" },
+        { type: "feature", text: "Security Marketplace — browse, install, and purchase security modules, exploit packs, and OSINT plugins from vetted contributors" },
+        { type: "feature", text: "SIEM Integration — forward Titan events and alerts to Splunk, Elastic, Datadog, and custom webhook endpoints" },
+        { type: "feature", text: "Compliance Reports — automated SOC2, ISO 27001, and GDPR readiness reports generated from your Titan audit trail" },
+        { type: "feature", text: "Event Bus — subscribe to platform events and build custom automation pipelines across Titan tools" },
+      ],
+    },
+    {
+      version: "v3.9.0",
+      date: "September 2025",
+      changes: [
+        { type: "feature", text: "LinkenSphere — anti-detect browser profile management with fingerprint spoofing, proxy binding, and session isolation" },
+        { type: "feature", text: "Isolated Browser — Titan-sandboxed Chromium for safe reconnaissance, payload staging, and dark-web browsing" },
+        { type: "feature", text: "Proxy Interceptor — man-in-the-middle proxy with real-time request inspection, rewriting, and response manipulation" },
+        { type: "feature", text: "Exploit Pack — curated exploit collection with CVE search, PoC runner, and automated impact assessment" },
+        { type: "improvement", text: "Titan AI model upgrades — faster reasoning, deeper context retention, and improved code generation accuracy" },
+        { type: "security", text: "VPN Chain multi-hop routing — chain up to 6 SSH/VPN hops with automatic dead-route fallback and geo-diversity enforcement" },
+      ],
+    },
+    {
     version: "v3.8.0",
     date: "March 2025",
-    label: "Latest",
     changes: [
       { type: "feature", text: "AI Content Studio — generate platform-optimised content for TikTok, Instagram, LinkedIn, and 12 other platforms" },
       { type: "feature", text: "Message queue in Titan Chat — send messages while Titan is processing without interrupting the current run" },
