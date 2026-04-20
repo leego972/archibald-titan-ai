@@ -35,9 +35,6 @@ export default function ContactPage() {
 
   return (
     <MarketingLayout>
-      {/* Navigation */}
-
-      {/* Content */}
       <div className="pt-28 pb-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12 text-center">
           <span className="text-sm font-semibold text-blue-400 tracking-widest uppercase">Support</span>
