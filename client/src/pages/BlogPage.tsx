@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import AffiliateRecommendations from "@/components/AffiliateRecommendations";
+import MarketingLayout from "@/components/MarketingLayout";
 
 // ─── Blog List Page ──────────────────────────────────────────────
 export function BlogListPage() {
@@ -24,9 +25,10 @@ export function BlogListPage() {
   const { data: categories } = trpc.blog.listCategories.useQuery();
 
   return (
-    <div className="min-h-screen bg-background">
+    <MarketingLayout>
+      <div className="pt-16">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-emerald-950 via-gray-950 to-gray-900 border-b border-emerald-900/30">
+      <div className="bg-gradient-to-br from-blue-950 via-[#060611] to-[#02040a] border-b border-blue-900/30">
         <div className="container max-w-6xl py-16">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Archibald Titan Blog
@@ -95,7 +97,7 @@ export function BlogListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {data?.posts.map((post) => (
                 <Link key={post.id} href={`/blog/${post.slug}`}>
-                  <article className="bg-card border border-border rounded-lg p-6 hover:border-emerald-500/50 transition-colors cursor-pointer h-full flex flex-col">
+                  <article className="bg-card border border-border rounded-lg p-6 hover:border-blue-500/50 transition-colors cursor-pointer h-full flex flex-col">
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="outline" className="text-xs">
                         {post.category}
@@ -156,7 +158,8 @@ export function BlogListPage() {
           </>
         )}
       </div>
-    </div>
+      </div>
+    </MarketingLayout>
   );
 }
 
@@ -172,7 +175,8 @@ export function BlogPostPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <MarketingLayout>
+      <div className="pt-16">
         <div className="container max-w-3xl py-16">
           <div className="animate-pulse">
             <div className="h-8 bg-muted rounded w-2/3 mb-4" />
@@ -185,12 +189,15 @@ export function BlogPostPage() {
           </div>
         </div>
       </div>
+      </div>
+    </MarketingLayout>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <MarketingLayout>
+      <div className="pt-16 flex items-center justify-center min-h-[80vh]">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Article Not Found</h1>
           <p className="text-muted-foreground mb-4">This article doesn't exist or has been removed.</p>
@@ -199,13 +206,15 @@ export function BlogPostPage() {
           </Link>
         </div>
       </div>
+    </MarketingLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <MarketingLayout>
+      <div className="pt-16">
       {/* Article Header */}
-      <div className="bg-gradient-to-br from-emerald-950 via-gray-950 to-gray-900 border-b border-emerald-900/30">
+      <div className="bg-gradient-to-br from-blue-950 via-[#060611] to-[#02040a] border-b border-blue-900/30">
         <div className="container max-w-3xl py-12">
           <Link href="/blog">
             <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white mb-6">
@@ -250,7 +259,7 @@ export function BlogPostPage() {
 
       {/* Article Content */}
       <div className="container max-w-3xl py-12">
-        <article className="prose prose-invert prose-emerald max-w-none">
+        <article className="prose prose-invert prose-blue max-w-none">
           <Streamdown>{post.content}</Streamdown>
         </article>
 
@@ -270,7 +279,7 @@ export function BlogPostPage() {
         <AffiliateRecommendations context="content_creation" variant="card" limit={3} className="mt-8" />
 
         {/* CTA */}
-        <div className="mt-12 p-8 bg-emerald-950/30 border border-emerald-900/30 rounded-lg text-center">
+        <div className="mt-12 p-8 bg-blue-950/30 border border-blue-900/30 rounded-lg text-center">
           <h3 className="text-xl font-semibold text-white mb-2">
             Ready to secure your credentials?
           </h3>
@@ -278,13 +287,14 @@ export function BlogPostPage() {
             Try Archibald Titan — the world's most advanced local AI agent for credential management.
           </p>
           <Link href="/">
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
+            <Button className="bg-blue-600 hover:bg-blue-500">
               Get Started Free
             </Button>
           </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </MarketingLayout>
   );
 }
 
