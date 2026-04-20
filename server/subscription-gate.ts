@@ -231,7 +231,12 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
   };
 
   const allowedPlans = featureMap[feature];
-  if (!allowedPlans) return true; // Unknown features default to allowed
+  if (!allowedPlans) {
+      // Unknown feature keys are denied by default — prevents silent bypass from
+      // typos or unregistered feature strings. Add the key to featureMap above.
+      console.warn(`[subscription-gate] Unknown feature key: "${feature}" — denied by default. Register it in featureMap.`);
+      return false;
+    }
   return allowedPlans.includes(planId);
 }
 
