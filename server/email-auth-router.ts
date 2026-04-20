@@ -11,6 +11,8 @@ import crypto from "crypto";
 import { eq, and, isNotNull, gt } from "drizzle-orm";
 import { getDb } from "./db";
 import { users, passwordResetTokens, identityProviders } from "../drizzle/schema";
+import { addCredits } from "./credit-service";
+  import { PRICING_TIERS } from "../shared/pricing";
 import { sdk } from "./_core/sdk";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
@@ -240,6 +242,16 @@ export function registerEmailAuthRoutes(app: Express) {
         }).catch(() => {
           log.warn("[Email Auth] Failed to auto-link email provider");
         });
+
+          // Grant signup bonus credits (50 credits for new free-tier users)
+          const freeTier = PRICING_TIERS.find((t) => t.id === "free");
+          const signupBonus = freeTier?.credits?.signupBonus ?? 50;
+          await addCredits(
+            newUser[0].id,
+            signupBonus,
+            "signup_bonus",
+            "Welcome to Archibald Titan — enjoy your free starter credits!"
+          ).catch((err) => log.warn("Failed to grant signup bonus", { userId: newUser[0].id, err: String(err) }));
       }
 
       // Send verification email

@@ -23,6 +23,8 @@
 import { Express, Request, Response } from "express";
 import crypto from "crypto";
 import { eq, and } from "drizzle-orm";
+import { addCredits } from "./credit-service";
+  import { PRICING_TIERS } from "../shared/pricing";
 import { getDb } from "./db";
 import { users, identityProviders } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
@@ -323,7 +325,17 @@ async function findOrCreateOAuthUser(opts: {
     email: opts.email, displayName: opts.name, avatarUrl: opts.avatarUrl, linkedAt: new Date(), lastUsedAt: new Date(),
   });
 
-  return { userId: newUser[0].id, openId, name: displayName, isNew: true };
+  // Grant signup bonus credits to new users
+    const freeTierSocial = PRICING_TIERS.find((t) => t.id === "free");
+    const signupBonusSocial = freeTierSocial?.credits?.signupBonus ?? 50;
+    await addCredits(
+      newUser[0].id,
+      signupBonusSocial,
+      "signup_bonus",
+      "Welcome to Archibald Titan — enjoy your free starter credits!"
+    ).catch(() => { /* non-fatal: bonus failure does not block registration */ });
+
+    return { userId: newUser[0].id, openId, name: displayName, isNew: true };
 }
 
 // ─── Helper: Issue session and redirect (handles cross-domain) ────
