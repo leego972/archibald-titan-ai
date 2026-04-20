@@ -1469,20 +1469,31 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     });
   }
 
-  // Grant initial monthly credit allocation for the new subscription
-  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
-  if (tier && tier.credits.monthlyAllocation > 0) {
-    await addCredits(
-      userId,
-      tier.credits.monthlyAllocation,
-      "monthly_refill",
-      `Initial ${tier.name} plan credits: +${tier.credits.monthlyAllocation} credits`
-    );
-    log.info(`[Stripe Webhook] Initial credits granted: user=${userId}, plan=${planId}, credits=${tier.credits.monthlyAllocation}`);
-  }
+  // Grant initial monthly credit allocation + one-time signup bonus for the new subscription
+    const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId);
+    if (tier && tier.credits.monthlyAllocation > 0) {
+      await addCredits(
+        userId,
+        tier.credits.monthlyAllocation,
+        "monthly_refill",
+        `Initial ${tier.name} plan credits: +${tier.credits.monthlyAllocation} credits`
+      );
+      log.info(`[Stripe Webhook] Initial credits granted: user=${userId}, plan=${planId}, credits=${tier.credits.monthlyAllocation}`);
+    }
 
-  log.info(`[Stripe Webhook] Checkout completed: user=${userId}, plan=${planId}, subscription=${subscriptionId}`);
-}
+    // One-time signup bonus for paid tier subscriptions (defined in PRICING_TIERS)
+    if (tier && tier.credits.signupBonus > 0) {
+      await addCredits(
+        userId,
+        tier.credits.signupBonus,
+        "signup_bonus",
+        `Welcome to ${tier.name}! One-time signup bonus: +${tier.credits.signupBonus} credits`
+      ).catch((err) => log.warn("[Stripe Webhook] Failed to grant signup bonus", { userId, plan: planId, err: String(err) }));
+      log.info(`[Stripe Webhook] Signup bonus granted: user=${userId}, plan=${planId}, bonus=${tier.credits.signupBonus}`);
+    }
+
+    log.info(`[Stripe Webhook] Checkout completed: user=${userId}, plan=${planId}, subscription=${subscriptionId}`);
+  }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const db = await getDb();
