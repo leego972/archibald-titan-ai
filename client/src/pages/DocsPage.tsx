@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { BookOpen, Zap, Key, Shield, Layers, Terminal, ChevronRight, Search, ArrowRight, Code2, Globe, FileText, ShieldAlert, ScanLine } from "lucide-react";
+import { BookOpen, Zap, Key, Shield, Layers, Terminal, ChevronRight, Search, ArrowRight, Code2, Globe, FileText, ShieldAlert } from "lucide-react";
 import MarketingLayout from "@/components/MarketingLayout";
 
 const SECTIONS = [
