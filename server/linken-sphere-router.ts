@@ -238,7 +238,8 @@ export const linkenSphereRouter = router({
         });
       }
       const result = await lsRequest(port, "POST", "/sessions/create_quick", { count: input.count });
-      await consumeCredits(ctx.user.id, "linken_quick_create", `Created ${input.count} Linken Sphere quick session(s)`);
+      const _cr1 = await consumeCredits(ctx.user.id, "linken_quick_create", `Created ${input.count} Linken Sphere quick session(s)`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       log.info(`[createQuickSessions] User ${ctx.user.id} created ${input.count} LS sessions`);
       return result;
     }),
@@ -267,7 +268,8 @@ export const linkenSphereRouter = router({
       const body: Record<string, unknown> = { uuid: input.uuid, headless: input.headless };
       if (input.debugPort) body.debug_port = input.debugPort;
       const result = await lsRequest(port, "POST", "/sessions/start", body);
-      await consumeCredits(ctx.user.id, "linken_session_start", `Started Linken Sphere session ${input.uuid}`);
+      const _cr2 = await consumeCredits(ctx.user.id, "linken_session_start", `Started Linken Sphere session ${input.uuid}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       log.info(`[startSession] User ${ctx.user.id} started LS session ${input.uuid}`);
       return result;
     }),

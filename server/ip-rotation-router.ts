@@ -172,11 +172,8 @@ export const ipRotationRouter = router({
       return { success: false, message: "Tor is already starting up, please wait...", exitIp: null };
     }
     const result = await torSupervisor.start();
-    try {
-      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Tor circuit started");
-    } catch (e) {
-      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
-    }
+    const _cr1 = await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Tor circuit started");
+    if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const newStatus = torSupervisor.getStatus();
     return { ...result, exitIp: newStatus.exitIp };
   }),
@@ -199,11 +196,8 @@ export const ipRotationRouter = router({
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits for new Tor circuit. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
     }
     const result = await torSupervisor.requestNewCircuit();
-    try {
-      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "New Tor circuit requested");
-    } catch (e) {
-      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
-    }
+    const _cr2 = await consumeCredits(ctx.user.id, "ip_rotation_circuit", "New Tor circuit requested");
+    if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return result;
   }),
 
@@ -253,11 +247,8 @@ export const ipRotationRouter = router({
     // Ensure pool is initialized with this user's ID for persistence
     proxyPool.start(ctx.user.id).catch(() => {});
     const result = await proxyPool.triggerScrape();
-    try {
-      await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Proxy scrape triggered");
-    } catch (e) {
-      log.warn("[IPRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
-    }
+    const _cr3 = await consumeCredits(ctx.user.id, "ip_rotation_circuit", "Proxy scrape triggered");
+    if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return result;
   }),
 
