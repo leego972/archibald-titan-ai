@@ -167,29 +167,96 @@ export function VoiceModeProvider({ children }: { children: ReactNode }) {
   }, [resetStandbyTimer]);
 
   // ── Send to Titan ─────────────────────────────────────────────────────────────
+  // Note: chat.send returns immediately with response="" (the real reply streams via SSE).
+  // We subscribe to /api/chat/stream/:conversationId and wait for the "done" event,
+  // which contains data.response — that's what we speak.
   const sendToTitan = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setTranscript(text);
     setPhase("processing");
     resetStandbyTimer();
+
+    // Open SSE first IF we already have a conversation id, so we don't miss events.
+    // If this is the first message, we'll open it after the mutate resolves (which gives us the id).
+    const esRef: { current: EventSource | null } = { current: null };
+    let settled = false;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+    const finishWith = async (reply: string) => {
+      if (settled) return;
+      settled = true;
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      if (esRef.current) { try { esRef.current.close(); } catch { /* ignore */ } esRef.current = null; }
+      setLastReply(reply);
+      setTranscript("");
+      if (reply.trim()) {
+        await speakText(reply);
+      } else {
+        setPhase("active");
+        resetStandbyTimer();
+      }
+    };
+
+    const subscribe = (convId: number) => {
+      try {
+        const ev = new EventSource(`/api/chat/stream/${convId}`, { withCredentials: true });
+        esRef.current = ev;
+        ev.addEventListener("done", (e: MessageEvent) => {
+          let reply = "";
+          try { reply = (JSON.parse(e.data)?.response as string) || ""; } catch { /* ignore */ }
+          void finishWith(reply || "Sorry, I didn't catch that.");
+        });
+        ev.addEventListener("aborted", () => { void finishWith("The response was cancelled."); });
+        ev.addEventListener("error", () => {
+          // Browsers fire "error" on every disconnect; only treat as failure if we never got a "done".
+          if (ev.readyState === EventSource.CLOSED && !settled) {
+            void finishWith("Connection dropped before Titan finished.");
+          }
+        });
+      } catch (err) {
+        console.error("[VoiceMode] SSE subscribe failed:", err);
+        void finishWith("Couldn't connect to Titan's response stream.");
+      }
+    };
+
     try {
+      // Subscribe early if we already know the conversation id
+      if (conversationIdRef.current) subscribe(conversationIdRef.current);
+
       const result = await sendMessage.mutateAsync({
         message: text,
         conversationId: conversationIdRef.current ?? undefined,
       });
-      if (result?.conversationId && !conversationIdRef.current) {
-        const cid = result.conversationId;
-        conversationIdRef.current = typeof cid === "string" ? parseInt(cid, 10) : (cid as number);
+
+      if (result?.conversationId) {
+        const cid = typeof result.conversationId === "string"
+          ? parseInt(result.conversationId, 10)
+          : (result.conversationId as number);
+        if (!conversationIdRef.current) {
+          conversationIdRef.current = cid;
+          subscribe(cid);
+        }
       }
-      const replyText: string =
-        (result as any)?.response ??
-        (result as any)?.content ??
-        "Sorry, I didn't catch that.";
-      setLastReply(replyText);
-      setTranscript("");
-      await speakText(replyText);
+
+      // Some legacy paths return the full reply inline (refusals, errors). If so, short-circuit.
+      const inlineReply: string =
+        ((result as any)?.response && String((result as any).response).trim()) ||
+        ((result as any)?.content && String((result as any).content).trim()) ||
+        "";
+      if (inlineReply) {
+        await finishWith(inlineReply);
+        return;
+      }
+
+      // 90s watchdog so we never hang forever if SSE never delivers "done"
+      watchdog = setTimeout(() => {
+        void finishWith("Titan is taking longer than usual. Please try again.");
+      }, 90000);
     } catch (err) {
       console.error("[VoiceMode] Chat error:", err);
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+      if (esRef.current) { try { esRef.current.close(); } catch { /* ignore */ } esRef.current = null; }
+      settled = true;
       toast.error("Titan couldn't respond. Try again.");
       setPhase("active");
       resetStandbyTimer();
