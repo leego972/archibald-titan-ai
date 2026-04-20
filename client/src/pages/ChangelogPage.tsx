@@ -152,7 +152,6 @@ const TYPE_CONFIG: Record<ChangeType, { label: string; color: string; bg: string
 export default function ChangelogPage() {
   return (
     <MarketingLayout>
-      {/* NAV */}
 
       {/* HERO */}
       <section className="relative pt-32 pb-12 sm:pt-40 sm:pb-16">
@@ -202,8 +201,6 @@ export default function ChangelogPage() {
           </div>
         </div>
       </section>
-
-      {/* FOOTER */}
     </MarketingLayout>
   );
 }
