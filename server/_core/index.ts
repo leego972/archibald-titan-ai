@@ -47,6 +47,7 @@ import { registerMarketplaceFileRoutes } from "../marketplace-files";
 import { registerBundleSyncRoutes } from "../bundle-sync";
 import { runHealthCheck, createSnapshot } from "../self-improvement-engine";
 import rateLimit from "express-rate-limit";
+import hpp from "hpp";
 import cookieParser from "cookie-parser";
 import compression from "compression";
 import { csrfCookieMiddleware, csrfValidationMiddleware } from "./csrf";
@@ -248,6 +249,8 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+    // HTTP Parameter Pollution protection — normalizes duplicate query/body keys to last value
+    app.use(hpp());
 
   // ── Request Correlation IDs ───────────────────────────────────
   app.use(correlationMiddleware);
