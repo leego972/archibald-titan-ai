@@ -1,12 +1,12 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-  import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-  import {
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-  } from "@/components/ui/dropdown-menu";
-  import {
+} from "@/components/ui/dropdown-menu";
+import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
@@ -18,10 +18,10 @@ import { useAuth } from "@/_core/hooks/useAuth";
     SidebarProvider,
     SidebarTrigger,
     useSidebar,
-  } from "@/components/ui/sidebar";
-  import { getLoginUrl } from "@/const";
-  import { useIsMobile } from "@/hooks/useMobile";
-  import {
+} from "@/components/ui/sidebar";
+import { getLoginUrl } from "@/const";
+import { useIsMobile } from "@/hooks/useMobile";
+import {
     Bell, LayoutDashboard, LogOut, PanelLeft, Users,
     Bot, Globe, Database, ShoppingBag, FolderOpen,
     Shield, Key, Settings, TrendingUp, Megaphone,
@@ -32,16 +32,16 @@ import { useAuth } from "@/_core/hooks/useAuth";
     Shuffle, ScanSearch, Monitor, Code2, Store,
     Radar, Radio, Fingerprint, Globe2, Server,
     AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown,
-  } from "lucide-react";
-  import { Badge } from "@/components/ui/badge";
-  import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-  import { useLocation } from "wouter";
-  import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-  import { Button } from "./ui/button";
-  import { CreditBalanceWidget } from "./CreditBalanceWidget";
-  import { trpc } from "@/lib/trpc";
-  import { TitanLogo } from "./TitanLogo";
-  import { isAdminRole } from "@shared/const";
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
+import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import { Button } from "./ui/button";
+import { CreditBalanceWidget } from "./CreditBalanceWidget";
+import { trpc } from "@/lib/trpc";
+import { TitanLogo } from "./TitanLogo";
+import { isAdminRole } from "@shared/const";
 
   // ── Menu item definition ─────────────────────────────────────────────────
   type MenuItem = {
