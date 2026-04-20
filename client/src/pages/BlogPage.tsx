@@ -34,7 +34,7 @@ export function BlogListPage() {
             Archibald Titan Blog
           </h1>
           <p className="text-lg text-gray-400 max-w-2xl mb-8">
-            Expert insights on AI security, credential management, developer tools, and cybersecurity best practices.
+            Expert insights on DevSecOps, offensive security, AI tools, red team operations, and cybersecurity best practices.
           </p>
 
           {/* Search */}
@@ -280,10 +280,10 @@ export function BlogPostPage() {
         {/* CTA */}
         <div className="mt-12 p-8 bg-blue-950/30 border border-blue-900/30 rounded-lg text-center">
           <h3 className="text-xl font-semibold text-white mb-2">
-            Ready to secure your credentials?
+            Ready to build with the most advanced security AI?
           </h3>
           <p className="text-gray-400 mb-4">
-            Try Archibald Titan — the world's most advanced local AI agent for credential management.
+            Archibald Titan — AI Builder, 26 offensive security tools, encrypted vault, and full DevSecOps automation. Cyber tier from $199/mo.
           </p>
           <Link href="/">
             <Button className="bg-blue-600 hover:bg-blue-500">
