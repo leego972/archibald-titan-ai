@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { AT_ICON_64 } from "@/lib/logos";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import {
+import MarketingLayout from "@/components/MarketingLayout";
   Rocket, Code2, Users, Building2, FileCode, LayoutDashboard,
   Globe, Zap, ArrowRight, CheckCircle2, ChevronDown, ChevronUp,
   Layers, BookOpen, Target, Menu, X, Star,
@@ -145,42 +145,8 @@ export default function UseCasesPage() {
   const Icon = active.icon;
 
   return (
-    <div className="min-h-screen bg-[#060611] text-white overflow-x-hidden">
+    <MarketingLayout>
       {/* NAV */}
-      <nav aria-label="Navigation" className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#060611]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <img loading="eager" src={AT_ICON_64} alt="AT" className="h-9 w-9 object-contain" />
-              <span className="text-lg font-bold tracking-tight">Archibald Titan</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-6">
-              <Link href="/builder" className="text-sm text-white/60 hover:text-white transition-colors">Builder</Link>
-              <span className="text-sm text-blue-400 font-semibold">Use Cases</span>
-              <Link href="/examples" className="text-sm text-white/60 hover:text-white transition-colors">Examples</Link>
-              <Link href="/security" className="text-sm text-white/60 hover:text-white transition-colors">Security</Link>
-              <Link href="/pricing" className="text-sm text-white/60 hover:text-white transition-colors">Pricing</Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" variant="ghost" className="text-white/70 hover:text-white hidden sm:flex">Sign In</Button>
-              <Button onClick={() => { window.location.href = getLoginUrl(); }} size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0">Get Started</Button>
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white" aria-label="Toggle menu">
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-            </div>
-          </div>
-        </div>
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-white/5 bg-[#060611]/95 backdrop-blur-xl">
-            <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-1">
-              <Link href="/builder" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5">Builder</Link>
-              <Link href="/examples" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5">Examples</Link>
-              <Link href="/security" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5">Security</Link>
-              <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 px-3 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/5">Pricing</Link>
-            </div>
-          </div>
-        )}
-      </nav>
 
       {/* HERO */}
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-24">
@@ -280,20 +246,6 @@ export default function UseCasesPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="relative border-t border-white/5 py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img loading="eager" src={AT_ICON_64} alt="AT" className="h-7 w-7 object-contain" />
-            <span className="text-sm font-bold tracking-tight">Archibald Titan</span>
-          </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="text-xs text-white/30 hover:text-white/60 transition-colors">Privacy</Link>
-            <Link href="/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors">Terms</Link>
-            <Link href="/contact" className="text-xs text-white/30 hover:text-white/60 transition-colors">Contact</Link>
-          </div>
-          <p className="text-xs text-white/20">&copy; {new Date().getFullYear()} Archibald Titan</p>
-        </div>
-      </footer>
-    </div>
+    </MarketingLayout>
   );
 }
