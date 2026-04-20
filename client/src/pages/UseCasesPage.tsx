@@ -6,7 +6,7 @@ import MarketingLayout from "@/components/MarketingLayout";
 import {
   Rocket, Code2, Users, Building2, FileCode, LayoutDashboard,
   Globe, Zap, ArrowRight, CheckCircle2, ChevronDown, ChevronUp,
-  Layers, BookOpen, Target, Menu, X, Star,
+  Layers, BookOpen, Target, Menu, X, Star, ShieldAlert,
 } from "lucide-react";
 
 const USE_CASES = [
@@ -134,9 +134,30 @@ const USE_CASES = [
     example: {
       brief: "Write a PRD for a mobile app that helps users track their daily water intake",
       output: "Full PRD: problem statement, user personas, functional requirements, non-functional requirements, user stories, acceptance criteria, and success metrics.",
+      },
     },
-  },
-];
+    {
+      id: "red-team",
+      icon: ShieldAlert,
+      audience: "Red Teams & Security Researchers",
+      color: "text-red-400",
+      bg: "bg-red-500/10",
+      border: "border-red-500/20",
+      tagline: "A complete offensive security platform with full auditability.",
+      desc: "Titan gives security professionals a managed, sandboxed environment for red team operations — from OSINT and attack surface mapping through exploitation, phishing simulation, and automated compliance reporting.",
+      outputs: [
+        "Attack surface analysis (Argus deep scan + visualisation)",
+        "Vulnerability chain report (Astra CVE detection + staging)",
+        "Phishing campaign setup (BlackEye + Evilginx2 templates)",
+        "Red Team Playbook from target profile brief",
+        "Automated compliance report (SOC 2 / ISO 27001)",
+      ],
+      example: {
+        brief: "Run a full attack surface analysis on target.example.com and produce an executive summary",
+        output: "Argus discovers 347 subdomains, flags 12 exposed services, confirms 3 critical CVEs. Executive report with risk ratings and a prioritised remediation roadmap.",
+      },
+    },
+  ];
 
 export default function UseCasesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
