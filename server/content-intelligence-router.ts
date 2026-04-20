@@ -56,7 +56,8 @@ export const contentIntelligenceRouter = router({
       }
       const result = await runContentPipeline(input);
       try {
-        await consumeCredits(ctx.user.id, "content_bulk_generate", `Content pipeline: ${input.platform} — ${input.prompt.slice(0, 60)}`);
+        const _cr1 = await consumeCredits(ctx.user.id, "content_bulk_generate", `Content pipeline: ${input.platform} — ${input.prompt.slice(0, 60)}`);
+        if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -77,7 +78,8 @@ export const contentIntelligenceRouter = router({
       }
       const result = await generateContentAtom(input);
       try {
-        await consumeCredits(ctx.user.id, "content_bulk_generate", `Content atom: ${input.topic}`);
+        const _cr2 = await consumeCredits(ctx.user.id, "content_bulk_generate", `Content atom: ${input.topic}`);
+        if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -126,7 +128,8 @@ export const contentIntelligenceRouter = router({
       }
       const result = await scoreBrandVoice(input.content);
       try {
-        await consumeCredits(ctx.user.id, "content_generate", `Brand voice score: ${input.content.slice(0, 40)}`);
+        const _cr3 = await consumeCredits(ctx.user.id, "content_generate", `Brand voice score: ${input.content.slice(0, 40)}`);
+        if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -193,7 +196,8 @@ export const contentIntelligenceRouter = router({
       }
       const result = await repurposeContent(input);
       try {
-        await consumeCredits(ctx.user.id, "content_generate", `Repurpose: ${input.sourcePlatform} → ${input.targetPlatforms.join(", ")}`);
+        const _cr4 = await consumeCredits(ctx.user.id, "content_generate", `Repurpose: ${input.sourcePlatform} → ${input.targetPlatforms.join(", ")}`);
+        if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }

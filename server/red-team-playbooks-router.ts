@@ -441,7 +441,8 @@ Format as clean Markdown.`;
   // Consume credits
   if (!isAdmin) {
     try {
-      await consumeCredits(userId, "red_team_run", `Red team playbook: ${run.playbookName}`);
+      const _cr1 = await consumeCredits(userId, "red_team_run", `Red team playbook: ${run.playbookName}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch { /* ignore credit errors after completion */ }
   }
 }

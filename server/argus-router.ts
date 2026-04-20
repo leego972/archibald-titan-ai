@@ -325,7 +325,9 @@ export const argusRouter = router({
       const output = await execSSHCommand(ssh, argusCmd, (input.timeout + 15) * 1000);
       const duration = Date.now() - startTime;
 
-      await consumeCredits(ctx.user.id, "security_scan", `Argus module: ${moduleMeta.name}`);
+      const _cr1 = await consumeCredits(ctx.user.id, "security_scan", `Argus module: ${moduleMeta.name}`);
+
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_run_module", category: "security", details: { moduleId: String(input.moduleId), moduleName: moduleMeta.name, target: input.target, duration: String(duration) }, ipAddress: ctx.req?.ip || "unknown" });
 
       return {
@@ -369,7 +371,8 @@ export const argusRouter = router({
       } else {
         for (const moduleId of input.moduleIds) await runOne(moduleId);
       }
-      await consumeCredits(ctx.user.id, "security_scan", `Argus batch scan: ${input.moduleIds.length} modules`);
+      const _cr2 = await consumeCredits(ctx.user.id, "security_scan", `Argus batch scan: ${input.moduleIds.length} modules`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_batch_scan", category: "security", details: { moduleCount: String(input.moduleIds.length), target: input.target, parallel: String(input.parallel) }, ipAddress: ctx.req?.ip || "unknown" });
       results.sort((a, b) => input.moduleIds.indexOf(a.moduleId) - input.moduleIds.indexOf(b.moduleId));
       return { results, target: input.target, totalModules: results.length, scannedAt: new Date().toISOString() };
@@ -389,7 +392,8 @@ export const argusRouter = router({
       const argusCmd = `cd /opt/argus 2>/dev/null || true && echo -e "set target ${input.target}\\nset threads ${input.threads}\\nrunall ${input.category}\\nexit" | timeout 300 python3 -m argus 2>&1 || echo -e "set target ${input.target}\\nrunall ${input.category}\\nexit" | timeout 300 argus 2>&1 || echo 'Category scan failed'`;
       const start = Date.now();
       const output = await execSSHCommand(ssh, argusCmd, 320000);
-      await consumeCredits(ctx.user.id, "security_scan", `Argus category scan: ${input.category}`);
+      const _cr3 = await consumeCredits(ctx.user.id, "security_scan", `Argus category scan: ${input.category}`);
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_category_scan", category: "security", details: { category: input.category, target: input.target }, ipAddress: ctx.req?.ip || "unknown" });
       return { category: input.category, target: input.target, output, duration: Date.now() - start, scannedAt: new Date().toISOString() };
     }),
@@ -424,7 +428,8 @@ export const argusRouter = router({
         }
       });
       await Promise.allSettled(promises);
-      await consumeCredits(ctx.user.id, "security_scan", `Argus quick recon (${input.depth})`);
+      const _cr4 = await consumeCredits(ctx.user.id, "security_scan", `Argus quick recon (${input.depth})`);
+      if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_quick_recon", category: "security", details: { target: input.target, depth: input.depth }, ipAddress: ctx.req?.ip || "unknown" });
       results.sort((a, b) => moduleList.indexOf(a.moduleId) - moduleList.indexOf(b.moduleId));
       return { results, target: input.target, depth: input.depth, totalModules: results.length, scannedAt: new Date().toISOString() };
@@ -462,7 +467,8 @@ export const argusRouter = router({
         });
         await Promise.allSettled(batchPromises);
       }
-      await consumeCredits(ctx.user.id, "security_scan", `Argus full recon (${allModuleIds.length} modules)`);
+      const _cr5 = await consumeCredits(ctx.user.id, "security_scan", `Argus full recon (${allModuleIds.length} modules)`);
+      if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.argus_full_recon", category: "security", details: { target: input.target, moduleCount: String(allModuleIds.length) }, ipAddress: ctx.req?.ip || "unknown" });
       results.sort((a, b) => a.moduleId - b.moduleId);
       const byCategory = results.reduce((acc, r) => {

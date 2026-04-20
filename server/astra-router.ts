@@ -296,7 +296,8 @@ export const astraRouter = router({
       if (result.data?.status && result.data.status !== "Failed") {
         await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_start_scan", category: "security", details: { appname: input.appname, url: input.url }, ipAddress: ctx.req?.ip || "unknown" });
         try {
-          await consumeCredits(ctx.user.id, "astra_scan", `Astra scan: ${input.url}`);
+          const _cr1 = await consumeCredits(ctx.user.id, "astra_scan", `Astra scan: ${input.url}`);
+          if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         } catch (e) {
           log.warn("[Astra] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
         }
@@ -364,7 +365,8 @@ export const astraRouter = router({
       if (result.data?.status && result.data.status !== "Failed") {
         await logAdminAction({ adminId: ctx.user.id, adminEmail: ctx.user.email || undefined, adminRole: ctx.user.role || "user", action: "security.astra_postman_scan", category: "security", details: { appname: input.appname, collectionUrl: input.collectionUrl }, ipAddress: ctx.req?.ip || "unknown" });
         try {
-          await consumeCredits(ctx.user.id, "astra_scan", `Astra Postman scan: ${input.appname}`);
+          const _cr2 = await consumeCredits(ctx.user.id, "astra_scan", `Astra Postman scan: ${input.appname}`);
+          if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         } catch (e) {
           log.warn("[Astra] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
         }

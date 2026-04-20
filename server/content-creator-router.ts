@@ -125,7 +125,8 @@ export const contentCreatorRouter = router({
         }
         // Consume credits after strategy generation
         try {
-          await consumeCredits(ctx.user.id, "content_campaign_create", `Campaign strategy: ${input.name}`);
+          const _cr1 = await consumeCredits(ctx.user.id, "content_campaign_create", `Campaign strategy: ${input.name}`);
+          if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         } catch (e) {
           log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
         }
@@ -271,7 +272,8 @@ export const contentCreatorRouter = router({
 
       // Consume credits after successful generation
       try {
-        await consumeCredits(ctx.user.id, "content_generate", `Generate ${input.platform} ${input.contentType}`);
+        const _cr2 = await consumeCredits(ctx.user.id, "content_generate", `Generate ${input.platform} ${input.contentType}`);
+        if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -332,7 +334,8 @@ export const contentCreatorRouter = router({
       const result = await bulkGenerateForCampaign(input);
 
       try {
-        await consumeCredits(ctx.user.id, "content_bulk_generate", `Bulk generate for campaign ${input.campaignId}`);
+        const _cr3 = await consumeCredits(ctx.user.id, "content_bulk_generate", `Bulk generate for campaign ${input.campaignId}`);
+        if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -568,7 +571,8 @@ export const contentCreatorRouter = router({
 
       // Consume credits after generation
       try {
-        await consumeCredits(ctx.user.id, "content_seo_brief", `SEO brief: ${input.topic}`);
+        const _cr4 = await consumeCredits(ctx.user.id, "content_seo_brief", `SEO brief: ${input.topic}`);
+        if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }
@@ -675,7 +679,8 @@ export const contentCreatorRouter = router({
       }
       const strategy = await generateCampaignStrategy(input);
       try {
-        await consumeCredits(ctx.user.id, "content_campaign_create", `Strategy for: ${input.name}`);
+        const _cr5 = await consumeCredits(ctx.user.id, "content_campaign_create", `Strategy for: ${input.name}`);
+        if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[ContentCreator] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }

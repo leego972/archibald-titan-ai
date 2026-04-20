@@ -120,7 +120,8 @@ export const seoRouter = router({
     }
     const result = await runScheduledSeoOptimization();
     try {
-      await consumeCredits(ctx.user.id, "seo_run", "SEO optimization run");
+      const _cr1 = await consumeCredits(ctx.user.id, "seo_run", "SEO optimization run");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }
@@ -206,7 +207,8 @@ export const seoRouter = router({
     }
     await runGeoOptimization();
     try {
-      await consumeCredits(ctx.user.id, "seo_run", "GEO optimization run");
+      const _cr2 = await consumeCredits(ctx.user.id, "seo_run", "GEO optimization run");
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }
@@ -303,7 +305,8 @@ export const seoRouter = router({
     }
     const result = await analyzeContentFreshness();
     try {
-      await consumeCredits(ctx.user.id, "seo_run", "Content freshness analysis");
+      const _cr3 = await consumeCredits(ctx.user.id, "seo_run", "Content freshness analysis");
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }
@@ -323,7 +326,8 @@ export const seoRouter = router({
     }
     const result = await analyzeContentGaps();
     try {
-      await consumeCredits(ctx.user.id, "seo_run", "Content gap analysis");
+      const _cr4 = await consumeCredits(ctx.user.id, "seo_run", "Content gap analysis");
+      if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }
@@ -470,7 +474,8 @@ export const seoIntelligenceRouter = trpcRouter({
     }
     const result = await checkAiSearchPresence();
     try {
-      await consumeCredits(ctx.user.id, "seo_run", "AI search presence check");
+      const _cr5 = await consumeCredits(ctx.user.id, "seo_run", "AI search presence check");
+      if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[SEO] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }

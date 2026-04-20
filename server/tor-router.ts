@@ -533,7 +533,8 @@ export const torRouter = router({
       const node = await getActiveNode(ctx.user.id);
       if (!node) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Tor node." });
       // Medium (75) — routing a command through an existing Tor circuit is lightweight
-      try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Tor: run command through circuit`); } catch { /* ignore */ }
+      const _crCmd = await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Tor: run command through circuit`);
+      if (!_crCmd.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const safeCmd = input.command.replace(/[`\\|;&><]/g, "");
       const script = `torify bash -c "${safeCmd.replace(/"/g, '\\"')}" 2>&1 || echo "TOR_CMD_FAILED"`;
       const output = await execSSHCommand(nodeToSSH(node), script, input.timeoutMs ?? 30000, ctx.user.id);

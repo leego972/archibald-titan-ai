@@ -144,7 +144,8 @@ export const affiliateRouter = router({
         throw new Error(`Insufficient credits for outreach generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
       const email = await generateOutreachEmail(input.partnerId);
-      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate outreach generated for partner #${input.partnerId}`);
+      const _cr4 = await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate outreach generated for partner #${input.partnerId}`);
+      if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return { ...email, success: true };
     }),
 
@@ -154,7 +155,8 @@ export const affiliateRouter = router({
       throw new Error(`Insufficient credits for bulk outreach. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
     }
     const count = await generateBulkOutreach();
-    await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate bulk outreach generated: ${count} emails`);
+    const _cr5 = await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate bulk outreach generated: ${count} emails`);
+    if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return { generated: count, success: true };
   }),
 
@@ -173,7 +175,8 @@ export const affiliateRouter = router({
         throw new Error(`Insufficient credits for partner analysis. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
       const result = await analyzePartnerPerformance(input.partnerId);
-      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate partner #${input.partnerId} performance analysis`);
+      const _cr6 = await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate partner #${input.partnerId} performance analysis`);
+      if (!_cr6.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return result;
     }),
 
@@ -184,7 +187,8 @@ export const affiliateRouter = router({
       throw new Error(`Insufficient credits for optimization cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
     }
     const result = await runAffiliateOptimizationCycle();
-    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate optimization cycle run");
+    const _cr1 = await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate optimization cycle run");
+    if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return result;
   }),
 
@@ -222,7 +226,8 @@ export const affiliateRouter = router({
       throw new Error(`Insufficient credits for discovery cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
     }
     const result = await runDiscoveryCycle("manual");
-    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate discovery cycle run");
+    const _cr2 = await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate discovery cycle run");
+    if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return result;
   }),
 
@@ -304,7 +309,8 @@ export const affiliateRouter = router({
         discoveryIds: input?.discoveryIds,
         adminUserId: ctx.user.id,
       });
-      await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate signup batch run (limit: ${input?.limit ?? 10})`);
+      const _cr7 = await consumeCredits(ctx.user.id, "affiliate_action", `Affiliate signup batch run (limit: ${input?.limit ?? 10})`);
+      if (!_cr7.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return result;
     }),
 
@@ -465,7 +471,8 @@ export const affiliateRouter = router({
         throw new Error(`Insufficient credits for AI partner scoring. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
       const result = await aiScorePartner(input);
-      await consumeCredits(ctx.user.id, "affiliate_action", `AI scored affiliate partner: ${input.name}`);
+      const _cr8 = await consumeCredits(ctx.user.id, "affiliate_action", `AI scored affiliate partner: ${input.name}`);
+      if (!_cr8.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return result;
     }),
 
@@ -476,7 +483,8 @@ export const affiliateRouter = router({
       throw new Error(`Insufficient credits for v2 optimization cycle. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
     }
     const result = await runOptimizationCycleV2();
-    await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate v2 optimization cycle run");
+    const _cr3 = await consumeCredits(ctx.user.id, "affiliate_action", "Affiliate v2 optimization cycle run");
+    if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return result;
   }),
 

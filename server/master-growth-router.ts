@@ -34,7 +34,8 @@ export const masterGrowthRouter = router({
     }
     const result = await runMasterGrowthCycle();
     try {
-      await consumeCredits(ctx.user.id, "advertising_run", "Master growth orchestrator cycle");
+      const _cr1 = await consumeCredits(ctx.user.id, "advertising_run", "Master growth orchestrator cycle");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[MasterGrowth] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }

@@ -435,7 +435,8 @@ export const binCheckerRouter = router({
       if (!creditCheck.allowed) {
         throw new Error(`Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
-      await consumeCredits(ctx.user.id, "card_live_check", "Full card check (Luhn + BIN + Stripe live)");
+      const _cr1 = await consumeCredits(ctx.user.id, "card_live_check", "Full card check (Luhn + BIN + Stripe live)");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const result = await checkCard({
         cardNumber: input.cardNumber.replace(/\D/g, ""),
         expMonth: input.expMonth,

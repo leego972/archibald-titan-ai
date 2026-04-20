@@ -511,7 +511,8 @@ export const vpnChainRouter = router({
     }
     // Intense base (300) + 100 per hop — scales with real SSH compute work
     const buildCost = 300 + (readyHops.length * 100);
-    try { await consumeCreditsAmount(ctx.user.id, buildCost, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain (${buildCost} credits)`); } catch { /* ignore */ }
+    const _crChain = await consumeCreditsAmount(ctx.user.id, buildCost, "vpn_generate", `VPN Chain: build ${readyHops.length}-hop chain (${buildCost} credits)`);
+    if (!_crChain.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const result = await buildChainTunnels(ctx.user.id, readyHops);
     if (result.success) {
       await saveHops(ctx.user.id, hops);
@@ -710,7 +711,8 @@ export const vpnChainRouter = router({
         if (!allLinked) {
           // Scaled cost: 300 base + 100/hop — single charge covers build + activate
           const activateBuildCost = 300 + (readyHops.length * 100);
-          try { await consumeCreditsAmount(ctx.user.id, activateBuildCost, "vpn_generate", `VPN Chain: activate + build ${readyHops.length}-hop chain (${activateBuildCost} credits)`); } catch { /* ignore */ }
+          const _crActivate = await consumeCreditsAmount(ctx.user.id, activateBuildCost, "vpn_generate", `VPN Chain: activate + build ${readyHops.length}-hop chain (${activateBuildCost} credits)`);
+          if (!_crActivate.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
           const result = await buildChainTunnels(ctx.user.id, readyHops);
           if (!result.success) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Chain build failed: ${result.message}` });
@@ -718,7 +720,8 @@ export const vpnChainRouter = router({
           await saveHops(ctx.user.id, hops);
         } else {
           // Chain already built — just toggling active state, flat 75 credits
-          try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", "VPN Chain: activate (already built)"); } catch { /* ignore */ }
+          const _crActivateFlat = await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", "VPN Chain: activate (already built)");
+          if (!_crActivateFlat.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         }
       } else {
         const hops = await getHops(ctx.user.id);

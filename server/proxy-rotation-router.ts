@@ -406,7 +406,8 @@ export const proxyRotationRouter = router({
     }
     await saveProxyList(ctx.user.id, proxies);
     try {
-      await consumeCredits(ctx.user.id, "proxy_test_all", `Proxy health check: ${results.length} proxies`);
+      const _cr1 = await consumeCredits(ctx.user.id, "proxy_test_all", `Proxy health check: ${results.length} proxies`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[ProxyRotation] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }

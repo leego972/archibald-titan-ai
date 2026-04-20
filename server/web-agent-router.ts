@@ -51,7 +51,8 @@ export const webAgentRouter = router({
 
       // Consume credits upfront before running the task
       try {
-        await consumeCredits(ctx.user.id, "web_agent_task", `Web Agent: ${input.instruction.slice(0, 80)}`);
+        const _cr1 = await consumeCredits(ctx.user.id, "web_agent_task", `Web Agent: ${input.instruction.slice(0, 80)}`);
+        if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[WebAgent] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }

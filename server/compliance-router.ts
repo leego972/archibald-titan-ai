@@ -462,7 +462,8 @@ Write in professional compliance language suitable for a board-level audience. B
 
       if (!isAdmin) {
         try {
-          await consumeCredits(userId, "compliance_report", `Compliance report: ${input.type.toUpperCase()}`);
+          const _cr1 = await consumeCredits(userId, "compliance_report", `Compliance report: ${input.type.toUpperCase()}`);
+          if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         } catch { /* ignore credit errors after generation */ }
       }
 

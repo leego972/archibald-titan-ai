@@ -307,7 +307,9 @@ export const siteMonitorRouter = router({
         details: { message: `Added site "${input.name}" for monitoring` },
       });
 
-      await consumeCredits(ctx.user!.id, "site_monitor_add", "Site monitor: add site");
+      const _cr1 = await consumeCredits(ctx.user!.id, "site_monitor_add", "Site monitor: add site");
+
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return { id: result.insertId, message: "Site added for monitoring" };
     }),
 

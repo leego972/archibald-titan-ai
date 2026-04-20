@@ -129,7 +129,8 @@ export const advertisingRouter = router({
     }
     const result = await runAdvertisingCycle();
     try {
-      await consumeCredits(ctx.user.id, "advertising_run", "Advertising cycle run");
+      const _cr1 = await consumeCredits(ctx.user.id, "advertising_run", "Advertising cycle run");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[Advertising] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }
@@ -738,7 +739,8 @@ export const advertisingRouter = router({
         throw new Error(`Insufficient credits for viral content generation. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.`);
       }
       const result = await generateViralPost(input.platform, input.topic);
-      await consumeCredits(ctx.user.id, "advertising_run", `Viral content generated for ${input.platform}: ${input.topic.substring(0, 50)}`);
+      const _cr2 = await consumeCredits(ctx.user.id, "advertising_run", `Viral content generated for ${input.platform}: ${input.topic.substring(0, 50)}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return result;
     }),
 

@@ -177,7 +177,9 @@ export const marketingRouter = router({
         status: "success",
       });
 
-      await consumeCredits(ctx.user.id, "marketing_run", `Budget allocated: $${input.monthlyBudget}/month`);
+      const _cr2 = await consumeCredits(ctx.user.id, "marketing_run", `Budget allocated: $${input.monthlyBudget}/month`);
+
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return { allocations, month };
     }),
 
@@ -387,7 +389,9 @@ export const marketingRouter = router({
         status: results.contentPublished > 0 || results.adsCreated > 0 ? "success" : "failed",
       });
 
-      await consumeCredits(ctx.user.id, "marketing_run", `Campaign #${input.campaignId} launched`);
+      const _cr3 = await consumeCredits(ctx.user.id, "marketing_run", `Campaign #${input.campaignId} launched`);
+
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return results;
     }),
 
@@ -517,7 +521,8 @@ export const marketingRouter = router({
     const result = await runAutonomousCycle();
 
     try {
-      await consumeCredits(ctx.user.id, "advertising_run", "Autonomous marketing cycle");
+      const _cr1 = await consumeCredits(ctx.user.id, "advertising_run", "Autonomous marketing cycle");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     } catch (e) {
       log.warn("[Marketing] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
     }

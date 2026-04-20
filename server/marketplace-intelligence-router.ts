@@ -155,7 +155,8 @@ export const marketplaceIntelligenceRouter = router({
       }
       const description = await generateListingDescription(input);
       try {
-        await consumeCredits(ctx.user.id, "marketplace_ai_describe", `AI description: ${input.title}`);
+        const _cr1 = await consumeCredits(ctx.user.id, "marketplace_ai_describe", `AI description: ${input.title}`);
+        if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       } catch (e) {
         log.warn("[MarketplaceIntelligence] Credit consumption failed (non-fatal):", { error: getErrorMessage(e) });
       }

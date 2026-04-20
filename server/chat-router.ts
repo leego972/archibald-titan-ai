@@ -3436,10 +3436,12 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
         // Admin users are never charged — unlimited access
         if (!isAdmin) {
           try {
-            await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
+            const _cr1 = await consumeCredits(userId, "chat_message", `Chat message in conversation ${conversationId}`);
+            if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
             for (const action of executedActions) {
               if (action.success) {
-                await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+                const _cr2 = await consumeCredits(userId, "builder_action", `Builder: ${action.tool}`);
+                if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
               }
             }
           } catch (consumeErr: unknown) {
