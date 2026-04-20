@@ -762,4 +762,56 @@ export const advertisingRouter = router({
   getWeeklyReport: adminProcedure.query(async () => {
     return getWeeklyGrowthReport();
   }),
+
+    // ─── Telegram Connection Test ─────────────────────────────────────────────
+    testTelegramConnection: adminProcedure
+      .input(z.object({ sendTest: z.boolean().default(false) }))
+      .mutation(async ({ input }) => {
+        const { env } = await import("./_core/env");
+        const token = env.telegramBotToken;
+        const channelId = env.telegramChannelId;
+
+        if (!token) return { success: false, error: "TELEGRAM_BOT_TOKEN is not set in Railway environment variables." };
+        if (!channelId) return { success: false, error: "TELEGRAM_CHANNEL_ID is not set in Railway environment variables." };
+
+        let botName = "";
+        try {
+          const getMeRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+          const getMeData = (await getMeRes.json()) as { ok: boolean; result?: { username?: string; first_name?: string }; description?: string };
+          if (!getMeData.ok) {
+            return { success: false, error: `Telegram API rejected the bot token: ${getMeData.description ?? "unknown error"}` };
+          }
+          botName = getMeData.result?.username ? `@${getMeData.result.username}` : (getMeData.result?.first_name ?? "Unknown Bot");
+        } catch (e: any) {
+          return { success: false, error: `Could not reach Telegram API: ${e.message}` };
+        }
+
+        if (input.sendTest) {
+          try {
+            const msgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: channelId,
+                text: "✅ *Archibald Titan AI — Telegram connection verified*\n\nThis is a test message sent from the Advertising Dashboard.",
+                parse_mode: "Markdown",
+              }),
+            });
+            const msgData = (await msgRes.json()) as { ok: boolean; description?: string };
+            if (!msgData.ok) {
+              return {
+                success: false,
+                botName,
+                channelId,
+                error: `Bot token is valid (connected as ${botName}) but could not post to channel ${channelId}: ${msgData.description ?? "unknown error"}. Make sure the bot is an admin of the channel with "Post messages" permission.`,
+              };
+            }
+          } catch (e: any) {
+            return { success: false, botName, channelId, error: `Message send failed: ${e.message}` };
+          }
+          return { success: true, botName, channelId, testSent: true };
+        }
+
+        return { success: true, botName, channelId, testSent: false };
+      }),
 });
