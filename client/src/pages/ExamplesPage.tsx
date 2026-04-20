@@ -6,6 +6,7 @@ import MarketingLayout from "@/components/MarketingLayout";
 import {
   Rocket, Code2, FileCode, LayoutDashboard, Settings, BookOpen,
   Globe, Zap, ArrowRight, Copy, CheckCircle2, Menu, X, Layers,
+  ShieldAlert, Crosshair, ScanLine,
 } from "lucide-react";
 
 type Tag = "All" | "Web" | "App" | "Tool" | "Doc" | "Code";
@@ -154,10 +155,34 @@ const EXAMPLES = [
     output: "12-slide web deck: problem, solution, market size, product demo section, business model, traction, team, financials, and ask. Animated slide transitions, investor-ready design.",
     lines: "~510 lines",
     time: "~60 sec",
-  },
-];
+    },
+    {
+      id: "pentest-report", category: "Security", tag: "Security", icon: ShieldAlert, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20",
+      title: "Penetration Test Report", desc: "Executive-ready pentest report from an Astra scan session",
+      prompt: "Generate a penetration test report for api.example.com — Astra findings, CVE details, CVSS scores, exploitability, and a prioritised remediation roadmap.",
+      output: "Structured pentest report: executive summary, scope, methodology, 7 findings (3 Critical, 2 High) with CVSS scores, proof-of-concept references, and remediation roadmap.",
+      lines: "~280 lines",
+      time: "~45 sec",
+    },
+    {
+      id: "red-team-playbook", category: "Security", tag: "Security", icon: Crosshair, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20",
+      title: "Red Team Playbook", desc: "Custom attack scenario playbook from a target profile brief",
+      prompt: "Create a red team playbook for a healthcare SaaS target — initial recon, phishing vector, credential harvesting, lateral movement, and exfiltration path.",
+      output: "5-phase playbook: OSINT recon (Argus), spear-phishing campaign (Evilginx2), credential replay strategy, privilege escalation steps, and data exfil detection avoidance.",
+      lines: "~320 lines",
+      time: "~50 sec",
+    },
+    {
+      id: "attack-surface", category: "Security", tag: "Security", icon: ScanLine, color: "text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20",
+      title: "Attack Surface Report", desc: "Visual attack surface analysis from an Argus deep-scan session",
+      prompt: "Run Argus deep scan on example.com and generate a visual attack surface report with exposed subdomains, services, and risk ratings.",
+      output: "Attack surface map: 247 subdomains discovered, 14 exposed APIs identified, 3 unauthenticated admin panels flagged. Risk-rated asset inventory with recommended immediate actions.",
+      lines: "~240 lines",
+      time: "~40 sec",
+    },
+  ];
 
-const TAGS: Tag[] = ["All", "Web", "App", "Tool", "Doc", "Code"];
+const TAGS: Tag[] = ["All", "Web", "App", "Tool", "Doc", "Code", "Security"];
 
 export default function ExamplesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
