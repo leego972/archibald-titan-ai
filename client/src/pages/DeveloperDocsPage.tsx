@@ -20,6 +20,7 @@ import {
   Braces,
   Globe,
   Shield,
+  ShieldAlert,
   Zap,
   ArrowRight,
   Download,
@@ -189,7 +190,75 @@ STRIPE_SECRET_KEY=your_stripe_key_here`,
   "timestamp": "2026-02-14T..."
 }`,
   },
-];
+
+    // ─── Security Tools API (Cyber Tier) ────────────────────────
+    {
+      method: "POST",
+      path: "/api/v1/security/scans",
+      description: "Launch an Argus attack surface scan against a target domain (Cyber tier required)",
+      scope: "security:scan",
+      response: `{
+    "scanId": "scan_abc123",
+    "status": "running",
+    "target": "target.example.com",
+    "engine": "argus",
+    "depth": "full",
+    "estimatedCompletionSeconds": 120
+  }`,
+    },
+    {
+      method: "GET",
+      path: "/api/v1/security/scans",
+      description: "List all security scans with status and summary results",
+      scope: "security:read",
+      response: `{
+    "data": [
+      {
+        "id": "scan_abc123",
+        "target": "target.example.com",
+        "status": "completed",
+        "engine": "argus",
+        "severity": { "critical": 2, "high": 5, "medium": 12, "low": 8 },
+        "completedAt": "2026-04-20T10:15:00Z"
+      }
+    ],
+    "count": 1
+  }`,
+    },
+    {
+      method: "GET",
+      path: "/api/v1/security/scans/:id",
+      description: "Get full results for a specific scan — findings, CVEs, affected subdomains",
+      scope: "security:read",
+      response: `{
+    "id": "scan_abc123",
+    "target": "target.example.com",
+    "findings": [
+      {
+        "subdomain": "admin.target.example.com",
+        "severity": "critical",
+        "cve": "CVE-2024-23897",
+        "cvss": 9.8,
+        "service": "Jenkins",
+        "exploitAvailable": true
+      }
+    ]
+  }`,
+    },
+    {
+      method: "POST",
+      path: "/api/v1/security/reports",
+      description: "Generate an executive security report from scan results using Titan Builder",
+      scope: "security:report",
+      response: `{
+    "reportId": "rpt_xyz456",
+    "format": "pdf",
+    "status": "generated",
+    "downloadUrl": "/api/v1/security/reports/rpt_xyz456/download",
+    "sections": ["executive_summary", "findings", "risk_matrix", "remediation_roadmap"]
+  }`,
+    },
+  ];
 
 // ─── Code Examples ───────────────────────────────────────────────
 function getCurlExample(endpoint: (typeof API_ENDPOINTS)[0]) {
