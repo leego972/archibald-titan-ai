@@ -75,6 +75,7 @@ export default function AdvertisingDashboard() {
   const [mvtChannel, setMvtChannel] = useState("x_twitter");
   const [mvtHooks, setMvtHooks] = useState("Hook A\nHook B\nHook C");
   const [previewContent, setPreviewContent] = useState<any>(null);
+    const [telegramTestResult, setTelegramTestResult] = useState<{ success: boolean; botName?: string; channelId?: string; testSent?: boolean; error?: string } | null>(null);
 
   // ─── Queries ─────────────────────────────────────────────────────────────
   const dashboard = trpc.advertising.getDashboard.useQuery(undefined, { refetchInterval: 60000 });
