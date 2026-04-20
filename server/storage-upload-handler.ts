@@ -25,6 +25,28 @@ const log = createLogger("StorageUploadHandler");
 
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500 MB
 
+  // Dangerous file extensions that are never allowed, even on S3.
+  // Prevents the platform being used as a malware distribution vector.
+  const BLOCKED_EXTENSIONS = new Set([
+    ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".pif",
+    ".sh",  ".bash", ".zsh", ".fish", ".csh", ".ksh",
+    ".ps1", ".psm1", ".psd1",
+    ".vbs", ".vbe", ".jse", ".wsf", ".wsh",
+    ".php", ".php3", ".php4", ".php5", ".phtml",
+    ".asp", ".aspx", ".ashx", ".asmx",
+    ".cgi", ".pl",
+    ".jar", ".war", ".ear",
+    ".dmg", ".pkg", ".deb", ".rpm",
+    ".reg", ".lnk", ".url", ".elf",
+  ]);
+
+  function hasBlockedExtension(filename: string): boolean {
+    const lower = filename.toLowerCase();
+    const dotIdx = lower.lastIndexOf(".");
+    if (dotIdx === -1) return false;
+    return BLOCKED_EXTENSIONS.has(lower.slice(dotIdx));
+  }
+
 // ─── Auth Helper ──────────────────────────────────────────────────────────────
 
 function getUserFromRequest(req: Request): { id: number; role: string } | null {
@@ -116,6 +138,13 @@ export function registerStorageUploadRoutes(app: Express): void {
             }
             if (fileBuffer.length > MAX_UPLOAD_SIZE) {
               res.status(413).json({ message: "File exceeds 500 MB limit" });
+              return resolve();
+            }
+
+            // Block dangerous file types — prevent malware distribution via the platform
+            if (hasBlockedExtension(fileName)) {
+              const ext = (fileName.split(".").pop() ?? "").toUpperCase();
+              res.status(422).json({ message: `File type not allowed: .${ext} files cannot be uploaded.` });
               return resolve();
             }
 

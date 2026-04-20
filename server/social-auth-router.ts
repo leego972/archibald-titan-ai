@@ -381,13 +381,30 @@ function redirectToLoginWithError(res: Response, message: string): void {
 
 // ─── Route Registration ────────────────────────────────────────────
 
-export function registerSocialAuthRoutes(app: Express) {
+
+  // ─── Open Redirect Protection ──────────────────────────────────────
+  /**
+   * Sanitize returnPath to prevent open redirect attacks.
+   * Only relative paths starting with "/" are allowed.
+   * Blocks: https://evil.com, //evil.com, javascript:, etc.
+   */
+  function sanitizeReturnPath(returnPath: string | undefined, fallback = "/dashboard"): string {
+    if (!returnPath) return fallback;
+    const decoded = decodeURIComponent(returnPath);
+    // Allow only relative paths (start with / but NOT //)
+    if (decoded.startsWith("/") && !decoded.startsWith("//") && !decoded.includes("://")) {
+      return decoded.slice(0, 500);
+    }
+    return fallback;
+  }
+
+  export function registerSocialAuthRoutes(app: Express) {
 
 
   // ─── GET /api/auth/token-exchange ────────────────────────────────
   app.get("/api/auth/token-exchange", (req: Request, res: Response) => {
     const token = req.query.token as string;
-    const returnPath = (req.query.returnPath as string) || "/dashboard";
+    const returnPath = sanitizeReturnPath(req.query.returnPath as string);
     if (!token) return res.status(400).send("Missing token parameter");
 
     const pending = pendingTokens.get(token);
@@ -410,7 +427,7 @@ export function registerSocialAuthRoutes(app: Express) {
 
   // ─── GET /api/auth/github ─────────────────────────────────────────
   app.get("/api/auth/github", (req: Request, res: Response) => {
-    const returnPath = (req.query.returnPath as string) || "/dashboard";
+    const returnPath = sanitizeReturnPath(req.query.returnPath as string);
     const mode = (req.query.mode as string) || "login";
     const state = crypto.randomBytes(32).toString("hex");
     const expiresAt = Date.now() + STATE_TTL_MS;
@@ -482,7 +499,7 @@ export function registerSocialAuthRoutes(app: Express) {
 
   // ─── GET /api/auth/google ─────────────────────────────────────────
   app.get("/api/auth/google", (req: Request, res: Response) => {
-    const returnPath = (req.query.returnPath as string) || "/dashboard";
+    const returnPath = sanitizeReturnPath(req.query.returnPath as string);
     const mode = (req.query.mode as string) || "login";
     const state = crypto.randomBytes(32).toString("hex");
     const expiresAt = Date.now() + STATE_TTL_MS;

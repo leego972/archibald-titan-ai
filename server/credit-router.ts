@@ -3,8 +3,7 @@
  */
 
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import {
   getCreditBalance,
   getCreditHistory,
@@ -18,7 +17,6 @@ import {
 import { CREDIT_COSTS, CREDIT_PACKS } from "../shared/pricing";
 import { ENV } from "./_core/env";
 import Stripe from "stripe";
-import { isAdminRole } from '@shared/const';
 
 // ─── Stripe Client (reuse pattern from stripe-router) ──────────────
 
@@ -128,33 +126,27 @@ export const creditRouter = router({
     }),
 
   /** Admin: Adjust a user's credit balance */
-  adminAdjust: protectedProcedure
-      .input(
-        z.object({
-          userId: z.number().int().positive(),
-          amount: z.number().int().refine(n => n !== 0, { message: "Amount cannot be zero" }),
-          reason: z.string().min(1).max(500),
-        })
-      )
-    .mutation(async ({ ctx, input }) => {
-      if (!isAdminRole(ctx.user.role)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
-      }
+  adminAdjust: adminProcedure
+    .input(
+      z.object({
+        userId: z.number().int().positive(),
+        amount: z.number().int().refine(n => n !== 0, { message: "Amount cannot be zero" }),
+        reason: z.string().min(1).max(500),
+      })
+    )
+    .mutation(async ({ input }) => {
       return adminAdjustCredits(input.userId, input.amount, input.reason);
     }),
 
   /** Admin: Toggle unlimited credits for a user */
-  adminSetUnlimited: protectedProcedure
+  adminSetUnlimited: adminProcedure
     .input(
       z.object({
         userId: z.number(),
         unlimited: z.boolean(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      if (!isAdminRole(ctx.user.role)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
-      }
+    .mutation(async ({ input }) => {
       await setUnlimited(input.userId, input.unlimited);
       return { success: true };
     }),
