@@ -136,6 +136,12 @@ import {
     const [annual, setAnnual] = useState(false);
 
     const createCheckout = trpc.stripe.createCheckout.useMutation();
+      const subQuery = trpc.stripe.getSubscription.useQuery(undefined, {
+        enabled: !!user,
+        retry: false,
+        staleTime: 60_000,
+      });
+      const currentPlanId = subQuery.data?.plan ?? null;
 
     const handleGetStarted = async (planId: PlanId) => {
       if (!user) {
@@ -217,7 +223,12 @@ import {
                   key={plan.id}
                   className={`flex flex-col p-7 rounded-3xl border ${plan.borderColor} ${plan.bgColor} relative transition-all duration-500 hover:scale-[1.01] ${plan.highlight ? "shadow-2xl" : ""}`}
                 >
-                  {plan.badge && (
+                  {plan.id === currentPlanId && (
+                    <div className="absolute -top-4 right-4 px-3 py-1 rounded-full bg-emerald-600 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-900/30">
+                      Current Plan
+                    </div>
+                  )}
+                  {plan.badge && plan.id !== currentPlanId && (
                     <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full ${plan.badgeColor} text-[10px] font-black uppercase tracking-widest text-white shadow-xl`}>
                       {plan.badge}
                     </div>
@@ -321,7 +332,7 @@ import {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button onClick={() => handleGetStarted("enterprise")} disabled={loadingPlan === "enterprise"} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
                 {loadingPlan === "enterprise" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {user ? "Subscribe Now" : "Get Started"}
+                {plan.id === currentPlanId ? "Manage Plan" : user ? "Subscribe Now" : "Get Started"}
               </Button>
               <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
                 Request Demo

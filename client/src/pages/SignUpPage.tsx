@@ -107,7 +107,7 @@ export default function SignUpPage() {
           <CardHeader className="text-center space-y-1 pb-4">
             <CardTitle className="text-xl font-bold text-white">Create your account</CardTitle>
             <CardDescription className="text-gray-400">
-              Join Archibald Titan — build websites, tools, and business assets with AI.
+              Join the platform built for security engineers, DevSecOps teams, and AI operators.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
