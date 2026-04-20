@@ -1272,85 +1272,93 @@ export async function getUserReferralDashboard(userId: number): Promise<{
  * Request a payout for accumulated referral commissions
  */
 export async function requestReferralPayout(
-  userId: number,
-  method: "wire_transfer" | "credits"
-): Promise<{ success: boolean; message: string; payoutId?: number; amountCents?: number }> {
-  const db = await getDb();
-  if (!db) return { success: false, message: "Database not available" };
+    userId: number,
+    method: "wire_transfer" | "credits"
+  ): Promise<{ success: boolean; message: string; payoutId?: number; amountCents?: number }> {
+    const db = await getDb();
+    if (!db) return { success: false, message: "Database not available" };
 
-  const [codeRecord] = await db.select().from(referralCodes)
-    .where(eq(referralCodes.userId, userId))
-    .limit(1);
+    return await db.transaction(async (tx) => {
+      // SELECT FOR UPDATE locks the referralCode row — prevents concurrent double-payout
+      const [codeRecord] = await tx
+        .select()
+        .from(referralCodes)
+        .where(eq(referralCodes.userId, userId))
+        .for("update")
+        .limit(1);
 
-  if (!codeRecord) {
-    return { success: false, message: "No referral code found" };
+      if (!codeRecord) {
+        return { success: false, message: "No referral code found" };
+      }
+
+      // Re-calculate pending inside the lock so concurrent calls see updated totals
+      const completedPayouts = await tx.select({
+        total: sql<number>`COALESCE(SUM(${affiliatePayouts.amountCents}), 0)`,
+      })
+        .from(affiliatePayouts)
+        .where(and(
+          eq(affiliatePayouts.partnerId, codeRecord.id),
+          eq(affiliatePayouts.status, "completed"),
+        ));
+
+      const paidOut = completedPayouts[0]?.total || 0;
+      const pendingAmount = codeRecord.totalCommissionCents - paidOut;
+
+      if (pendingAmount < REFERRAL_CONFIG.minPayoutCents) {
+        return {
+          success: false,
+          message: `Minimum payout is $${(REFERRAL_CONFIG.minPayoutCents / 100).toFixed(2)}. You have $${(pendingAmount / 100).toFixed(2)} pending.`,
+        };
+      }
+
+      // Apply credit bonus if paying in credits
+      let finalAmount = pendingAmount;
+      if (method === "credits") {
+        finalAmount = Math.round(pendingAmount * REFERRAL_CONFIG.creditBonusMultiplier);
+      }
+
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const result = await tx.insert(affiliatePayouts).values({
+        partnerId: codeRecord.id,
+        amountCents: finalAmount,
+        currency: method === "credits" ? "CRD" : "USD",
+        status: method === "credits" ? "completed" : "pending",
+        paymentMethod: method,
+        periodStart,
+        periodEnd,
+        conversionCount: codeRecord.totalReferrals,
+      });
+      const payoutId = Number(result[0].insertId);
+
+      // Credit grant happens after payout insert — both are inside the transaction.
+      // addCredits opens its own nested transaction; if it fails, we log and throw
+      // so the outer tx rolls back the payout insert as well.
+      if (method === "credits") {
+        const creditResult = await addCredits(
+          userId,
+          finalAmount,
+          "referral_bonus",
+          `Referral payout — ${finalAmount} credits (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
+        );
+        if (!creditResult.success) {
+          throw new Error(`Credit grant failed for payout ${payoutId}`);
+        }
+      }
+
+      return {
+        success: true,
+        message: method === "credits"
+          ? `${finalAmount} credits added to your balance! (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
+          : `Payout of $${(finalAmount / 100).toFixed(2)} via wire transfer requested. Processing in 3-5 business days.`,
+        payoutId,
+        amountCents: finalAmount,
+      };
+    });
   }
-
-  // Calculate pending amount
-  const completedPayouts = await db.select({
-    total: sql<number>`COALESCE(SUM(${affiliatePayouts.amountCents}), 0)`,
-  })
-    .from(affiliatePayouts)
-    .where(and(
-      eq(affiliatePayouts.partnerId, codeRecord.id),
-      eq(affiliatePayouts.status, "completed"),
-    ));
-
-  const paidOut = completedPayouts[0]?.total || 0;
-  const pendingAmount = codeRecord.totalCommissionCents - paidOut;
-
-  if (pendingAmount < REFERRAL_CONFIG.minPayoutCents) {
-    return {
-      success: false,
-      message: `Minimum payout is $${(REFERRAL_CONFIG.minPayoutCents / 100).toFixed(2)}. You have $${(pendingAmount / 100).toFixed(2)} pending.`,
-    };
-  }
-
-  // Apply credit bonus if paying in credits
-  let finalAmount = pendingAmount;
-  if (method === "credits") {
-    finalAmount = Math.round(pendingAmount * REFERRAL_CONFIG.creditBonusMultiplier);
-  }
-
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-   const result = await db.insert(affiliatePayouts).values({
-    partnerId: codeRecord.id,
-    amountCents: finalAmount,
-    currency: method === "credits" ? "CRD" : "USD",
-    status: method === "credits" ? "completed" : "pending",
-    paymentMethod: method,
-    periodStart,
-    periodEnd,
-    conversionCount: codeRecord.totalReferrals,
-  });
-  const payoutId = Number(result[0].insertId);
-
-  // If paying out as credits, immediately top up the user's credit balance
-  if (method === "credits") {
-    try {
-      await addCredits(
-        userId,
-        finalAmount,
-        "referral_bonus",
-        `Referral payout — ${finalAmount} credits (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
-      );
-    } catch (err) {
-      log.error("Failed to add referral credits to user balance", { error: String(err), userId, payoutId });
-    }
-  }
-
-  return {
-    success: true,
-    message: method === "credits"
-      ? `${finalAmount} credits added to your balance! (${REFERRAL_CONFIG.creditBonusMultiplier}x bonus applied)`
-      : `Payout of $${(finalAmount / 100).toFixed(2)} via wire transfer requested. Processing in 3-5 business days.`,
-    payoutId,
-    amountCents: finalAmount,
-  };
-}
+  
 
 /**
  * Record a recurring commission when a referred user makes a payment
@@ -1394,25 +1402,31 @@ export async function recordReferralCommission(
   const tier = getReferralTier(codeRecord.totalReferrals);
   const commissionCents = Math.round(paymentAmountCents * (tier.commissionPercent / 100));
 
-  // Update conversion record
-  await db.update(referralConversions)
-    .set({
-      status: "rewarded",
-      rewardType: "commission",
-      rewardAmountCents: sql`${referralConversions.rewardAmountCents} + ${commissionCents}`,
-      subscriptionId: subscriptionId || conversion.subscriptionId,
-      rewardGrantedAt: new Date(),
-    })
-    .where(eq(referralConversions.id, conversion.id));
+  // Wrap both updates in a single transaction — prevents diverged state if one fails
+    const result = await db.transaction(async (tx) => {
+      // Update conversion record
+      await tx.update(referralConversions)
+        .set({
+          status: "rewarded",
+          rewardType: "commission",
+          rewardAmountCents: sql`${referralConversions.rewardAmountCents} + ${commissionCents}`,
+          subscriptionId: subscriptionId || conversion.subscriptionId,
+          rewardGrantedAt: new Date(),
+        })
+        .where(eq(referralConversions.id, conversion.id));
 
-  // Update total commission on code record
-  await db.update(referralCodes)
-    .set({
-      totalCommissionCents: sql`${referralCodes.totalCommissionCents} + ${commissionCents}`,
-    })
-    .where(eq(referralCodes.id, codeRecord.id));
+      // Update total commission on code record
+      await tx.update(referralCodes)
+        .set({
+          totalCommissionCents: sql`${referralCodes.totalCommissionCents} + ${commissionCents}`,
+        })
+        .where(eq(referralCodes.id, codeRecord.id));
 
-  log.info(`[ReferralProgram] Commission: $${(commissionCents / 100).toFixed(2)} (${tier.commissionPercent}%) for user ${conversion.referrerId} from payment by user ${referredUserId}`);
+      return { success: true, commissionCents, referrerId: conversion.referrerId };
+    });
 
-  return { success: true, commissionCents, referrerId: conversion.referrerId };
-}
+    log.info(`[ReferralProgram] Commission: $${(commissionCents / 100).toFixed(2)} (${tier.commissionPercent}%) for user ${conversion.referrerId} from payment by user ${referredUserId}`);
+
+    return result;
+  }
+  
