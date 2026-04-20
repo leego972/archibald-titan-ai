@@ -2,8 +2,8 @@ import { Link } from "wouter";
 import { AT_ICON_64, FULL_LOGO_256 } from "@/lib/logos";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import {
 import MarketingLayout from "@/components/MarketingLayout";
+import {
   Shield, Zap, Globe, Users, ArrowRight, CheckCircle2,
   Mail, Github, Twitter, Lock, HardDrive, Cpu,
 } from "lucide-react";
