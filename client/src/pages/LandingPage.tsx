@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { getRegisterUrl } from "@/const";
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import MarketingLayout from "@/components/MarketingLayout";
 import {
     Shield, ChevronDown, ArrowRight, Check,
@@ -327,7 +327,25 @@ import {
           </div>
         </section>
 
-        {/* FINAL CTA */}
+        {/* COMPARE */}
+          <section className="relative py-16 border-t border-white/5">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/25 mb-6">See how Titan stacks up against the alternatives</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link href="/vs-copilot" className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white/90 border border-white/8 hover:border-white/20 rounded-full px-5 py-2.5 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
+                  Titan vs GitHub Copilot <ArrowRight className="h-3 w-3" />
+                </Link>
+                <Link href="/vs-cloud-ai" className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white/90 border border-white/8 hover:border-white/20 rounded-full px-5 py-2.5 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
+                  Titan vs Cloud AI Agents <ArrowRight className="h-3 w-3" />
+                </Link>
+                <Link href="/vs-no-code" className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white/90 border border-white/8 hover:border-white/20 rounded-full px-5 py-2.5 bg-white/[0.02] hover:bg-white/[0.05] transition-all">
+                  Titan vs No-Code Builders <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* FINAL CTA */}
         <section className="relative py-24 sm:py-32 border-t border-white/5 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-600/6 rounded-full blur-[100px]" />
