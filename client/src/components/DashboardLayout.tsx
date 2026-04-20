@@ -31,7 +31,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     Terminal, Bug, Crosshair, Fish, Network, Cpu,
     Shuffle, ScanSearch, Monitor, Code2, Store,
     Radar, Radio, Fingerprint, Globe2, Server,
-    AlertTriangle, GitBranch, RefreshCw, ShoppingCart,
+    AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown,
   } from "lucide-react";
   import { Badge } from "@/components/ui/badge";
   import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -86,6 +86,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops",  cyberOnly: true },
     { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops",     adminOnly: true },
     { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
+      { icon: ScanSearch,      label: "Proxy Interceptor",path: "/proxy-interceptor",  group: "Security Ops",       cyberOnly: true },
 
     // ── Intelligence ──────────────────────────────────────────────────
     { icon: Globe,           label: "Smart Fetch",     path: "/fetcher/smart-fetch",    group: "Intelligence" },
