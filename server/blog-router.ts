@@ -300,7 +300,8 @@ Tone: ${input.tone}`
       });
 
       const generated = JSON.parse(response.choices[0].message.content as string);
-      try { await consumeCredits(ctx.user.id, "blog_generate", "AI blog post generation"); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "blog_generate", "AI blog post generation");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return {
         ...generated,
         category: input.category,

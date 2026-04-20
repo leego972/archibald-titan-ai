@@ -204,7 +204,8 @@ export const siemRouter = router({
       };
       siemConfigs.push(config);
       if (!isAdmin) {
-        try { await consumeCredits(ctx.user.id, "siem_config", `SIEM config created: ${input.name}`); } catch { /* ignore */ }
+        const _cr1 = await consumeCredits(ctx.user.id, "siem_config", `SIEM config created: ${input.name}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       }
       return { success: true, config: { ...config, apiKey: config.apiKey ? "••••••••" : undefined } };
     }),
@@ -264,7 +265,8 @@ export const siemRouter = router({
         config.lastTestedAt = new Date();
         config.lastTestStatus = "success";
         if (!isAdmin2) {
-          try { await consumeCredits(ctx.user.id, "siem_test", `SIEM test: ${config.name}`); } catch { /* ignore */ }
+          const _cr2 = await consumeCredits(ctx.user.id, "siem_test", `SIEM test: ${config.name}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         }
         return { success: true, message: "Test event sent successfully" };
       } catch (err: any) {

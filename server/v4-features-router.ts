@@ -105,7 +105,8 @@ export const leakScannerRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "leak_scanner", "Credential Leak Scanner");
-      try { await consumeCredits(ctx.user.id, "security_scan", `Credential leak scan: ${input.scanType}`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "security_scan", `Credential leak scan: ${input.scanType}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
 
       const db = await getDb();
@@ -449,7 +450,8 @@ export const onboardingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "scheduled_fetches", "Provider Onboarding");
-      try { await consumeCredits(ctx.user.id, "builder_action", `Provider onboarding analysis: ${input.url}`); } catch { /* ignore */ }
+      const _cr2 = await consumeCredits(ctx.user.id, "builder_action", `Provider onboarding analysis: ${input.url}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });

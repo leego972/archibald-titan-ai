@@ -214,7 +214,8 @@ export const importRouter = router({
       // Deduct 1 credit per 10 credentials imported (minimum 1)
       const creditUnits = Math.max(1, Math.ceil(parsed.length / 10));
       for (let _i = 0; _i < creditUnits; _i++) {
-        try { await consumeCredits(ctx.user.id, "import_action", `CSV import: ${input.source} (${parsed.length} entries)`); } catch { /* ignore */ }
+        const _cr1 = await consumeCredits(ctx.user.id, "import_action", `CSV import: ${input.source} (${parsed.length} entries)`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       }
 
       // Create import record

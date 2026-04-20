@@ -110,7 +110,8 @@ export const businessPlanRouter = router({
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
     }
-    try { await consumeCredits(ctx.user.id, "business_plan_generate", "Business plan generation"); } catch { /* ignore */ }
+    const _cr1 = await consumeCredits(ctx.user.id, "business_plan_generate", "Business plan generation");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -180,7 +181,8 @@ export const grantRouter = router({
     return db.getGrantOpportunityById(input.id);
   }),
   match: protectedProcedure.input(z.object({ companyId: z.number() })).mutation(async ({ input, ctx }) => {
-    try { await consumeCredits(ctx.user.id, "grant_match", "Grant matching analysis"); } catch { /* ignore */ }
+    const _cr2 = await consumeCredits(ctx.user.id, "grant_match", "Grant matching analysis");
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -302,7 +304,8 @@ export const grantApplicationRouter = router({
     if (!creditCheck.allowed) {
       throw new TRPCError({ code: "FORBIDDEN", message: `Insufficient credits. Need ${creditCheck.cost}, have ${creditCheck.currentBalance}.` });
     }
-    try { await consumeCredits(ctx.user.id, "grant_match", "Grant application generation"); } catch { /* ignore */ }
+    const _cr3 = await consumeCredits(ctx.user.id, "grant_match", "Grant application generation");
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     const company = await db.getCompanyById(input.companyId);
     if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Company not found" });
     const userApiKey = await getUserOpenAIKey(ctx.user.id) || undefined;
@@ -738,7 +741,8 @@ Be realistic — most first-time applications score 40-65. Strong applications w
     if (regenerated > 0) {
       await db.updateGrantApplication(input.applicationId, updates as any);
       log.info(`[GrantRegen] Regenerated ${regenerated} sections for application ${input.applicationId}`);
-      try { await consumeCredits(ctx.user.id, "grant_match", `Grant sections regenerated: ${regenerated}/9 for application #${input.applicationId}`); } catch { /* ignore */ }
+      const _cr4 = await consumeCredits(ctx.user.id, "grant_match", `Grant sections regenerated: ${regenerated}/9 for application #${input.applicationId}`);
+      if (!_cr4.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     }
 
     return { success: true, regenerated, total: 9 };
@@ -1279,7 +1283,8 @@ Write in first person plural ("we"). Keep it under 800 words. Use markdown forma
       userApiKey,
       messages: [{ role: "user", content: prompt }],
     });
-    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`); } catch { /* ignore */ }
+    const _cr5 = await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding story generated: ${input.title}`);
+      if (!_cr5.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     return { story: String(response.choices[0]?.message?.content || "") };
   }),
 
@@ -1308,7 +1313,8 @@ Example: [{"title":"Early Bird","description":"Get early access","minAmount":25,
       messages: [{ role: "user", content: prompt }],
     });
     const content = String(response.choices[0]?.message?.content || "[]");
-    try { await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding reward tiers suggested: ${input.title}`); } catch { /* ignore */ }
+    const _cr6 = await consumeCredits(ctx.user.id, "grant_match", `Crowdfunding reward tiers suggested: ${input.title}`);
+      if (!_cr6.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
     try {
       const jsonMatch = content.match(/\[\s\S\]*\]/);
       return { rewards: jsonMatch ? JSON.parse(jsonMatch[0]) : [] };

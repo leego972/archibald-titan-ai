@@ -455,7 +455,8 @@ export const astraRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
       const ssh = await getSshConfig(ctx.user.id);
-      try { await consumeCredits(ctx.user.id, "astra_scan", `Fuzzer: ${input.targetUrl}`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "astra_scan", `Fuzzer: ${input.targetUrl}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const cmd = `gobuster dir -u '${input.targetUrl}' -w '${input.wordlist}' -x '${input.extensions}' -t ${input.threads} --no-error 2>&1 | head -200`;
       const output = await execSSHCommand(ssh, cmd, 120000);
       return { success: true, output, target: input.targetUrl };
@@ -473,7 +474,8 @@ export const astraRouter = router({
       const plan = await getUserPlan(ctx.user.id);
       enforceFeature(plan.planId, "security_tools", "Astra");
       const ssh = await getSshConfig(ctx.user.id);
-      try { await consumeCredits(ctx.user.id, "astra_scan", `Wfuzz: ${input.targetUrl}`); } catch { /* ignore */ }
+      const _cr2 = await consumeCredits(ctx.user.id, "astra_scan", `Wfuzz: ${input.targetUrl}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const cmd = `wfuzz -c -w '${input.wordlist}' --hc ${input.filterCode} -t ${input.threads} '${input.targetUrl}/FUZZ' 2>&1 | head -200`;
       const output = await execSSHCommand(ssh, cmd, 120000);
       return { success: true, output, target: input.targetUrl };

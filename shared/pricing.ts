@@ -441,6 +441,7 @@ export const CREDIT_COSTS = {
   vpn_chain_config: 150,
 
   // Isolated Browser
+  isolated_browser: 1,          // per-minute; rate determined dynamically per plan tier
   isolated_browser_session: 200,
 
   // Site Monitor

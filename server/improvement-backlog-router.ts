@@ -533,7 +533,8 @@ ${task.description}`,
       }
 
       log.info(`[analyzeTask] Analysis complete for task #${task.id}. canAutoApply=${analysis.canAutoApply}`);
-      try { await consumeCredits(ctx.user.id, "advertising_run", `Self-improvement task analysis: #${task.id} ${task.title}`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "advertising_run", `Self-improvement task analysis: #${task.id} ${task.title}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return { taskId: task.id, title: task.title, ...analysis };
     }),
 
@@ -771,7 +772,8 @@ Generate the code changes needed to implement this task. Read any relevant exist
         }).where(eq(improvementTasks.id, task.id));
 
         log.info(`[executeTask] Task #${task.id} completed successfully. Pushed=${pushed}`);
-        try { await consumeCredits(ctx.user.id, "marketing_run", `Self-improvement task executed: #${task.id} ${task.title}`); } catch { /* ignore */ }
+        const _cr2 = await consumeCredits(ctx.user.id, "marketing_run", `Self-improvement task executed: #${task.id} ${task.title}`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
 
         return {
           success: true,

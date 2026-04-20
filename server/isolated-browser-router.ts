@@ -646,7 +646,7 @@ export const isolatedBrowserRouter = router({
         const result = await consumeCreditsAmount(
           user.id,
           creditsToBill,
-          "isolated_browser" as any,
+          "isolated_browser",
           `Titan Isolated Browser — ${fullMinutesToBill} min @ ${session.creditsPerMinute} credits/min`
         );
 

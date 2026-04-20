@@ -84,7 +84,8 @@ export const voiceRouter = router({
           });
         }
         // Deduct credits for voice transcription
-      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "voice_action", "Voice transcription");
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return { text: result.text, language: result.language, duration: result.duration };
       }
 
@@ -102,7 +103,8 @@ export const voiceRouter = router({
         if ("error" in dataResult) {
           throw new TRPCError({ code: "BAD_REQUEST", message: dataResult.error });
         }
-        try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
+        const _cr2 = await consumeCredits(ctx.user.id, "voice_action", "Voice transcription");
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
         return { text: dataResult.text, language: dataResult.language, duration: dataResult.duration };
       }
 
@@ -122,7 +124,8 @@ export const voiceRouter = router({
       }
 
       // Deduct credits for voice transcription
-      try { await consumeCredits(ctx.user.id, "voice_action", "Voice transcription"); } catch { /* ignore */ }
+      const _cr3 = await consumeCredits(ctx.user.id, "voice_action", "Voice transcription");
+      if (!_cr3.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       return {
         text: result.text,
         language: result.language,

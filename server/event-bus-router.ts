@@ -231,7 +231,8 @@ export const eventBusRouter = router({
       };
       ruleStore.set(id, rule);
       if (!isAdmin) {
-        try { await consumeCredits(ctx.user.id as number, "event_bus_rule", `Event bus rule: ${input.name}`); } catch { /* ignore */ }
+        const _cr1 = await consumeCredits(ctx.user.id as number, "event_bus_rule", `Event bus rule: ${input.name}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       }
       return { success: true, rule };
     }),

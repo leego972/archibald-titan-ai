@@ -132,7 +132,8 @@ export const fetcherRouter = router({
 
       // Deduct 1 credit per provider being fetched
       for (const _p of providerCheck.valid) {
-        try { await consumeCredits(ctx.user.id, "fetch_action", `Credential fetch: ${_p}`); } catch { /* ignore */ }
+        const _cr1 = await consumeCredits(ctx.user.id, "fetch_action", `Credential fetch: ${_p}`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       }
 
       // Start the real browser automation asynchronously

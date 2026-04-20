@@ -220,7 +220,8 @@ export const proxyMakerRouter = router({
       node.status = "deploying";
       await saveNodes(ctx.user.id, nodes);
       // Intense (300) — full VPS provisioning + 3proxy install + config via SSH
-      try { await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node "${node.label}"`); } catch { /* ignore */ }
+      const _cr1 = await consumeCredits(ctx.user.id, "vpn_generate", `Proxy Maker: deploy node "${node.label}"`);
+      if (!_cr1.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       try {
         const output = await execSSHCommand(nodeToSSH(node), INSTALL_3PROXY, 180000, ctx.user.id);
         if (!output.includes("PROXY_OK")) {
@@ -392,7 +393,8 @@ export const proxyMakerRouter = router({
       if (!node) throw new TRPCError({ code: "NOT_FOUND", message: "Node not found." });
       if (!node.publicIp) return { success: false, message: "Deploy node first." };
       // Medium (75) — lightweight SSH curl test through existing proxy
-      try { await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Proxy Maker: test proxy "${node.label}"`); } catch { /* ignore */ }
+      const _cr2 = await consumeCreditsAmount(ctx.user.id, 75, "vpn_generate", `Proxy Maker: test proxy "${node.label}"`);
+      if (!_cr2.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits. Purchase more credits or upgrade your plan." });
       const script = `curl -s --max-time 10 --socks5 127.0.0.1:1080 "${input.testUrl}" 2>&1 || echo PROXY_TEST_FAILED`;
       try {
         const output = await execSSHCommand(nodeToSSH(node), script, 20000, ctx.user.id);
