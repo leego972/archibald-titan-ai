@@ -245,8 +245,6 @@ export default function SecurityPage() {
           </div>
         </div>
       </section>
-
-      {/* FOOTER */}
     </MarketingLayout>
     </MarketingLayout>
   );
