@@ -659,30 +659,46 @@ export async function processDailyLoginBonus(userId: number): Promise<{ awarded:
     return { awarded: false, amount: 0, monthlyTotal };
   }
 
-  // Award the bonus
-  const newMonthlyTotal = monthlyTotal + awardAmount;
+  // Award the bonus — atomic conditional UPDATE prevents double-grant on concurrent calls.
+    // The WHERE DATE() check means only one concurrent UPDATE will succeed (affectedRows=1).
+    const newMonthlyTotal = monthlyTotal + awardAmount;
 
-  await db
-    .update(creditBalances)
-    .set({
-      lastLoginBonusAt: now,
-      loginBonusThisMonth: newMonthlyTotal,
-    })
-    .where(eq(creditBalances.userId, userId));
+    const updateResult = await db
+      .update(creditBalances)
+      .set({ lastLoginBonusAt: now, loginBonusThisMonth: newMonthlyTotal })
+      .where(
+        and(
+          eq(creditBalances.userId, userId),
+          sql`(DATE(${creditBalances.lastLoginBonusAt}) < CURDATE() OR ${creditBalances.lastLoginBonusAt} IS NULL)`
+        )
+      );
 
-  const result = await addCredits(
-    userId,
-    awardAmount,
-    "daily_login_bonus",
-    `Daily login bonus: +${awardAmount} credits (${newMonthlyTotal}/${MONTHLY_LOGIN_BONUS_CAP} this month)`
-  );
+    // If affectedRows = 0, another concurrent request already claimed today's bonus — bail out
+    const affected = (updateResult as any)?.[0]?.affectedRows ?? (updateResult as any)?.affectedRows ?? 1;
+    if (affected === 0) {
+      return { awarded: false, amount: 0, monthlyTotal };
+    }
 
-  if (result.success) {
-    return { awarded: true, amount: awardAmount, monthlyTotal: newMonthlyTotal };
+    const result = await addCredits(
+      userId,
+      awardAmount,
+      "daily_login_bonus",
+      `Daily login bonus: +${awardAmount} credits (${newMonthlyTotal}/${MONTHLY_LOGIN_BONUS_CAP} this month)`
+    );
+
+    if (result.success) {
+      return { awarded: true, amount: awardAmount, monthlyTotal: newMonthlyTotal };
+    }
+
+    // addCredits failed — restore the login bonus state so user can retry tomorrow
+    await db
+      .update(creditBalances)
+      .set({ lastLoginBonusAt: bal[0].lastLoginBonusAt, loginBonusThisMonth: monthlyTotal })
+      .where(eq(creditBalances.userId, userId))
+      .catch(() => {});
+
+    return { awarded: false, amount: 0, monthlyTotal };
   }
-
-  return { awarded: false, amount: 0, monthlyTotal };
-}
 
 // ─── Get Transaction History ───────────────────────────────────────
 
