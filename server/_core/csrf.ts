@@ -136,7 +136,9 @@ export function csrfValidationMiddleware(req: Request, res: Response, next: Next
   const headerToken = req.headers[CSRF_HEADER] as string | undefined;
 
   // Both must be present and match
-  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+  if (!cookieToken || !headerToken ||
+      Buffer.byteLength(cookieToken) !== Buffer.byteLength(headerToken) ||
+      !timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
     log.warn("CSRF validation failed", {
       path: req.path,
       hasCookie: !!cookieToken,
