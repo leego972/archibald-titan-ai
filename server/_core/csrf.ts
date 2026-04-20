@@ -18,7 +18,7 @@
  * - GET/HEAD/OPTIONS requests — safe methods
  */
 
-import { randomBytes } from "crypto";
+import { randomBytes, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { createLogger } from "./logger.js";
 
