@@ -913,6 +913,41 @@ export function registerStripeWebhook(app: Express) {
               }
               break;
             }
+              case "charge.dispute.created": {
+                // Chargeback filed — immediately log and mark subscription past_due.
+                // This is critical: fraudulent dispute attempts should not enjoy active service.
+                const dispute = event.data.object as Stripe.Dispute;
+                const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge?.id;
+                log.warn(`[Stripe Webhook] Chargeback filed: dispute=${dispute.id}, charge=${chargeId}, amount=${dispute.amount}, reason=${dispute.reason}`);
+                // Locate the subscription via the charge's customer
+                const customerId = typeof dispute.payment_intent === "string" ? null : null;
+                // Best-effort: look up by charge and suspend the subscription
+                try {
+                  const charge = chargeId ? await stripe.charges.retrieve(chargeId) : null;
+                  if (charge?.customer) {
+                    const custId = typeof charge.customer === "string" ? charge.customer : charge.customer.id;
+                    await db.update(subscriptions).set({ status: "past_due" }).where(eq(subscriptions.stripeCustomerId, custId));
+                    log.warn(`[Stripe Webhook] Subscription suspended due to chargeback: customer=${custId}`);
+                  }
+                } catch (e) {
+                  log.error(`[Stripe Webhook] Failed to suspend subscription for dispute ${dispute.id}: ${getErrorMessage(e)}`);
+                }
+                break;
+              }
+              case "charge.refunded": {
+                // A charge was refunded (partial or full). Log it — credit reversal is handled
+                // by Stripe's invoice system and subscription cancellation if needed.
+                const charge = event.data.object as Stripe.Charge;
+                log.info(`[Stripe Webhook] Charge refunded: charge=${charge.id}, amount_refunded=${charge.amount_refunded}, customer=${charge.customer}`);
+                break;
+              }
+              case "invoice.upcoming": {
+                // Upcoming invoice (sent 3-7 days before renewal). Log for future email notification.
+                const upcomingInvoice = event.data.object as Stripe.Invoice;
+                log.info(`[Stripe Webhook] Upcoming invoice: customer=${upcomingInvoice.customer}, amount=${upcomingInvoice.amount_due}, due=${upcomingInvoice.next_payment_attempt}`);
+                // TODO: sendUpcomingRenewalEmail(upcomingInvoice.customer)
+                break;
+              }
             default:
               log.info(`[Stripe Webhook] Unhandled event type: ${event.type}`);
           }

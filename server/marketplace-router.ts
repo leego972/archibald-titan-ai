@@ -208,27 +208,46 @@ export const marketplaceRouter = router({
       if (input.payWithCredits) {
         // Pay with credits
         const balance = await getCreditBalance(ctx.user.id);
-        if (balance.credits < SELLER_ANNUAL_FEE_CREDITS && !balance.isUnlimited) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: `Seller registration costs ${SELLER_ANNUAL_FEE_CREDITS} credits ($12/year). You have ${balance.credits} credits.` });
-        }
-        if (!balance.isUnlimited) {
-          const dbInstance = await getDb();
-          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-          const { creditBalances, creditTransactions } = await import("../drizzle/schema");
-          const { eq, sql: sqlOp } = await import("drizzle-orm");
-          await dbInstance.update(creditBalances).set({
-            credits: sqlOp`${creditBalances.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
-            lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`,
-          }).where(eq(creditBalances.userId, ctx.user.id));
-          const updatedBal = await dbInstance.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
-          await dbInstance.insert(creditTransactions).values({
-            userId: ctx.user.id,
-            amount: -SELLER_ANNUAL_FEE_CREDITS,
-            type: "marketplace_seller_fee",
-            description: `Bazaar Seller Registration — $12/year annual fee`,
-            balanceAfter: updatedBal[0]?.credits ?? 0,
-          });
-        }
+          // Quick pre-check (non-blocking) — main enforcement happens inside the transaction
+          if (balance.credits < SELLER_ANNUAL_FEE_CREDITS && !balance.isUnlimited) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `Seller registration costs ${SELLER_ANNUAL_FEE_CREDITS} credits ($12/year). You have ${balance.credits} credits.` });
+          }
+          if (!balance.isUnlimited) {
+            const dbInstance = await getDb();
+            if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+            const { creditBalances, creditTransactions } = await import("../drizzle/schema");
+            const { eq, sql: sqlOp } = await import("drizzle-orm");
+            // ── RACE CONDITION GUARD: Wrap in DB transaction with SELECT FOR UPDATE ──
+            const txResult = await dbInstance.transaction(async (tx) => {
+              // Lock the balance row to prevent concurrent becomeSeller calls
+              const lockedBal = await tx
+                .select({ credits: creditBalances.credits, isUnlimited: creditBalances.isUnlimited })
+                .from(creditBalances)
+                .where(eq(creditBalances.userId, ctx.user.id))
+                .for("update")
+                .limit(1);
+              if (lockedBal.length === 0 || lockedBal[0].isUnlimited) return { skipped: true };
+              if (lockedBal[0].credits < SELLER_ANNUAL_FEE_CREDITS) {
+                return { insufficient: true, credits: lockedBal[0].credits };
+              }
+              await tx.update(creditBalances).set({
+                credits: sqlOp`${creditBalances.credits} - ${SELLER_ANNUAL_FEE_CREDITS}`,
+                lifetimeCreditsUsed: sqlOp`${creditBalances.lifetimeCreditsUsed} + ${SELLER_ANNUAL_FEE_CREDITS}`,
+              }).where(eq(creditBalances.userId, ctx.user.id));
+              const updatedBal = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+              await tx.insert(creditTransactions).values({
+                userId: ctx.user.id,
+                amount: -SELLER_ANNUAL_FEE_CREDITS,
+                type: "marketplace_seller_fee",
+                description: `Bazaar Seller Registration — $12/year annual fee`,
+                balanceAfter: updatedBal[0]?.credits ?? 0,
+              });
+              return { success: true };
+            });
+            if (txResult.insufficient) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: `Seller registration costs ${SELLER_ANNUAL_FEE_CREDITS} credits ($12/year). You have ${txResult.credits} credits.` });
+            }
+          }
       }
       // Stripe payment path — redirect to Stripe Checkout for seller registration
       if (!input.payWithCredits) {

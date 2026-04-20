@@ -443,7 +443,7 @@ export async function consumeCreditsAmount(
 export async function addCredits(
   userId: number,
   amount: number,
-  type: "monthly_refill" | "pack_purchase" | "admin_adjustment" | "referral_bonus" | "signup_bonus" | "daily_login_bonus",
+  type: "monthly_refill" | "pack_purchase" | "admin_adjustment" | "referral_bonus" | "signup_bonus" | "daily_login_bonus" | "marketplace_sale" | "marketplace_refund" | "marketplace_purchase" | "marketplace_seller_fee" | "marketplace_seller_renewal" | "marketplace_boost" | "marketplace_verification",
   description: string,
   stripePaymentIntentId?: string
 ): Promise<{ success: boolean; balanceAfter: number }> {
