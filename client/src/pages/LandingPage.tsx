@@ -1,10 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-  import { Button } from "@/components/ui/button";
-  import { getRegisterUrl } from "@/const";
-  import { useState, useEffect } from "react";
-  import { useLocation } from "wouter";
-  import MarketingLayout from "@/components/MarketingLayout";
-  import {
+import { Button } from "@/components/ui/button";
+import { getRegisterUrl } from "@/const";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import MarketingLayout from "@/components/MarketingLayout";
+import {
     Shield, ChevronDown, ArrowRight, Check,
     ShieldCheck, Server, Cpu, Activity,
     Database, Workflow, Globe2,
@@ -16,7 +16,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
     BrainCircuit, Satellite, ScanLine, Bug,
     Settings2, GitBranch, Braces, Wifi,
     AlertTriangle, CheckCircle2, TrendingUp,
-  } from "lucide-react";
+} from "lucide-react";
 
   function FAQItem({ question, answer }: { question: string; answer: string }) {
     const [open, setOpen] = useState(false);
