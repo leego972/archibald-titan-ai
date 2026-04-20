@@ -205,8 +205,7 @@ export const binCheckerRouter = router({
 
       // Deduct credits after successful lookup
       const _cr1 = await consumeCredits(ctx.user.id, "bin_lookup", `BIN lookup: ${bin.slice(0, 6)}`);
-      if (!_cr1.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id }););
-      }
+      if (!_cr1.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id });
 
       // Build unified response from local DB or API data
       const bankName = localRow?.issuer ?? apiData?.bank?.name ?? null;
@@ -344,8 +343,7 @@ export const binCheckerRouter = router({
 
       // Consume credits after successful search
       const _cr2 = await consumeCredits(ctx.user.id, "bin_lookup", `Reverse BIN search: ${input.query}`);
-      if (!_cr2.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id }););
-      }
+      if (!_cr2.success) log.warn("[Credits] Deduction failed (user may have run out):", { userId: ctx.user.id });
 
       return {
         success: true,
