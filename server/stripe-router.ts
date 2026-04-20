@@ -888,9 +888,34 @@ export function registerStripeWebhook(app: Express) {
             await handleInvoicePaymentFailed(invoice);
             break;
           }
-          default:
-            log.info(`[Stripe Webhook] Unhandled event type: ${event.type}`);
-        }
+          case "invoice.payment_action_required": {
+              // 3DS / SCA authentication required on subscription renewal.
+              // Treat like payment_failed: mark subscription past_due and email the customer.
+              const invoice = event.data.object as Stripe.Invoice;
+              await handleInvoicePaymentFailed(invoice);
+              break;
+            }
+            case "customer.subscription.trial_will_end": {
+              // Trial ends in ≤3 days — log now; sendTrialEndingEmail is a TODO once
+              // the email template is designed in email-service.ts.
+              const subscription = event.data.object as Stripe.Subscription;
+              const subRec = await db
+                .select({ userId: subscriptions.userId, plan: subscriptions.plan })
+                .from(subscriptions)
+                .where(eq(subscriptions.stripeSubscriptionId, subscription.id))
+                .limit(1);
+              if (subRec.length > 0) {
+                const trialEndTs = (subscription as any).trial_end as number | null;
+                const daysLeft = trialEndTs
+                  ? Math.max(0, Math.ceil((trialEndTs * 1000 - Date.now()) / 86_400_000))
+                  : 0;
+                log.info(`[Stripe Webhook] Trial ending in ${daysLeft}d: user=${subRec[0].userId}, plan=${subRec[0].plan}`);
+              }
+              break;
+            }
+            default:
+              log.info(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+          }
       } catch (err: unknown) {
         log.error(`[Stripe Webhook] Error processing ${event.type}:`, { error: String(getErrorMessage(err)) });
       }
@@ -1664,6 +1689,17 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         typeof (invoice as any).payment_intent === "string" ? (invoice as any).payment_intent : (invoice as any).payment_intent?.id
       );
       log.info(`[Stripe Webhook] Auto-renewal refill: user=${userId}, plan=${planId}, credits=+${allocation}`);
+
+        // Belt-and-suspenders: if subscription was past_due (e.g. payment retry succeeded),
+        // immediately mark it active here — customer.subscription.updated will also fire,
+        // but there can be a race window where the user sees stale status.
+        await db
+          .update(subscriptions)
+          .set({ status: "active" })
+          .where(and(
+            eq(subscriptions.stripeSubscriptionId, subId),
+            ne(subscriptions.status, "active")
+          ));
     }
 
     // ── Reset escalation funnel state for the new billing cycle ──────────

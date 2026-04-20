@@ -9,7 +9,7 @@
 import { eq, sql, desc } from "drizzle-orm";
 import { log } from "./_core/logger";
 import { getDb } from "./db";
-import { creditBalances, creditTransactions, users } from "../drizzle/schema";
+import { creditBalances, creditTransactions, users, subscriptions } from "../drizzle/schema";
 import {
   PRICING_TIERS, INTERNAL_TIERS, CREDIT_COSTS,
   DAILY_FREE_CREDITS_PLAN,
@@ -361,15 +361,40 @@ export async function consumeCreditsAmount(
   await ensureBalance(userId);
 
   const validTxTypes = new Set([
+    // Core AI
     "chat_message", "builder_action", "voice_action", "image_generation", "video_generation",
+    // Fetch & integrations
     "fetch_action", "github_action", "import_action", "clone_action", "replicate_action",
-    "seo_run", "blog_generate", "content_generate", "marketing_run", "advertising_run",
+    // SEO & Content
+    "seo_run", "blog_generate", "content_generate",
+    "content_campaign_create", "content_bulk_generate", "content_seo_brief",
+    "marketing_run", "advertising_run",
+    // Security tools
     "security_scan", "metasploit_action", "evilginx_action", "blackeye_action",
+    "astra_scan", "exploit_exec", "exploit_cve_search",
+    "cybermcp_scan", "red_team_run", "compliance_report",
+    "siem_config", "siem_test", "event_bus_rule", "security_module_install",
+    // Grants & business
     "grant_match", "grant_apply", "business_plan_generate",
-    "marketplace_list", "marketplace_feature",
-    "site_monitor_add", "sandbox_run",
+    // Marketplace
+    "marketplace_list", "marketplace_feature", "marketplace_ai_describe", "marketplace_ai_price",
+    // Site monitor & sandbox
+    "site_monitor_add", "site_monitor_check", "sandbox_run",
+    // Affiliate, API, VPN
     "affiliate_action", "api_call", "vpn_generate",
-    "isolated_browser",
+    "vpn_chain_build", "vpn_chain_config",
+    // Proxy & IP routing
+    "proxy_test", "proxy_test_all", "proxy_scrape", "proxy_add", "ip_rotation_circuit",
+    // Isolated browser & anonymity
+    "isolated_browser", "isolated_browser_session",
+    "tor_new_circuit", "tor_run_command",
+    "linken_session_start", "linken_quick_create",
+    // BIN checker
+    "bin_lookup", "bin_bulk_lookup", "bin_reverse_search", "card_live_check",
+    // Web agent
+    "web_agent_task",
+    // Credential & auth tools
+    "credential_breach_check", "totp_code_generate",
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txType = (validTxTypes.has(action) ? action : "chat_message") as any;
@@ -510,6 +535,22 @@ export async function processMonthlyRefill(userId: number): Promise<boolean> {
     .limit(1);
 
   if (bal.length === 0 || bal[0].isUnlimited) return false;
+
+  // ── Subscription status guard ─────────────────────────────────────────────
+  // Free-tier users have no subscription record → always eligible for 500/mo refill.
+  // Paid subscribers who are past_due, canceled, unpaid, or incomplete are NOT
+  // refilled until their payment is resolved (Stripe will send subscription.updated
+  // with status "active" when payment recovers, which restores their full access).
+  const subRecord = await db
+    .select({ status: subscriptions.status })
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .limit(1);
+
+  if (subRecord.length > 0 && !["active", "trialing"].includes(subRecord[0].status)) {
+    log.info(`[Credits] Skipping monthly refill for user=${userId}: subscription status is "${subRecord[0].status}"`);
+    return false;
+  }
 
   // Check if already refilled this month
   const now = new Date();
