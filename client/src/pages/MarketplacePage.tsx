@@ -323,7 +323,7 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {(trending as any[]).map((item: any) => (
-                <button key={item.id} onClick={() => onSelectListing(item.id)}
+                <button key={item.listingId} onClick={() => onSelectListing(item.listingId)}
                   className="text-left p-3 rounded-lg border border-amber-600/30 bg-amber-950/10 hover:border-amber-500/50 hover:bg-amber-950/20 transition-all group">
                   <div className="text-xs font-medium truncate group-hover:text-amber-400 transition-colors">{item.title}</div>
                   <div className="text-[10px] text-muted-foreground mt-1">{item.priceCredits} cr</div>
@@ -346,7 +346,7 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {(recommendations as any[]).map((item: any) => (
-                <button key={item.id} onClick={() => onSelectListing(item.id)}
+                <button key={item.listingId} onClick={() => onSelectListing(item.listingId)}
                   className="text-left p-3 rounded-lg border border-purple-600/30 bg-purple-950/10 hover:border-purple-500/50 hover:bg-purple-950/20 transition-all group">
                   <div className="text-xs font-medium truncate group-hover:text-purple-400 transition-colors">{item.title}</div>
                   <div className="text-[10px] text-muted-foreground mt-1">{item.priceCredits} cr</div>
