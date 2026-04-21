@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY patches/ ./patches/
 # Install all dependencies (including devDependencies for build)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # ─── Stage 2: Build ─────────────────────────────────────────────────
 FROM node:22-slim AS build
@@ -133,7 +133,7 @@ RUN pip3 install --break-system-packages --no-cache-dir \
 # Copy package manifests, npmrc, patches, and install production-only dependencies
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
 # Install Playwright Chromium browser
 RUN npx playwright install chromium
