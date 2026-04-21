@@ -1,16 +1,16 @@
 # Railway nixpacks configuration
-  # Pins Node.js 22 because Vite 7 requires Node >= 20 and nixpacks defaults to Node 18
+    # Pins Node.js 22 because Vite 7 requires Node >= 20 and nixpacks defaults to Node 18
 
-  [phases.setup]
-  nixPkgs = ["nodejs_22"]
+    [phases.setup]
+    nixPkgs = ["nodejs_22"]
 
-  [phases.install]
-  cmds = ["npm install -g pnpm@10.4.1 --silent && pnpm install --frozen-lockfile"]
+    [phases.install]
+    cmds = ["npm install -g pnpm@10.4.1 --silent && pnpm install --no-frozen-lockfile"]
 
-  [phases.build]
-  cmds = ["NODE_ENV=production pnpm build"]
-  dependsOn = ["install"]
+    [phases.build]
+    cmds = ["NODE_ENV=production pnpm build"]
+    dependsOn = ["install"]
 
-  [start]
-  cmd = "node dist/index.js"
-  
+    [start]
+    cmd = "node dist/index.js"
+    
