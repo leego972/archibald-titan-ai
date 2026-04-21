@@ -308,6 +308,8 @@ export async function getPersonalizedRecommendations(
 
       return {
         listingId: c.id,
+        title: c.title,
+        priceCredits: c.priceCredits,
         score,
         reason: preferredCategories.includes(c.category)
           ? `Matches your interest in ${c.category}`
@@ -382,6 +384,7 @@ export async function getTrendingListings(
         listingId: l.id,
         title: l.title,
         category: l.category,
+        priceCredits: l.priceCredits,
         trendScore,
         viewVelocity: Math.round(viewVelocity * 10) / 10,
         salesVelocity: Math.round(salesVelocity * 100) / 100,
