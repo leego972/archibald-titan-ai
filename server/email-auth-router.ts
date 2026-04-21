@@ -405,9 +405,6 @@ export function registerEmailAuthRoutes(app: Express) {
       return res.json({
         success: true,
         message: "If an account with that email exists, a password reset link has been sent.",
-        // Include resetUrl in response for development/testing
-        // In production with real email, remove this
-        resetUrl,
       });
     } catch (error: unknown) {
       log.error("[Password Reset] Request failed:", { error: String(error) });
