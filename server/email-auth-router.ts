@@ -400,7 +400,7 @@ export function registerEmailAuthRoutes(app: Express) {
         log.warn("[Password Reset] Failed to send email");
       });
 
-      log.info(`[Password Reset] Token generated for ${user.email}: ${resetUrl}`);
+      log.info(`[Password Reset] Token generated and sent for user ID ${user.id}`);
 
       return res.json({
         success: true,
