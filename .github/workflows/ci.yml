@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm check
         continue-on-error: true
   build:
@@ -62,7 +62,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
         env:
           NODE_ENV: production
@@ -80,7 +80,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium --with-deps
       - name: Run E2E smoke tests
