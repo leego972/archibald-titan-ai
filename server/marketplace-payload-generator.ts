@@ -3536,6 +3536,14 @@ function resolvePayloadKey(title: string): string | null {
     if (t.includes("ghosttraffic") || t.includes("ghost traffic") || t.includes("encrypted c2")) return "ghost-traffic";
     if (t.includes("firmwarex") || t.includes("firmware") || t.includes("iot firmware")) return "firmware-x";
     if (t.includes("social media osint") || t.includes("social osint")) return "social-osint";
+    // ── Gap-fill: 7 MODULE_CATALOG titles with specific patterns ──────────────────
+    if (t.includes("packet analyzer") || t.includes("network packet"))    return "network-analyzer";
+    if (t.includes("seo") && (t.includes("keyword") || t.includes("research"))) return "seo-automation";
+    if (t.includes("defi") || (t.includes("arbitrage") && !t.includes("crypto"))) return "crypto-arbitrage";
+    if (t.includes("chatbot") && (t.includes("support") || t.includes("blueprint"))) return "ai-chatbot";
+    if (t.includes("container") && (t.includes("detection") || t.includes("prevention"))) return "docker-scanner";
+    if (t.includes("vaultaudit") || (t.includes("vault") && t.includes("audit"))) return "secure-ci";
+    if (t.includes("supply") && t.includes("chain"))                      return "supply-chain";
     return null;
 }
 
