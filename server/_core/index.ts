@@ -368,8 +368,9 @@ async function startServer() {
       health.llm = 'unknown';
     }
 
-    const statusCode = health.status === 'ok' ? 200 : 503;
-    res.status(statusCode).json(health);
+    // Always return HTTP 200 so Railway health checks pass even in degraded mode.
+    // The JSON body still carries status: 'degraded' for monitoring / alerting.
+    res.status(200).json(health);
   });
   // ── Deep Diagnostic Endpoint ─────────────────────────────────
   // Tests database, LLM API, key pool, and environment config
