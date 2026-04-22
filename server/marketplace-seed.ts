@@ -2303,7 +2303,7 @@ export async function seedMarketplaceWithMerchants(): Promise<{ merchants: numbe
         });
       }
     } catch (e: unknown) {
-      log.warn(`[Marketplace Seed] Failed to create merchant "${bot.name}":`, { error: String(getErrorMessage(e)) });
+      log.warn(`[Marketplace Seed] Failed to create merchant "${bot.name}": ${String(getErrorMessage(e))}`);
     }
   }
 

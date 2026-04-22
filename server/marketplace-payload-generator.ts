@@ -3594,7 +3594,7 @@ export async function generateAndUploadPayload(listingId: number): Promise<strin
       .where(eq(marketplaceListings.id, listingId));
     return storageKey;
   } catch (err) {
-    log.error("[PayloadGen] Upload failed:", { error: err });
+    log.error("[PayloadGen] Upload failed for listing " + listingId + ": " + (err instanceof Error ? err.name + ": " + err.message : String(err)));
     return null;
   }
 }
