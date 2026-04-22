@@ -453,30 +453,31 @@ import { isAdminRole } from "@shared/const";
   }
 
   function NotificationBell() {
-    const [, navigate] = useLocation();
-    const watchdogSummary = trpc.watchdog.summary.useQuery(undefined, {
-      refetchInterval: 60_000,
-      retry: false,
-    });
+      const watchdogSummary = trpc.watchdog.summary.useQuery(undefined, {
+        refetchInterval: 60_000,
+        retry: false,
+      });
 
-    const expiring = watchdogSummary.data?.expiringSoon ?? 0;
-    const expired = watchdogSummary.data?.expired ?? 0;
-    const alertCount = expiring + expired;
+      const expiring = watchdogSummary.data?.expiringSoon ?? 0;
+      const expired = watchdogSummary.data?.expired ?? 0;
+      const alertCount = expiring + expired;
 
-    return (
-      <button
-        onClick={() => navigate("/fetcher/watchdog")}
-        className="relative p-1.5 rounded-lg hover:bg-accent transition-colors"
-        aria-label={alertCount > 0 ? `${alertCount} credential alerts` : "No credential alerts"}
-        title={alertCount > 0 ? `${expired} expired, ${expiring} expiring soon` : "All credentials healthy"}
-      >
-        <Bell className={`h-5 w-5 ${alertCount > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
-        {alertCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {alertCount > 99 ? "99+" : alertCount}
-          </span>
-        )}
-      </button>
-    );
-  }
+      return (
+        <a
+          href="/fetcher/watchdog"
+          role="button"
+          aria-label={alertCount > 0 ? `${alertCount} credential alerts` : "No credential alerts"}
+          title={alertCount > 0 ? `${expired} expired, ${expiring} expiring soon` : "All credentials healthy"}
+          className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent active:bg-accent/80 transition-colors touch-manipulation cursor-pointer select-none"
+          style={{ WebkitTapHighlightColor: "transparent" }}
+        >
+          <Bell className={`h-5 w-5 pointer-events-none ${alertCount > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
+          {alertCount > 0 && (
+            <span className="pointer-events-none absolute top-1.5 right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {alertCount > 99 ? "99+" : alertCount}
+            </span>
+          )}
+        </a>
+      );
+    }
   
