@@ -11,6 +11,7 @@ import { marketplaceListings } from "../drizzle/schema";
 import { eq, isNull } from "drizzle-orm";
 import { storagePut } from "./storage";
 import JSZip from "jszip";
+import { pickCyberTemplate } from "./marketplace-payload-templates";
 
 // ─── Legal Notice (prepended to all offensive tool READMEs) ──────────────────
 const LEGAL = `\n\n---\n## ⚖️ Legal Notice\nThis tool is provided for **authorised security testing, CTF competitions, and educational research only**.\nYou must have explicit written permission from the system owner before testing any target.\nUnauthorised use against systems you do not own or have permission to test is illegal in most jurisdictions.\nThe authors accept no liability for misuse.\n`;
@@ -3579,7 +3580,7 @@ export async function buildPayloadBufferForListing(listingId: number): Promise<{
   const key = resolvePayloadKey(listing.title);
   const files = key && PAYLOADS[key]
     ? PAYLOADS[key]
-    : buildGenericPayload(listing.title, listing.description, listing.language || "Python");
+    : pickCyberTemplate(listing.title, listing.description, listing.language || "Python");
 
   const buffer = await buildZip(files);
   const fileName = `${listing.uid}.zip`;
