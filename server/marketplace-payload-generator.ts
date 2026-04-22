@@ -1473,7 +1473,7 @@ class SEOAnalyzer:
             issues.append({"type": f"Title too long ({len(title)}ch)", "severity": "MEDIUM"}); score -= 5
 
         # Meta description
-        desc_m = re.search(r'<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']', html, re.I)
+        desc_m = re.search(r'<meta[^>]+name=["\\']description["\\'][^>]+content=["\\']([^"\\']*)["\\']', html, re.I)
         desc   = desc_m.group(1) if desc_m else ""
         if not desc:
             issues.append({"type": "Missing meta description", "severity": "HIGH"}); score -= 15
