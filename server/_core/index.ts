@@ -25,6 +25,7 @@ import { startScheduledDiscovery } from "../affiliate-discovery-engine";
 import { startScheduledSignups } from "../affiliate-signup-engine";
 import { runOptimizationCycleV2 } from "../affiliate-engine-v2";
 import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
+import { generateAllMissingPayloads } from "../marketplace-payload-generator";
 import { updateCampaignImages } from "../crowdfunding-aggregator";
 import { updateCampaign, listCampaigns } from "../db";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
@@ -991,6 +992,15 @@ async function startServer() {
           log.info(`Marketplace seeded: ${result.merchants} merchants, ${result.listings} listings`);
         } else {
           log.debug('Marketplace bots already seeded');
+        }
+        // Generate real downloadable payloads for any listing missing fileUrl
+        try {
+          const payloadRes = await generateAllMissingPayloads();
+          if (payloadRes.generated > 0 || payloadRes.failed > 0) {
+            log.info(`Marketplace payloads: ${payloadRes.generated} generated, ${payloadRes.failed} failed`);
+          }
+        } catch (err) {
+          log.error('Marketplace payload generation failed', { error: String(err) });
         }
       } catch (err) {
         log.error('Marketplace bot seed failed', { error: String(err) });

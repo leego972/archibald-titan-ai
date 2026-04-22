@@ -1,9 +1,58 @@
 // Storage helpers — supports AWS S3 and Cloudflare R2 fallback
 import { ENV } from './_core/env';
 
-function isS3Mode(): boolean {
-  return !!process.env.AWS_S3_BUCKET;
-}
+function isS3CompatMode(): boolean {
+    return !!(process.env.S3_BUCKET && process.env.S3_ENDPOINT);
+  }
+
+  function isS3Mode(): boolean {
+    return !!process.env.AWS_S3_BUCKET;
+  }
+
+  async function s3CompatPut(
+    relKey: string,
+    data: Buffer | Uint8Array | string,
+    contentType: string,
+    originalFileName?: string
+  ): Promise<{ key: string; url: string }> {
+    const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const bucket = process.env.S3_BUCKET!;
+    const endpoint = process.env.S3_ENDPOINT!;
+    const region = process.env.S3_REGION || "auto";
+    const client = new S3Client({
+      region,
+      endpoint,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+      },
+    });
+    const key = relKey.replace(/^\/+/, "");
+    const body = typeof data === "string" ? Buffer.from(data) : data;
+    const dispositionName = originalFileName || key.split("/").pop() || "file";
+    await client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ContentDisposition: `attachment; filename="${dispositionName}"`,
+    }));
+    const publicDomain = process.env.S3_PUBLIC_DOMAIN
+      || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN
+      || `pub-${process.env.CLOUDFLARE_ACCOUNT_ID || "50a0dac68f7662315e516bd67d975c70"}.r2.dev`;
+    const url = `https://${publicDomain}/${key}`;
+    return { key, url };
+  }
+
+  async function s3CompatGet(relKey: string): Promise<{ key: string; url: string }> {
+    const key = relKey.replace(/^\/+/, "");
+    const publicDomain = process.env.S3_PUBLIC_DOMAIN
+      || process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN
+      || `pub-${process.env.CLOUDFLARE_ACCOUNT_ID || "50a0dac68f7662315e516bd67d975c70"}.r2.dev`;
+    const url = `https://${publicDomain}/${key}`;
+    return { key, url };
+  }
 
 // ---- AWS S3 Direct Mode ----
 async function s3Put(
@@ -114,6 +163,9 @@ export async function storagePut(
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      if (isS3CompatMode()) {
+        return await s3CompatPut(relKey, data, contentType, originalFileName);
+      }
       if (isS3Mode()) {
         return await s3Put(relKey, data, contentType, originalFileName);
       }
@@ -131,6 +183,9 @@ export async function storagePut(
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+  if (isS3CompatMode()) {
+    return s3CompatGet(relKey);
+  }
   if (isS3Mode()) {
     return s3Get(relKey);
   }

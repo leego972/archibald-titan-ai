@@ -8,7 +8,7 @@
 import { getDb } from "./db";
 import { log } from "./_core/logger.js";
 import { marketplaceListings } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { storagePut } from "./storage";
 import JSZip from "jszip";
 
@@ -3606,7 +3606,7 @@ export async function generateAllMissingPayloads(): Promise<{ generated: number;
   const listings = await db
     .select()
     .from(marketplaceListings)
-    .where(eq(marketplaceListings.fileUrl, null as any));
+    .where(isNull(marketplaceListings.fileUrl));
 
   let generated = 0, failed = 0;
   for (const listing of listings) {
