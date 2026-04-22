@@ -3566,16 +3566,14 @@ function buildGenericPayload(title: string, description: string, language: strin
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
-export async function generateAndUploadPayload(listingId: number): Promise<string | null> {
+export async function buildPayloadBufferForListing(listingId: number): Promise<{ buffer: Buffer; fileName: string } | null> {
   const db = await getDb();
   if (!db) return null;
-
   const [listing] = await db
     .select()
     .from(marketplaceListings)
     .where(eq(marketplaceListings.id, listingId))
     .limit(1);
-
   if (!listing) return null;
 
   const key = resolvePayloadKey(listing.title);
@@ -3583,18 +3581,29 @@ export async function generateAndUploadPayload(listingId: number): Promise<strin
     ? PAYLOADS[key]
     : buildGenericPayload(listing.title, listing.description, listing.language || "Python");
 
-  const zipBuffer = await buildZip(files);
-  const storageKey = `marketplace/payloads/${listing.uid}.zip`;
+  const buffer = await buildZip(files);
+  const fileName = `${listing.uid}.zip`;
+  return { buffer, fileName };
+}
 
+export async function generateAndUploadPayload(listingId: number): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [listing] = await db
+    .select()
+    .from(marketplaceListings)
+    .where(eq(marketplaceListings.id, listingId))
+    .limit(1);
+  if (!listing) return null;
+  const fileUrl = `inline:${listing.uid}.zip`;
   try {
-    await storagePut(storageKey, zipBuffer, "application/zip");
     await db
       .update(marketplaceListings)
-      .set({ fileUrl: storageKey })
+      .set({ fileUrl, fileType: "application/zip" })
       .where(eq(marketplaceListings.id, listingId));
-    return storageKey;
+    return fileUrl;
   } catch (err) {
-    log.error("[PayloadGen] Upload failed for listing " + listingId + ": " + (err instanceof Error ? err.name + ": " + err.message : String(err)));
+    log.error("[PayloadGen] DB update failed for listing " + listingId + ": " + (err instanceof Error ? err.message : String(err)));
     return null;
   }
 }
@@ -3602,12 +3611,10 @@ export async function generateAndUploadPayload(listingId: number): Promise<strin
 export async function generateAllMissingPayloads(): Promise<{ generated: number; failed: number }> {
   const db = await getDb();
   if (!db) return { generated: 0, failed: 0 };
-
   const listings = await db
     .select()
     .from(marketplaceListings)
     .where(isNull(marketplaceListings.fileUrl));
-
   let generated = 0, failed = 0;
   for (const listing of listings) {
     const result = await generateAndUploadPayload(listing.id);

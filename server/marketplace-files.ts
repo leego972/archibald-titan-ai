@@ -283,7 +283,31 @@ export function registerMarketplaceFileRoutes(app: Express) {
       }
 
       if (!listing.fileUrl) {
-        return res.status(404).json({ error: "No file available for this listing yet. The seller has not uploaded the deliverable." });
+          return res.status(404).json({ error: "No file available for this listing yet. The seller has not uploaded the deliverable." });
+        }
+
+        // INLINE MODE: generate zip on demand and stream it back
+        if (listing.fileUrl.startsWith("inline:")) {
+          const { buildPayloadBufferForListing } = await import("./marketplace-payload-generator");
+          const built = await buildPayloadBufferForListing(listing.id);
+          if (!built) {
+            return res.status(500).json({ error: "Failed to build payload" });
+          }
+          const { sql: sqlInc } = await import("drizzle-orm");
+          await database
+            .update(marketplacePurchases)
+            .set({ downloadCount: sqlInc`${marketplacePurchases.downloadCount} + 1` })
+            .where(eq(marketplacePurchases.downloadToken, token));
+          await database
+            .update(marketplaceListings)
+            .set({ downloadCount: sqlInc`${marketplaceListings.downloadCount} + 1` })
+            .where(eq(marketplaceListings.id, purchase.listingId));
+          res.setHeader("Content-Type", "application/zip");
+          res.setHeader("Content-Disposition", `attachment; filename="${built.fileName}"`);
+          res.setHeader("Content-Length", String(built.buffer.length));
+          res.setHeader("Cache-Control", "no-store");
+          return res.end(built.buffer);
+        });
       }
 
       // Increment download count
