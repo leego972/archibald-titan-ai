@@ -797,6 +797,12 @@ export const crowdfundingRouter = router({
     const campaigns = await db.listCampaigns(input || {});
     let filtered = campaigns;
 
+    // Hide stale campaigns by default (status "ended" or "cancelled").
+    // Caller can opt-in by passing an explicit status to see them.
+    if (!input?.status) {
+      filtered = filtered.filter((c: any) => c.status !== "ended" && c.status !== "cancelled");
+    }
+
     // Filter by source platform
     if (input?.source && input.source !== "all") {
       filtered = filtered.filter((c: any) => c.source === input.source);

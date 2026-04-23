@@ -648,20 +648,25 @@ export async function refreshCrowdfundingDaily(
   let removed = 0;
   let markedEnded = 0;
 
+  // Only stale criterion is "endDate has actually passed". Status alone (funded/cancelled)
+  // is NOT a deletion trigger — that prevents perpetual delete/reseed churn for funded
+  // externals (seed data marks several as "funded" with percentFunded > 100).
+  const seedExternalIds = new Set(
+    getAllSeedCampaigns().map((s) => s.externalId).filter(Boolean)
+  );
+
   for (const c of all as any[]) {
     const end = c.endDate ? new Date(c.endDate) : null;
     const isPastEnd = end ? end.getTime() < now.getTime() : false;
-    const isExpiredByDays = typeof c.daysLeft === "number" && c.daysLeft <= 0;
-    const isStaleStatus = c.status === "ended" || c.status === "funded" || c.status === "cancelled";
-    const isStale = isPastEnd || isExpiredByDays || isStaleStatus;
 
-    if (!isStale) {
-      // Active — refresh derived fields (daysLeft, percentFunded) so they stay current.
+    if (!isPastEnd) {
+      // Active — refresh derived fields. Note: percentFunded is NOT capped at 100,
+      // so funded campaigns can correctly display values like 922% / 4190%.
       try {
         const ms = end ? Math.max(0, end.getTime() - now.getTime()) : null;
         const newDaysLeft = ms !== null ? Math.ceil(ms / (24 * 60 * 60 * 1000)) : null;
         const newPercent = c.goalAmount && c.goalAmount > 0
-          ? Math.min(100, Math.floor(((c.currentAmount || 0) / c.goalAmount) * 100))
+          ? Math.floor(((c.currentAmount || 0) / c.goalAmount) * 100)
           : 0;
         if (newDaysLeft !== c.daysLeft || newPercent !== c.percentFunded) {
           await updateCampaign(c.id, { daysLeft: newDaysLeft, percentFunded: newPercent });
@@ -670,17 +675,22 @@ export async function refreshCrowdfundingDaily(
       continue;
     }
 
-    // Stale: external campaigns get hard-deleted (re-seeded fresh below if still present in source).
-    // Internal campaigns are preserved but marked "ended" so the user can review their history.
+    // Past endDate. Default action: soft-archive (status="ended") so the row is
+    // preserved (rewards/contributions/comments stay intact) but the listing UI
+    // can hide it. Only hard-delete EXTERNAL campaigns that are also no longer
+    // present in the seed feed (truly orphaned) AND have no associated user data.
     const isInternal = !c.source || c.source === "internal";
-    if (isInternal) {
-      if (c.status !== "ended") {
-        try { await updateCampaign(c.id, { status: "ended", daysLeft: 0 }); markedEnded++; }
-        catch { /* non-critical */ }
-      }
-    } else {
+    const isOrphanedExternal = !isInternal &&
+      c.externalId &&
+      !seedExternalIds.has(c.externalId);
+
+    if (isOrphanedExternal && c.status === "ended") {
+      // Already archived once AND removed from upstream feed → safe to fully clean up.
       try { await deleteCampaign(c.id); removed++; }
       catch (err) { log.error("[Crowdfunding Refresh] Delete failed", { id: c.id, error: String(err) }); }
+    } else if (c.status !== "ended") {
+      try { await updateCampaign(c.id, { status: "ended", daysLeft: 0 }); markedEnded++; }
+      catch { /* non-critical */ }
     }
   }
 
