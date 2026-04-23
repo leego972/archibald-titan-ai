@@ -26,8 +26,8 @@ import { startScheduledSignups } from "../affiliate-signup-engine";
 import { runOptimizationCycleV2 } from "../affiliate-engine-v2";
 import { seedMarketplaceWithMerchants as seedMarketplace } from "../marketplace-seed";
 import { generateAllMissingPayloads } from "../marketplace-payload-generator";
-import { updateCampaignImages } from "../crowdfunding-aggregator";
-import { updateCampaign, listCampaigns } from "../db";
+import { updateCampaignImages, refreshCrowdfundingDaily } from "../crowdfunding-aggregator";
+import { updateCampaign, listCampaigns, createCampaign, deleteCampaign } from "../db";
 import { startAdvertisingScheduler } from "../advertising-orchestrator";
 import { startMasterOrchestrator } from "../master-growth-orchestrator";
 import { startModuleGeneratorScheduler } from "../module-generator-engine";
@@ -1163,6 +1163,29 @@ async function startServer() {
         log.error('[CrowdfundingImages] Image update failed', { error: String(err) });
       }
     }, 14000);
+
+    // ─── Crowdfunding Daily Refresh ────────────────────────────────
+    // Removes stale external campaigns (past endDate / daysLeft<=0 /
+    // status ended/funded/cancelled), re-seeds fresh ones from the
+    // aggregator, and updates daysLeft + percentFunded on active
+    // campaigns. Internal campaigns are preserved (marked "ended"
+    // instead of deleted) so users keep their history.
+    setTimeout(async () => {
+      try {
+        const r = await refreshCrowdfundingDaily(listCampaigns, createCampaign, updateCampaign, deleteCampaign);
+        log.info('[CrowdfundingRefresh] First run complete', r);
+      } catch (err) {
+        log.error('[CrowdfundingRefresh] First run failed', { error: String(err) });
+      }
+    }, 30000); // 30s after boot
+    setInterval(async () => {
+      try {
+        const r = await refreshCrowdfundingDaily(listCampaigns, createCampaign, updateCampaign, deleteCampaign);
+        log.info('[CrowdfundingRefresh] Daily run complete', r);
+      } catch (err) {
+        log.error('[CrowdfundingRefresh] Daily run failed', { error: String(err) });
+      }
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
 
     // ─── Autonomous Affiliate Signup Engine ───────────────────────
     // Runs weekly: auto-signs up for discovered affiliate programs,

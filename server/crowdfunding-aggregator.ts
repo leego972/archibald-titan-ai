@@ -626,3 +626,77 @@ export function getSourceStats(campaigns: any[]): {
     totalBackers: campaigns.reduce((sum: number, c: any) => sum + (c.backerCount || 0), 0),
   };
 }
+
+/**
+ * Daily refresh — removes stale external campaigns and re-syncs fresh ones.
+ *
+ * Stale = endDate in the past, or daysLeft <= 0, or status in ("ended","funded","cancelled").
+ * Internal campaigns (source === "internal") are NEVER deleted; they are only
+ * marked "ended" if their endDate has passed.
+ *
+ * Returns counts of removed/marked-ended/seeded campaigns.
+ */
+export async function refreshCrowdfundingDaily(
+  listCampaigns: (filters?: any) => Promise<any[]>,
+  createCampaign: (data: any) => Promise<{ id: number }>,
+  updateCampaign: (id: number, data: any) => Promise<void>,
+  deleteCampaign: (id: number) => Promise<void>,
+): Promise<{ removed: number; markedEnded: number; seeded: number; skipped: number; total: number }> {
+  const now = new Date();
+  const all = await listCampaigns();
+
+  let removed = 0;
+  let markedEnded = 0;
+
+  for (const c of all as any[]) {
+    const end = c.endDate ? new Date(c.endDate) : null;
+    const isPastEnd = end ? end.getTime() < now.getTime() : false;
+    const isExpiredByDays = typeof c.daysLeft === "number" && c.daysLeft <= 0;
+    const isStaleStatus = c.status === "ended" || c.status === "funded" || c.status === "cancelled";
+    const isStale = isPastEnd || isExpiredByDays || isStaleStatus;
+
+    if (!isStale) {
+      // Active — refresh derived fields (daysLeft, percentFunded) so they stay current.
+      try {
+        const ms = end ? Math.max(0, end.getTime() - now.getTime()) : null;
+        const newDaysLeft = ms !== null ? Math.ceil(ms / (24 * 60 * 60 * 1000)) : null;
+        const newPercent = c.goalAmount && c.goalAmount > 0
+          ? Math.min(100, Math.floor(((c.currentAmount || 0) / c.goalAmount) * 100))
+          : 0;
+        if (newDaysLeft !== c.daysLeft || newPercent !== c.percentFunded) {
+          await updateCampaign(c.id, { daysLeft: newDaysLeft, percentFunded: newPercent });
+        }
+      } catch { /* non-critical */ }
+      continue;
+    }
+
+    // Stale: external campaigns get hard-deleted (re-seeded fresh below if still present in source).
+    // Internal campaigns are preserved but marked "ended" so the user can review their history.
+    const isInternal = !c.source || c.source === "internal";
+    if (isInternal) {
+      if (c.status !== "ended") {
+        try { await updateCampaign(c.id, { status: "ended", daysLeft: 0 }); markedEnded++; }
+        catch { /* non-critical */ }
+      }
+    } else {
+      try { await deleteCampaign(c.id); removed++; }
+      catch (err) { log.error("[Crowdfunding Refresh] Delete failed", { id: c.id, error: String(err) }); }
+    }
+  }
+
+  // Re-seed external campaigns. seedExternalCampaigns is idempotent — it skips
+  // any externalId that still exists, so only the just-removed stale ones (and
+  // any newly added seeds) will be re-inserted with fresh dates.
+  const seedResult = await seedExternalCampaigns(createCampaign, listCampaigns);
+
+  log.info("[Crowdfunding Refresh] Daily sync complete", {
+    removed, markedEnded,
+    seeded: seedResult.seeded, skipped: seedResult.skipped, total: seedResult.total,
+  });
+
+  return {
+    removed, markedEnded,
+    seeded: seedResult.seeded, skipped: seedResult.skipped, total: seedResult.total,
+  };
+}
+
