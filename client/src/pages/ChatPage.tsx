@@ -1992,7 +1992,6 @@ export default function ChatPage() {
         setIsLoading(false);
         refetchConv().catch(() => {});
       }
-    }
   };
 
   const handleNewConversation = () => {
