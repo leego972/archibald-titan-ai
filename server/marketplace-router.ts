@@ -991,11 +991,11 @@ export const marketplaceRouter = router({
         // Quick pre-check — enforced atomically inside the transaction below
         if (balance.credits < FEATURE_COST && !balance.isUnlimited)
           throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${FEATURE_COST} credits. You have ${balance.credits}.` });
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
+        const { eq, sql: sqlOp } = await import("drizzle-orm");
         if (!balance.isUnlimited) {
-          const dbInstance = await getDb();
-          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-          const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
-          const { eq, sql: sqlOp } = await import("drizzle-orm");
           // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
           const txResult = await dbInstance.transaction(async (tx) => {
             const lockedBal = await tx
@@ -1036,11 +1036,11 @@ export const marketplaceRouter = router({
         // Quick pre-check — enforced atomically inside the transaction below
         if (balance.credits < BOOST_COST && !balance.isUnlimited)
           throw new TRPCError({ code: "BAD_REQUEST", message: `Need ${BOOST_COST} credits. You have ${balance.credits}.` });
+        const dbInstance = await getDb();
+        if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
+        const { eq, sql: sqlOp } = await import("drizzle-orm");
         if (!balance.isUnlimited) {
-          const dbInstance = await getDb();
-          if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-          const { creditBalances, creditTransactions, marketplaceListings } = await import("../drizzle/schema");
-          const { eq, sql: sqlOp } = await import("drizzle-orm");
           // ── RACE CONDITION GUARD: SELECT FOR UPDATE inside DB transaction ──
           const txResult = await dbInstance.transaction(async (tx) => {
             const lockedBal = await tx
