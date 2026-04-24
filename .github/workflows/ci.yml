@@ -50,7 +50,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm check
-        continue-on-error: true
   build:
     name: Build
     runs-on: ubuntu-latest
