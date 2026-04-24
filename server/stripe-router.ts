@@ -899,6 +899,7 @@ export function registerStripeWebhook(app: Express) {
               // Trial ends in ≤3 days — log now; sendTrialEndingEmail is a TODO once
               // the email template is designed in email-service.ts.
               const subscription = event.data.object as Stripe.Subscription;
+              const db = await getDb();
               const subRec = await db
                 .select({ userId: subscriptions.userId, plan: subscriptions.plan })
                 .from(subscriptions)
@@ -926,7 +927,8 @@ export function registerStripeWebhook(app: Express) {
                   const charge = chargeId ? await stripe.charges.retrieve(chargeId) : null;
                   if (charge?.customer) {
                     const custId = typeof charge.customer === "string" ? charge.customer : charge.customer.id;
-                    await db.update(subscriptions).set({ status: "past_due" }).where(eq(subscriptions.stripeCustomerId, custId));
+                    const db = await getDb();
+                    await db!.update(subscriptions).set({ status: "past_due" }).where(eq(subscriptions.stripeCustomerId, custId));
                     log.warn(`[Stripe Webhook] Subscription suspended due to chargeback: customer=${custId}`);
                   }
                 } catch (e) {
