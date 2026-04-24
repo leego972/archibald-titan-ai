@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, publicProcedure, router, TRPCError } from "./_core/trpc";
 import { getDb } from "./db";
 import { blogPosts, blogCategories } from "../drizzle/schema";
 import { eq, desc, sql, like, and, or } from "drizzle-orm";
