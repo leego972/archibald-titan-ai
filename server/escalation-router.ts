@@ -23,7 +23,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { creditBalances, creditEscalation, subscriptions } from "../drizzle/schema";
 import { getUserPlan } from "./subscription-gate";
