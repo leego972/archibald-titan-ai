@@ -101,6 +101,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
+import { TITAN_API_BASE, TITAN_MAX_STEPS, TITAN_MODEL } from "@/lib/titanApi";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { DeliverablesShelf } from "@/components/DeliverablesShelf";
 import { BuildProgressBar, type BuildPhase } from "@/components/BuildProgressBar";
@@ -900,6 +901,8 @@ export default function ChatPage() {
     'hash_crack', 'generate_payload', 'osint_lookup', 'cve_lookup', 'run_exploit', 'decompile_binary', 'fuzzer_run',
     'sandbox_exec', 'sandbox_write_file', 'create_file', 'provide_project_zip', 'eas_build'];
   const eventSourceRef = useRef<EventSource | null>(null);
+  const titanAbortRef = useRef<AbortController | null>(null);
+  const titanJobIdRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === "admin" || authUser?.role === "head_admin";
@@ -1858,470 +1861,136 @@ export default function ChatPage() {
     setBuildLog([]);
     reasoningStepsRef.current = []; // reset reasoning steps for this new message
 
-    // Flag: when server uses fire-and-forget, the SSE 'done' handler manages loading state
-    let fireAndForget = false;
-
-    // Pre-create conversation if this is a new chat, so we can connect SSE before sending
-    let convIdForStream = activeConversationId;
-    if (!convIdForStream) {
-      try {
-        const newConv = await utils.client.chat.createConversation.mutate({});
-        convIdForStream = newConv.id;
-        setActiveConversationId(newConv.id);
-        utils.chat.listConversations.invalidate();
-      } catch {
-        // Failed to pre-create — sendMessage will create it server-side
+    // ── TitanAI: pre-create conversation if needed ────────────────────────────
+      let convIdForStream = activeConversationId;
+      if (!convIdForStream) {
+        try {
+          const newConv = await utils.client.chat.createConversation.mutate({});
+          convIdForStream = newConv.id;
+          setActiveConversationId(newConv.id);
+          utils.chat.listConversations.invalidate();
+        } catch {
+          // proceed without pre-created conversation
+        }
       }
-    }
 
-    // Connect to SSE stream for real-time events
-    if (convIdForStream) {
-      try {
-        const es = new EventSource(`/api/chat/stream/${convIdForStream}`);
-        eventSourceRef.current = es;
-        es.addEventListener('tool_start', (e) => {
-          const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'tool_start', tool: data.tool, description: data.description, round: data.round, timestamp: Date.now() };
-          setStreamEvents(prev => [...prev, evt]);
-          setBuildLog(prev => [...prev, evt]);
-          setLoadingPhase(data.description || `Using ${data.tool.replace(/_/g, ' ')}...`);
-          // Detect builder/security mode
-          if (SECURITY_TOOLS.includes(data.tool)) setIsBuildMode(true);
-        });
-        es.addEventListener('tool_result', (e) => {
-          const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'tool_result', tool: data.tool, success: data.success, summary: data.summary, preview: data.preview, round: data.round, timestamp: Date.now() };
-          setStreamEvents(prev => [...prev, evt]);
-          setBuildLog(prev => [...prev, evt]);
-        });
-        es.addEventListener('thinking', (e) => {
-          const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'thinking', message: data.message, round: data.round, reasoning: data.reasoning, phase: data.phase, timestamp: Date.now() };
-          setStreamEvents(prev => [...prev, evt]);
-          setBuildLog(prev => [...prev, evt]);
-          // Capture reasoning steps into ref for persistence on the message
-          if (data.reasoning && data.message && data.message.trim().length > 10) {
-            reasoningStepsRef.current = [...reasoningStepsRef.current, data.message.trim()];
-          }
-          // Only update the loading phase label with non-reasoning events (reasoning content is shown in the panel)
-          if (!data.reasoning) setLoadingPhase(data.message || 'Thinking...');
-        });
-        es.addEventListener('status', (e) => {
-          const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'status', message: data.message, timestamp: Date.now() };
-          setStreamEvents(prev => [...prev, evt]);
-          setBuildLog(prev => [...prev, evt]);
-          setLoadingPhase(data.message || 'Working...');
-        });
-        es.addEventListener('verification', (e) => {
-          const data = JSON.parse(e.data);
-          const evt: StreamEvent = { type: 'verification', message: data.message, results: data.results, block: data.block, error: data.error, timestamp: Date.now() };
-          setStreamEvents(prev => [...prev, evt]);
-          setBuildLog(prev => [...prev, evt]);
-          setLoadingPhase(data.message || 'Verification complete');
-        });
-        es.addEventListener('build_progress', (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            setBuildProgress({ phase: data.phase as BuildPhase, detail: data.detail, filesCreated: data.filesCreated, buildType: data.buildType, round: data.round });
-            setLoadingPhase(data.detail || data.phase || 'Building...');
-            if (buildStartTimeRef.current === null) buildStartTimeRef.current = Date.now();
-          } catch { /* ignore */ }
-        });
-        es.addEventListener('build_complete', (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            const durationMs = buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined;
-            setBuildReport({ totalRounds: data.totalRounds, successCount: data.successCount, failedCount: data.failedCount, filesCreated: data.filesCreated, deliverables: data.deliverables || [], buildType: data.buildType, durationMs });
-            setBuildProgress(null);
-            // Toast notification — useful when user has scrolled away or switched tabs
-            const durationStr = durationMs ? (durationMs < 60000 ? ` in ${(durationMs/1000).toFixed(1)}s` : ` in ${Math.floor(durationMs/60000)}m ${Math.round((durationMs%60000)/1000)}s`) : '';
-            const deliverableCount = (data.deliverables || []).length;
-            if (data.failedCount === 0) {
-              toast.success(`Build complete${durationStr}${deliverableCount > 0 ? ` — ${deliverableCount} deliverable${deliverableCount !== 1 ? 's' : ''} ready` : ''}`, { duration: 6000 });
-            } else {
-              toast.warning(`Build finished with ${data.failedCount} error${data.failedCount !== 1 ? 's' : ''}${durationStr}`, { duration: 6000 });
-            }
-          } catch { /* ignore */ }
-        });
-        es.addEventListener('done', (e: MessageEvent) => {
-          try {
-            // Fire-and-forget: the server delivers the final response via SSE 'done' event
-            const data = e.data ? JSON.parse(e.data) : {};
-            if (data.response) {
-              // Build the assistant message from SSE done data
-              const assistantMsg: ChatMsg = {
-                id: -Date.now() - 1,
-                role: 'assistant',
-                content: data.response,
-                createdAt: Date.now(),
-                actionsTaken: data.actions
-                  ? (data.actions as any[]).map((a: any) => {
-                      let summary = a.success ? `Executed ${a.tool}` : `Failed ${a.tool}`;
-                      const d = a.result as any;
-                      if (d) {
-                        switch (a.tool) {
-                          case 'self_type_check': summary = d.passed ? 'TypeScript: 0 errors' : `TypeScript: ${d.errorCount} error(s)`; break;
-                          case 'self_run_tests': summary = d.passed ? `Tests: ${d.totalTests} passed` : `Tests: ${d.failedTests}/${d.totalTests} failed`; break;
-                          case 'self_modify_file': summary = a.success ? `Modified ${a.args?.filePath || 'file'}` : `Failed to modify ${a.args?.filePath || 'file'}`; break;
-                          case 'self_multi_file_modify': summary = d.summary || (a.success ? `${(d.modifications || []).length} file(s) modified` : 'Multi-file modify failed'); break;
-                          case 'self_health_check': summary = d.healthy ? 'All systems healthy' : `${(d.checks || []).filter((c: any) => !c.passed).length} issue(s) detected`; break;
-                          case 'self_rollback': summary = a.success ? `Rolled back (${d.filesRestored || 0} files restored)` : 'Rollback failed'; break;
-                          case 'self_restart': summary = a.success ? 'Server restart triggered' : 'Restart failed'; break;
-                          case 'self_read_file': summary = `Read ${a.args?.filePath || 'file'} (${d.length || 0} chars)`; break;
-                          case 'self_list_files': summary = `Listed ${d.count || 0} files in ${a.args?.dirPath || 'directory'}`; break;
-                          case 'create_file': summary = a.success ? `Created ${d.fileName || a.args?.fileName || 'file'} (${d.size ? (d.size < 1024 ? d.size + 'B' : (d.size / 1024).toFixed(1) + 'KB') : ''})` : `Failed to create ${a.args?.fileName || 'file'}`; break;
-                          case 'create_github_repo': summary = a.success ? `Created repo: ${d.repoFullName || a.args?.name}` : 'Failed to create repo'; break;
-                          case 'push_to_github': summary = a.success ? `Pushed ${d.filesPushed || 0} files to ${d.repoFullName || a.args?.repoFullName}` : 'Failed to push to GitHub'; break;
-                          case 'read_uploaded_file': summary = a.success ? `Read uploaded file (${d.size || 0} chars)` : 'Failed to read file'; break;
-                        }
-                      }
-                      return { tool: a.tool, success: a.success, summary };
-                    })
-                  : null,
-                thinkingSteps: reasoningStepsRef.current.length > 0 ? [...reasoningStepsRef.current] : undefined,
-              };
-              optimisticIdsRef.current.add(assistantMsg.id);
-              setLocalMessages(prev => [...prev, assistantMsg]);
-              // Voice mode
-              if (voiceModeRef.current && data.response) speakText(data.response);
-              // Track created files
-              if (data.actions && (data.actions as any[]).length > 0) {
-                const newFiles = (data.actions as any[])
-                  .filter((a: any) => a.tool === 'create_file' && a.success && a.result)
-                  .map((a: any) => { const d = a.result as any; return { name: d.fileName || a.args?.fileName || 'unknown', url: d.url || '', size: d.size || 0, language: d.language || 'text' }; });
-                if (newFiles.length > 0) {
-                  setCreatedFiles(prev => { const updated = [...prev]; for (const nf of newFiles) { const idx = updated.findIndex(f => f.name === nf.name); if (idx >= 0) updated[idx] = nf; else updated.push(nf); } return updated; });
-                  setShowProjectFiles(true);
-                }
-                // Action toasts
-                let hasSpecificToast = false;
-                for (const a of data.actions as any[]) {
-                  if (a.tool === 'navigate_to_page' && a.success) { const d = a.result as any; if (d?.action === 'navigate' && d?.path) { setTimeout(() => setLocation(d.path), 800); toast.info(`Navigating to ${d.path}`, { duration: 2500 }); hasSpecificToast = true; } }
-                  if (a.tool === 'perform_page_action' && a.success) { const d = a.result as any; if (d?.message) { toast.success(d.message, { duration: 4000 }); hasSpecificToast = true; } }
-                }
-                const successCount = (data.actions as any[]).filter((a: any) => a.success).length;
-                const failCount = (data.actions as any[]).length - successCount;
-                if (!hasSpecificToast) { if (failCount === 0) toast.success(`${successCount} action${successCount > 1 ? 's' : ''} completed`); else toast.warning(`${successCount} succeeded, ${failCount} failed`); }
-                else if (failCount > 0) toast.warning(`${failCount} action${failCount > 1 ? 's' : ''} failed`);
-              }
-              utils.chat.listConversations.invalidate();
-              setTimeout(() => utils.chat.listConversations.invalidate(), 3000);
-            }
-          } catch { /* ignore parse errors */ }
-          // Clean up loading state
-          setStreamEvents([]);
-          setBuildProgress(null);
-          setIsLoading(false);
-          es.close();
-          eventSourceRef.current = null;
-          // Refetch conversation to reconcile optimistic messages with DB
-          refetchConv().catch(() => { /* ignore */ });
-        });
-        es.addEventListener('error', (e: Event) => {
-          // SSE error while in fire-and-forget mode — clear loading state
-          es.close(); eventSourceRef.current = null; setBuildProgress(null);
-          setIsLoading(false);
-          setStreamEvents([]);
-        });
-        es.addEventListener('aborted', () => {
-          es.close(); eventSourceRef.current = null; setBuildProgress(null);
-          setIsLoading(false);
-          setStreamEvents([]);
-        });
-      } catch {
-        // SSE connection failed — continue without streaming
-      }
-    }
-
-    try {
-      // Build final message with attachment URLs for the AI
+      // ── TitanAI: build message with any file attachments ─────────────────────
       let finalMessage = messageText;
       if (uploadedAttachments.length > 0) {
-        const attachmentLines = uploadedAttachments.map(a => {
-          if (a.mimeType.startsWith('image/')) {
-            return `[Attached image: ${a.name}](${a.url})`;
-          }
+        const attachmentLines = uploadedAttachments.map((a: { mimeType: string; name: string; url: string }) => {
+          if (a.mimeType.startsWith("image/")) return `[Attached image: ${a.name}](${a.url})`;
           return `[Attached file: ${a.name}](${a.url})`;
         });
-        finalMessage += '\n\n' + attachmentLines.join('\n');
-        const hasImages = uploadedAttachments.some(a => a.mimeType.startsWith('image/'));
-        if (hasImages) {
-          finalMessage += '\n\nI have attached image(s) above. Please analyze them using the read_uploaded_file tool.';
+        finalMessage += "\n\n" + attachmentLines.join("\n");
+        if (uploadedAttachments.some((a: { mimeType: string }) => a.mimeType.startsWith("image/"))) {
+          finalMessage += "\n\nI have attached image(s) above. Please analyze them.";
         } else {
-          finalMessage += '\n\nPlease read the attached file(s) using the read_uploaded_file tool to see their contents.';
+          finalMessage += "\n\nPlease read the attached file(s) to see their contents.";
         }
       }
-      const result = await sendMutation.mutateAsync({
-        message: finalMessage,
-        conversationId: convIdForStream || undefined,
-        preferredLanguage: selectedLanguage,
-      });
 
-      // If conversation was created server-side (fallback), update the ID
-      if (!convIdForStream && result.conversationId) {
-        const cid = result.conversationId;
-        setActiveConversationId(typeof cid === "string" ? parseInt(cid, 10) : cid as number);
-        utils.chat.listConversations.invalidate();
-      }
+      // ── TitanAI: stream the response via POST SSE ─────────────────────────────
+      const titanCtrl = new AbortController();
+      titanAbortRef.current = titanCtrl;
 
-      // Fire-and-forget mode: server returned immediately, response will come via SSE 'done' event
-      // The done event handler above will render the message and call setIsLoading(false)
-      if ((result as any).status === 'running') {
-        fireAndForget = true;
-        // Do not render anything here — wait for SSE done event
-        // Note: setIsLoading(false) is intentionally NOT called here; the SSE done handler does it
-        return;
-      }
+      try {
+        const titanRes = await fetch(`${TITAN_API_BASE}/api/v1/agent/run/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal: finalMessage, maxSteps: TITAN_MAX_STEPS, model: TITAN_MODEL }),
+          signal: titanCtrl.signal,
+          credentials: "include",
+        });
 
-      // Legacy path: server returned the response directly (backward compat)
-      const legacyResult = result as any;
-      const assistantMsg: ChatMsg = {
-        id: -Date.now() - 1,
-        role: "assistant",
-        content: result.response,
-        createdAt: Date.now(),
-        actionsTaken: legacyResult.actions
-          ? legacyResult.actions.map((a: ExecutedAction) => {
-              let summary = a.success ? `Executed ${a.tool}` : `Failed ${a.tool}`;
-              const d = a.result as any;
-              if (d) {
-                switch (a.tool) {
-                  case "self_type_check":
-                    summary = d.passed ? "TypeScript: 0 errors" : `TypeScript: ${d.errorCount} error(s)`;
-                    break;
-                  case "self_run_tests":
-                    summary = d.passed ? `Tests: ${d.totalTests} passed` : `Tests: ${d.failedTests}/${d.totalTests} failed`;
-                    break;
-                  case "self_modify_file":
-                    summary = a.success ? `Modified ${a.args?.filePath || "file"}` : `Failed to modify ${a.args?.filePath || "file"}`;
-                    break;
-                  case "self_multi_file_modify":
-                    summary = d.summary || (a.success ? `${(d.modifications || []).length} file(s) modified` : "Multi-file modify failed");
-                    break;
-                  case "self_health_check":
-                    summary = d.healthy ? "All systems healthy" : `${(d.checks || []).filter((c: any) => !c.passed).length} issue(s) detected`;
-                    break;
-                  case "self_rollback":
-                    summary = a.success ? `Rolled back (${d.filesRestored || 0} files restored)` : "Rollback failed";
-                    break;
-                  case "self_restart":
-                    summary = a.success ? "Server restart triggered" : "Restart failed";
-                    break;
-                  case "self_read_file":
-                    summary = `Read ${a.args?.filePath || "file"} (${d.length || 0} chars)`;
-                    break;
-                  case "self_list_files":
-                    summary = `Listed ${d.count || 0} files in ${a.args?.dirPath || "directory"}`;
-                    break;
-                  case "create_file":
-                    summary = a.success ? `Created ${d.fileName || a.args?.fileName || "file"} (${d.size ? (d.size < 1024 ? d.size + 'B' : (d.size / 1024).toFixed(1) + 'KB') : ''})` : `Failed to create ${a.args?.fileName || "file"}`;
-                    break;
-                  case "create_github_repo":
-                    summary = a.success ? `Created repo: ${d.repoFullName || a.args?.name}` : `Failed to create repo`;
-                    break;
-                  case "push_to_github":
-                    summary = a.success ? `Pushed ${d.filesPushed || 0} files to ${d.repoFullName || a.args?.repoFullName}` : `Failed to push to GitHub`;
-                    break;
-                  case "read_uploaded_file":
-                    summary = a.success ? `Read uploaded file (${d.size || 0} chars)` : `Failed to read file`;
-                    break;
+        if (!titanRes.ok) {
+          const body = await titanRes.json().catch(() => ({}));
+          throw new Error((body as { error?: string }).error ?? `TitanAI: HTTP ${titanRes.status}`);
+        }
+        if (!titanRes.body) throw new Error("TitanAI: No response body");
+
+        const reader = titanRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+
+        const processBuf = (): boolean => {
+          const blocks = buf.split("\n\n");
+          buf = blocks.pop() ?? "";
+          for (const block of blocks) {
+            const bLines = block.split("\n");
+            let etype = "";
+            let dline = "";
+            for (const bl of bLines) {
+              if (bl.startsWith("event: ")) etype = bl.slice(7).trim();
+              else if (bl.startsWith("data: ")) dline = bl.slice(6).trim();
+            }
+            if (!dline) continue;
+            try {
+              const p = JSON.parse(dline);
+              if (etype === "job") {
+                titanJobIdRef.current = p.jobId ?? null;
+              } else if (etype === "step") {
+                if (p.thought) {
+                  const evt = { type: "thinking" as const, message: String(p.thought), round: p.step as number, timestamp: Date.now() };
+                  setStreamEvents(prev => [...prev.slice(-20), evt]);
+                  setBuildLog(prev => [...prev, evt]);
+                  setLoadingPhase(String(p.thought).slice(0, 80));
                 }
-              }
-              return { tool: a.tool, success: a.success, summary };
-            })
-          : null,
-        // Capture reasoning steps from the ref (not state) to avoid stale closure issues
-        thinkingSteps: reasoningStepsRef.current.length > 0 ? [...reasoningStepsRef.current] : undefined,
-      };
-
-      // Register assistant message as optimistic so DB sync won't wipe it
-      optimisticIdsRef.current.add(assistantMsg.id);
-      setLocalMessages((prev) => [...prev, assistantMsg]);
-
-      // Voice Mode: speak the response aloud
-      if (voiceModeRef.current && result.response) {
-        speakText(result.response);
-      }
-
-      // Track created files for the project files panel
-      if (legacyResult.actions && legacyResult.actions.length > 0) {
-        const newFiles = legacyResult.actions
-          .filter((a: ExecutedAction) => a.tool === 'create_file' && a.success && a.result)
-          .map((a: ExecutedAction) => {
-            const d = a.result as any;
-            return {
-              name: d.fileName || (a.args as any)?.fileName || 'unknown',
-              url: d.url || '',
-              size: d.size || 0,
-              language: d.language || 'text',
-            };
-          });
-        if (newFiles.length > 0) {
-          setCreatedFiles(prev => {
-            // Deduplicate: replace existing files with the same name (rewrites)
-            const updated = [...prev];
-            for (const nf of newFiles) {
-              const existingIdx = updated.findIndex(f => f.name === nf.name);
-              if (existingIdx >= 0) {
-                updated[existingIdx] = nf; // Replace old version
-              } else {
-                updated.push(nf); // New file
-              }
-            }
-            return updated;
-          });
-          setShowProjectFiles(true);
-        }
-      }
-      if (legacyResult.actions && legacyResult.actions.length > 0) {
-        let hasSpecificToast = false;
-        for (const a of legacyResult.actions as ExecutedAction[]) {
-          // navigate_to_page — actually navigate the user to the requested page
-          if (a.tool === 'navigate_to_page' && a.success) {
-            const d = a.result as any;
-            if (d?.action === 'navigate' && d?.path) {
-              setTimeout(() => setLocation(d.path), 800);
-              toast.info(`Navigating to ${d.path}`, { duration: 2500 });
-              hasSpecificToast = true;
-            }
-          }
-          // perform_page_action — show the result message from Titan
-          if (a.tool === 'perform_page_action' && a.success) {
-            const d = a.result as any;
-            if (d?.message) {
-              toast.success(d.message, { duration: 4000 });
-              hasSpecificToast = true;
-            }
-          }
-        }
-        const successCount = legacyResult.actions.filter((a: ExecutedAction) => a.success).length;
-        const failCount = legacyResult.actions.length - successCount;
-        if (!hasSpecificToast) {
-          if (failCount === 0) {
-            toast.success(`${successCount} action${successCount > 1 ? 's' : ''} completed`);
-          } else {
-            toast.warning(`${successCount} succeeded, ${failCount} failed`);
-          }
-        } else if (failCount > 0) {
-          toast.warning(`${failCount} action${failCount > 1 ? 's' : ''} failed`);
-        }
-      }
-
-      utils.chat.listConversations.invalidate();
-      // The server generates the conversation title asynchronously via LLM.
-      // Schedule a follow-up invalidation after ~3 seconds to pick up the generated title.
-      setTimeout(() => {
-        utils.chat.listConversations.invalidate();
-      }, 3000);
-    } catch (err: any) {
-      const serverMessage = err?.message || err?.data?.message || "";
-
-      // ── Network-level failure recovery (Safari iOS 'Load failed') ──────────
-      // When Safari drops the HTTP connection (Railway 5-min timeout, ITP, etc.)
-      // the fetch throws TypeError: 'Load failed'. The server may have already
-      // finished processing — poll the build-status endpoint to recover the result.
-      const isNetworkFailure = serverMessage === 'Load failed' ||
-        serverMessage.toLowerCase().includes('load failed') ||
-        serverMessage.toLowerCase().includes('network request failed') ||
-        serverMessage.toLowerCase().includes('failed to fetch') ||
-        serverMessage.toLowerCase().includes('aborted') ||
-        serverMessage.toLowerCase().includes('network error') ||
-        serverMessage.toLowerCase().includes('networkerror') ||
-        serverMessage.toLowerCase().includes('the operation couldn');
-
-      if (isNetworkFailure && convIdForStream) {
-        // Poll build-status up to 60 times (5 min total) waiting for completion
-        let recovered = false;
-        toast.info('Connection interrupted — checking if Titan is still working...', { duration: 10000 });
-        for (let attempt = 0; attempt < 60; attempt++) {
-          await new Promise(r => setTimeout(r, 5000));
-          try {
-            const statusRes = await fetch(`/api/chat/build-status/${convIdForStream}`, { credentials: 'include' });
-            if (statusRes.ok) {
-              const status = await statusRes.json();
-              if (status.status === 'completed' && status.response) {
-                // Build completed — show the response
-                const recoveredMsg: ChatMsg = {
+                if (p.action && p.action !== "none") {
+                  const desc = `Using ${String(p.action).replace(/_/g, " ")}...`;
+                  const startEvt = { type: "tool_start" as const, tool: String(p.action), description: desc, round: p.step as number, timestamp: Date.now() };
+                  setStreamEvents(prev => [...prev.slice(-20), startEvt]);
+                  setBuildLog(prev => [...prev, startEvt]);
+                  setLoadingPhase(desc);
+                }
+                if (p.observation && p.action && p.action !== "none") {
+                  const resultEvt = { type: "tool_result" as const, tool: String(p.action), success: true, summary: String(p.observation).slice(0, 300), round: p.step as number, timestamp: Date.now() };
+                  setStreamEvents(prev => [...prev.slice(-20), resultEvt]);
+                  setBuildLog(prev => [...prev, resultEvt]);
+                }
+              } else if (etype === "final") {
+                const answer: string = p.finalAnswer ?? p.response ?? JSON.stringify(p);
+                const assistantMsg: ChatMsg = {
                   id: -Date.now() - 1,
-                  role: 'assistant',
-                  content: status.response,
+                  role: "assistant",
+                  content: answer,
                   createdAt: Date.now(),
-                  actionsTaken: status.actions
-                    ? status.actions.map((a: any) => ({ tool: a.tool, success: a.success, summary: a.summary || `${a.success ? 'Executed' : 'Failed'} ${a.tool}` }))
-                    : null,
                 };
-                optimisticIdsRef.current.add(recoveredMsg.id);
-                setLocalMessages(prev => [...prev, recoveredMsg]);
-                if (voiceModeRef.current && status.response) speakText(status.response);
+                optimisticIdsRef.current.add(assistantMsg.id);
+                setLocalMessages(prev => [...prev, assistantMsg]);
+                if (voiceModeRef.current && answer) speakText(answer);
                 utils.chat.listConversations.invalidate();
-                recovered = true;
-                break;
-              } else if (status.status === 'failed') {
-                break; // Server-side failure — fall through to error display
+                setTimeout(() => utils.chat.listConversations.invalidate(), 3000);
+                return true;
+              } else if (etype === "error") {
+                throw new Error((p as { error?: string }).error ?? "TitanAI stream error");
               }
-              // Still running — keep polling
-              if (attempt % 6 === 5) {
-                toast.info('Titan is still working — waiting for completion...', { duration: 5000 });
-              }
+            } catch (parseErr) {
+              if (parseErr instanceof SyntaxError) continue;
+              throw parseErr;
             }
-          } catch {
-            // Poll failed — keep trying
           }
+          return false;
+        };
+
+        let streamDone = false;
+        while (!streamDone) {
+          const { done, value } = await reader.read();
+          if (done) { buf += decoder.decode(); processBuf(); break; }
+          buf += decoder.decode(value, { stream: true });
+          streamDone = processBuf();
         }
-        if (recovered) {
-          toast.success('Titan finished! Response recovered successfully.');
-          return; // Skip error display — response was recovered
+      } catch (titanErr) {
+        if (!(titanErr instanceof DOMException && titanErr.name === "AbortError")) {
+          const msg = titanErr instanceof Error ? titanErr.message : String(titanErr);
+          toast.error(`TitanAI: ${msg}`);
         }
-      }
-      // ── Standard error display ──────────────────────────────────────────────
-      let userFacingError = "Something went wrong. Please try again.";
-      if (serverMessage.toLowerCase().includes("credit")) {
-        userFacingError = serverMessage;
-      } else if (serverMessage.toLowerCase().includes("unauthorized") || serverMessage.toLowerCase().includes("session")) {
-        userFacingError = "Session expired. Please refresh the page and try again.";
-      } else if (serverMessage.toLowerCase().includes("rate limit") || serverMessage.toLowerCase().includes("too many")) {
-        userFacingError = "Rate limit reached. Please wait a moment and try again.";
-      } else if (serverMessage.toLowerCase().includes("timeout") || serverMessage.toLowerCase().includes("timed out")) {
-        userFacingError = "The request timed out. This can happen with complex builds. Try again or break the request into smaller parts.";
-      } else if (isNetworkFailure) {
-        userFacingError = "Connection dropped — Titan may still be working in the background. Refresh the page to check for a response.";
-      } else if (serverMessage) {
-        userFacingError = serverMessage;
-      }
-      toast.error(userFacingError);
-      // KEEP the user message visible — don't delete it on error.
-      // Instead, add an error assistant message so the user can see what happened.
-      const errorAssistantMsg: ChatMsg = {
-        id: -Date.now() - 2,
-        role: "assistant",
-        content: `⚠️ ${userFacingError}`,
-        createdAt: Date.now(),
-      };
-      optimisticIdsRef.current.add(errorAssistantMsg.id);
-      setLocalMessages((prev) => [...prev, errorAssistantMsg]);
-      // Preserve the build log so the user can see what was done before the error
-      if (streamEvents.length > 0) {
-        setBuildLog([...streamEvents]);
-      }
-    } finally {
-      // In fire-and-forget mode, the SSE 'done' handler manages loading state and SSE cleanup.
-      // Only clean up here for the legacy synchronous path or on error.
-      if (!fireAndForget) {
+      } finally {
+        titanJobIdRef.current = null;
+        titanAbortRef.current = null;
         setStreamEvents([]);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        // Refetch conversation so the DB sync effect can reconcile optimistic messages.
-        if (activeConversationId || convIdForStream) {
-          try {
-            await refetchConv();
-          } catch {
-            // Refetch failed — optimistic messages will remain until next sync
-          }
-        }
+        setBuildProgress(null);
         setIsLoading(false);
+        refetchConv().catch(() => {});
       }
     }
   };
@@ -3051,22 +2720,22 @@ export default function ChatPage() {
                         <div className="mt-2 pt-2 border-t border-border/30">
                           <Button
                             onClick={async () => {
-                              try {
-                                if (activeConversationId) {
-                                  const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
-                                   await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
+                                try {
+                                  if (titanAbortRef.current) {
+                                    titanAbortRef.current.abort();
+                                    titanAbortRef.current = null;
+                                  }
+                                  if (titanJobIdRef.current) {
+                                    await fetch(`${TITAN_API_BASE}/api/v1/agent/run/${titanJobIdRef.current}`, { method: "DELETE", credentials: "include" });
+                                    titanJobIdRef.current = null;
+                                  }
+                                  setIsLoading(false);
+                                  setStreamEvents([]);
+                                  toast.info("TitanAI run cancelled");
+                                } catch {
+                                  toast.error("Failed to cancel TitanAI run");
                                 }
-                                if (eventSourceRef.current) {
-                                  eventSourceRef.current.close();
-                                  eventSourceRef.current = null;
-                                }
-                                setIsLoading(false);
-                                setStreamEvents([]);
-                                toast.info('Request cancelled');
-                              } catch {
-                                toast.error('Failed to cancel request');
-                              }
-                            }}
+                              }}
                             variant="ghost"
                             size="sm"
                             className="w-full h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-1.5"
@@ -3352,22 +3021,22 @@ export default function ChatPage() {
                 {isLoading && (
                   <Button
                     onClick={async () => {
-                      try {
-                        if (activeConversationId) {
-                          const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
-                          await fetch(`/api/chat/abort/${activeConversationId}`, { method: 'POST', credentials: 'include', headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {} });
+                        try {
+                          if (titanAbortRef.current) {
+                            titanAbortRef.current.abort();
+                            titanAbortRef.current = null;
+                          }
+                          if (titanJobIdRef.current) {
+                            await fetch(`${TITAN_API_BASE}/api/v1/agent/run/${titanJobIdRef.current}`, { method: "DELETE", credentials: "include" });
+                            titanJobIdRef.current = null;
+                          }
+                          setIsLoading(false);
+                          setStreamEvents([]);
+                          toast.info("TitanAI stopped");
+                        } catch {
+                          toast.error("Failed to stop TitanAI");
                         }
-                        if (eventSourceRef.current) {
-                          eventSourceRef.current.close();
-                          eventSourceRef.current = null;
-                        }
-                        setIsLoading(false);
-                        setStreamEvents([]);
-                        toast.info('Titan stopped');
-                      } catch {
-                        toast.error('Failed to stop');
-                      }
-                    }}
+                      }}
                     size="icon"
                     className={`rounded-xl touch-target bg-red-600 hover:bg-red-700 text-white animate-pulse ${isMobile ? 'h-[44px] w-[44px]' : 'h-10 w-10'}`}
                     title="Stop Titan"
