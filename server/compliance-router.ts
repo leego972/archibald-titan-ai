@@ -6,7 +6,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, protectedProcedure, TRPCError } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { eq, desc, count, and, gte } from "drizzle-orm";
