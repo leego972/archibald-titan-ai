@@ -6,7 +6,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
-import { router, adminProcedure } from "./_core/trpc";
+import { router, adminProcedure, TRPCError } from "./_core/trpc";
 import { z } from "zod";
 import axios from "axios";
 import { getUserPlan, enforceFeature } from "./subscription-gate";
