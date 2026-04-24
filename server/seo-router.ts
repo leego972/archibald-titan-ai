@@ -20,8 +20,7 @@
  */
 
 import { z } from "zod";
-import { adminProcedure } from "./_core/trpc";
-import { router } from "./_core/trpc";
+import { adminProcedure, router, TRPCError } from "./_core/trpc";
 import {
   analyzeSeoHealth,
   analyzeKeywords,
