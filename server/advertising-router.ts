@@ -22,7 +22,7 @@
 
 import { z } from "zod";
 import { ENV } from "./_core/env";
-import { router, adminProcedure } from "./_core/trpc";
+import { router, adminProcedure, TRPCError } from "./_core/trpc";
 import { getAllChannelStatuses } from "./marketing-channels";
 import { getExpandedChannelStatuses } from "./expanded-channels";
 import {
