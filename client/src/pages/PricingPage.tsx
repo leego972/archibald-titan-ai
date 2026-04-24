@@ -332,7 +332,7 @@ import {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button onClick={() => handleGetStarted("enterprise")} disabled={loadingPlan === "enterprise"} size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white border-0 h-14 px-10 text-base font-bold">
                 {loadingPlan === "enterprise" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {plan.id === currentPlanId ? "Manage Plan" : user ? "Subscribe Now" : "Get Started"}
+                {"enterprise" === currentPlanId ? "Manage Plan" : user ? "Subscribe Now" : "Get Started"}
               </Button>
               <Button onClick={() => { window.location.href = "mailto:sales@archibaldtitan.ai"; }} size="lg" variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white h-14 px-10 text-base font-bold">
                 Request Demo
