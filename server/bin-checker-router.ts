@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { router, adminProcedure } from "./_core/trpc";
+import { router, adminProcedure, TRPCError } from "./_core/trpc";
 import { createLogger } from "./_core/logger.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { getErrorMessage } from "./_core/errors.js";
