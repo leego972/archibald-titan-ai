@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { router, adminProcedure } from "./_core/trpc.js";
+import { router, adminProcedure, TRPCError } from "./_core/trpc.js";
 import { consumeCredits, checkCredits } from "./credit-service";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
