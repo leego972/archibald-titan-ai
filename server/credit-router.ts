@@ -3,7 +3,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, router, TRPCError } from "./_core/trpc";
 import {
   getCreditBalance,
   getCreditHistory,
