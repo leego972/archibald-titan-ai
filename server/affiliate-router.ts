@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure, adminProcedure } from "./_core/trpc";
+import { router, publicProcedure, protectedProcedure, adminProcedure, TRPCError } from "./_core/trpc";
 import { checkCredits, consumeCredits } from "./credit-service";
 import {
   seedAffiliatePrograms,
