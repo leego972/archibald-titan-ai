@@ -80,3 +80,4 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+export { TRPCError };
