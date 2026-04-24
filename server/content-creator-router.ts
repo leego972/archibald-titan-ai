@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { adminProcedure, router, TRPCError } from "./_core/trpc";
 import { getDb } from "./db";
 import {
   contentCreatorCampaigns,
