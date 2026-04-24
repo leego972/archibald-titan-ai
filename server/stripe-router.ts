@@ -900,6 +900,7 @@ export function registerStripeWebhook(app: Express) {
               // the email template is designed in email-service.ts.
               const subscription = event.data.object as Stripe.Subscription;
               const db = await getDb();
+              if (!db) break;
               const subRec = await db
                 .select({ userId: subscriptions.userId, plan: subscriptions.plan })
                 .from(subscriptions)
