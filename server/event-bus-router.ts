@@ -6,7 +6,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
-import { router, protectedProcedure, adminProcedure } from "./_core/trpc";
+import { router, protectedProcedure, adminProcedure, TRPCError } from "./_core/trpc";
 import { z } from "zod";
 import { consumeCredits } from "./credit-service";
 
