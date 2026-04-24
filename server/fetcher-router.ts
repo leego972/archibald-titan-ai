@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, router, TRPCError } from "./_core/trpc";
 import { fetcherJobs } from "../drizzle/schema";
 import {
   createJob,
