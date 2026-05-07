@@ -37,6 +37,7 @@ import { marketingRouter } from "./marketing-router";
 import { customProviderRouter } from "./custom-provider-router";
 import { affiliateRouter } from "./affiliate-router";
 import { seoRouter, seoIntelligenceRouter } from "./seo-router";
+import { growthSuiteRouter } from "./growth-suite-router";
 import { blogRouter } from "./blog-router";
 import { advertisingRouter } from "./advertising-router";
 import { userSecretsRouter } from "./user-secrets-router";
@@ -146,6 +147,7 @@ export const appRouter = router({
   affiliate: affiliateRouter,
   seo: seoRouter,
   seoIntelligence: seoIntelligenceRouter,
+  growthSuite: growthSuiteRouter,
   blog: blogRouter,
   advertising: advertisingRouter,
   userSecrets: userSecretsRouter,

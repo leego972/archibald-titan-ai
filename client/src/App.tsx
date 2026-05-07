@@ -83,6 +83,7 @@ import CrowdfundingPage from "./pages/CrowdfundingPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import AdvertisingDashboard from "./pages/AdvertisingDashboard";
 import MasterGrowthDashboard from "./pages/MasterGrowthDashboard";
+import GrowthSuitePage from "./pages/GrowthSuitePage";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import SeoDashboard from "./pages/SeoDashboard";
 import BlogAdmin from "./pages/BlogAdmin";
@@ -237,6 +238,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         <Route path="/referrals" component={ReferralsPage} />
         <Route path="/advertising" component={() => <AdminRoute component={AdvertisingDashboard} />} />
         <Route path="/master-growth" component={() => <AdminRoute component={MasterGrowthDashboard} />} />
+        <Route path="/growth-suite" component={() => <AdminRoute component={GrowthSuitePage} />} />
         <Route path="/affiliate" component={AffiliateDashboard} />
         <Route path="/seo" component={() => <AdminRoute component={SeoDashboard} />} />
         <Route path="/blog-admin" component={() => <AdminRoute component={BlogAdmin} />} />
@@ -418,6 +420,8 @@ function Router() {
       <Route path="/crowdfunding" component={DashboardRouter} />
       <Route path="/referrals" component={DashboardRouter} />
       <Route path="/advertising" component={DashboardRouter} />
+      <Route path="/master-growth" component={DashboardRouter} />
+      <Route path="/growth-suite" component={DashboardRouter} />
       <Route path="/affiliate" component={DashboardRouter} />
       <Route path="/seo" component={DashboardRouter} />
       <Route path="/blog-admin" component={DashboardRouter} />
@@ -455,7 +459,6 @@ function Router() {
       <Route path="/security-marketplace" component={DashboardRouter} />
       <Route path="/exploitpack" component={DashboardRouter} />
       <Route path="/builder-templates" component={DashboardRouter} />
-      <Route path="/master-growth" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
