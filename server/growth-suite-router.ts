@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
+import { analyzeSeoHealth, analyzeKeywords, getWebVitalsSummary, getRedirects, getCachedReport } from "./seo-engine";
+import { getAllProgrammaticPages, getTopicClusters, getFeaturedSnippetTargets, getSemanticKeywordClusters } from "./seo-engine-v4";
+import { getRankings, getRisingKeywords, getFallingKeywords, getBacklinkGaps, getCoreWebVitalsDiagnosis, generateSeoIntelligenceReport } from "./seo-intelligence";
 
 const SITE_URL = "https://www.archibaldtitan.com";
 const BRAND = "Archibald Titan";
@@ -53,6 +56,15 @@ const backlinkTasks = [
   { target: "G2/Capterra", type: "review", priority: "medium" as Priority, cost: "$0-$200", action: "Create profiles only after onboarding first active users for reviews." },
 ];
 
+async function safeRead<T>(name: string, fallback: T, read: () => T | Promise<T>) {
+  try {
+    return { name, ok: true, data: await read() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { name, ok: false, data: fallback, error: message };
+  }
+}
+
 function scoreAction(action: Pick<GrowthAction, "impact" | "effort" | "priority">) {
   const priorityBoost = action.priority === "critical" ? 30 : action.priority === "high" ? 20 : action.priority === "medium" ? 10 : 0;
   return Math.round(action.impact * 12 - action.effort * 4 + priorityBoost);
@@ -79,17 +91,55 @@ function contentIdeas(audience: string) {
 }
 
 function getExecutionQueue() {
-  return actions().map((action) => ({
-    id: action.id,
-    title: action.title,
-    area: action.area,
-    priority: action.priority,
-    score: scoreAction(action),
-    status: "ready_for_review",
-    safeToRun: !["advertising"].includes(action.area),
-    requiresConfirmation: action.area === "advertising",
-    nextStep: action.implementation[0],
-  })).sort((a, b) => b.score - a.score);
+  return actions().map((action) => ({ id: action.id, title: action.title, area: action.area, priority: action.priority, score: scoreAction(action), status: "ready_for_review", safeToRun: !["advertising"].includes(action.area), requiresConfirmation: action.area === "advertising", nextStep: action.implementation[0] })).sort((a, b) => b.score - a.score);
+}
+
+async function getLiveSnapshot() {
+  const [seoHealth, keywords, webVitals, redirects, cachedReport, rankings, risingKeywords, fallingKeywords, backlinkGaps, coreVitals, intelligenceReport, programmaticPages, topicClusters, snippetTargets, semanticClusters] = await Promise.all([
+    safeRead("seoHealth", null, () => analyzeSeoHealth()),
+    safeRead("keywords", [], () => analyzeKeywords()),
+    safeRead("webVitals", null, () => getWebVitalsSummary()),
+    safeRead("redirects", [], () => getRedirects()),
+    safeRead("cachedReport", null, () => getCachedReport()),
+    safeRead("rankings", [], () => getRankings()),
+    safeRead("risingKeywords", [], () => getRisingKeywords()),
+    safeRead("fallingKeywords", [], () => getFallingKeywords()),
+    safeRead("backlinkGaps", [], () => getBacklinkGaps()),
+    safeRead("coreVitals", [], () => getCoreWebVitalsDiagnosis()),
+    safeRead("intelligenceReport", null, () => generateSeoIntelligenceReport()),
+    safeRead("programmaticPages", [], () => getAllProgrammaticPages()),
+    safeRead("topicClusters", [], () => getTopicClusters()),
+    safeRead("snippetTargets", [], () => getFeaturedSnippetTargets()),
+    safeRead("semanticClusters", [], () => getSemanticKeywordClusters()),
+  ]);
+
+  const dataSources = [seoHealth, keywords, webVitals, redirects, cachedReport, rankings, risingKeywords, fallingKeywords, backlinkGaps, coreVitals, intelligenceReport, programmaticPages, topicClusters, snippetTargets, semanticClusters];
+  const connected = dataSources.filter((source) => source.ok).length;
+  const total = dataSources.length;
+  const readinessScore = Math.round((connected / total) * 100);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    readinessScore,
+    connected,
+    total,
+    sources: dataSources.map(({ name, ok, error }) => ({ name, ok, error })),
+    seoHealth: seoHealth.data,
+    keywordCount: Array.isArray(keywords.data) ? keywords.data.length : 0,
+    rankings: Array.isArray(rankings.data) ? rankings.data.slice(0, 12) : [],
+    risingKeywords: Array.isArray(risingKeywords.data) ? risingKeywords.data.slice(0, 8) : [],
+    fallingKeywords: Array.isArray(fallingKeywords.data) ? fallingKeywords.data.slice(0, 8) : [],
+    backlinkGaps: Array.isArray(backlinkGaps.data) ? backlinkGaps.data.slice(0, 10) : [],
+    coreVitals: coreVitals.data,
+    webVitals: webVitals.data,
+    redirects: redirects.data,
+    cachedReportAge: cachedReport.data && typeof cachedReport.data === "object" && "generatedAt" in cachedReport.data ? Date.now() - Number((cachedReport.data as { generatedAt: number }).generatedAt) : null,
+    programmaticPageCount: Array.isArray(programmaticPages.data) ? programmaticPages.data.length : 0,
+    topicClusterCount: Array.isArray(topicClusters.data) ? topicClusters.data.length : 0,
+    featuredSnippetTargetCount: Array.isArray(snippetTargets.data) ? snippetTargets.data.length : 0,
+    semanticClusterCount: Array.isArray(semanticClusters.data) ? semanticClusters.data.length : 0,
+    intelligenceReport: intelligenceReport.data,
+  };
 }
 
 export const growthSuiteRouter = router({
@@ -97,68 +147,40 @@ export const growthSuiteRouter = router({
     const allActions = actions();
     const sorted = [...allActions].sort((a, b) => scoreAction(b) - scoreAction(a));
     const avgConversion = Math.round(conversionPages.reduce((sum, page) => sum + page.score, 0) / conversionPages.length);
-    return {
-      brand: BRAND,
-      siteUrl: SITE_URL,
-      generatedAt: new Date().toISOString(),
-      score: Math.round((91 + avgConversion) / 2),
-      summary: "Growth suite is configured around SEO, GEO, content, low-budget ad validation, affiliate loops, conversion tracking, and source-quality analytics.",
-      priorities: sorted.slice(0, 5).map((action) => ({ ...action, score: scoreAction(action) })),
-      channelMix: { free: channels.filter((c) => c.type === "free").length, lowCost: channels.filter((c) => c.type === "low_cost").length, paid: channels.filter((c) => c.type === "paid").length },
-      conversionScore: avgConversion,
-      backlinkTasks: backlinkTasks.length,
-      executionReady: getExecutionQueue().filter((item) => item.safeToRun).length,
-    };
+    return { brand: BRAND, siteUrl: SITE_URL, generatedAt: new Date().toISOString(), score: Math.round((91 + avgConversion) / 2), summary: "Growth suite is configured around SEO, GEO, content, low-budget ad validation, affiliate loops, conversion tracking, and source-quality analytics.", priorities: sorted.slice(0, 5).map((action) => ({ ...action, score: scoreAction(action) })), channelMix: { free: channels.filter((c) => c.type === "free").length, lowCost: channels.filter((c) => c.type === "low_cost").length, paid: channels.filter((c) => c.type === "paid").length }, conversionScore: avgConversion, backlinkTasks: backlinkTasks.length, executionReady: getExecutionQueue().filter((item) => item.safeToRun).length };
   }),
-
-  getSeoPlan: adminProcedure.query(() => ({
-    pillars: seoPillars,
-    technicalChecklist: ["Canonical URLs on every public page", "Sitemap index plus segmented sitemaps", "Robots.txt with AI crawler allowances", "llms.txt and llms-full.txt", "FAQ, Breadcrumb, Organization, SoftwareApplication, and Product schema", "Internal links from high-authority pages to high-intent comparison pages", "IndexNow submission after meaningful content updates"],
-    geoReadiness: { score: 87, checks: ["llms.txt planned", "AI citation metadata planned", "answer-block content briefs planned", "structured product facts planned"] },
-    publishingCadence: "2 comparison pages, 2 integration pages, 1 use-case page, and 1 founder/product proof post per week.",
-  })),
-
+  getLiveSnapshot: adminProcedure.query(() => getLiveSnapshot()),
+  getLiveSeoSummary: adminProcedure.query(async () => {
+    const live = await getLiveSnapshot();
+    return { readinessScore: live.readinessScore, seoHealth: live.seoHealth, keywordCount: live.keywordCount, rankings: live.rankings, risingKeywords: live.risingKeywords, fallingKeywords: live.fallingKeywords, programmaticPageCount: live.programmaticPageCount, topicClusterCount: live.topicClusterCount, featuredSnippetTargetCount: live.featuredSnippetTargetCount, semanticClusterCount: live.semanticClusterCount };
+  }),
+  getSeoPlan: adminProcedure.query(() => ({ pillars: seoPillars, technicalChecklist: ["Canonical URLs on every public page", "Sitemap index plus segmented sitemaps", "Robots.txt with AI crawler allowances", "llms.txt and llms-full.txt", "FAQ, Breadcrumb, Organization, SoftwareApplication, and Product schema", "Internal links from high-authority pages to high-intent comparison pages", "IndexNow submission after meaningful content updates"], geoReadiness: { score: 87, checks: ["llms.txt planned", "AI citation metadata planned", "answer-block content briefs planned", "structured product facts planned"] }, publishingCadence: "2 comparison pages, 2 integration pages, 1 use-case page, and 1 founder/product proof post per week." })),
   getAdvertisingPlan: adminProcedure.input(z.object({ monthlyBudget: z.number().min(0).max(100000).default(500) }).optional()).query(({ input }) => {
     const budget = input?.monthlyBudget ?? 500;
     const experimental = Math.round(budget * 0.2);
     const search = Math.round(budget * 0.45);
     const retargeting = Math.round(budget * 0.2);
     const creative = Math.max(0, budget - experimental - search - retargeting);
-    return {
-      monthlyBudget: budget,
-      allocation: [
-        { bucket: "Exact-match search validation", amount: search, rationale: "Capture high-intent competitor and alternative searches." },
-        { bucket: "Retargeting", amount: retargeting, rationale: "Recover docs/pricing/comparison visitors." },
-        { bucket: "Creative testing", amount: creative, rationale: "Produce and test hooks before scaling." },
-        { bucket: "Experiments", amount: experimental, rationale: "Test new channels without risking core budget." },
-      ],
-      safeguards: ["Daily caps", "Strict negative keywords", "Pause rules for low CTR and zero demo intent", "UTM tracking on every ad", "No broad match until conversion data exists"],
-      freeFirstChannels: channels.filter((c) => c.type !== "paid"),
-    };
+    return { monthlyBudget: budget, allocation: [{ bucket: "Exact-match search validation", amount: search, rationale: "Capture high-intent competitor and alternative searches." }, { bucket: "Retargeting", amount: retargeting, rationale: "Recover docs/pricing/comparison visitors." }, { bucket: "Creative testing", amount: creative, rationale: "Produce and test hooks before scaling." }, { bucket: "Experiments", amount: experimental, rationale: "Test new channels without risking core budget." }], safeguards: ["Daily caps", "Strict negative keywords", "Pause rules for low CTR and zero demo intent", "UTM tracking on every ad", "No broad match until conversion data exists"], freeFirstChannels: channels.filter((c) => c.type !== "paid") };
   }),
-
   getCampaignIdeas: adminProcedure.input(z.object({ audience: z.string().min(2).max(80).optional() }).optional()).query(({ input }) => {
     const audience = input?.audience || "startup CTOs";
     return { audience, ideas: contentIdeas(audience), reusableAngles: ["Stop copying API keys manually", "Credentials are workflow debt, not just vault data", "Local AI agent for technical founders", "Secrets management needs retrieval automation", "Cut DevOps admin work without cutting security"], audiences: coreAudiences };
   }),
-
   getActions: adminProcedure.query(() => actions().map((action) => ({ ...action, score: scoreAction(action) })).sort((a, b) => b.score - a.score)),
   getChannels: adminProcedure.query(() => channels),
   getBacklinkTasks: adminProcedure.query(() => backlinkTasks),
   getConversionAudit: adminProcedure.query(() => ({ pages: conversionPages, averageScore: Math.round(conversionPages.reduce((sum, page) => sum + page.score, 0) / conversionPages.length), nextFix: conversionPages.sort((a, b) => a.score - b.score)[0] })),
   getExecutionQueue: adminProcedure.query(() => getExecutionQueue()),
-  getWeeklyOperatingPlan: adminProcedure.query(() => ({
-    monday: ["Review Growth Suite priorities", "Publish one high-intent comparison page"],
-    tuesday: ["Ship one integration page", "Create LinkedIn founder post"],
-    wednesday: ["Run conversion audit fixes", "Prepare directory/backlink submissions"],
-    thursday: ["Publish snippet-optimized article", "Create short demo clip"],
-    friday: ["Review channel quality", "Update next-week execution queue"],
-  })),
+  runSafeAction: adminProcedure.input(z.object({ actionId: z.string().min(2) })).mutation(({ input }) => {
+    const action = actions().find((item) => item.id === input.actionId);
+    if (!action) return { success: false, actionId: input.actionId, message: "Unknown Growth Suite action." };
+    if (action.area === "advertising") return { success: false, actionId: input.actionId, message: "Advertising actions require explicit budget confirmation and are not auto-run from Growth Suite yet." };
+    return { success: true, actionId: input.actionId, message: "Action marked ready. Use the linked system workflow to execute the first implementation step.", nextStep: action.implementation[0], linkedArea: action.area };
+  }),
+  getWeeklyOperatingPlan: adminProcedure.query(() => ({ monday: ["Review Growth Suite priorities", "Publish one high-intent comparison page"], tuesday: ["Ship one integration page", "Create LinkedIn founder post"], wednesday: ["Run conversion audit fixes", "Prepare directory/backlink submissions"], thursday: ["Publish snippet-optimized article", "Create short demo clip"], friday: ["Review channel quality", "Update next-week execution queue"] })),
   exportPlan: adminProcedure.query(() => {
     const top = actions().map((action) => ({ ...action, score: scoreAction(action) })).sort((a, b) => b.score - a.score).slice(0, 7);
-    return {
-      filename: "archibald-titan-growth-plan.md",
-      markdown: [`# ${BRAND} Growth Plan`, `Generated: ${new Date().toISOString()}`, "", "## Top Actions", ...top.map((a, i) => `${i + 1}. **${a.title}** (${a.priority}, score ${a.score}) - ${a.expectedOutcome}`), "", "## Free/Low-cost channels", ...channels.map((c) => `- ${c.channel}: ${c.cost} - ${c.role}`)].join("\n"),
-    };
+    return { filename: "archibald-titan-growth-plan.md", markdown: [`# ${BRAND} Growth Plan`, `Generated: ${new Date().toISOString()}`, "", "## Top Actions", ...top.map((a, i) => `${i + 1}. **${a.title}** (${a.priority}, score ${a.score}) - ${a.expectedOutcome}`), "", "## Free/Low-cost channels", ...channels.map((c) => `- ${c.channel}: ${c.cost} - ${c.role}`)].join("\n") };
   }),
 });
