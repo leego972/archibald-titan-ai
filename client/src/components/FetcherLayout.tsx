@@ -52,7 +52,8 @@ import {
   Sun,
   Moon,
   Bell,
-  Lock
+  Lock,
+  Brain
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -149,6 +150,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: CreditCard, label: "Affiliate Dashboard", path: "/affiliate" },
         { icon: Bell, label: "Referrals", path: "/referrals" },
         // ── Marketing & SEO ───────────────────────────────────────────────
+        { icon: Brain, label: "Growth Suite", path: "/growth-suite", adminOnly: true },
         { icon: Webhook, label: "SEO Command Centre", path: "/seo" },
         { icon: ScrollText, label: "Blog Engine", path: "/blog-admin" },
         { icon: Activity, label: "Marketing Engine", path: "/marketing" },
