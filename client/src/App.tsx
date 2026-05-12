@@ -123,6 +123,7 @@ import SelfImprovementDashboard from "./pages/SelfImprovementDashboard";
 
 // Project Files
 import ProjectFilesViewer from "./pages/ProjectFilesViewer";
+import BridgeAIPage from "./pages/BridgeAI";
 
 // Site Monitor
 import SiteMonitorPage from "./pages/SiteMonitorPage";
@@ -218,6 +219,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         <Route path="/marketplace/:rest*" component={MarketplacePage} />
         <Route path="/project-files" component={ProjectFilesViewer} />
         <Route path="/project-files/:projectId" component={ProjectFilesViewer} />
+        <Route path="/bridge" component={BridgeAIPage} />
 
         {/* Security */}
         <Route path="/fetcher/totp-vault" component={TotpVaultPage} />
@@ -459,6 +461,7 @@ function Router() {
       <Route path="/security-marketplace" component={DashboardRouter} />
       <Route path="/exploitpack" component={DashboardRouter} />
       <Route path="/builder-templates" component={DashboardRouter} />
+      <Route path="/bridge" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
