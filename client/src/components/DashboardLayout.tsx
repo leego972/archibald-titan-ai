@@ -60,6 +60,7 @@ import { isAdminRole } from "@shared/const";
     { icon: Terminal,        label: "Builder",         path: "/builder",          group: "Core" },
     { icon: ShoppingBag,     label: "Marketplace",     path: "/marketplace",      group: "Core" },
     { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
+    { icon: Zap,             label: "BridgeAI",         path: "/bridge",           group: "Core" },
 
     // ── Offensive Security ────────────────────────────────────────────
     { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security", cyberOnly: true },
