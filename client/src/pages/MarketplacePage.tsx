@@ -1299,6 +1299,224 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
 
 
 // ═══════════════════════════════════════════════════════════════════
+
+// EARNINGS & PAYOUTS — Full seller withdrawal flow
+// ═══════════════════════════════════════════════════════════════════
+
+function EarningsAndPayouts() {
+  const { data: earnings, isLoading: earningsLoading, refetch: refetchEarnings } = trpc.marketplace.getSellerEarnings.useQuery();
+  const { data: payoutHistory = [], refetch: refetchHistory } = trpc.marketplace.getPayoutHistory.useQuery();
+  const { data: payoutMethods = [] } = trpc.marketplace.getPayoutMethods.useQuery();
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [selectedMethodId, setSelectedMethodId] = useState<number | null>(null);
+  const [creditsToRedeem, setCreditsToRedeem] = useState<string>("");
+
+  const requestPayoutMutation = trpc.marketplace.requestPayout.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Payout request submitted! ${data.creditsRedeemed.toLocaleString()} credits → $${data.amountAud} AUD pending review.`);
+      setShowRequestDialog(false);
+      setCreditsToRedeem("");
+      setSelectedMethodId(null);
+      refetchEarnings();
+      refetchHistory();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleRequestPayout = () => {
+    const credits = parseInt(creditsToRedeem, 10);
+    if (!selectedMethodId) { toast.error("Please select a payout method"); return; }
+    if (!credits || credits < 25000) { toast.error("Minimum payout is 25,000 credits (~$10 AUD)"); return; }
+    if (earnings && credits > earnings.availableCredits) { toast.error("Insufficient credit balance"); return; }
+    requestPayoutMutation.mutate({ creditsToRedeem: credits, payoutMethodId: selectedMethodId });
+  };
+
+  const STATUS_STYLES: Record<string, string> = {
+    pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    processing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    paid: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    rejected: "bg-red-500/20 text-red-400 border-red-500/30",
+  };
+
+  const METHOD_LABEL: Record<string, string> = {
+    bank_transfer: "Bank Transfer",
+    paypal: "PayPal",
+    stripe_connect: "Stripe Connect",
+  };
+
+  const audPreview = earnings && creditsToRedeem
+    ? (parseInt(creditsToRedeem || "0", 10) * (earnings.creditToAudRate || 0.0004)).toFixed(2)
+    : "0.00";
+
+  return (
+    <div className="space-y-4">
+      {/* Earnings Summary Cards */}
+      {earningsLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-amber-400" /></div>
+      ) : earnings ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="border-border/30 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-amber-400" />
+                <span className="text-xs text-muted-foreground">Total Earned</span>
+              </div>
+              <div className="text-2xl font-bold text-amber-400">${earnings.totalRevenueAud}</div>
+              <div className="text-xs text-muted-foreground">{earnings.totalRevenueCredits.toLocaleString()} credits lifetime</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/30 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-muted-foreground">Available to Withdraw</span>
+              </div>
+              <div className="text-2xl font-bold text-emerald-400">${earnings.withdrawableAud}</div>
+              <div className="text-xs text-muted-foreground">{earnings.availableCredits.toLocaleString()} credits</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/30 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Coins className="w-4 h-4 text-blue-400" />
+                <span className="text-xs text-muted-foreground">Pending Payouts</span>
+              </div>
+              <div className="text-2xl font-bold text-blue-400">${earnings.pendingAud}</div>
+              <div className="text-xs text-muted-foreground">{earnings.pendingCredits.toLocaleString()} credits under review</div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground text-center py-4">Register as a seller to track earnings.</p>
+      )}
+
+      {/* Withdraw banner */}
+      {earnings && (
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between p-4 rounded-lg border border-amber-600/30 bg-amber-950/10">
+          <div>
+            <p className="text-sm font-medium text-amber-200">Ready to cash out?</p>
+            <p className="text-xs text-muted-foreground">
+              Min. {earnings.minPayoutCredits.toLocaleString()} credits (~${earnings.minPayoutAud} AUD)
+              &nbsp;&middot;&nbsp;
+              Rate: 1,000 credits = ${(earnings.creditToAudRate * 1000).toFixed(2)} AUD
+            </p>
+          </div>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+            disabled={!earnings.canWithdraw || (payoutMethods as any[]).length === 0}
+            onClick={() => setShowRequestDialog(true)}
+          >
+            <DollarSign className="w-4 h-4 mr-2" /> Request Payout
+          </Button>
+        </div>
+      )}
+
+      {earnings && !earnings.canWithdraw && earnings.availableCredits > 0 && (
+        <p className="text-xs text-muted-foreground text-center">
+          Need {(earnings.minPayoutCredits - earnings.availableCredits).toLocaleString()} more credits to reach the minimum payout threshold.
+        </p>
+      )}
+      {(payoutMethods as any[]).length === 0 && earnings && (
+        <p className="text-xs text-amber-400 text-center">Add a payout method below before requesting a withdrawal.</p>
+      )}
+
+      {/* Payout History */}
+      {(payoutHistory as any[]).length > 0 && (
+        <Card className="border-border/30 bg-card/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-amber-400" /> Payout History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(payoutHistory as any[]).map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+                  <div>
+                    <div className="text-sm font-medium">${p.amountAud} AUD</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.creditsRedeemed?.toLocaleString()} credits
+                      {p.method ? ` via ${METHOD_LABEL[p.method.methodType] || p.method.methodType}` : ""}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()}</div>
+                    {p.adminNotes && <div className="text-xs text-muted-foreground italic mt-0.5">Note: {p.adminNotes}</div>}
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLES[p.status] || ""}`}>{p.status}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payout Methods Manager (existing component) */}
+      <PayoutMethodsManager />
+
+      {/* Request Payout Dialog */}
+      <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+        <DialogContent className="border-border/30 bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Payout</DialogTitle>
+            <DialogDescription>
+              Your credits will be deducted immediately. Payouts are reviewed and processed within 2–5 business days.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium block mb-1">Payout Method</label>
+              <Select value={selectedMethodId?.toString() ?? ""} onValueChange={(v) => setSelectedMethodId(Number(v))}>
+                <SelectTrigger className="border-border/40">
+                  <SelectValue placeholder="Select payout method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(payoutMethods as any[]).map((m: any) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.label || METHOD_LABEL[m.methodType] || m.methodType}
+                      {m.isDefault ? " (default)" : ""}
+                      {m.methodType === "paypal" && m.paypalEmail ? ` — ${m.paypalEmail}` : ""}
+                      {m.methodType === "bank_transfer" && m.bankAccountName ? ` — ${m.bankAccountName}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Credits to Redeem</label>
+              <Input
+                type="number"
+                placeholder="e.g. 25000"
+                value={creditsToRedeem}
+                onChange={(e) => setCreditsToRedeem(e.target.value)}
+                min={25000}
+                max={earnings?.availableCredits ?? 0}
+                step={1000}
+                className="border-border/40"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                = ${audPreview} AUD &nbsp;&middot;&nbsp; Available: {earnings?.availableCredits?.toLocaleString() ?? 0} credits
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleRequestPayout}
+              disabled={requestPayoutMutation.isPending}
+            >
+              {requestPayoutMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <DollarSign className="w-4 h-4 mr-1" />}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
 // PAYOUT METHODS MANAGER — BSB/Account, PayPal, Stripe Connect
 // ═══════════════════════════════════════════════════════════════════
 
@@ -2327,7 +2545,7 @@ function SellerDashboardView() {
         </TabsContent>
 
         <TabsContent value="payouts">
-          <PayoutMethodsManager />
+          <EarningsAndPayouts />
         </TabsContent>
       </Tabs>
     </div>

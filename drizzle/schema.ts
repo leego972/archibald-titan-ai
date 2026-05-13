@@ -834,6 +834,7 @@ export const creditTransactions = mysqlTable("credit_transactions", {
       "marketplace_list", "marketplace_feature", "marketplace_purchase",
       "marketplace_seller_fee", "marketplace_seller_renewal",
       "marketplace_boost", "marketplace_verification",
+      "marketplace_payout", "marketplace_payout_refund",
       "marketplace_ai_describe", "marketplace_ai_price",
       // ── Site monitor & sandbox ────────────────────────────────────────────────────
       "site_monitor_add", "site_monitor_check", "sandbox_run",
@@ -2507,3 +2508,21 @@ export const venicelDailyUsage = mysqlTable(
 );
 export type VeniceDailyUsage = typeof venicelDailyUsage.$inferSelect;
 export type InsertVeniceDailyUsage = typeof venicelDailyUsage.$inferInsert;
+
+// ─── Seller Payout Requests ────────────────────────────────────────
+  export const sellerPayoutRequests = mysqlTable("seller_payout_requests", {
+    id: int("id").autoincrement().primaryKey(),
+    sellerId: int("sellerId").notNull(),
+    userId: int("userId").notNull(),
+    payoutMethodId: int("payoutMethodId").notNull(),
+    creditsRedeemed: int("creditsRedeemed").notNull(),
+    amountAud: varchar("amountAud", { length: 20 }).notNull(),
+    status: mysqlEnum("status", ["pending", "processing", "paid", "rejected"]).notNull().default("pending"),
+    adminNotes: text("adminNotes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    processedAt: timestamp("processedAt"),
+  });
+  export type SellerPayoutRequest = typeof sellerPayoutRequests.$inferSelect;
+  export type InsertSellerPayoutRequest = typeof sellerPayoutRequests.$inferInsert;
+  

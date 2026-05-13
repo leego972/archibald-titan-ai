@@ -1331,6 +1331,147 @@ export const marketplaceRouter = router({
       return { success: true };
     }),
 
+  /** Get seller earnings summary and withdrawable balance */
+  getSellerEarnings: protectedProcedure.query(async ({ ctx }) => {
+    const database = await getDb();
+    if (!database || !ctx.user?.id) return null;
+    const { sellerProfiles, sellerPayoutRequests, creditBalances } = await import('../drizzle/schema');
+    const { eq, and, inArray } = await import('drizzle-orm');
+    const profiles = await database.select().from(sellerProfiles).where(eq(sellerProfiles.userId, ctx.user.id)).limit(1);
+    if (profiles.length === 0) return null;
+    const profile = profiles[0];
+    const balRows = await database.select().from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+    const availableCredits = balRows[0]?.credits ?? 0;
+    let pendingCredits = 0;
+    try {
+      const pending = await database.select().from(sellerPayoutRequests)
+        .where(and(eq(sellerPayoutRequests.userId, ctx.user.id), inArray(sellerPayoutRequests.status, ['pending', 'processing'])));
+      pendingCredits = pending.reduce((s, p) => s + p.creditsRedeemed, 0);
+    } catch {}
+    const RATE = 0.0004, MIN = 25000;
+    return {
+      totalRevenueCredits: profile.totalRevenue,
+      totalRevenueAud: (profile.totalRevenue * RATE).toFixed(2),
+      availableCredits,
+      withdrawableAud: (availableCredits * RATE).toFixed(2),
+      pendingCredits,
+      pendingAud: (pendingCredits * RATE).toFixed(2),
+      minPayoutCredits: MIN,
+      minPayoutAud: (MIN * RATE).toFixed(2),
+      canWithdraw: availableCredits >= MIN,
+      creditToAudRate: RATE,
+    };
+  }),
+
+  /** Request a payout — deducts credits, creates a pending payout record */
+  requestPayout: protectedProcedure
+    .input(z.object({ creditsToRedeem: z.number().int().min(25000), payoutMethodId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database || !ctx.user?.id) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const { sellerProfiles, sellerPayoutMethods, sellerPayoutRequests, creditBalances, creditTransactions } = await import('../drizzle/schema');
+      const { eq, and, sql } = await import('drizzle-orm');
+      const RATE = 0.0004, MIN = 25000;
+      if (input.creditsToRedeem < MIN)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Minimum payout is 25,000 credits (~$10 AUD)' });
+      const [profile] = await database.select().from(sellerProfiles).where(eq(sellerProfiles.userId, ctx.user.id)).limit(1);
+      if (!profile) throw new TRPCError({ code: 'FORBIDDEN', message: 'You must be a registered seller' });
+      const [method] = await database.select().from(sellerPayoutMethods)
+        .where(and(eq(sellerPayoutMethods.id, input.payoutMethodId), eq(sellerPayoutMethods.userId, ctx.user.id))).limit(1);
+      if (!method) throw new TRPCError({ code: 'NOT_FOUND', message: 'Payout method not found' });
+      return await database.transaction(async (tx) => {
+        const [bal] = await tx.select({ credits: creditBalances.credits })
+          .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).for('update').limit(1);
+        if (!bal || bal.credits < input.creditsToRedeem)
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Insufficient credit balance' });
+        await tx.update(creditBalances).set({
+          credits: sql`${creditBalances.credits} - ${input.creditsToRedeem}`,
+          lifetimeCreditsUsed: sql`${creditBalances.lifetimeCreditsUsed} + ${input.creditsToRedeem}`,
+        }).where(eq(creditBalances.userId, ctx.user.id));
+        const [updated] = await tx.select({ credits: creditBalances.credits })
+          .from(creditBalances).where(eq(creditBalances.userId, ctx.user.id)).limit(1);
+        const aud = (input.creditsToRedeem * RATE).toFixed(2);
+        await tx.insert(creditTransactions).values({
+          userId: ctx.user.id, amount: -input.creditsToRedeem, type: 'marketplace_payout',
+          description: 'Payout request: ' + input.creditsToRedeem.toLocaleString() + ' credits to $' + aud + ' AUD via ' + method.methodType,
+          balanceAfter: updated?.credits ?? 0,
+        });
+        await tx.insert(sellerPayoutRequests).values({
+          sellerId: profile.id, userId: ctx.user.id, payoutMethodId: input.payoutMethodId,
+          creditsRedeemed: input.creditsToRedeem, amountAud: aud, status: 'pending',
+        });
+        return { success: true, creditsRedeemed: input.creditsToRedeem, amountAud: aud };
+      });
+    }),
+
+  /** Get payout history for current seller */
+  getPayoutHistory: protectedProcedure.query(async ({ ctx }) => {
+    const database = await getDb();
+    if (!database || !ctx.user?.id) return [];
+    const { sellerPayoutRequests, sellerPayoutMethods } = await import('../drizzle/schema');
+    const { eq, desc } = await import('drizzle-orm');
+    try {
+      const rows = await database.select({ req: sellerPayoutRequests, method: sellerPayoutMethods })
+        .from(sellerPayoutRequests)
+        .leftJoin(sellerPayoutMethods, eq(sellerPayoutRequests.payoutMethodId, sellerPayoutMethods.id))
+        .where(eq(sellerPayoutRequests.userId, ctx.user.id))
+        .orderBy(desc(sellerPayoutRequests.createdAt));
+      return rows.map(r => ({ ...r.req, method: r.method }));
+    } catch { return []; }
+  }),
+
+  /** Admin: list all payout requests */
+  adminListPayoutRequests: protectedProcedure.query(async ({ ctx }) => {
+    if (!isAdminRole(ctx.user?.role)) throw new TRPCError({ code: 'UNAUTHORIZED' });
+    const database = await getDb();
+    if (!database) return [];
+    const { sellerPayoutRequests, sellerPayoutMethods, users } = await import('../drizzle/schema');
+    const { eq, desc } = await import('drizzle-orm');
+    try {
+      const rows = await database.select({ req: sellerPayoutRequests, method: sellerPayoutMethods, user: { id: users.id, email: users.email, username: users.username } })
+        .from(sellerPayoutRequests)
+        .leftJoin(sellerPayoutMethods, eq(sellerPayoutRequests.payoutMethodId, sellerPayoutMethods.id))
+        .leftJoin(users, eq(sellerPayoutRequests.userId, users.id))
+        .orderBy(desc(sellerPayoutRequests.createdAt));
+      return rows.map(r => ({ ...r.req, method: r.method, user: r.user }));
+    } catch { return []; }
+  }),
+
+  /** Admin: approve, mark paid, or reject a payout request */
+  adminProcessPayoutRequest: protectedProcedure
+    .input(z.object({ requestId: z.number(), action: z.enum(['processing', 'paid', 'rejected']), adminNotes: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdminRole(ctx.user?.role)) throw new TRPCError({ code: 'UNAUTHORIZED' });
+      const database = await getDb();
+      if (!database) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const { sellerPayoutRequests, creditBalances, creditTransactions } = await import('../drizzle/schema');
+      const { eq, sql } = await import('drizzle-orm');
+      const [request] = await database.select().from(sellerPayoutRequests).where(eq(sellerPayoutRequests.id, input.requestId)).limit(1);
+      if (!request) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (request.status === 'paid') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Already paid' });
+      if (input.action === 'rejected') {
+        await database.transaction(async (tx) => {
+          await tx.update(creditBalances).set({ credits: sql`${creditBalances.credits} + ${request.creditsRedeemed}` })
+            .where(eq(creditBalances.userId, request.userId));
+          const [upd] = await tx.select({ credits: creditBalances.credits }).from(creditBalances).where(eq(creditBalances.userId, request.userId)).limit(1);
+          await tx.insert(creditTransactions).values({
+            userId: request.userId, amount: request.creditsRedeemed, type: 'marketplace_payout_refund',
+            description: 'Payout #' + request.id + ' rejected — ' + request.creditsRedeemed.toLocaleString() + ' credits refunded',
+            balanceAfter: upd?.credits ?? 0,
+          });
+          await tx.update(sellerPayoutRequests).set({ status: 'rejected', adminNotes: input.adminNotes ?? null, processedAt: sql`NOW()` })
+            .where(eq(sellerPayoutRequests.id, input.requestId));
+        });
+      } else {
+        await database.update(sellerPayoutRequests).set({
+          status: input.action, adminNotes: input.adminNotes ?? null,
+          processedAt: input.action === 'paid' ? sql`NOW()` : null,
+        }).where(eq(sellerPayoutRequests.id, input.requestId));
+      }
+      return { success: true };
+    }),
+
+
   /** Get Stripe Connect onboarding link (for incomplete onboarding) */
   getStripeOnboardingLink: protectedProcedure
     .input(z.object({ payoutMethodId: z.number() }))
