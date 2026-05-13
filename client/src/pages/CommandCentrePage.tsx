@@ -119,37 +119,37 @@ export default function CommandCentrePage() {
   return (
     <div className="flex flex-col h-full bg-[#02040a] text-white">
       {/* Header */}
-      <div className="border-b border-white/[0.05] px-8 py-8 bg-[#02040a]/50 backdrop-blur-xl sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-5">
-            <div className="p-3 bg-blue-600/10 rounded-xl border border-blue-600/20">
-              <Monitor className="w-6 h-6 text-blue-400" />
+      <div className="border-b border-white/[0.05] px-4 sm:px-8 py-5 sm:py-8 bg-[#02040a]/50 backdrop-blur-xl sticky top-0 z-20">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-8">
+          <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+            <div className="p-2.5 sm:p-3 bg-blue-600/10 rounded-xl border border-blue-600/20 shrink-0">
+              <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
             </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase">Command Center</h1>
-              <p className="text-sm text-white/30 font-medium">Enterprise orchestration and real-time engine status</p>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase leading-tight">Command Center</h1>
+              <p className="text-xs sm:text-sm text-white/30 font-medium">Enterprise orchestration and real-time engine status</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] rounded-lg border border-white/[0.05]">
               <Zap className="w-3.5 h-3.5 text-amber-400/60" />
               <span className="text-xs font-bold text-white/60">
                 {credits ? ((credits as any).balance ?? 0).toLocaleString() : "0"} Credits
               </span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetchCredits()} className="border-white/10 bg-white/5 text-white/40 hover:text-white h-10 px-4 font-bold">
-              <RefreshCw className="w-4 h-4 mr-2" /> Sync
+            <Button variant="outline" size="sm" onClick={() => refetchCredits()} className="border-white/10 bg-white/5 text-white/40 hover:text-white h-8 sm:h-10 px-3 sm:px-4 font-bold">
+              <RefreshCw className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Sync</span>
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {["all", "security", "infrastructure", "growth"].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.15em] transition-all border ${
+              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] transition-all border whitespace-nowrap ${
                 categoryFilter === cat 
                   ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20" 
                   : "bg-white/[0.02] text-white/30 hover:text-white/60 border-white/[0.05]"
@@ -162,7 +162,7 @@ export default function CommandCentrePage() {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 p-4 sm:p-8 lg:p-12 overflow-y-auto custom-scrollbar">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredEngines.map((engine) => {
             const status = getEngineStatus(engine.id);
