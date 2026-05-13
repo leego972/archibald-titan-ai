@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -346,8 +346,9 @@ import { isAdminRole } from "@shared/const";
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <Avatar className="h-9 w-9 border shrink-0">
-                      <AvatarFallback className="text-xs font-medium">
+                    <Avatar className="h-9 w-9 border border-green-500/30 shrink-0 bg-black">
+                      <AvatarImage src="/Madebyleego.png" alt="Leego" className="object-contain p-0.5" style={{ filter: "drop-shadow(0 0 4px rgba(0,255,50,0.5))" }} />
+                      <AvatarFallback className="text-xs font-medium bg-black text-green-400">
                         {user?.name?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
