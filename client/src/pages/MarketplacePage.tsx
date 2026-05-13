@@ -1177,12 +1177,24 @@ function InventoryView({ onSelectListing }: { onSelectListing: (id: number) => v
                           {!purchase.hasReviewed && <Badge className="bg-amber-600/20 text-amber-400 text-[10px]">Review pending</Badge>}
                         </div>
                         <div className="mt-2 flex gap-2">
-                          <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-600/50 text-xs h-7"
-                            disabled={downloading === purchase.downloadToken}
-                            onClick={(e) => handleDownload(e, purchase.downloadToken)}>
-                            {downloading === purchase.downloadToken ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-                            Download ({purchase.maxDownloads - purchase.downloadCount} left)
-                          </Button>
+                          {listing.fileUrl ? (
+                            purchase.downloadToken ? (
+                              <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-600/50 text-xs h-7"
+                                disabled={downloading === purchase.downloadToken || (purchase.maxDownloads - purchase.downloadCount) <= 0}
+                                onClick={(e) => handleDownload(e, purchase.downloadToken)}>
+                                {downloading === purchase.downloadToken ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
+                                {(purchase.maxDownloads - purchase.downloadCount) <= 0 ? "No downloads left" : `Download (${purchase.maxDownloads - purchase.downloadCount} left)`}
+                              </Button>
+                            ) : (
+                              <Badge className="bg-amber-600/20 text-amber-400 text-[10px] flex items-center gap-1 px-2 py-1 h-7">
+                                <Download className="w-3 h-3" /> Token pending
+                              </Badge>
+                            )
+                          ) : (
+                            <Badge className="bg-slate-600/20 text-slate-400 text-[10px] flex items-center gap-1 px-2 py-1 h-7">
+                              <Download className="w-3 h-3" /> No file uploaded yet
+                            </Badge>
+                          )}
                           <Button size="sm" variant="outline" className="text-red-400 border-red-600/50 text-xs h-7"
                             onClick={(e) => { e.stopPropagation(); setDisputeListingId(listing.id); }}>
                             <AlertTriangle className="w-3 h-3 mr-1" /> Dispute
@@ -1815,10 +1827,11 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
 
   const createMutation = trpc.marketplace.create.useMutation({
     onSuccess: (data) => {
-      toast.success(`Listing created! ID: ${data.uid}. Risk: ${data.riskCategory}. Status: ${data.reviewStatus}`);
+      toast.success(`Listing created! Now upload your file so buyers can download it.`, { duration: 5000 });
       setShowCreateDialog(false);
       setNewListing({ title: "", description: "", longDescription: "", category: "modules", priceCredits: 100, tags: "", language: "", license: "MIT", version: "1.0.0" });
       refetch();
+      setTimeout(() => handleFileUpload(data.id), 700);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -2132,12 +2145,13 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
                         Resume
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" className="text-blue-400 border-blue-600/50 text-xs"
+                    <Button size="sm" variant="outline" className="text-blue-400 border-blue-600/50 text-xs gap-1"
                       disabled={uploading === listing.id}
+                      title={listing.fileUrl ? "Replace the uploaded file" : "Upload the file buyers will download"}
                       onClick={() => handleFileUpload(listing.id)}>
                       {uploading === listing.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <Upload className="w-3.5 h-3.5" />}
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Uploading…</span></>
+                        : <><Upload className="w-3.5 h-3.5" /><span>{listing.fileUrl ? "Replace File" : "Upload File"}</span></>}
                     </Button>
                     <Button size="sm" variant="outline" className="text-purple-400 border-purple-600/50 text-xs"
                       title="Boost listing for 7 days (200 credits)"
