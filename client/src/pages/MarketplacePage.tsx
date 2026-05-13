@@ -597,6 +597,7 @@ function BrowseView({ onSelectListing, onListItem }: { onSelectListing: (id: num
 // ═══════════════════════════════════════════════════════════════════
 
 function DetailView({ listingId, onBack }: { listingId: number; onBack: () => void }) {
+  const { user: currentUser } = useAuth();
   const { data, isLoading } = trpc.marketplace.getById.useQuery({ id: listingId });
   const { data: hasPurchased } = trpc.marketplace.hasPurchased.useQuery({ listingId });
   const sub = useSubscription();
@@ -649,6 +650,7 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
   if (!data) return <div className="text-center py-20 text-muted-foreground">Listing not found</div>;
 
   const { listing, reviews, seller } = data;
+  const isOwnListing = !!(currentUser && listing.sellerId === (currentUser as any).id);
   let tags: string[] = [];
   try { tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : []; } catch { tags = []; }
   const CatIcon = CATEGORY_ICONS[listing.category] || Package2;
@@ -815,7 +817,14 @@ function DetailView({ listingId, onBack }: { listingId: number; onBack: () => vo
                 )}
               </div>
 
-              {hasPurchased ? (
+              {isOwnListing ? (
+                <div className="space-y-2">
+                  <Button className="w-full border-amber-600/50 text-amber-400" variant="outline" disabled>
+                    <Store className="w-4 h-4 mr-2" /> Your Listing
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">Manage this from your seller dashboard</p>
+                </div>
+              ) : hasPurchased ? (
                 <div className="space-y-2">
                   <Button className="w-full bg-emerald-600 hover:bg-emerald-700" disabled>
                     <CheckCircle2 className="w-4 h-4 mr-2" /> Purchased
