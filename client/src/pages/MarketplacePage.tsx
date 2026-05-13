@@ -19,8 +19,10 @@ import {
   TrendingUp, BarChart3, Tag, ExternalLink, ArrowLeft, Coins, MessageSquare,
   Skull, Bug, Database, FileText, Zap, Crown, Upload, CreditCard, Wallet,
   Building2, Mail, Link2, Trash2, Edit, Settings,
+  Globe, Lock, RefreshCw, Code, CheckCircle, Users,
 } from "lucide-react";
-import AffiliateRecommendations from "@/components/AffiliateRecommendations";
+import { Label } from "@/components/ui/label";
+  import AffiliateRecommendations from "@/components/AffiliateRecommendations";
 import { BAZAAR_LOGO_256, BAZAAR_LOGO_128 } from "@/lib/logos";
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -146,6 +148,7 @@ function MarketplaceNav({ activeTab, onTabChange }: { activeTab: string; onTabCh
     { id: "purchases", label: "Purchases", labelFull: "My Purchases", icon: Package2 },
     { id: "listings", label: "Listings", labelFull: "My Listings", icon: ShoppingBag },
     { id: "dashboard", label: "Seller", labelFull: "Seller Dashboard", icon: LayoutDashboard },
+    { id: "security", label: "Security", labelFull: "Security Modules", icon: Shield },
   ];
 
   return (
@@ -2570,7 +2573,335 @@ function SellerDashboardView() {
 // MAIN MARKETPLACE PAGE — Tab-based Router
 // ═══════════════════════════════════════════════════════════════════
 
-export default function MarketplacePage() {
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SECURITY MODULES VIEW — Free community library of security modules
+  // ═══════════════════════════════════════════════════════════════════
+
+  const SEC_CATEGORY_ICONS: Record<string, React.ReactNode> = {
+    osint: <Eye className="h-4 w-4" />,
+    exploitation: <Zap className="h-4 w-4" />,
+    recon: <Globe className="h-4 w-4" />,
+    post_exploitation: <Shield className="h-4 w-4" />,
+    reporting: <Code className="h-4 w-4" />,
+    automation: <RefreshCw className="h-4 w-4" />,
+    evasion: <Lock className="h-4 w-4" />,
+    forensics: <Search className="h-4 w-4" />,
+  };
+
+  const SEC_CATEGORY_COLORS: Record<string, string> = {
+    osint: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    exploitation: "text-red-400 bg-red-500/10 border-red-500/20",
+    recon: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    post_exploitation: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+    reporting: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+    automation: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+    evasion: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+    forensics: "text-pink-400 bg-pink-500/10 border-pink-500/20",
+  };
+
+  function SecurityModulesView() {
+    const [search, setSearch] = useState("");
+    const [secCategory, setSecCategory] = useState<string>("all");
+    const [sortBy, setSortBy] = useState<"downloads" | "rating" | "newest">("downloads");
+    const [selectedModule, setSelectedModule] = useState<any>(null);
+    const [showPublish, setShowPublish] = useState(false);
+    const [publishForm, setPublishForm] = useState({
+      name: "", description: "", category: "osint", version: "1.0.0", tags: "", code: "", readme: "", price: 0,
+    });
+
+    const { data: modulesData, refetch } = trpc.securityMarketplace.listModules.useQuery({
+      search: search || undefined,
+      category: secCategory === "all" ? undefined : secCategory as any,
+      sortBy,
+    });
+
+    const { data: installedData, refetch: refetchInstalled } = trpc.securityMarketplace.getInstalled.useQuery();
+    const { data: statsData } = trpc.securityMarketplace.getStats.useQuery();
+
+    const installModule = trpc.securityMarketplace.installModule.useMutation({
+      onSuccess: () => {
+        refetchInstalled();
+        toast.success("Module installed — " + (selectedModule?.name ?? "") + " is ready to use");
+        setSelectedModule(null);
+      },
+      onError: (e: any) => toast.error("Install failed: " + e.message),
+    });
+
+    const uninstallModule = trpc.securityMarketplace.uninstallModule.useMutation({
+      onSuccess: () => { refetchInstalled(); toast.success("Module uninstalled"); },
+    });
+
+    const rateModule = trpc.securityMarketplace.rateModule.useMutation({
+      onSuccess: () => { refetch(); toast.success("Rating submitted"); },
+    });
+
+    const publishModule = trpc.securityMarketplace.publishModule.useMutation({
+      onSuccess: () => { refetch(); setShowPublish(false); toast.success("Module submitted for review"); },
+      onError: (e: any) => toast.error("Publish failed: " + e.message),
+    });
+
+    const modules = (modulesData as any)?.modules ?? [];
+    const installed = (installedData as any)?.modules ?? [];
+    const installedIds = new Set(installed.map((m: any) => m.moduleId));
+    const stats = statsData as any;
+
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Shield className="h-6 w-6 text-red-400" />
+              Security Module Library
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Free community security modules — install, rate, and publish your own</p>
+          </div>
+          <Button onClick={() => setShowPublish(true)} className="bg-red-700 hover:bg-red-600 text-white shrink-0">
+            <Upload className="h-4 w-4 mr-2" /> Publish Module
+          </Button>
+        </div>
+
+        {/* Stats */}
+        {stats && (
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex items-center gap-2 px-4 py-2 bg-card/50 border border-border/30 rounded-lg">
+              <Database className="h-4 w-4 text-red-400" />
+              <span className="text-sm font-bold">{stats.totalModules ?? 0}</span>
+              <span className="text-xs text-muted-foreground">modules</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-card/50 border border-border/30 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-bold">{installed.length}</span>
+              <span className="text-xs text-muted-foreground">installed</span>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search security modules..."
+              className="pl-9 bg-card/50 border-border/50"
+            />
+          </div>
+          <Select value={secCategory} onValueChange={setSecCategory}>
+            <SelectTrigger className="w-44 bg-card/50 border-border/50">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {Object.keys(SEC_CATEGORY_ICONS).map((c) => (
+                <SelectItem key={c} value={c} className="capitalize">{c.replace("_", " ")}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <SelectTrigger className="w-36 bg-card/50 border-border/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="downloads">Most Popular</SelectItem>
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="rating">Top Rated</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Installed pills */}
+        {installed.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs text-muted-foreground self-center">Installed:</span>
+            {installed.map((inst: any) => (
+              <Badge key={inst.moduleId} className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 text-xs gap-1">
+                <CheckCircle className="w-3 h-3" /> {inst.moduleName}
+                <button onClick={() => uninstallModule.mutate({ moduleId: inst.moduleId })} className="ml-1 hover:text-red-400 transition-colors">×</button>
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Module Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {modules.map((mod: any) => (
+            <Card
+              key={mod.id}
+              className="border-border/30 bg-card/50 hover:border-red-600/40 cursor-pointer transition-all"
+              onClick={() => setSelectedModule(mod)}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`p-2 rounded-lg border ${SEC_CATEGORY_COLORS[mod.category] ?? "text-muted-foreground bg-card border-border"}`}>
+                    {SEC_CATEGORY_ICONS[mod.category] ?? <Database className="h-4 w-4" />}
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap justify-end">
+                    {installedIds.has(mod.id) && (
+                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 text-[10px]">Installed</Badge>
+                    )}
+                    {mod.verified && (
+                      <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30 text-[10px]">Verified</Badge>
+                    )}
+                  </div>
+                </div>
+                <h3 className="font-semibold text-sm mb-1">{mod.name}</h3>
+                <p className="text-muted-foreground text-xs line-clamp-2 mb-3">{mod.description}</p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                    <span className="text-amber-400">{(mod.rating ?? 0).toFixed(1)}</span>
+                    <span>({mod.ratingCount ?? 0})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Download className="h-3 w-3" />
+                    <span>{(mod.downloads ?? 0).toLocaleString()}</span>
+                  </div>
+                  <span>v{mod.version}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {(mod.tags ?? []).slice(0, 3).map((tag: string) => (
+                    <span key={tag} className="text-[10px] bg-muted/40 text-muted-foreground px-2 py-0.5 rounded">#{tag}</span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {modules.length === 0 && (
+          <div className="text-center py-16">
+            <Shield className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+            <p className="text-muted-foreground">No modules found. Try adjusting your search or be the first to publish one!</p>
+          </div>
+        )}
+
+        {/* Module Detail Dialog */}
+        {selectedModule && (
+          <Dialog open={!!selectedModule} onOpenChange={() => setSelectedModule(null)}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`p-2 rounded-lg border ${SEC_CATEGORY_COLORS[selectedModule.category] ?? "text-muted-foreground bg-card border-border"}`}>
+                    {SEC_CATEGORY_ICONS[selectedModule.category] ?? <Database className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <DialogTitle>{selectedModule.name}</DialogTitle>
+                    <div className="text-sm text-muted-foreground">by {selectedModule.authorName} · v{selectedModule.version}</div>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm">{selectedModule.description}</p>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                    <span className="text-amber-400 font-medium">{(selectedModule.rating ?? 0).toFixed(1)}</span>
+                    <span className="text-muted-foreground">({selectedModule.ratingCount ?? 0} ratings)</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Download className="h-4 w-4" />
+                    <span>{(selectedModule.downloads ?? 0).toLocaleString()} downloads</span>
+                  </div>
+                </div>
+                {selectedModule.readme && (
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/40">
+                    <div className="text-xs text-muted-foreground mb-2 font-mono">README</div>
+                    <pre className="text-sm whitespace-pre-wrap font-mono text-foreground/80">{selectedModule.readme}</pre>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1">
+                  {(selectedModule.tags ?? []).map((tag: string) => (
+                    <span key={tag} className="text-xs bg-muted/40 text-muted-foreground px-2 py-1 rounded">#{tag}</span>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground mb-2">Rate this module:</div>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button key={star} onClick={() => rateModule.mutate({ moduleId: selectedModule.id, rating: star, comment: "" })} className="text-muted-foreground/30 hover:text-amber-400 transition-colors">
+                        <Star className="h-5 w-5" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedModule(null)}>Close</Button>
+                {installedIds.has(selectedModule.id) ? (
+                  <Button variant="outline" className="text-red-400 border-red-600/50 hover:bg-red-600/10"
+                    onClick={() => { uninstallModule.mutate({ moduleId: selectedModule.id }); setSelectedModule(null); }}>
+                    Uninstall
+                  </Button>
+                ) : (
+                  <Button onClick={() => installModule.mutate({ moduleId: selectedModule.id })} disabled={installModule.isPending} className="bg-red-700 hover:bg-red-600">
+                    {installModule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Download className="h-4 w-4 mr-2" />Install Free</>}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Publish Dialog */}
+        <Dialog open={showPublish} onOpenChange={setShowPublish}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Publish Security Module</DialogTitle>
+              <DialogDescription>Share your security module with the community — free to install</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
+                <Label>Module Name</Label>
+                <Input value={publishForm.name} onChange={(e) => setPublishForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. LinkedIn OSINT Scraper" className="bg-card/50 border-border/50" />
+              </div>
+              <div className="space-y-1">
+                <Label>Description</Label>
+                <Textarea value={publishForm.description} onChange={(e) => setPublishForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this module do?" rows={3} className="bg-card/50 border-border/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Category</Label>
+                  <Select value={publishForm.category} onValueChange={(v) => setPublishForm(f => ({ ...f, category: v }))}>
+                    <SelectTrigger className="bg-card/50 border-border/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(SEC_CATEGORY_ICONS).map((c) => (
+                        <SelectItem key={c} value={c} className="capitalize">{c.replace("_", " ")}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Version</Label>
+                  <Input value={publishForm.version} onChange={(e) => setPublishForm(f => ({ ...f, version: e.target.value }))} placeholder="1.0.0" className="bg-card/50 border-border/50" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Tags (comma-separated)</Label>
+                <Input value={publishForm.tags} onChange={(e) => setPublishForm(f => ({ ...f, tags: e.target.value }))} placeholder="osint, linkedin, scraping" className="bg-card/50 border-border/50" />
+              </div>
+              <div className="space-y-1">
+                <Label>README / Instructions</Label>
+                <Textarea value={publishForm.readme} onChange={(e) => setPublishForm(f => ({ ...f, readme: e.target.value }))} placeholder="Installation and usage instructions..." rows={4} className="bg-card/50 border-border/50 font-mono text-xs" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPublish(false)}>Cancel</Button>
+              <Button onClick={() => publishModule.mutate({ ...publishForm, tags: publishForm.tags.split(",").map(t => t.trim()).filter(Boolean) })}
+                disabled={publishModule.isPending || !publishForm.name || !publishForm.description}
+                className="bg-red-700 hover:bg-red-600">
+                {publishModule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Upload className="h-4 w-4 mr-2" />Submit Module</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  export default function MarketplacePage() {
   const [location, navigate] = useLocation();
   const searchString = useSearch();
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
@@ -2600,6 +2931,7 @@ export default function MarketplacePage() {
     if (subPath === "inventory") return "purchases";
     if (subPath === "sell") return "listings";
     if (subPath === "seller") return "dashboard";
+    if (subPath === "security") return "security";
     return "browse";
   };
 
@@ -2613,6 +2945,7 @@ export default function MarketplacePage() {
     else if (tab === "purchases") navigate("/marketplace/inventory");
     else if (tab === "listings") navigate("/marketplace/sell");
     else if (tab === "dashboard") navigate("/marketplace/seller");
+    else if (tab === "security") navigate("/marketplace/security");
   };
 
   const handleSelectListing = (id: number) => {
@@ -2646,6 +2979,7 @@ export default function MarketplacePage() {
       {activeTab === "purchases" && <InventoryView onSelectListing={handleSelectListing} />}
       {activeTab === "listings" && <SellView onSelectListing={handleSelectListing} />}
       {activeTab === "dashboard" && <SellerDashboardView />}
+      {activeTab === "security" && <SecurityModulesView />}
     </>
   );
 }
