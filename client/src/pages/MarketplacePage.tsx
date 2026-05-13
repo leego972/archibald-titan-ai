@@ -2237,14 +2237,25 @@ function SellView({ onSelectListing }: { onSelectListing: (id: number) => void }
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Price (Credits) *</label>
-                <Input type="number" min={0} value={newListing.priceCredits} onChange={(e) => setNewListing({ ...newListing, priceCredits: parseInt(e.target.value) || 0 })} />
-                {priceSuggestion && (priceSuggestion as any).suggested && (
+                <Input type="number" min={500} value={newListing.priceCredits} onChange={(e) => setNewListing({ ...newListing, priceCredits: parseInt(e.target.value) || 0 })} />
+                {priceSuggestion && (priceSuggestion as any).suggested ? (
                   <p className="text-xs text-muted-foreground mt-1">
                     <Sparkles className="w-3 h-3 inline mr-1 text-purple-400" />
                     AI suggests: <button className="text-amber-400 hover:underline" onClick={() => setNewListing(prev => ({ ...prev, priceCredits: (priceSuggestion as any).suggested }))}>{(priceSuggestion as any).suggested} credits</button>
                     {(priceSuggestion as any).range && <span className="text-muted-foreground/60"> (range: {(priceSuggestion as any).range.min}–{(priceSuggestion as any).range.max})</span>}
                   </p>
-                )}
+                ) : BAZAAR_PRICE_GUIDE[newListing.category] ? (
+                  <div className="mt-2 p-2.5 bg-amber-600/5 border border-amber-600/20 rounded-lg text-[11px] space-y-1.5">
+                    <div className="flex items-center gap-3 font-medium">
+                      <span className="text-muted-foreground">Market guide:</span>
+                      <button onClick={() => setNewListing(prev => ({ ...prev, priceCredits: BAZAAR_PRICE_GUIDE[prev.category]?.min ?? prev.priceCredits }))} className="text-green-400 hover:underline">Min {BAZAAR_PRICE_GUIDE[newListing.category].min.toLocaleString()}</button>
+                      <button onClick={() => setNewListing(prev => ({ ...prev, priceCredits: BAZAAR_PRICE_GUIDE[prev.category]?.suggested ?? prev.priceCredits }))} className="text-amber-400 hover:underline font-bold">↑ {BAZAAR_PRICE_GUIDE[newListing.category].suggested.toLocaleString()} suggested</button>
+                      <button onClick={() => setNewListing(prev => ({ ...prev, priceCredits: BAZAAR_PRICE_GUIDE[prev.category]?.max ?? prev.priceCredits }))} className="text-red-400 hover:underline">Max {BAZAAR_PRICE_GUIDE[newListing.category].max.toLocaleString()}</button>
+                    </div>
+                    <p className="text-muted-foreground">{BAZAAR_PRICE_GUIDE[newListing.category].note}</p>
+                    <p className="text-muted-foreground/60">≈ ${(newListing.priceCredits / 100).toFixed(2)} USD · minimum 500 credits ($5.00)</p>
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -2600,6 +2611,32 @@ function SellerDashboardView() {
     forensics: "text-pink-400 bg-pink-500/10 border-pink-500/20",
   };
 
+  // Credit pricing benchmarks  (1 cr ≈ $0.01 USD)
+  // Market refs: Metasploit Pro $15k/yr · Cobalt Strike $3.5k/yr · Burp Suite $449/yr
+  //              GoPhish $199/mo · SpiderFoot $99/mo · Maltego $999/yr
+  const SEC_MODULE_PRICES: Record<string, { min: number; suggested: number; max: number; usd: string }> = {
+    osint:           { min: 1500,  suggested: 2500,  max: 6000,  usd: "$15–60"  },
+    scanning:        { min: 3000,  suggested: 5000,  max: 12000, usd: "$30–120" },
+    exploitation:    { min: 8000,  suggested: 15000, max: 35000, usd: "$80–350" },
+    phishing:        { min: 5000,  suggested: 8000,  max: 18000, usd: "$50–180" },
+    anonymity:       { min: 2000,  suggested: 4000,  max: 9000,  usd: "$20–90"  },
+    automation:      { min: 3000,  suggested: 6000,  max: 14000, usd: "$30–140" },
+    reporting:       { min: 800,   suggested: 1500,  max: 4000,  usd: "$8–40"   },
+    playbook:        { min: 8000,  suggested: 12000, max: 28000, usd: "$80–280" },
+    wordlist:        { min: 1500,  suggested: 3000,  max: 9000,  usd: "$15–90"  },
+    template:        { min: 500,   suggested: 2000,  max: 5500,  usd: "$5–55"   },
+  };
+
+  const BAZAAR_PRICE_GUIDE: Record<string, { min: number; suggested: number; max: number; note: string }> = {
+    modules:    { min: 500,   suggested: 2500,  max: 12000, note: "Basic scripts 500cr; AI-powered modules up to 12k" },
+    datasets:   { min: 2000,  suggested: 8000,  max: 30000, note: "Niche/proprietary data commands premium. Compare: $50–300 commercial datasets" },
+    agents:     { min: 5000,  suggested: 10000, max: 35000, note: "Full autonomous agents. Ref: AgentOps $100/mo, LangGraph Cloud $150/mo" },
+    blueprints: { min: 3000,  suggested: 7000,  max: 18000, note: "Architecture blueprints and battle-tested system designs" },
+    exploits:   { min: 10000, suggested: 20000, max: 80000, note: "Rare CVE exploits — price for exclusivity. Ref: Metasploit modules $15k/yr" },
+    templates:  { min: 500,   suggested: 2000,  max: 8000,  note: "Config, prompt and workflow templates" },
+    other:      { min: 500,   suggested: 3000,  max: 18000, note: "Price based on complexity and market uniqueness" },
+  };
+
   function SecurityModulesView() {
     const [search, setSearch] = useState("");
     const [secCategory, setSecCategory] = useState<string>("all");
@@ -2748,7 +2785,20 @@ function SellerDashboardView() {
                   </div>
                 </div>
                 <h3 className="font-semibold text-sm mb-1">{mod.name}</h3>
-                <p className="text-muted-foreground text-xs line-clamp-2 mb-3">{mod.description}</p>
+                <p className="text-muted-foreground text-xs line-clamp-2 mb-2">{mod.description}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  {mod.creditCost && mod.license !== "free" ? (
+                    <div className="flex items-center gap-1 text-amber-400 font-bold text-sm">
+                      <Coins className="w-3.5 h-3.5" /> {mod.creditCost.toLocaleString()}
+                      <span className="text-[10px] text-muted-foreground font-normal ml-0.5">(${(mod.creditCost / 100).toFixed(2)})</span>
+                    </div>
+                  ) : (
+                    <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 text-[10px]">Free</Badge>
+                  )}
+                  {mod.license === "subscription" && (
+                    <Badge className="bg-purple-600/20 text-purple-400 border-purple-600/30 text-[10px]">Subscription</Badge>
+                  )}
+                </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
@@ -2805,6 +2855,15 @@ function SellerDashboardView() {
                     <Download className="h-4 w-4" />
                     <span>{(selectedModule.downloads ?? 0).toLocaleString()} downloads</span>
                   </div>
+                  {selectedModule.creditCost && selectedModule.license !== "free" ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-600/10 border border-amber-600/30 rounded-lg">
+                      <Coins className="h-4 w-4 text-amber-400" />
+                      <span className="font-bold text-amber-400">{selectedModule.creditCost.toLocaleString()} credits</span>
+                      <span className="text-muted-foreground text-xs">(${(selectedModule.creditCost / 100).toFixed(2)})</span>
+                    </div>
+                  ) : (
+                    <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30">Free to install</Badge>
+                  )}
                 </div>
                 {selectedModule.readme && (
                   <div className="bg-muted/30 rounded-lg p-4 border border-border/40">
@@ -2837,7 +2896,7 @@ function SellerDashboardView() {
                   </Button>
                 ) : (
                   <Button onClick={() => installModule.mutate({ moduleId: selectedModule.id })} disabled={installModule.isPending} className="bg-red-700 hover:bg-red-600">
-                    {installModule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Download className="h-4 w-4 mr-2" />Install Free</>}
+                    {installModule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Download className="h-4 w-4 mr-2" />{selectedModule.creditCost && selectedModule.license !== "free" ? `Buy & Install · ${selectedModule.creditCost.toLocaleString()} cr` : "Install Free"}</>}
                   </Button>
                 )}
               </DialogFooter>
@@ -2850,7 +2909,7 @@ function SellerDashboardView() {
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Publish Security Module</DialogTitle>
-              <DialogDescription>Share your security module with the community — free to install</DialogDescription>
+              <DialogDescription>Share your security module — set a credit price or publish free to the community</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1">
@@ -2881,6 +2940,44 @@ function SellerDashboardView() {
               <div className="space-y-1">
                 <Label>Tags (comma-separated)</Label>
                 <Input value={publishForm.tags} onChange={(e) => setPublishForm(f => ({ ...f, tags: e.target.value }))} placeholder="osint, linkedin, scraping" className="bg-card/50 border-border/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Pricing Model</Label>
+                  <Select
+                    value={(publishForm as any).license ?? "free"}
+                    onValueChange={(v) => setPublishForm(f => ({ ...f, license: v }))}>
+                    <SelectTrigger className="bg-card/50 border-border/50"><SelectValue placeholder="Free" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="free">Free — community library</SelectItem>
+                      <SelectItem value="credits">Paid — require credits</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Price (Credits)</Label>
+                  <Input
+                    type="number" min={0}
+                    value={(publishForm as any).creditCost ?? 0}
+                    onChange={(e) => setPublishForm(f => ({ ...f, creditCost: parseInt(e.target.value) || 0 }))}
+                    placeholder="0 = free"
+                    className="bg-card/50 border-border/50" />
+                  {publishForm.category && SEC_MODULE_PRICES[publishForm.category] && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Suggested:{" "}
+                      <button
+                        className="text-amber-400 hover:underline"
+                        onClick={() => setPublishForm(f => ({
+                          ...f,
+                          creditCost: SEC_MODULE_PRICES[f.category].suggested,
+                          license: "credits",
+                        }))}>
+                        {SEC_MODULE_PRICES[publishForm.category].suggested.toLocaleString()} cr
+                      </button>
+                      {" "}· range {SEC_MODULE_PRICES[publishForm.category].usd}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="space-y-1">
                 <Label>README / Instructions</Label>
