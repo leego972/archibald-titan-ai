@@ -72,7 +72,9 @@ const FEATURE_ACCESS: Record<string, PlanId[]> = {
   // Marketplace — Free plan can browse only; Pro+ can buy/sell
   marketplace_buy:  ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
   marketplace_sell: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
-  // Titan-exclusive features
+  // BridgeAI multi-agent orchestration — Enterprise and above
+    bridge_ai: ["enterprise", "cyber", "cyber_plus", "titan"],
+    // Titan-exclusive features
   zero_click_research: ["cyber_plus", "titan"],
   c2_framework: ["cyber_plus", "titan"],
   offensive_tooling: ["titan"],
