@@ -40,7 +40,7 @@ import { seoRouter, seoIntelligenceRouter } from "./seo-router";
 import { growthSuiteRouter } from "./growth-suite-router";
 import { blogRouter } from "./blog-router";
 import { advertisingRouter } from "./advertising-router";
-import { userSecretsRouter } from "./user-secrets-router";
+import { userSecretsRouter, veniceKeyRouter } from "./user-secrets-router";
 import { customInstructionsRouter } from "./custom-instructions-router";
 import { marketplaceRouter } from "./marketplace-router";
 import { marketplaceIntelligenceRouter } from "./marketplace-intelligence-router";
@@ -151,6 +151,7 @@ export const appRouter = router({
   blog: blogRouter,
   advertising: advertisingRouter,
   userSecrets: userSecretsRouter,
+  veniceKey: veniceKeyRouter,
   marketplace: marketplaceRouter,
   marketplaceIntelligence: marketplaceIntelligenceRouter,
   siteMonitor: siteMonitorRouter,
