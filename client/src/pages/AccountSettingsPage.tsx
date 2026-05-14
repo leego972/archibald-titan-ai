@@ -56,6 +56,121 @@ const providerConfig: Record<string, { label: string; color: string; icon: React
   },
 };
 
+// ─── Venice API Key Management Component ────────────────────────────────
+function VeniceKeySection() {
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const utils = trpc.useUtils();
+  const { data: keyData, isLoading } = trpc.veniceKey.getVeniceKey.useQuery();
+
+  const saveMutation = trpc.veniceKey.saveVeniceKey.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Venice API key saved (${data.maskedKey}) — builder is now live`);
+      setApiKey("");
+      setShowKey(false);
+      utils.veniceKey.getVeniceKey.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to save Venice API key"),
+    onSettled: () => setSaving(false),
+  });
+
+  const deleteMutation = trpc.veniceKey.deleteVeniceKey.useMutation({
+    onSuccess: () => {
+      toast.success("Venice API key removed");
+      utils.veniceKey.getVeniceKey.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to remove Venice API key"),
+    onSettled: () => setDeleting(false),
+  });
+
+  const testMutation = trpc.veniceKey.testVeniceKey.useMutation({
+    onSuccess: (data) => {
+      if (data.valid) toast.success("Venice API key is valid — builder will use it immediately");
+      else toast.error(data.error || "Venice key test failed");
+    },
+    onError: (err) => toast.error(err.message || "Failed to test Venice API key"),
+    onSettled: () => setTesting(false),
+  });
+
+  return (
+    <Card className="border-purple-500/30 bg-card/80">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Eye className="w-5 h-5 text-purple-400" />
+          Venice AI Key
+          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs ml-1">Builder Provider</Badge>
+        </CardTitle>
+        <CardDescription>
+          Set your personal <span className="font-medium text-purple-400">Venice API key</span> to power the Titan Builder while your self-hosted instance is being set up. Venice is privacy-first — no logging, no data retention.
+          {" "}<a href="https://venice.ai/settings/api" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">Get your key →</a>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+          </div>
+        ) : keyData?.hasKey ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                <span className="text-sm font-mono text-purple-300">{keyData.maskedKey}</span>
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">Active</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setTesting(true); testMutation.mutate(); }} disabled={testing} className="text-xs">
+                  {testing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Zap className="w-3 h-3 mr-1" />}
+                  {testing ? "Testing..." : "Test"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setDeleting(true); deleteMutation.mutate(); }} disabled={deleting} className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                  {deleting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                  Remove
+                </Button>
+              </div>
+            </div>
+            {keyData.lastUsedAt && (
+              <p className="text-xs text-muted-foreground">Last used: {new Date(keyData.lastUsedAt).toLocaleString()}</p>
+            )}
+            <Separator />
+            <p className="text-xs text-muted-foreground">To update your key, enter a new one below:</p>
+          </div>
+        ) : (
+          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-sm text-amber-400/80">
+            No Venice key set — the builder needs either this key or a running TitanAI instance to respond.
+          </div>
+        )}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Paste your Venice API key here..."
+              className="pr-10 font-mono text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
+          <Button onClick={() => { if (!apiKey.trim()) return; setSaving(true); saveMutation.mutate({ apiKey: apiKey.trim() }); }} disabled={saving || !apiKey.trim()} className="bg-purple-700 hover:bg-purple-600 text-white">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            {saving ? "Saving..." : "Save Key"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── OpenAI API Key Management Component ───────────────────────────────
 function OpenAIKeySection() {
   const [apiKey, setApiKey] = useState("");
@@ -824,6 +939,9 @@ export default function AccountSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Venice API Key Section */}
+      <VeniceKeySection />
 
       {/* OpenAI API Key Section */}
       <OpenAIKeySection />
