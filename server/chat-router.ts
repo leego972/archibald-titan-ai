@@ -9,7 +9,7 @@ import { eq, desc, and, like, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { invokeLLM, type Message, type ToolCall } from "./_core/llm";
-import { getUserOpenAIKey } from "./user-secrets-router";
+import { getUserOpenAIKey, getUserVeniceKey } from "./user-secrets-router";
 import { checkCredits, consumeCredits, getCreditBalance } from "./credit-service";
 import { checkRateLimit, recordRequest, buildStarted, buildFinished } from "./rate-limiter";
 import { getUserPlan } from "./subscription-gate";
@@ -1461,10 +1461,15 @@ export const chatRouter = router({
       // ── Parallelise pre-LLM async work ────────────────────────
       // Run all independent async operations concurrently to minimise
       // time-to-first-token. These do not depend on each other.
-      const [userApiKey, previousMessages, userContext, longTermMemory] = await Promise.all([
-        // 1. Personal API key lookup
+      const [userApiKey, userVeniceKey, previousMessages, userContext, longTermMemory] = await Promise.all([
+        // 1. Personal OpenAI API key lookup
         getUserOpenAIKey(userId).catch((err: unknown) => {
-          log.error("[Chat] Failed to load user API key:", { error: getErrorMessage(err) });
+          log.error("[Chat] Failed to load user OpenAI key:", { error: getErrorMessage(err) });
+          return undefined as string | undefined;
+        }),
+        // 2. Personal Venice API key lookup (used as platform Venice key if set)
+        getUserVeniceKey(userId).catch((err: unknown) => {
+          log.error("[Chat] Failed to load user Venice key:", { error: getErrorMessage(err) });
           return undefined as string | undefined;
         }),
         // 2. Conversation history (now uses enhanced memory module with 40-message context + summaries)
@@ -2200,6 +2205,7 @@ Do NOT attempt any tool calls or builds.`;
                 maxTokens: isBuildRequest ? 16384 : 2048,
                 ...(modelTier ? { model: modelTier } : {}),
                 ...(userApiKey ? { userApiKey } : {}),
+                ...(userVeniceKey ? { userVeniceKey } : {}),
                 // Security builds: route through OpenRouter uncensored model (Dolphin Mistral 24B Venice)
                 // This bypasses OpenAI's safety training entirely. Falls back to OpenAI if OpenRouter fails.
                 ...(useOpenRouterForSecurity ? { forceOpenRouter: true } : {}),
@@ -2311,6 +2317,7 @@ Do NOT attempt any tool calls or builds.`;
                   { role: 'user', content: input.message },
                 ],
                 ...(userApiKey ? { userApiKey } : {}),
+                ...(userVeniceKey ? { userVeniceKey } : {}),
                 // No forceOpenRouter here — this is a plain text fallback with no tools.
                 // Venice Dolphin doesn't support tool-calling and would fail.
                 userId,
@@ -3200,7 +3207,7 @@ ACTION REQUIRED: Answer the question or call create_file RIGHT NOW. No preamble.
         // If we exhausted rounds without a final text
         if (!finalText && rounds >= MAX_TOOL_ROUNDS) {
           // No forceOpenRouter here — Venice Dolphin doesn't support tool-calling.
-          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "strong" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), userId, planId: userPlanId });
+          const fallback = await invokeLLM({ priority: "chat", model: isAdmin ? "strong" : "fast", messages: llmMessages, ...(userApiKey ? { userApiKey } : {}), ...(userVeniceKey ? { userVeniceKey } : {}), userId, planId: userPlanId });
           finalText =
             extractText(fallback.choices?.[0]?.message?.content || "") ||
             "Sorted. Actions completed — check the results above.";
