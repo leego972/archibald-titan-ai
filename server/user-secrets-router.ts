@@ -478,6 +478,143 @@ export const userSecretsRouter = router({
 // Helper for chat-router: Get decrypted user API key (returns null if not set)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Venice API Key Management
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Validate that a string looks like a Venice API key */
+function isValidVeniceKey(key: string): boolean {
+  return key.length >= 20;
+}
+
+/** Mask a Venice API key for display */
+function maskVeniceKey(key: string): string {
+  if (key.length < 12) return "venice-****";
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
+}
+
+/** Validate a Venice API key by making a lightweight test call */
+async function validateVeniceKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch("https://api.venice.ai/api/v1/models", {
+      method: "GET",
+      headers: { authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.ok) return { valid: true };
+    if (response.status === 401) return { valid: false, error: "Invalid Venice API key — authentication failed" };
+    const body = await response.text().catch(() => "");
+    return { valid: false, error: `Venice returned ${response.status}: ${body.slice(0, 200)}` };
+  } catch (err: unknown) {
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      return { valid: false, error: "Connection to Venice timed out — please try again" };
+    }
+    return { valid: false, error: `Failed to connect to Venice: ${getErrorMessage(err)}` };
+  }
+}
+
+export const veniceKeyRouter = router({
+  /** Get the user's stored Venice API key (masked) */
+  getVeniceKey: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { hasKey: false, maskedKey: null, lastUsedAt: null };
+
+    const rows = await db.select().from(userSecrets)
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "venice_api_key")))
+      .limit(1);
+
+    if (rows.length === 0) return { hasKey: false, maskedKey: null, lastUsedAt: null };
+
+    try {
+      const decrypted = decrypt(rows[0].encryptedValue);
+      return { hasKey: true, maskedKey: maskVeniceKey(decrypted), lastUsedAt: rows[0].lastUsedAt?.toISOString() || null };
+    } catch {
+      return { hasKey: false, maskedKey: null, lastUsedAt: null };
+    }
+  }),
+
+  /** Save or update the user's Venice API key */
+  saveVeniceKey: protectedProcedure
+    .input(z.object({ apiKey: z.string().min(20, "Venice API key must be at least 20 characters") }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isValidVeniceKey(input.apiKey)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid Venice API key format — must be at least 20 characters." });
+      }
+
+      const validation = await validateVeniceKey(input.apiKey);
+      if (!validation.valid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: validation.error || "Venice API key validation failed" });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const encrypted = encrypt(input.apiKey);
+      const existing = await db.select({ id: userSecrets.id }).from(userSecrets)
+        .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "venice_api_key")))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db.update(userSecrets).set({ encryptedValue: encrypted, label: maskVeniceKey(input.apiKey) }).where(eq(userSecrets.id, existing[0].id));
+      } else {
+        await db.insert(userSecrets).values({ userId: ctx.user.id, secretType: "venice_api_key", encryptedValue: encrypted, label: maskVeniceKey(input.apiKey) });
+      }
+
+      return { success: true, maskedKey: maskVeniceKey(input.apiKey) };
+    }),
+
+  /** Delete the user's Venice API key */
+  deleteVeniceKey: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    await db.delete(userSecrets).where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "venice_api_key")));
+    return { success: true };
+  }),
+
+  /** Test the user's stored Venice API key */
+  testVeniceKey: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    const rows = await db.select().from(userSecrets)
+      .where(and(eq(userSecrets.userId, ctx.user.id), eq(userSecrets.secretType, "venice_api_key")))
+      .limit(1);
+
+    if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No Venice API key stored" });
+
+    let decrypted: string;
+    try { decrypted = decrypt(rows[0].encryptedValue); }
+    catch { throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to decrypt stored key" }); }
+
+    const validation = await validateVeniceKey(decrypted);
+    if (validation.valid) {
+      await db.update(userSecrets).set({ lastUsedAt: new Date() }).where(eq(userSecrets.id, rows[0].id));
+    }
+    return { valid: validation.valid, error: validation.error || null };
+  }),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Server-side helpers (called directly from routers, not via tRPC)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Get the user's Venice API key from the database (decrypted). Returns null if not set. */
+export async function getUserVeniceKey(userId: number): Promise<string | null> {
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db.select().from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.secretType, "venice_api_key")))
+      .limit(1);
+    if (rows.length === 0) return null;
+    const decrypted = decrypt(rows[0].encryptedValue);
+    db.update(userSecrets).set({ lastUsedAt: new Date() }).where(eq(userSecrets.id, rows[0].id)).catch(() => {});
+    return decrypted;
+  } catch {
+    return null;
+  }
+}
+
 export async function getUserOpenAIKey(userId: number): Promise<string | null> {
   try {
     const db = await getDb();
