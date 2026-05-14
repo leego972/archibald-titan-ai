@@ -164,6 +164,12 @@ export type InvokeParams = {
    * If omitted, "free" limits apply.
    */
   planId?: string;
+  /**
+   * The user's personal Venice API key — bypasses the shared platform Venice key.
+   * When set, this key is used for Venice routing instead of the VENICE_API_KEY env var.
+   * Allows admins/owners to configure their own Venice key without setting env vars.
+   */
+  userVeniceKey?: string;
 };
 
 export type ToolCall = {
@@ -563,8 +569,10 @@ async function _invokeGeneral(
   const sharedVeniceFailed = params._sharedVeniceFailed === true;
 
   // Venice Pro shared tier — primary provider for all users without their own key.
-  // Skipped if: user has their own key, Venice key not set, or Venice already failed this request.
-  const useSharedVenice = !usingUserKey && !forceGemini && !!VENICE_API_KEY && !sharedVeniceFailed;
+  // Uses user's personal Venice key if set, otherwise falls back to VENICE_API_KEY env var.
+  // Skipped if: user has their own OpenAI key, no Venice key available, or Venice already failed this request.
+  const effectiveVeniceKey = params.userVeniceKey || VENICE_API_KEY;
+  const useSharedVenice = !usingUserKey && !forceGemini && !!effectiveVeniceKey && !sharedVeniceFailed;
 
   // ── Venice shared-tier daily budget check ──
   if (useSharedVenice && params.userId) {
@@ -628,7 +636,7 @@ async function _invokeGeneral(
   const skipOpenAIPool = forceGemini || useSharedVenice;
   const keyHandle = (!usingUserKey && useOpenAI && !skipOpenAIPool) ? acquireKey(systemTag) : null;
   const apiKey = useSharedVenice
-    ? VENICE_API_KEY
+    ? effectiveVeniceKey
     : forceGemini
     ? GEMINI_API_KEY
     : usingUserKey ? params.userApiKey! : (keyHandle ? keyHandle.key : getLegacyApiKey());
