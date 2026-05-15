@@ -61,7 +61,7 @@ const FEATURE_ACCESS: Record<string, PlanId[]> = {
   csv_export: ["enterprise", "cyber", "cyber_plus", "titan"],
   api_export: ["enterprise", "cyber", "cyber_plus", "titan"],
   team_management: ["enterprise", "cyber", "cyber_plus", "titan"],
-  api_access: ["enterprise", "cyber", "cyber_plus", "titan"],
+  api_access: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
   sso_saml: ["enterprise", "cyber", "cyber_plus", "titan"],
   audit_logs: ["enterprise", "cyber", "cyber_plus", "titan"],
   // Cyber+ features
