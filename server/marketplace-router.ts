@@ -26,6 +26,7 @@ import {
 } from "./security-hardening";
 import { auditQueryParam } from "./security-fortress";
 import { isAdminRole } from '@shared/const';
+  import { getUserPlan, isFeatureAllowed } from "./subscription-gate";
 import { dispatchNotification } from "./notification-channels-router";
 const log = createLogger("MarketplaceRouter");
 
