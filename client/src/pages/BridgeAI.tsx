@@ -4,7 +4,7 @@ import { useState } from "react";
   import { Card, CardContent } from "@/components/ui/card";
   import {
     Bot, Brain, Code2, ExternalLink, Globe, Search, Zap,
-    ArrowRight, Maximize2, Minimize2, RefreshCw,
+    ArrowRight, Maximize2, Minimize2, RefreshCw, Loader2,
   } from "lucide-react";
   import { useSubscription } from "@/hooks/useSubscription";
   import { UpgradeBanner } from "@/components/UpgradePrompt";
@@ -29,6 +29,7 @@ import { useState } from "react";
     const [view, setView] = useState<ViewMode>("embed");
     const [iframeKey, setIframeKey] = useState(0);
     const [fullscreen, setFullscreen] = useState(false);
+    const [iframeLoading, setIframeLoading] = useState(true);
 
     const hasAccess = canUse("bridge_ai");
 
@@ -133,8 +134,18 @@ import { useState } from "react";
 
             {view === "embed" && (
               <>
-                <Button size="sm" variant="ghost" onClick={() => setIframeKey(k => k + 1)} title="Reload BridgeAI">
-                  <RefreshCw className="h-3.5 w-3.5" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setIframeLoading(true); setIframeKey(k => k + 1); }}
+                  title="Reload BridgeAI"
+                  disabled={iframeLoading}
+                >
+                  {iframeLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setFullscreen(f => !f)} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
                   {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -154,7 +165,13 @@ import { useState } from "react";
         </div>
 
         {view === "embed" && (
-          <div className={`flex-1 min-h-0 rounded-xl overflow-hidden border border-border/60 shadow-lg ${fullscreen ? "fixed inset-0 z-50 rounded-none border-0" : ""}`}>
+          <div className={`relative flex-1 min-h-0 rounded-xl overflow-hidden border border-border/60 shadow-lg ${fullscreen ? "fixed inset-0 z-50 rounded-none border-0" : ""}`}>
+            {iframeLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm z-10">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                <p className="text-sm text-muted-foreground">Loading BridgeAI…</p>
+              </div>
+            )}
             {fullscreen && (
               <div className="absolute top-3 right-3 z-10 flex gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setFullscreen(false)}>
@@ -169,6 +186,7 @@ import { useState } from "react";
               className="w-full h-full"
               style={{ minHeight: fullscreen ? "100vh" : "600px", border: "none" }}
               allow="clipboard-read; clipboard-write"
+              onLoad={() => setIframeLoading(false)}
             />
           </div>
         )}
@@ -181,7 +199,7 @@ import { useState } from "react";
               review in one unified workflow, at a fraction of single-model cost.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button className="gap-2 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeKey(k => k + 1); }}>
+              <Button className="gap-2 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeLoading(true); setIframeKey(k => k + 1); }}>
                 <Zap className="h-4 w-4" /> Open in Dashboard
               </Button>
               <Button variant="outline" className="gap-2" onClick={() => window.open(`${BRIDGE_AI_URL}/sessions/new`, "_blank", "noopener,noreferrer")}>
@@ -212,7 +230,7 @@ import { useState } from "react";
                   <p className="font-semibold text-sm">Ready to orchestrate your AI team?</p>
                   <p className="text-xs text-muted-foreground mt-1">Create a session, describe your goal, and let BridgeAI assign the right model to every task.</p>
                 </div>
-                <Button className="gap-2 shrink-0 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeKey(k => k + 1); }}>
+                <Button className="gap-2 shrink-0 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeLoading(true); setIframeKey(k => k + 1); }}>
                   <Zap className="h-4 w-4" /> Launch BridgeAI
                 </Button>
               </CardContent>
