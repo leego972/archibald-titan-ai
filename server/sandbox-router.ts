@@ -37,6 +37,7 @@ import {
   generateFixReport,
 } from "./auto-fix-engine";
 import { consumeCredits } from "./credit-service";
+  import { getUserPlan, isFeatureAllowed } from "./subscription-gate";
 
 export const sandboxRouter = router({
   /**
