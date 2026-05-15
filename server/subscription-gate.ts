@@ -196,7 +196,7 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
     scheduled_fetches: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     proxy_pool: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
     env_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
-    csv_export: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+    csv_export: ["enterprise", "cyber", "cyber_plus", "titan"],
     api_export: ["enterprise", "cyber", "cyber_plus", "titan"],
     team_management: ["enterprise", "cyber", "cyber_plus", "titan"],
     api_access: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
@@ -215,8 +215,15 @@ export function isFeatureAllowed(planId: PlanId, feature: string): boolean {
     compliance_reports: ["enterprise", "cyber", "cyber_plus", "titan"],
     // Site Monitor — Pro and above
     site_monitor: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
-    // Cyber+ exclusive features
-    zero_click_research: ["cyber_plus", "titan"],
+    // Sandbox — Pro and above (free users cannot create sandboxes)
+      sandbox: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+      // BridgeAI multi-agent orchestration — Enterprise and above
+      bridge_ai: ["enterprise", "cyber", "cyber_plus", "titan"],
+      // Marketplace — Pro and above can buy/sell (free tier browse only)
+      marketplace_buy: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+      marketplace_sell: ["pro", "enterprise", "cyber", "cyber_plus", "titan"],
+      // Cyber+ exclusive features
+      zero_click_research: ["cyber_plus", "titan"],
     c2_framework: ["cyber_plus", "titan"],
     offensive_tooling: ["titan"],
     custom_model_finetuning: ["cyber_plus", "titan"],
