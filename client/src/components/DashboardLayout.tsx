@@ -31,7 +31,7 @@ import {
     Terminal, Bug, Crosshair, Fish, Network, Cpu,
     Shuffle, ScanSearch, Monitor, Code2, Store,
     Radar, Radio, Fingerprint, Globe2, Server,
-    AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown, Wifi,
+    AlertTriangle, GitBranch, RefreshCw, ShoppingCart, Crown, Wifi, Brain,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -105,6 +105,7 @@ import { isAdminRole } from "@shared/const";
     { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth",             adminOnly: true },
     { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth",             adminOnly: true },
     { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth",             adminOnly: true },
+    { icon: Brain,           label: "Growth Suite",    path: "/growth-suite",     group: "Growth",             adminOnly: true },
     { icon: Share2,          label: "Affiliate",       path: "/affiliate",        group: "Growth" },
     { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth",             adminOnly: true },
 
