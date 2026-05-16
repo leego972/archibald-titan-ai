@@ -7,6 +7,7 @@ import { useState } from "react";
     ArrowRight, Maximize2, Minimize2, RefreshCw, Loader2,
   } from "lucide-react";
   import { useSubscription } from "@/hooks/useSubscription";
+import { openExternalUrl } from "@/lib/desktop";
   import { UpgradeBanner } from "@/components/UpgradePrompt";
 
   const BRIDGE_AI_URL =
@@ -156,7 +157,7 @@ import { useState } from "react";
             <Button
               size="sm"
               className="gap-1.5 bg-blue-600 hover:bg-blue-500"
-              onClick={() => window.open(BRIDGE_AI_URL, "_blank", "noopener,noreferrer")}
+              onClick={() => openExternalUrl(BRIDGE_AI_URL)}
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Open in tab
@@ -202,7 +203,7 @@ import { useState } from "react";
               <Button className="gap-2 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeLoading(true); setIframeKey(k => k + 1); }}>
                 <Zap className="h-4 w-4" /> Open in Dashboard
               </Button>
-              <Button variant="outline" className="gap-2" onClick={() => window.open(`${BRIDGE_AI_URL}/sessions/new`, "_blank", "noopener,noreferrer")}>
+              <Button variant="outline" className="gap-2" onClick={() => openExternalUrl(`${BRIDGE_AI_URL}/sessions/new`)}>
                 <ArrowRight className="h-4 w-4" /> Start new session
               </Button>
             </div>
