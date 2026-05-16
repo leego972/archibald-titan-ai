@@ -57,6 +57,7 @@ export default function GrowthSuitePage() {
   const conversion = trpc.growthSuite.getConversionAudit.useQuery();
   const execution = trpc.growthSuite.getExecutionQueue.useQuery();
   const week = trpc.growthSuite.getWeeklyOperatingPlan.useQuery();
+    const liveData = trpc.growthSuite.getLiveSeoSummary.useQuery();
   const exportPlan = trpc.growthSuite.exportPlan.useQuery();
 
   const data = dashboard.data;
@@ -114,6 +115,7 @@ export default function GrowthSuitePage() {
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="channels">Channels</TabsTrigger>
           <TabsTrigger value="week">Weekly Plan</TabsTrigger>
+            <TabsTrigger value="live">Live Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="priorities" className="space-y-3">
@@ -189,6 +191,56 @@ export default function GrowthSuitePage() {
         <TabsContent value="week" className="grid grid-cols-1 gap-3 lg:grid-cols-5">
           {week.data && Object.entries(week.data).map(([day, tasks]) => <Card key={day} className="border-border bg-card"><CardHeader className="pb-2"><CardTitle className="capitalize text-sm">{day}</CardTitle></CardHeader><CardContent><ul className="space-y-2 text-sm text-muted-foreground">{(tasks as string[]).map((task) => <li key={task}>• {task}</li>)}</ul></CardContent></Card>)}
         </TabsContent>
+
+          <TabsContent value="live" className="space-y-4">
+            {!liveData.data ? <LoadingCard /> : (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <Card className="border-border bg-card"><CardContent className="pt-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Zap className="h-4 w-4 text-emerald-400" /> Readiness</div><div className="mt-1 text-3xl font-bold">{liveData.data.readinessScore}%</div><p className="text-xs text-muted-foreground">{(liveData.data as any).connected ?? 0}/{(liveData.data as any).total ?? 0} sources</p></CardContent></Card>
+                  <Card className="border-border bg-card"><CardContent className="pt-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Globe className="h-4 w-4 text-cyan-400" /> Keywords</div><div className="mt-1 text-3xl font-bold">{liveData.data.keywordCount}</div></CardContent></Card>
+                  <Card className="border-border bg-card"><CardContent className="pt-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Target className="h-4 w-4 text-purple-400" /> Prog. Pages</div><div className="mt-1 text-3xl font-bold">{liveData.data.programmaticPageCount}</div></CardContent></Card>
+                  <Card className="border-border bg-card"><CardContent className="pt-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Lightbulb className="h-4 w-4 text-yellow-400" /> Snippet Targets</div><div className="mt-1 text-3xl font-bold">{liveData.data.featuredSnippetTargetCount}</div></CardContent></Card>
+                </div>
+                {liveData.data.rankings.length > 0 && (
+                  <Card className="border-border bg-card">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4 text-emerald-400" /> Current Rankings</CardTitle></CardHeader>
+                    <CardContent className="flex flex-wrap gap-2">
+                      {liveData.data.rankings.map((r: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5">
+                          <span className="text-xs font-mono">{r.keyword ?? r}</span>
+                          {r.position && <Badge variant="outline" className="text-[10px] px-1 h-4"># {r.position}</Badge>}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+                {liveData.data.risingKeywords.length > 0 && (
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <Card className="border-border bg-card">
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-emerald-400"><TrendingUp className="h-4 w-4" /> Rising Keywords</CardTitle></CardHeader>
+                      <CardContent className="flex flex-wrap gap-2">
+                        {liveData.data.risingKeywords.map((k: any, i: number) => <Badge key={i} variant="outline" className="border-emerald-600/40 text-emerald-400">{k.keyword ?? k}</Badge>)}
+                      </CardContent>
+                    </Card>
+                    {liveData.data.fallingKeywords.length > 0 && (
+                      <Card className="border-border bg-card">
+                        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2 text-red-400"><TrendingDown className="h-4 w-4" /> Falling Keywords</CardTitle></CardHeader>
+                        <CardContent className="flex flex-wrap gap-2">
+                          {liveData.data.fallingKeywords.map((k: any, i: number) => <Badge key={i} variant="outline" className="border-red-600/40 text-red-400">{k.keyword ?? k}</Badge>)}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+                {liveData.data.seoHealth && (
+                  <Card className="border-border bg-card">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-400" /> SEO Health</CardTitle></CardHeader>
+                    <CardContent><pre className="text-xs text-muted-foreground whitespace-pre-wrap">{JSON.stringify(liveData.data.seoHealth, null, 2)}</pre></CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
       </Tabs>
     </div>
   );
