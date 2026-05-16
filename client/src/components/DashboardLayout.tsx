@@ -58,9 +58,9 @@ import { isAdminRole } from "@shared/const";
     { icon: LayoutDashboard, label: "Dashboard",       path: "/",                group: "Core" },
     { icon: Bot,             label: "Titan AI",        path: "/dashboard",        group: "Core" },
     { icon: Terminal,        label: "Builder",         path: "/builder",          group: "Core" },
+    { icon: Zap,             label: "BridgeAI",         path: "/bridge",           group: "Core" },
     { icon: ShoppingBag,     label: "Marketplace",     path: "/marketplace",      group: "Core" },
     { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
-    { icon: Zap,             label: "BridgeAI",         path: "/bridge",           group: "Core" },
 
     // ── Offensive Security ────────────────────────────────────────────
     { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security", cyberOnly: true },
