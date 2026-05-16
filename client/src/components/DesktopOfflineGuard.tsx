@@ -72,6 +72,7 @@ const FEATURE_NAMES: Record<string, string> = {
   "/attack-graph": "Attack Graph",
   "/proxy-interceptor": "Proxy Interceptor",
   "/red-team-playbooks": "Red Team Playbooks",
+  "/bridge": "BridgeAI",
   "/command-centre": "Command Centre",
   "/event-bus": "Event Bus",
   "/compliance-reports": "Compliance Reports",
