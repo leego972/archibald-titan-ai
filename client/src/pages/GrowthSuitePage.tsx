@@ -19,6 +19,8 @@ import {
   Rocket,
   ShieldCheck,
   Target,
+  TrendingDown,
+  TrendingUp,
   Zap,
 } from "lucide-react";
 
