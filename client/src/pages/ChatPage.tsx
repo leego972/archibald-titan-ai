@@ -1102,6 +1102,17 @@ export default function ChatPage() {
       source.start(0);
     } catch (err) {
       console.error('[TTS] Error:', err);
+      // Graceful degradation: try Web Speech API before giving up
+      if ('speechSynthesis' in window && cleanText) {
+        try {
+          const utt = new SpeechSynthesisUtterance(cleanText);
+          utt.rate = 0.95;
+          await new Promise<void>((res) => { utt.onend = () => res(); utt.onerror = () => res(); window.speechSynthesis.speak(utt); });
+          setIsSpeaking(false); setSpeakingMsgId(null); setVoiceStatus('idle');
+          if (voiceModeRef.current) { setTimeout(() => { if (voiceModeRef.current) { startRecording(); setVoiceStatus('listening'); } }, 600); }
+          return;
+        } catch { /* fall through */ }
+      }
       setIsSpeaking(false);
       setSpeakingMsgId(null);
       setVoiceStatus('idle'); // always reset on error
@@ -1145,8 +1156,11 @@ export default function ChatPage() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
-    // Stop any TTS playback
+    // Release mic stream even if recording never started (VAD holds it open)
+    if (vadStreamRef.current) { vadStreamRef.current.getTracks().forEach((t) => t.stop()); vadStreamRef.current = null; }
+    // Stop any TTS playback + cancel pending Web Speech utterances
     stopTtsPlayback();
+    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch { /* ignore */ } }
     // Reset all voice state
     setIsSpeaking(false);
     setSpeakingMsgId(null);
@@ -1158,8 +1172,13 @@ export default function ChatPage() {
   };
 
   // Cleanup TTS on unmount
+  // Cleanup TTS + mic stream + Web Speech on unmount
   useEffect(() => {
-    return () => { stopTtsPlayback(); };
+    return () => {
+      stopTtsPlayback();
+      if (vadStreamRef.current) { vadStreamRef.current.getTracks().forEach((t) => t.stop()); vadStreamRef.current = null; }
+      if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch { /* ignore */ } }
+    };
   }, []);
 
   // File Upload State
