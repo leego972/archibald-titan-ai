@@ -4,15 +4,15 @@ import { useState } from "react";
   import { Card, CardContent } from "@/components/ui/card";
   import {
     Bot, Brain, Code2, ExternalLink, Globe, Search, Zap,
-    ArrowRight, Maximize2, Minimize2, RefreshCw, Loader2,
+    ArrowRight, Maximize2, Minimize2, RefreshCw, Loader2, AlertCircle,
   } from "lucide-react";
   import { useSubscription } from "@/hooks/useSubscription";
-import { openExternalUrl } from "@/lib/desktop";
+  import { openExternalUrl } from "@/lib/desktop";
   import { UpgradeBanner } from "@/components/UpgradePrompt";
 
   const BRIDGE_AI_URL =
     import.meta.env.VITE_BRIDGE_AI_URL ??
-    "https://bridge-ai-app-production.up.railway.app";
+    "https://archibaldtitan.com/bridge-ai/";
 
   const PROVIDERS = [
     { name: "ChatGPT",      provider: "OpenAI",        role: "Strategic Planning", icon: Brain,  color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
@@ -31,8 +31,25 @@ import { openExternalUrl } from "@/lib/desktop";
     const [iframeKey, setIframeKey] = useState(0);
     const [fullscreen, setFullscreen] = useState(false);
     const [iframeLoading, setIframeLoading] = useState(true);
+    const [iframeError, setIframeError] = useState(false);
 
     const hasAccess = canUse("bridge_ai");
+
+    function handleIframeLoad() {
+      setIframeLoading(false);
+      setIframeError(false);
+    }
+
+    function handleIframeError() {
+      setIframeLoading(false);
+      setIframeError(true);
+    }
+
+    function reloadIframe() {
+      setIframeLoading(true);
+      setIframeError(false);
+      setIframeKey((k) => k + 1);
+    }
 
     if (loading) {
       return (
@@ -138,7 +155,7 @@ import { openExternalUrl } from "@/lib/desktop";
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => { setIframeLoading(true); setIframeKey(k => k + 1); }}
+                  onClick={reloadIframe}
                   title="Reload BridgeAI"
                   disabled={iframeLoading}
                 >
@@ -148,7 +165,7 @@ import { openExternalUrl } from "@/lib/desktop";
                     <RefreshCw className="h-3.5 w-3.5" />
                   )}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setFullscreen(f => !f)} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                <Button size="sm" variant="ghost" onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
                   {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
                 </Button>
               </>
@@ -166,76 +183,96 @@ import { openExternalUrl } from "@/lib/desktop";
         </div>
 
         {view === "embed" && (
-          <div className={`relative flex-1 min-h-0 rounded-xl overflow-hidden border border-border/60 shadow-lg ${fullscreen ? "fixed inset-0 z-50 rounded-none border-0" : ""}`}>
-            {iframeLoading && (
+          <div
+            className={`relative flex-1 min-h-0 rounded-xl overflow-hidden border border-border/60 shadow-lg ${
+              fullscreen ? "fixed inset-0 z-50 rounded-none border-0" : ""
+            }`}
+          >
+            {/* Loading overlay */}
+            {iframeLoading && !iframeError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm z-10">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
                 <p className="text-sm text-muted-foreground">Loading BridgeAI…</p>
               </div>
             )}
+
+            {/* Error overlay */}
+            {iframeError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background z-10 p-6 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
+                  <AlertCircle className="h-6 w-6 text-red-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">BridgeAI failed to load</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    The app could not be embedded. This is usually a browser security policy (CSP / X-Frame-Options).
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-wrap justify-center">
+                  <Button size="sm" variant="outline" onClick={reloadIframe}>
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Try again
+                  </Button>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-500 gap-1.5" onClick={() => openExternalUrl(BRIDGE_AI_URL)}>
+                    <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {fullscreen && (
-              <div className="absolute top-3 right-3 z-10 flex gap-2">
+              <div className="absolute top-3 right-3 z-20 flex gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setFullscreen(false)}>
                   <Minimize2 className="h-3.5 w-3.5 mr-1" /> Exit Fullscreen
                 </Button>
               </div>
             )}
+
             <iframe
               key={iframeKey}
               src={BRIDGE_AI_URL}
+              className="w-full h-full border-0"
               title="BridgeAI"
-              className="w-full h-full"
-              style={{ minHeight: fullscreen ? "100vh" : "600px", border: "none" }}
-              allow="clipboard-read; clipboard-write"
-              onLoad={() => setIframeLoading(false)}
+              allow="clipboard-read; clipboard-write; microphone"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
             />
           </div>
         )}
 
         {view === "launcher" && (
-          <div className="flex-1 overflow-y-auto space-y-6 pb-6">
-            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-              BridgeAI coordinates multiple AI providers around a shared session goal. Each model handles
-              the task type it excels at — so you get strategic planning, code execution, research and
-              review in one unified workflow, at a fraction of single-model cost.
+          <div className="flex-1 overflow-y-auto pb-6 space-y-6">
+            <p className="text-sm text-muted-foreground">
+              BridgeAI orchestrates multiple AI providers in a single session. Click a provider card or open BridgeAI to get started.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button className="gap-2 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeLoading(true); setIframeKey(k => k + 1); }}>
-                <Zap className="h-4 w-4" /> Open in Dashboard
-              </Button>
-              <Button variant="outline" className="gap-2" onClick={() => openExternalUrl(`${BRIDGE_AI_URL}/sessions/new`)}>
-                <ArrowRight className="h-4 w-4" /> Start new session
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
+                <Card
+                  key={name}
+                  className={`border ${bg} bg-card/50 cursor-pointer hover:bg-card/80 transition-colors`}
+                  onClick={() => { setView("embed"); reloadIframe(); }}
+                >
+                  <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                      <Icon className={`h-4 w-4 ${color}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold leading-none">{name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{provider} · {role}</p>
+                    </div>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="flex justify-center pt-2">
+              <Button
+                className="bg-blue-600 hover:bg-blue-500 gap-2"
+                onClick={() => setView("embed")}
+              >
+                <Zap className="h-4 w-4" /> Launch BridgeAI
               </Button>
             </div>
-            <div>
-              <h2 className="text-sm font-semibold mb-3">Supported AI Providers</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
-                  <Card key={name} className={`border ${bg} bg-card/40`}>
-                    <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3">
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bg}`}>
-                        <Icon className={`h-4 w-4 ${color}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-none">{name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{provider} · {role}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-            <Card className="border-blue-500/20 bg-blue-500/5">
-              <CardContent className="flex flex-col sm:flex-row items-center gap-4 py-5 px-5">
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">Ready to orchestrate your AI team?</p>
-                  <p className="text-xs text-muted-foreground mt-1">Create a session, describe your goal, and let BridgeAI assign the right model to every task.</p>
-                </div>
-                <Button className="gap-2 shrink-0 bg-blue-600 hover:bg-blue-500" onClick={() => { setView("embed"); setIframeLoading(true); setIframeKey(k => k + 1); }}>
-                  <Zap className="h-4 w-4" /> Launch BridgeAI
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         )}
       </div>
