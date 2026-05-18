@@ -99,9 +99,12 @@ export function useSecurityStream(tool: string): UseSecurityStreamReturn {
       esRef.current = null;
     });
 
-    // Handle network-level EventSource errors
+    // Handle network-level EventSource errors.
+    // If the connection closed while we were still streaming, surface an
+    // error so pages show feedback instead of silently stopping.
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) {
+        setError(prev => prev ?? "Stream connection closed unexpectedly");
         setIsStreaming(false);
         esRef.current = null;
       }
