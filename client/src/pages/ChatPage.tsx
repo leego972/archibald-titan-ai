@@ -1908,109 +1908,135 @@ export default function ChatPage() {
         }
       }
 
-      // ── TitanAI: stream the response via POST SSE ─────────────────────────────
-      const titanCtrl = new AbortController();
-      titanAbortRef.current = titanCtrl;
+      // ── Titan: open local SSE stream, then fire tRPC send mutation ─────────────
+        // Connects to the built-in /api/chat/stream SSE endpoint and fires the
+        // local chat.send tRPC mutation — no external API dependency.
+        if (convIdForStream) {
+          const streamConvId = convIdForStream;
 
-      try {
-        const titanRes = await fetch(`${TITAN_API_BASE}/api/v1/agent/run/stream`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ goal: finalMessage, maxSteps: TITAN_MAX_STEPS, model: TITAN_MODEL }),
-          signal: titanCtrl.signal,
-          credentials: "include",
-        });
+          // Open SSE FIRST so events aren't missed before the mutation fires
+          const es = new EventSource(`/api/chat/stream/${streamConvId}`, { withCredentials: true });
+          eventSourceRef.current = es;
 
-        if (!titanRes.ok) {
-          const body = await titanRes.json().catch(() => ({}));
-          throw new Error((body as { error?: string }).error ?? `TitanAI: HTTP ${titanRes.status}`);
-        }
-        if (!titanRes.body) throw new Error("TitanAI: No response body");
+          // Wire titanAbortRef so the existing Stop buttons still work
+          const localCtrl = new AbortController();
+          titanAbortRef.current = localCtrl;
+          localCtrl.signal.addEventListener('abort', () => {
+            es.close();
+            eventSourceRef.current = null;
+            const csrfTkn = document.cookie.split('; ').find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+            fetch(`/api/chat/abort/${streamConvId}`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: csrfTkn ? { 'x-csrf-token': csrfTkn } : {},
+            }).catch(() => {});
+          });
 
-        const reader = titanRes.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
+          const cleanupStream = (invalidate = true) => {
+            es.close();
+            eventSourceRef.current = null;
+            titanAbortRef.current = null;
+            titanJobIdRef.current = null;
+            setIsLoading(false);
+            setStreamEvents([]);
+            setBuildProgress(null);
+            if (invalidate) refetchConv().catch(() => {});
+          };
 
-        const processBuf = (): boolean => {
-          const blocks = buf.split("\n\n");
-          buf = blocks.pop() ?? "";
-          for (const block of blocks) {
-            const bLines = block.split("\n");
-            let etype = "";
-            let dline = "";
-            for (const bl of bLines) {
-              if (bl.startsWith("event: ")) etype = bl.slice(7).trim();
-              else if (bl.startsWith("data: ")) dline = bl.slice(6).trim();
-            }
-            if (!dline) continue;
+          es.addEventListener('thinking', (e) => {
             try {
-              const p = JSON.parse(dline);
-              if (etype === "job") {
-                titanJobIdRef.current = p.jobId ?? null;
-              } else if (etype === "step") {
-                if (p.thought) {
-                  const evt = { type: "thinking" as const, message: String(p.thought), round: p.step as number, timestamp: Date.now() };
-                  setStreamEvents(prev => [...prev.slice(-20), evt]);
-                  setBuildLog(prev => [...prev, evt]);
-                  setLoadingPhase(String(p.thought).slice(0, 80));
-                }
-                if (p.action && p.action !== "none") {
-                  const desc = `Using ${String(p.action).replace(/_/g, " ")}...`;
-                  const startEvt = { type: "tool_start" as const, tool: String(p.action), description: desc, round: p.step as number, timestamp: Date.now() };
-                  setStreamEvents(prev => [...prev.slice(-20), startEvt]);
-                  setBuildLog(prev => [...prev, startEvt]);
-                  setLoadingPhase(desc);
-                }
-                if (p.observation && p.action && p.action !== "none") {
-                  const resultEvt = { type: "tool_result" as const, tool: String(p.action), success: true, summary: String(p.observation).slice(0, 300), round: p.step as number, timestamp: Date.now() };
-                  setStreamEvents(prev => [...prev.slice(-20), resultEvt]);
-                  setBuildLog(prev => [...prev, resultEvt]);
-                }
-              } else if (etype === "final") {
-                const answer: string = p.finalAnswer ?? p.response ?? JSON.stringify(p);
-                const assistantMsg: ChatMsg = {
-                  id: -Date.now() - 1,
-                  role: "assistant",
-                  content: answer,
-                  createdAt: Date.now(),
-                };
+              const d = JSON.parse(e.data);
+              const evt = { type: 'thinking' as const, message: d.message, reasoning: d.reasoning, phase: d.phase, round: d.round, timestamp: Date.now() };
+              setStreamEvents(prev => [...prev.slice(-20), evt]);
+              setBuildLog(prev => [...prev, evt]);
+              if (!d.reasoning) setLoadingPhase(d.message || 'Thinking...');
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('tool_start', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              const evt = { type: 'tool_start' as const, tool: d.tool, description: d.description, round: d.round, timestamp: Date.now() };
+              setStreamEvents(prev => [...prev.slice(-20), evt]);
+              setBuildLog(prev => [...prev, evt]);
+              setLoadingPhase(d.description || `Running ${d.tool}...`);
+              setIsBuildMode(SECURITY_TOOLS.includes(d.tool));
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('tool_result', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              const evt = { type: 'tool_result' as const, tool: d.tool, success: d.success, summary: d.summary, round: d.round, timestamp: Date.now() };
+              setStreamEvents(prev => [...prev.slice(-20), evt]);
+              setBuildLog(prev => [...prev, evt]);
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('status', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              setStreamEvents(prev => [...prev.slice(-20), { type: 'status' as const, message: d.message, timestamp: Date.now() }]);
+              setLoadingPhase(d.message || 'Processing...');
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('build_progress', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              setBuildProgress({ phase: d.phase as BuildPhase, detail: d.detail, filesCreated: d.filesCreated, buildType: d.buildType, round: d.round });
+              setLoadingPhase(d.detail || d.phase || 'Building...');
+              if (!buildStartTimeRef.current) buildStartTimeRef.current = Date.now();
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('build_complete', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              setBuildReport({ totalRounds: d.totalRounds, successCount: d.successCount, failedCount: d.failedCount, filesCreated: d.filesCreated, deliverables: d.deliverables || [], buildType: d.buildType, durationMs: buildStartTimeRef.current ? Date.now() - buildStartTimeRef.current : undefined });
+              setBuildProgress(null);
+            } catch { /* ignore */ }
+          });
+
+          es.addEventListener('done', (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              if (d.response) {
+                const assistantMsg: ChatMsg = { id: -Date.now() - 1, role: 'assistant', content: d.response, createdAt: Date.now() };
                 optimisticIdsRef.current.add(assistantMsg.id);
                 setLocalMessages(prev => [...prev, assistantMsg]);
-                if (voiceModeRef.current && answer) speakText(answer);
-                utils.chat.listConversations.invalidate();
-                setTimeout(() => utils.chat.listConversations.invalidate(), 3000);
-                return true;
-              } else if (etype === "error") {
-                throw new Error((p as { error?: string }).error ?? "TitanAI stream error");
+                if (voiceModeRef.current && d.response) speakText(d.response);
               }
-            } catch (parseErr) {
-              if (parseErr instanceof SyntaxError) continue;
-              throw parseErr;
-            }
-          }
-          return false;
-        };
+            } catch { /* ignore */ }
+            cleanupStream();
+            utils.chat.getConversation.invalidate({ conversationId: streamConvId });
+            utils.chat.listConversations.invalidate();
+            setTimeout(() => utils.chat.listConversations.invalidate(), 3000);
+          });
 
-        let streamDone = false;
-        while (!streamDone) {
-          const { done, value } = await reader.read();
-          if (done) { buf += decoder.decode(); processBuf(); break; }
-          buf += decoder.decode(value, { stream: true });
-          streamDone = processBuf();
+          es.addEventListener('aborted', () => { cleanupStream(false); });
+
+          es.onerror = () => {
+            if (es.readyState === EventSource.CLOSED) {
+              cleanupStream();
+            }
+          };
+
+          // Fire the tRPC mutation — this triggers server-side processing + SSE events
+          sendMutation.mutate(
+            { message: finalMessage, conversationId: streamConvId, preferredLanguage: selectedLanguage },
+            {
+              onError: (err) => {
+                toast.error(err.message || 'Failed to send message. Please try again.');
+                cleanupStream(false);
+              },
+            }
+          );
+        } else {
+          toast.error('Could not start conversation. Please refresh and try again.');
+          setIsLoading(false);
+          setStreamEvents([]);
         }
-      } catch (titanErr) {
-        if (!(titanErr instanceof DOMException && titanErr.name === "AbortError")) {
-          const msg = titanErr instanceof Error ? titanErr.message : String(titanErr);
-          toast.error(`TitanAI: ${msg}`);
-        }
-      } finally {
-        titanJobIdRef.current = null;
-        titanAbortRef.current = null;
-        setStreamEvents([]);
-        setBuildProgress(null);
-        setIsLoading(false);
-        refetchConv().catch(() => {});
-      }
   };
 
   const handleNewConversation = () => {
