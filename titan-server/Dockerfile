@@ -38,13 +38,17 @@ ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 
 # Install Evilginx3 v3.3.0
-RUN mkdir -p /opt/evilginx && \
-    wget -q https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip \
-        -O /tmp/evilginx.zip && \
-    unzip -q /tmp/evilginx.zip -d /opt/evilginx && \
-    rm /tmp/evilginx.zip && \
-    chmod +x /opt/evilginx/evilginx && \
-    ln -sf /opt/evilginx/evilginx /usr/local/bin/evilginx
+# Uses curl (follows GitHub CDN redirects) with 3 retries.
+# Extracts to a temp dir; find locates the binary regardless of ZIP layout.
+RUN mkdir -p /tmp/evilginx-extract /opt/evilginx && \
+    curl -fsSL --retry 3 --retry-delay 5 \
+        https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip \
+        -o /tmp/evilginx.zip && \
+    unzip -q /tmp/evilginx.zip -d /tmp/evilginx-extract && \
+    find /tmp/evilginx-extract -name "evilginx" -type f | head -1 | xargs -I{} cp {} /usr/local/bin/evilginx && \
+    chmod +x /usr/local/bin/evilginx && \
+    ln -sf /usr/local/bin/evilginx /opt/evilginx/evilginx && \
+    rm -rf /tmp/evilginx.zip /tmp/evilginx-extract
 
 # Create base directory for Titan users
 RUN mkdir -p /opt/titan/users
