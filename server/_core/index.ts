@@ -129,6 +129,12 @@ async function startServer() {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
     // Content-Security-Policy: restrict resource loading to trusted origins
+    const bridgeAiCspOrigin = (() => {
+      const url = process.env.VITE_BRIDGE_AI_URL ?? '';
+      if (!url) return '';
+      try { return ` ${new URL(url).origin}`; } catch { return ''; }
+    })();
+
     const csp = [
       "default-src 'self'",
       // 'unsafe-eval' removed — no longer required by the Vite production bundle.
@@ -141,7 +147,7 @@ async function startServer() {
       "img-src 'self' data: blob: https: http:",
       "connect-src 'self' https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://files.manuscdn.com wss: ws:",
       "media-src 'self' https://files.manuscdn.com blob: data:",
-      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+      `frame-src 'self' https://js.stripe.com https://hooks.stripe.com${bridgeAiCspOrigin}`,
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
