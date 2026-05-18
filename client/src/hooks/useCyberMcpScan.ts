@@ -66,12 +66,15 @@ export function useCyberMcpScan(): UseCyberMcpScanReturn {
   const [finalResult, setFinalResult] = useState<FinalScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  // Ref mirrors isScanning so the onerror closure always reads a live value
+  const isScanningRef = useRef(false);
 
   const cancel = useCallback(() => {
     if (esRef.current) {
       esRef.current.close();
       esRef.current = null;
     }
+    isScanningRef.current = false;
     setIsScanning(false);
   }, []);
 
@@ -93,6 +96,7 @@ export function useCyberMcpScan(): UseCyberMcpScanReturn {
     setChecks(INITIAL_CHECKS.map(c => ({ ...c })));
     setFinalResult(null);
     setError(null);
+    isScanningRef.current = true;
     setIsScanning(true);
 
     // Build URL
@@ -134,6 +138,7 @@ export function useCyberMcpScan(): UseCyberMcpScanReturn {
         const data = JSON.parse(e.data) as FinalScanResult;
         setFinalResult(data);
       } catch { /* ignore */ }
+      isScanningRef.current = false;
       setIsScanning(false);
       es.close();
       esRef.current = null;
@@ -146,17 +151,24 @@ export function useCyberMcpScan(): UseCyberMcpScanReturn {
       } catch {
         setError("Scan failed — connection error");
       }
+      isScanningRef.current = false;
       setIsScanning(false);
       es.close();
       esRef.current = null;
     });
 
-    // Network-level error (e.g. 401, 402)
+    // Network-level error (e.g. 401, 402).
+    // Uses isScanningRef instead of isScanning to avoid stale closure bug.
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) {
-        if (isScanning) {
+        if (isScanningRef.current) {
           setError("Connection closed unexpectedly");
+          // Mark any still-running checks as errored
+          setChecks(prev =>
+            prev.map(c => c.status === "running" ? { ...c, status: "error" as CheckStatus } : c)
+          );
         }
+        isScanningRef.current = false;
         setIsScanning(false);
         esRef.current = null;
       }
