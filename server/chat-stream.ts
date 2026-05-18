@@ -19,6 +19,10 @@
  */
 import type { Express, Request, Response } from "express";
 import { EventEmitter } from "events";
+import { sdk } from "./_core/sdk.js";
+import { getDb } from "./db.js";
+import { chatConversations } from "../drizzle/schema.js";
+import { eq, and } from "drizzle-orm";
 
 // ── Active Request Tracking ──────────────────────────────────────
 // Maps conversationId → AbortController for cancellation
@@ -245,11 +249,26 @@ export function registerChatStreamRoutes(app: Express): void {
   // Clients connect to this to receive real-time events during chat processing.
   // IMPORTANT: Client disconnection does NOT stop the build — only the abort
   // endpoint can stop a build. This allows builds to continue in the background.
-  app.get("/api/chat/stream/:conversationId", (req: Request, res: Response) => {
+  app.get("/api/chat/stream/:conversationId", async (req: Request, res: Response) => {
+    // Auth before headers — cannot change status after writeHead()
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const conversationId = parseInt(req.params.conversationId, 10);
     if (isNaN(conversationId)) {
       res.status(400).json({ error: "Invalid conversation ID" });
       return;
+    }
+
+    // Verify the user owns this conversation (prevents cross-user stream snooping)
+    const db = await getDb();
+    if (db) {
+      const [conv] = await db
+        .select({ id: chatConversations.id })
+        .from(chatConversations)
+        .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, user.id)))
+        .limit(1);
+      if (!conv) { res.status(403).json({ error: "Access denied" }); return; }
     }
 
     // Set SSE headers
@@ -330,12 +349,19 @@ export function registerChatStreamRoutes(app: Express): void {
   // ── Abort Endpoint ──────────────────────────────────────────
   // POST /api/chat/abort/:conversationId — cancel an active request
   // This is the ONLY way to stop a build. Disconnecting/logging out does NOT stop it.
-  app.post("/api/chat/abort/:conversationId", (req: Request, res: Response) => {
+  app.post("/api/chat/abort/:conversationId", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const conversationId = parseInt(req.params.conversationId, 10);
     if (isNaN(conversationId)) {
       res.status(400).json({ error: "Invalid conversation ID" });
       return;
     }
+
+    // Verify ownership — prevents aborting another user's build
+    const buildCheck = activeBuilds.get(conversationId);
+    if (buildCheck && buildCheck.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
 
     const aborted = abortRequest(conversationId);
     res.json({ success: aborted, message: aborted ? "Request cancelled" : "No active request found" });
@@ -345,7 +371,10 @@ export function registerChatStreamRoutes(app: Express): void {
   // POST /api/chat/inject/:conversationId — inject a message into an active run
   // The message is queued and picked up by the agent loop between rounds.
   // Titan reads it and can adjust his current work without stopping.
-  app.post("/api/chat/inject/:conversationId", (req: Request, res: Response) => {
+  app.post("/api/chat/inject/:conversationId", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const conversationId = parseInt(req.params.conversationId, 10);
     if (isNaN(conversationId)) {
       res.status(400).json({ error: "Invalid conversation ID" });
@@ -360,6 +389,8 @@ export function registerChatStreamRoutes(app: Express): void {
     if (!build || build.status !== "running") {
       res.status(409).json({ error: "No active build for this conversation", active: false });
       return;
+    // Verify the user owns this build (prevents cross-user message injection)
+    if (build.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
     }
     injectMidRunMessage(conversationId, message.trim());
     // Emit a streaming event so the client can show confirmation
