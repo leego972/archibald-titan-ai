@@ -213,15 +213,18 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    proxy: {
-        "/titan-api": {
-          target:
-            (process.env.VITE_TITAN_API_URL ?? "").replace(/\/$/, "") ||
-            "https://6a5c6e25-1a7d-497f-8e00-47eb485bd67d-00-2xiavwi0pvmgb.worf.replit.dev/api-server",
-          changeOrigin: true,
-          secure: true,
-          rewrite: (p: string) => p.replace(/^\/titan-api/, ""),
-        },
+    ...(process.env.VITE_TITAN_API_URL
+      ? {
+          proxy: {
+            "/titan-api": {
+              target: process.env.VITE_TITAN_API_URL.replace(/\/$/, ""),
+              changeOrigin: true,
+              secure: true,
+              rewrite: (p: string) => p.replace(/^\/titan-api/, ""),
+            },
+          },
+        }
+      : {}),
       },
     },
 });
