@@ -108,6 +108,6 @@ export const ENV = {
   // TitanAI Inference API — self-hosted model server (FastAPI, OpenAI-compatible)
   // Set TITAN_API_URL to the address of the running TitanAI API server, e.g. http://ssh5.vast.ai:8000 (current Vast.AI box: TitanAI-Verified-2, run `source .local/vast.sh && vast_ssh_info` to refresh host)
   // Leave empty to disable TitanAI routing (falls back to Venice/OpenAI as normal).
-  titanApiUrl: process.env.TITAN_API_URL ?? "",
+  titanApiUrl: process.env.TITAN_API_URL ?? "http://172.81.127.43:8000/v1",
   titanApiKey: process.env.TITAN_API_KEY ?? "",
 };
