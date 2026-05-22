@@ -1,3 +1,4 @@
+import { DestroFace } from "../components/3d/DestroFace";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useVoiceMode } from "@/components/VoiceMode";
 import LeegoLogo from "@/components/LeegoLogo";
@@ -3811,6 +3812,7 @@ export default function ChatPage() {
                 <span className="text-sm font-medium text-amber-300">Titan is thinking...</span>
               </>
             )}
+{voiceStatus !== 'off' && <div className="w-full h-64 mb-4"><DestroFace volume={voiceStatus === 'speaking' ? 0.5 : 0} /></div>}
             {voiceStatus === 'speaking' && (
               <>
                 <div className="flex items-center gap-[3px] shrink-0">
@@ -3860,6 +3862,7 @@ export default function ChatPage() {
                 {!isMobile && 'Stop'}
               </button>
             )}
+{voiceStatus !== 'off' && <div className="w-full h-64 mb-4"><DestroFace volume={voiceStatus === 'speaking' ? 0.5 : 0} /></div>}
             {voiceStatus === 'speaking' && (
               <button
                 onClick={() => {

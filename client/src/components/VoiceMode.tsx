@@ -1,3 +1,4 @@
+import { DestroFace } from "./3d/DestroFace";
 /**
    * VoiceMode — Hands-free voice interface for Titan
    *
