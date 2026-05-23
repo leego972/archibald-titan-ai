@@ -265,7 +265,7 @@ export const releasesRouter = router({
    * Public endpoint — can be called by anyone (e.g., webhook, cron, or on page load).
    * Rate-limited by GitHub API (60 req/hr unauthenticated).
    */
-  syncFromGitHub: publicProcedure.mutation(async () => {
+  syncFromGitHub: adminProcedure.mutation(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
