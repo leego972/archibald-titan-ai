@@ -20,6 +20,7 @@ import {
   hasActiveStorageSubscription,
 } from "./storage-service";
 import { isAdminRole } from "../shared/const";
+import { sdk } from "./_core/sdk.js";
 
 const log = createLogger("StorageUploadHandler");
 
@@ -48,13 +49,6 @@ const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500 MB
   }
 
 // ─── Auth Helper ──────────────────────────────────────────────────────────────
-
-function getUserFromRequest(req: Request): { id: number; role: string } | null {
-  const user = (req as any).user;
-  if (user?.id) return { id: user.id, role: user.role ?? "" };
-  return null;
-}
-
 // ─── Register Routes ──────────────────────────────────────────────────────────
 
 export function registerStorageUploadRoutes(app: Express): void {
@@ -69,7 +63,7 @@ export function registerStorageUploadRoutes(app: Express): void {
     "/api/storage/upload",
     async (req: Request, res: Response) => {
       try {
-        const user = getUserFromRequest(req);
+        const user = await sdk.authenticateRequest(req).catch(() => null);
         if (!user) {
           return res.status(401).json({ message: "Unauthorized" });
         }
@@ -207,7 +201,7 @@ export function registerStorageUploadRoutes(app: Express): void {
     "/api/storage/download/:fileId",
     async (req: Request, res: Response) => {
       try {
-        const user = getUserFromRequest(req);
+        const user = await sdk.authenticateRequest(req).catch(() => null);
         if (!user) {
           return res.status(401).json({ message: "Unauthorized" });
         }
@@ -234,7 +228,7 @@ export function registerStorageUploadRoutes(app: Express): void {
     "/api/storage/admin/files",
     async (req: Request, res: Response) => {
       try {
-        const user = getUserFromRequest(req);
+        const user = await sdk.authenticateRequest(req).catch(() => null);
         if (!user) return res.status(401).json({ message: "Unauthorized" });
         if (!isAdminRole(user.role)) return res.status(403).json({ message: "Admin access required" });
 
