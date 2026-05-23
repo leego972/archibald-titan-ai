@@ -32,6 +32,7 @@ import { storagePut } from "./storage";
 import { getDb } from "./db";
 import { createLogger } from "./_core/logger";
 import { getErrorMessage } from "./_core/errors";
+import { sdk } from "./_core/sdk";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -231,17 +232,21 @@ setInterval(async () => {
 // This function is called from server/_core/index.ts
 
 export function registerIsolatedBrowserSSE(app: import("express").Express): void {
-  app.get("/api/isolated-browser/stream/:sessionId", (req, res) => {
+  app.get("/api/isolated-browser/stream/:sessionId", async (req, res) => {
+    // Verify session cookie — required before exposing live browser screenshot stream
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const { sessionId } = req.params;
     const session = sessions.get(sessionId);
 
-    // Auth: check session cookie (same as other SSE endpoints)
-    // We trust the sessionId as the auth token here since it's a random UUID
-    // and only the launching user knows it.
     if (!session) {
       res.status(404).json({ error: "Session not found" });
       return;
     }
+
+    // Verify ownership — prevents another user from viewing this browser session
+    if (session.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
