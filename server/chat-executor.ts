@@ -2483,11 +2483,11 @@ async function execSelfGitDiff(
   filePath?: string,
   staged?: boolean
 ): Promise<ToolExecutionResult> {
+  try {
     // Sanitize filePath: allow only safe path characters to prevent shell injection
     const safeFilePath = filePath?.replace(/[^a-zA-Z0-9._\-\/]/g, '') ?? '';
     const stagedFlag = staged ? "--cached" : "";
     const fileArg = safeFilePath ? `-- '${safeFilePath}'` : "";
-    const fileArg = filePath ? `-- ${filePath}` : "";
     const diffCmd = `git diff ${stagedFlag} --stat ${fileArg} 2>/dev/null`;
     const stat = execSync(diffCmd, { cwd: PROJ_ROOT, encoding: "utf-8", timeout: 5000 }).trim();
     const fullDiffCmd = `git diff ${stagedFlag} ${fileArg} 2>/dev/null | head -500`;
