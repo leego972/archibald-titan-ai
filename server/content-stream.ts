@@ -21,6 +21,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { EventEmitter } from "events";
+import { sdk } from "./_core/sdk.js";
 
 // ── Active Content Job Tracking ──────────────────────────────────
 // Maps jobId (string UUID) → EventEmitter for streaming events
@@ -170,12 +171,19 @@ export function registerContentStreamRoutes(app: Express): void {
    * GET /api/content/stream/:jobId
    * SSE endpoint — client connects here to receive real-time progress events.
    */
-  app.get("/api/content/stream/:jobId", (req: Request, res: Response) => {
+  app.get("/api/content/stream/:jobId", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const { jobId } = req.params;
     if (!jobId || typeof jobId !== "string") {
       res.status(400).json({ error: "Invalid job ID" });
       return;
     }
+
+    // Verify ownership — prevents reading another user's content job
+    const jobStatus = activeContentJobs.get(jobId);
+    if (jobStatus && jobStatus.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
 
     // Set SSE headers
     res.writeHead(200, {
@@ -260,13 +268,18 @@ export function registerContentStreamRoutes(app: Express): void {
    * GET /api/content/stream/status/:jobId
    * Polling fallback — returns current job status as JSON.
    */
-  app.get("/api/content/stream/status/:jobId", (req: Request, res: Response) => {
+  app.get("/api/content/stream/status/:jobId", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const { jobId } = req.params;
     const status = activeContentJobs.get(jobId);
     if (!status) {
       res.status(404).json({ error: "Job not found or expired" });
       return;
     }
+    // Verify ownership — prevents reading another user's generated content
+    if (status.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
     res.json(status);
   });
 }
