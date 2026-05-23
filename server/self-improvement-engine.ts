@@ -2136,6 +2136,7 @@ export async function pushToGitHub(
     // Commit
     try {
       execFileSync("git", ["commit", "-m", commitMessage], { cwd: getProjectRoot(), encoding: "utf-8" });
+    } catch (commitErr: unknown) {
       // If nothing to commit, that's OK
       if ((commitErr as any).stdout?.includes("nothing to commit") || (commitErr as any).stderr?.includes("nothing to commit")) {
         return {
