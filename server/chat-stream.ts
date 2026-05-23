@@ -389,9 +389,9 @@ export function registerChatStreamRoutes(app: Express): void {
     if (!build || build.status !== "running") {
       res.status(409).json({ error: "No active build for this conversation", active: false });
       return;
+    }
     // Verify the user owns this build (prevents cross-user message injection)
     if (build.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
-    }
     injectMidRunMessage(conversationId, message.trim());
     // Emit a streaming event so the client can show confirmation
     const emitter = activeStreams.get(conversationId);
@@ -406,7 +406,10 @@ export function registerChatStreamRoutes(app: Express): void {
   // ── Build Status Endpoint ──────────────────────────────────
   // GET /api/chat/build-status/:conversationId — check if a build is running
   // Used by the client to reconnect and see progress after page reload/navigation
-  app.get("/api/chat/build-status/:conversationId", (req: Request, res: Response) => {
+  app.get("/api/chat/build-status/:conversationId", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const conversationId = parseInt(req.params.conversationId, 10);
     if (isNaN(conversationId)) {
       res.status(400).json({ error: "Invalid conversation ID" });
@@ -418,6 +421,9 @@ export function registerChatStreamRoutes(app: Express): void {
       res.json({ active: false });
       return;
     }
+
+    // Verify ownership — prevents reading another user's build results
+    if (status.userId !== user.id) { res.status(403).json({ error: "Access denied" }); return; }
 
     res.json({
       active: status.status === "running",
@@ -434,11 +440,12 @@ export function registerChatStreamRoutes(app: Express): void {
 
   // ── User Builds Endpoint ──────────────────────────────────
   // GET /api/chat/active-builds — get all active builds for the current user
-  app.get("/api/chat/active-builds", (req: Request, res: Response) => {
-    // Note: In production, extract userId from session/auth middleware
-    // For now, return all active builds (the client filters by conversationId)
+  app.get("/api/chat/active-builds", async (req: Request, res: Response) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) { res.status(401).json({ error: "Authentication required" }); return; }
+
     const builds = Array.from(activeBuilds.values())
-      .filter(b => b.status === "running")
+      .filter(b => b.status === "running" && b.userId === user.id)
       .map(b => ({
         conversationId: b.conversationId,
         currentPhase: b.currentPhase,
