@@ -207,6 +207,8 @@ async function startServer() {
     message: { error: 'Too many checkout attempts. Please wait a moment.' },
   });
   app.use('/api/trpc/stripe.', stripeLimiter);
+  // Desktop license activation is a password login — restrict to 20/min to prevent brute-force
+  app.use('/api/trpc/desktopLicense.activate', authLimiter);
   // Offensive/admin tool endpoints: 15 per minute per IP (prevents abuse)
   const offensiveLimiter = rateLimit({
     windowMs: 60 * 1000,
