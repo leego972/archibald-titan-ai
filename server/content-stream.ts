@@ -220,7 +220,6 @@ export function registerContentStreamRoutes(app: Express): void {
     emitter.on("close", onClose);
 
     // Send initial status for reconnection support
-    const jobStatus = activeContentJobs.get(jobId);
     res.write(`event: connected\ndata: ${JSON.stringify({
       jobId,
       active: !!jobStatus && jobStatus.status === "running",
