@@ -3755,20 +3755,34 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Voice Mode Bar — compact floating bar above input, chat stays fully visible */}
+      {/* Voice Mode — Destro face panel + status/controls bar */}
       {voiceModeActive && (
-        <div
-          className={`fixed bottom-0 left-0 right-0 z-[90] flex items-center gap-3 px-4 py-3 border-t transition-all duration-300 ${
-            voiceStatus === 'listening'
-              ? 'bg-cyan-950/95 border-cyan-500/40'
-              : voiceStatus === 'speaking'
-              ? 'bg-purple-950/95 border-purple-500/40'
-              : voiceStatus === 'thinking'
-              ? 'bg-amber-950/95 border-amber-500/40'
-              : 'bg-background/95 border-border/50'
-          }`}
-          style={{ backdropFilter: 'blur(16px)', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-        >
+        <div className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col" style={{ backdropFilter: 'blur(16px)' }}>
+          {/* Destro face — emotion + lip-sync driven by voice phase */}
+          <div className="w-full bg-black/90 border-t border-white/10" style={{ height: 'min(48vw, 14rem)' }}>
+            <DestroFace
+              volume={voiceStatus === 'speaking' ? 0.6 : voiceStatus === 'listening' ? 0.2 : 0}
+              emotion={
+                voiceStatus === 'listening' ? 'thinking'       :
+                voiceStatus === 'thinking'  ? 'thinking'       :
+                voiceStatus === 'speaking'  ? 'friendly_stern' :
+                'neutral'
+              }
+            />
+          </div>
+          {/* Status + controls row */}
+          <div
+            className={`flex items-center gap-3 px-4 py-3 border-t transition-all duration-300 ${
+              voiceStatus === 'listening'
+                ? 'bg-cyan-950/95 border-cyan-500/40'
+                : voiceStatus === 'speaking'
+                ? 'bg-purple-950/95 border-purple-500/40'
+                : voiceStatus === 'thinking'
+                ? 'bg-amber-950/95 border-amber-500/40'
+                : 'bg-background/95 border-border/50'
+            }`}
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
           {/* Titan logo with status glow */}
           <div className={`relative h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${
             voiceStatus === 'listening'
@@ -3812,7 +3826,6 @@ export default function ChatPage() {
                 <span className="text-sm font-medium text-amber-300">Titan is thinking...</span>
               </>
             )}
-{voiceStatus !== 'off' && <div className="w-full h-64 mb-4"><DestroFace volume={voiceStatus === 'speaking' ? 0.5 : 0} /></div>}
             {voiceStatus === 'speaking' && (
               <>
                 <div className="flex items-center gap-[3px] shrink-0">
@@ -3862,7 +3875,6 @@ export default function ChatPage() {
                 {!isMobile && 'Stop'}
               </button>
             )}
-{voiceStatus !== 'off' && <div className="w-full h-64 mb-4"><DestroFace volume={voiceStatus === 'speaking' ? 0.5 : 0} /></div>}
             {voiceStatus === 'speaking' && (
               <button
                 onClick={() => {
@@ -3888,6 +3900,7 @@ export default function ChatPage() {
               <PhoneOff className="h-4 w-4" />
               {!isMobile && 'End'}
             </button>
+          </div>
           </div>
         </div>
       )}
