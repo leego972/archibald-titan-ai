@@ -32,7 +32,7 @@ import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { eq, desc, sql } from "drizzle-orm";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { createLogger } from "./_core/logger.js";
 import { getErrorMessage } from "./_core/errors.js";
 
@@ -1626,8 +1626,10 @@ export async function runTests(testPattern?: string): Promise<{
     };
   }
   try {
-    const cmd = testPattern
-      ? `pnpm test -- ${testPattern} 2>&1`
+    // Sanitize testPattern to prevent shell injection
+    const safePattern = testPattern?.replace(/[^a-zA-Z0-9.\-_/:. ]/g, '') ?? '';
+    const cmd = safePattern
+      ? `pnpm test -- ${safePattern} 2>&1`
       : "pnpm test 2>&1";
     const output = execSync(cmd, {
       cwd: getProjectRoot(),
@@ -2132,10 +2134,8 @@ export async function pushToGitHub(
     }
 
     // Commit
-    const sanitizedMessage = commitMessage.replace(/"/g, '\\"');
     try {
-      execSync(`git commit -m "${sanitizedMessage}"`, { cwd: getProjectRoot(), encoding: "utf-8" });
-    } catch (commitErr: unknown) {
+      execFileSync("git", ["commit", "-m", commitMessage], { cwd: getProjectRoot(), encoding: "utf-8" });
       // If nothing to commit, that's OK
       if ((commitErr as any).stdout?.includes("nothing to commit") || (commitErr as any).stderr?.includes("nothing to commit")) {
         return {
