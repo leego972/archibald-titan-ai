@@ -2451,7 +2451,8 @@ async function execSelfGrepCodebase(
 ): Promise<ToolExecutionResult> {
   try {
     const limit = Math.min(maxResults || 50, 100);
-    const include = filePattern ? `--include='${filePattern}'` : "--include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.json' --include='*.css' --include='*.md'";
+    const safeFilePattern = filePattern?.replace(/'/g, "'\\''"  ) ?? '';
+      const include = safeFilePattern ? `--include='${safeFilePattern}'` : "--include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.json' --include='*.css' --include='*.md'";
     const cmd = `grep -rn ${include} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git -E '${pattern.replace(/'/g, "'\\''")}' . | head -${limit}`;
     const output = execSync(cmd, { cwd: PROJ_ROOT, encoding: "utf-8", timeout: 10000 }).trim();
     const lines = output ? output.split("\n") : [];
@@ -2668,9 +2669,9 @@ async function execSelfCodeStats(
     let functionCount = 0;
     let exportCount = 0;
     try {
-      const funcCmd = `grep -rn --include='*.ts' --include='*.tsx' -E '(function |const .+ = (async )?\\(|=>)' ${targetDir} --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null | wc -l`;
+      const funcCmd = `grep -rn --include='*.ts' --include='*.tsx' -E '(function |const .+ = (async )?\\(|=>)' "${targetDir}" --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null | wc -l`;
       functionCount = parseInt(execSync(funcCmd, { encoding: "utf-8", timeout: 10000 }).trim()) || 0;
-      const exportCmd = `grep -rn --include='*.ts' --include='*.tsx' -E '^export ' ${targetDir} --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null | wc -l`;
+      const exportCmd = `grep -rn --include='*.ts' --include='*.tsx' -E '^export ' "${targetDir}" --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null | wc -l`;
       exportCount = parseInt(execSync(exportCmd, { encoding: "utf-8", timeout: 10000 }).trim()) || 0;
     } catch { /* non-critical */ }
 
