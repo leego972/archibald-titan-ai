@@ -8,7 +8,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
       androidScheme: 'https',
       allowNavigation: [
         'bridge-ai-app-production.up.railway.app',
-        '*.replit.app',
+        // '*.replit.app' wildcard removed — too broad. Add explicit domains as needed.
       ],
     },
     android: {
