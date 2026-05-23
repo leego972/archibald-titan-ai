@@ -1,4 +1,4 @@
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { invokeLLM } from "./_core/llm";
 import { getProviderParams } from "./_core/provider-policy";
@@ -757,7 +757,7 @@ Be realistic — most first-time applications score 40-65. Strong applications w
 });
 
 export const grantSeedRouter = router({
-  seed: protectedProcedure.mutation(async () => {
+  seed: adminProcedure.mutation(async () => {
     // Instead of fake seeds, fetch real grants from government APIs
     const result = await refreshAllGrants();
     return { success: true, count: result.totalDiscovered + result.totalUpdated };
