@@ -2483,8 +2483,10 @@ async function execSelfGitDiff(
   filePath?: string,
   staged?: boolean
 ): Promise<ToolExecutionResult> {
-  try {
+    // Sanitize filePath: allow only safe path characters to prevent shell injection
+    const safeFilePath = filePath?.replace(/[^a-zA-Z0-9._\-\/]/g, '') ?? '';
     const stagedFlag = staged ? "--cached" : "";
+    const fileArg = safeFilePath ? `-- '${safeFilePath}'` : "";
     const fileArg = filePath ? `-- ${filePath}` : "";
     const diffCmd = `git diff ${stagedFlag} --stat ${fileArg} 2>/dev/null`;
     const stat = execSync(diffCmd, { cwd: PROJ_ROOT, encoding: "utf-8", timeout: 5000 }).trim();
@@ -2629,14 +2631,16 @@ async function execSelfDbSchemaInspect(
 async function execSelfCodeStats(
   directory?: string
 ): Promise<ToolExecutionResult> {
-  try {
+    // Sanitize directory: allow only safe path characters to prevent shell injection
+    const safeDirectory = directory?.replace(/[^a-zA-Z0-9._\-\/]/g, '') ?? '';
+    const targetDir = safeDirectory ? path.join(PROJ_ROOT, safeDirectory) : PROJ_ROOT;
     const targetDir = directory ? path.join(PROJ_ROOT, directory) : PROJ_ROOT;
-    if (!fs.existsSync(targetDir)) {
+      return { success: false, error: `Directory not found: ${safeDirectory}` };
       return { success: false, error: `Directory not found: ${directory}` };
     }
 
     // Count files and lines by extension
-    const cmd = `find ${targetDir} -type f ( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' ) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
+    const cmd = `find "${targetDir}" -type f ( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' ) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
     const files = execSync(cmd, { encoding: "utf-8", timeout: 10000 }).trim().split("\n").filter(Boolean);
 
     const stats: Record<string, { files: number; lines: number; largest: { file: string; lines: number } }> = {};
