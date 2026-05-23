@@ -2631,16 +2631,16 @@ async function execSelfDbSchemaInspect(
 async function execSelfCodeStats(
   directory?: string
 ): Promise<ToolExecutionResult> {
+  try {
     // Sanitize directory: allow only safe path characters to prevent shell injection
     const safeDirectory = directory?.replace(/[^a-zA-Z0-9._\-\/]/g, '') ?? '';
     const targetDir = safeDirectory ? path.join(PROJ_ROOT, safeDirectory) : PROJ_ROOT;
-    const targetDir = directory ? path.join(PROJ_ROOT, directory) : PROJ_ROOT;
+    if (!fs.existsSync(targetDir)) {
       return { success: false, error: `Directory not found: ${safeDirectory}` };
-      return { success: false, error: `Directory not found: ${directory}` };
     }
 
     // Count files and lines by extension
-    const cmd = `find "${targetDir}" -type f ( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' ) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
+    const cmd = `find "${targetDir}" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.json' -o -name '*.md' \) -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/.git/*' | head -1000`;
     const files = execSync(cmd, { encoding: "utf-8", timeout: 10000 }).trim().split("\n").filter(Boolean);
 
     const stats: Record<string, { files: number; lines: number; largest: { file: string; lines: number } }> = {};
@@ -2682,7 +2682,7 @@ async function execSelfCodeStats(
     return {
       success: true,
       data: {
-        directory: directory || "project root",
+        directory: safeDirectory || "project root",
         totalFiles,
         totalLines,
         byExtension: stats,
@@ -2696,7 +2696,6 @@ async function execSelfCodeStats(
     return { success: false, error: `Code stats failed: ${getErrorMessage(err)}` };
   }
 }
-
 async function execSelfDeploymentCheck(
   quick?: boolean
 ): Promise<ToolExecutionResult> {
