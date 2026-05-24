@@ -146,7 +146,25 @@ export function initKeyPool(): void {
     }
   }
 
-  // Log the system → key assignments
+  // ── Duplicate key detection ──────────────────────────────────────────────
+    // Warn if multiple env var slots resolve to the same key string — means there
+    // is no real rotation. A single rate-limit will kill every slot simultaneously.
+    const _seenKeys = new Map<string, string[]>();
+    for (const [envVar, info] of allKeys) {
+      const dupes = _seenKeys.get(info.key) ?? [];
+      dupes.push(envVar);
+      _seenKeys.set(info.key, dupes);
+    }
+    for (const [, dupeVars] of _seenKeys) {
+      if (dupeVars.length > 1) {
+        log.warn(
+          `[KeyPool] ⚠️  DUPLICATE KEY across ${dupeVars.length} slots: ${dupeVars.join(", ")}` +
+          ` — this is NOT a real pool. Add distinct keys via Railway env vars for actual rotation.`
+        );
+      }
+    }
+
+    // Log the system → key assignments
   log.info(`[KeyPool] ═══ Dedicated Key-Per-System v3 ═══`);
   log.info(`[KeyPool] Discovered ${allKeys.size} API keys`);
 
