@@ -509,7 +509,7 @@ async function _invokeTitanAI(
   });
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+  const timeout = setTimeout(() => controller.abort(), 8_000); // 8 s fast-fail — GPU busy; falls back to Venice/OpenAI
 
   let response: Response;
   try {
