@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./_core/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { isAdminRole } from "@shared/const";
@@ -18,7 +18,7 @@ import { VoiceModeProvider } from "./components/VoiceMode";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
-import BuilderPage from "./pages/BuilderPage";
+const BuilderPage = lazy(() => import("./pages/BuilderPage"));
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import ContactPage from "./pages/ContactPage";
@@ -60,13 +60,13 @@ import FetcherExport from "./pages/FetcherExport";
 import FetcherSettings from "./pages/FetcherSettings";
 
 // Developer Tools
-import ReplicatePage from "./pages/ReplicatePage";
-import SandboxPage from "./pages/SandboxPage";
+const ReplicatePage = lazy(() => import("./pages/ReplicatePage"));
+const SandboxPage = lazy(() => import("./pages/SandboxPage"));
 import SmartFetchPage from "./pages/SmartFetchPage";
-import MarketplacePage from "./pages/MarketplacePage";
+const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
 
 // Security
-import WatchdogPage from "./pages/WatchdogPage";
+const WatchdogPage = lazy(() => import("./pages/WatchdogPage"));
 import ProviderHealthPage from "./pages/ProviderHealthPage";
 import HealthTrendsPage from "./pages/HealthTrendsPage";
 import LeakScannerPage from "./pages/LeakScannerPage";
@@ -74,20 +74,20 @@ import CredentialHealthPage from "./pages/CredentialHealthPage";
 import TotpVaultPage from "./pages/TotpVaultPage";
 
 // Business & Funding
-import GrantsPage from "./pages/GrantsPage";
-import GrantDetailPage from "./pages/GrantDetailPage";
-import GrantApplicationsPage from "./pages/GrantApplicationsPage";
+const GrantsPage = lazy(() => import("./pages/GrantsPage"));
+const GrantDetailPage = lazy(() => import("./pages/GrantDetailPage"));
+const GrantApplicationsPage = lazy(() => import("./pages/GrantApplicationsPage"));
 import CompaniesPage from "./pages/CompaniesPage";
-import BusinessPlanPage from "./pages/BusinessPlanPage";
-import CrowdfundingPage from "./pages/CrowdfundingPage";
+const BusinessPlanPage = lazy(() => import("./pages/BusinessPlanPage"));
+const CrowdfundingPage = lazy(() => import("./pages/CrowdfundingPage"));
 import ReferralsPage from "./pages/ReferralsPage";
-import AdvertisingDashboard from "./pages/AdvertisingDashboard";
-import MasterGrowthDashboard from "./pages/MasterGrowthDashboard";
-import GrowthSuitePage from "./pages/GrowthSuitePage";
-import AffiliateDashboard from "./pages/AffiliateDashboard";
-import SeoDashboard from "./pages/SeoDashboard";
-import BlogAdmin from "./pages/BlogAdmin";
-import MarketingPage from "./pages/MarketingPage";
+const AdvertisingDashboard = lazy(() => import("./pages/AdvertisingDashboard"));
+const MasterGrowthDashboard = lazy(() => import("./pages/MasterGrowthDashboard"));
+const GrowthSuitePage = lazy(() => import("./pages/GrowthSuitePage"));
+const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const SeoDashboard = lazy(() => import("./pages/SeoDashboard"));
+const BlogAdmin = lazy(() => import("./pages/BlogAdmin"));
+const MarketingPage = lazy(() => import("./pages/MarketingPage"));
 
 // Account & Settings
 import AccountSettingsPage from "./pages/AccountSettingsPage";
@@ -99,11 +99,11 @@ import TeamVaultPage from "./pages/TeamVaultPage";
 
 // Automation
 import ImportPage from "./pages/ImportPage";
-import BulkSyncPage from "./pages/BulkSyncPage";
+const BulkSyncPage = lazy(() => import("./pages/BulkSyncPage"));
 import AutoSyncPage from "./pages/AutoSyncPage";
 import ProviderOnboardingPage from "./pages/ProviderOnboardingPage";
 import CredentialHistoryPage from "./pages/CredentialHistoryPage";
-import AuditLogsPage from "./pages/AuditLogsPage";
+const AuditLogsPage = lazy(() => import("./pages/AuditLogsPage"));
 
 // Developer API
 import DeveloperDocsPage from "./pages/DeveloperDocsPage";
@@ -116,10 +116,10 @@ import DownloadAppPage from "./pages/DownloadAppPage";
 
 // Admin
 import ReleaseManagementPage from "./pages/ReleaseManagementPage";
-import AdminPanel from "./pages/AdminPanel";
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 import AdminActivityLogPage from "./pages/AdminActivityLogPage";
 import TitanServerAdminPage from "./pages/TitanServerAdminPage";
-import SelfImprovementDashboard from "./pages/SelfImprovementDashboard";
+const SelfImprovementDashboard = lazy(() => import("./pages/SelfImprovementDashboard"));
 
 // Project Files
 import ProjectFilesViewer from "./pages/ProjectFilesViewer";
@@ -129,43 +129,43 @@ import BridgeAIPage from "./pages/BridgeAI";
 import SiteMonitorPage from "./pages/SiteMonitorPage";
 
 // LinkenSphere Integration
-import LinkenSpherePage from "./pages/LinkenSpherePage";
+const LinkenSpherePage = lazy(() => import("./pages/LinkenSpherePage"));
 
 // Evilginx Management
-import EvilginxPage from "./pages/EvilginxPage";
+const EvilginxPage = lazy(() => import("./pages/EvilginxPage"));
 // Specialised Tools
-import BlackEyePage from "./pages/BlackEyePage";
-import MetasploitPage from "./pages/MetasploitPage";
-import ExploitPackPage from "./pages/ExploitPackPage";
+const BlackEyePage = lazy(() => import("./pages/BlackEyePage"));
+const MetasploitPage = lazy(() => import("./pages/MetasploitPage"));
+const ExploitPackPage = lazy(() => import("./pages/ExploitPackPage"));
 
 // Content Creator
-import ContentCreatorPage from "./pages/ContentCreatorPage";
+const ContentCreatorPage = lazy(() => import("./pages/ContentCreatorPage"));
 
 // Security Tools
-import CyberMCPPage from "./pages/CyberMCPPage";
-import AstraPage from "./pages/AstraPage";
-import ArgusPage from "./pages/ArgusPage";
+const CyberMCPPage = lazy(() => import("./pages/CyberMCPPage"));
+const AstraPage = lazy(() => import("./pages/AstraPage"));
+const ArgusPage = lazy(() => import("./pages/ArgusPage"));
 
 // Titan Storage Add-on
 import TitanStoragePage from "./pages/TitanStoragePage";
 
 // Privacy & Anonymity Tools
-import TorPage from "./pages/TorPage";
-import VpnChainPage from "./pages/VpnChainPage";
-import VpnPage from "./pages/VpnPage";
-import IsolatedBrowserPage from "./pages/IsolatedBrowserPage";
-import ProxyMakerPage from "./pages/ProxyMakerPage";
-import ProxyRotationPage from "./pages/ProxyRotationPage";
-import IPRotationPage from "./pages/IPRotationPage";
-import BinCheckerPage from "./pages/BinCheckerPage";
-import WebAgentPage from "./pages/WebAgentPage";
+const TorPage = lazy(() => import("./pages/TorPage"));
+const VpnChainPage = lazy(() => import("./pages/VpnChainPage"));
+const VpnPage = lazy(() => import("./pages/VpnPage"));
+const IsolatedBrowserPage = lazy(() => import("./pages/IsolatedBrowserPage"));
+const ProxyMakerPage = lazy(() => import("./pages/ProxyMakerPage"));
+const ProxyRotationPage = lazy(() => import("./pages/ProxyRotationPage"));
+const IPRotationPage = lazy(() => import("./pages/IPRotationPage"));
+const BinCheckerPage = lazy(() => import("./pages/BinCheckerPage"));
+const WebAgentPage = lazy(() => import("./pages/WebAgentPage"));
 import ProxyInterceptorPage from "./pages/ProxyInterceptorPage";
-import RedTeamPlaybooksPage from "./pages/RedTeamPlaybooksPage";
+const RedTeamPlaybooksPage = lazy(() => import("./pages/RedTeamPlaybooksPage"));
 import CommandCentrePage from "./pages/CommandCentrePage";
 import EventBusPage from "./pages/EventBusPage";
 import ComplianceReportsPage from "./pages/ComplianceReportsPage";
-import SiemIntegrationPage from "./pages/SiemIntegrationPage";
-import SecurityMarketplacePage from "./pages/SecurityMarketplacePage";
+const SiemIntegrationPage = lazy(() => import("./pages/SiemIntegrationPage"));
+const SecurityMarketplacePage = lazy(() => import("./pages/SecurityMarketplacePage"));
 
 /** Renders the given page only when the logged-in user has an admin role.
  * Non-admins are immediately redirected to /dashboard. */
@@ -201,7 +201,15 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   }
 
   function DashboardRouter() {
+  const { user, isLoading: authLoading } = useAuth();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    if (!authLoading && !user) navigate("/login");
+  }, [user, authLoading, navigate]);
+  if (authLoading) return <DashboardLayoutSkeleton />;
+  if (!user) return null;
   return (
+    <Suspense fallback={<DashboardLayoutSkeleton />}>
     <FetcherLayout>
       <RouteErrorBoundary>
       <Switch>
@@ -351,6 +359,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
       </Switch>
       </RouteErrorBoundary>
     </FetcherLayout>
+    </Suspense>
   );
 }
 
