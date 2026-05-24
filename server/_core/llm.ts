@@ -28,6 +28,26 @@ const log = createLogger("LLM");
 const TITAN_API_URL = ENV.titanApiUrl || "";
 const TITAN_API_KEY = ENV.titanApiKey || "";
 
+  // ── LLM Provider Startup Diagnostics ────────────────────────────────────────
+  // Log provider availability once at module load so Railway logs make it
+  // immediately obvious if a key is missing in the environment.
+  (function logProviderStatus() {
+    const log2 = createLogger("LLM:startup");
+    if (!TITAN_API_URL) {
+      log2.info("[LLM] TitanAI: DISABLED (TITAN_API_URL not set — set it in Railway env to enable)");
+    } else {
+      log2.info(`[LLM] TitanAI: ENABLED → ${TITAN_API_URL}`);
+    }
+    if (!ENV.veniceApiKey) {
+      log2.warn("[LLM] ⚠️  Venice Pro: DISABLED (VENICE_API_KEY not set) — all traffic will hit the OpenAI key pool");
+    } else {
+      log2.info("[LLM] Venice Pro: ENABLED");
+    }
+    if (!ENV.openaiApiKey && !ENV.titanApiUrl) {
+      log2.warn("[LLM] ⚠️  No primary LLM provider configured — builder responses will fail");
+    }
+  })();
+
 /**
  * Gemini API key — EMERGENCY FALLBACK ONLY.
  * Used only when ALL OpenAI keys are simultaneously exhausted (all 6 keys 429'd).
