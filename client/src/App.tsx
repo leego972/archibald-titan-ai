@@ -202,13 +202,6 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   }
 
   function DashboardRouter() {
-  const { user, loading: authLoading } = useAuth();
-  const [, navigate] = useLocation();
-  useEffect(() => {
-    if (!authLoading && !user) navigate("/login");
-  }, [user, authLoading, navigate]);
-  if (authLoading) return <DashboardLayoutSkeleton />;
-  if (!user) return null;
   return (
     <Suspense fallback={<DashboardLayoutSkeleton />}>
     <FetcherLayout>
