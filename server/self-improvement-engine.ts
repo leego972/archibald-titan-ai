@@ -2120,6 +2120,29 @@ export async function pushToGitHub(
       execSync('git config user.name "Archibald Titan"', { cwd: getProjectRoot(), encoding: "utf-8" });
     }
 
+    // ── TypeScript Pre-compile Guard ──────────────────────────────────────────
+    // Block push if TypeScript reports errors. runTypeCheck() is a no-op in
+    // production (skips gracefully) but catches errors in dev/staging pushes.
+    const tcResult = await runTypeCheck();
+    if (!tcResult.passed && tcResult.errorCount > 0) {
+      log.error("[SelfImprovement] Push blocked — TypeScript errors", { errorCount: tcResult.errorCount });
+      return {
+        success: false,
+        pushedRepos: [],
+        error: `Push blocked: ${tcResult.errorCount} TypeScript error(s).\n${tcResult.output.slice(0, 800)}`,
+      };
+    }
+
+    // ── Pull-before-push ────────────────────────────────────────────────────────
+    // Rebase on remote main before committing to keep history linear.
+    try {
+      execSync("git fetch origin main --depth=1 2>&1", { cwd: getProjectRoot(), encoding: "utf-8", timeout: 30000 });
+      execSync("git rebase origin/main 2>&1 || git rebase --abort 2>&1 || true", { cwd: getProjectRoot(), encoding: "utf-8", timeout: 30000 });
+      log.info("[SelfImprovement] Rebased on origin/main before push");
+    } catch {
+      log.warn("[SelfImprovement] Could not rebase — proceeding anyway");
+    }
+
     // Stage the modified files
     for (const file of files) {
       const normalized = normalizePath(file);
@@ -2133,9 +2156,19 @@ export async function pushToGitHub(
       }
     }
 
+    // ── Append diff stats to commit message ────────────────────────────────────
+    let _commitMsg = commitMessage;
+    try {
+      const _diffOut = execSync("git diff --stat --cached 2>&1", { cwd: getProjectRoot(), encoding: "utf-8" }).trim();
+      const _lastLine = _diffOut.split("\n").pop()?.trim() ?? "";
+      if (_lastLine && (_lastLine.includes("insertion") || _lastLine.includes("deletion"))) {
+        _commitMsg = `${commitMessage}\n\n${_lastLine}`;
+      }
+    } catch { /* non-fatal */ }
+
     // Commit
     try {
-      execFileSync("git", ["commit", "-m", commitMessage], { cwd: getProjectRoot(), encoding: "utf-8" });
+      execFileSync("git", ["commit", "-m", _commitMsg], { cwd: getProjectRoot(), encoding: "utf-8" });
     } catch (commitErr: unknown) {
       // If nothing to commit, that's OK
       if ((commitErr as any).stdout?.includes("nothing to commit") || (commitErr as any).stderr?.includes("nothing to commit")) {
