@@ -348,9 +348,14 @@ async function issueSessionAndRedirect(
   const sessionToken = await sdk.createSessionToken(result.openId, { name: result.name, expiresInMs: ONE_YEAR_MS });
   const publicOrigin = getPublicOrigin();
   const callbackOrigin = getOAuthCallbackOrigin();
-  // On Railway, callbackOrigin == publicOrigin (both archibaldtitan.com), so no cross-domain needed
-  // Cross-domain only applies when running on manus.space with a different public domain
-  const isCrossDomain = callbackOrigin !== publicOrigin;
+  // Always route through the dedicated /api/auth/token-exchange endpoint so the session
+    // cookie is set in its own GET response — NOT piggy-backed on a 302 redirect.
+    // Setting Set-Cookie inside a redirect response is unreliable: some browsers and
+    // Railway's proxy layer may drop or delay the cookie, causing auth.me to return null
+    // on the /dashboard load even though OAuth succeeded.
+    // The token-exchange GET endpoint sets the cookie cleanly, then issues the final
+    // redirect to /dashboard with the cookie already in the browser's cookie jar.
+    const isCrossDomain = true;
   log.info(`[Auth] publicOrigin=${publicOrigin}, callbackOrigin=${callbackOrigin}, isCrossDomain=${isCrossDomain}`);
 
   // Clear the OAuth state cookie now that login is complete
