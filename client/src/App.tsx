@@ -51,7 +51,7 @@ import AttackGraphPage from "./pages/AttackGraphPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
-import DashboardLayoutSkeleton from "@/components/DashboardLayoutSkeleton";
+import { DashboardLayoutSkeleton } from "@/components/DashboardLayoutSkeleton";
 import ChatPage from "./pages/ChatPage";
 import FetcherNew from "./pages/FetcherNew";
 import FetcherJobs from "./pages/FetcherJobs";
