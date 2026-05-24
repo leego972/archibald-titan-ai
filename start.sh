@@ -18,8 +18,8 @@ run_migrations() {
 
     if [ $? -eq 0 ]; then
       echo "[Startup] MySQL ready! Running migrations..."
-      npx drizzle-kit generate 2>&1 || true
-      npx drizzle-kit migrate 2>&1 || echo "[Startup] Migration failed, tables may already exist"
+      ./node_modules/.bin/drizzle-kit generate 2>&1 || true
+      ./node_modules/.bin/drizzle-kit migrate 2>&1 || echo "[Startup] Migration failed, tables may already exist"
       echo "[Startup] Migrations complete"
       return 0
     fi
