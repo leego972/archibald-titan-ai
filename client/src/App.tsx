@@ -51,6 +51,7 @@ import AttackGraphPage from "./pages/AttackGraphPage";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
+import DashboardLayoutSkeleton from "@/components/DashboardLayoutSkeleton";
 import ChatPage from "./pages/ChatPage";
 import FetcherNew from "./pages/FetcherNew";
 import FetcherJobs from "./pages/FetcherJobs";
@@ -201,7 +202,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   }
 
   function DashboardRouter() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
