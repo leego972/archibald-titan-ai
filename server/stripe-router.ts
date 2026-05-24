@@ -17,8 +17,46 @@ import { sendPaymentFailedEmail, sendSubscriptionCancelledEmail, sendPaymentSucc
 import { dispatchNotification } from "./notification-channels-router";
 const log = createLogger("StripeRouter");
 
-/** In-memory set of processed Stripe webhook event IDs for idempotency */
-const processedWebhookEvents = new Set<string>();
+/**
+ * DB-backed Stripe webhook idempotency.
+ * Persists processed event IDs in auditLogs so server restarts cannot cause
+ * duplicate processing. Falls back to in-memory if the DB is unavailable.
+ */
+const processedWebhookEventsMemory = new Set<string>();
+
+async function isWebhookEventProcessed(eventId: string): Promise<boolean> {
+  try {
+    const db = await getDb();
+    if (!db) return processedWebhookEventsMemory.has(eventId);
+    const existing = await db
+      .select({ action: auditLogs.action })
+      .from(auditLogs)
+      .where(and(eq(auditLogs.action, "stripe_webhook:" + eventId), eq(auditLogs.userId, 0)))
+      .limit(1);
+    return existing.length > 0;
+  } catch {
+    return processedWebhookEventsMemory.has(eventId);
+  }
+}
+
+async function markWebhookEventProcessed(eventId: string): Promise<void> {
+  processedWebhookEventsMemory.add(eventId);
+  if (processedWebhookEventsMemory.size > 500) {
+    const first = processedWebhookEventsMemory.values().next().value;
+    if (first) processedWebhookEventsMemory.delete(first);
+  }
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.insert(auditLogs).values({
+      userId: 0,
+      action: "stripe_webhook:" + eventId,
+      details: "Stripe webhook event processed at " + new Date().toISOString(),
+    }).onDuplicateKeyUpdate({ set: { action: "stripe_webhook:" + eventId } });
+  } catch {
+    // Non-fatal: in-memory guard is still active
+  }
+}
 
 // ─── Stripe Client ───────────────────────────────────────────────────
 
@@ -834,25 +872,12 @@ export function registerStripeWebhook(app: Express) {
         log.info("[Stripe Webhook] Test event detected, returning verification response");
         return res.json({ verified: true });
       }
-
-      // ── Idempotency: skip duplicate events ──
-      if (processedWebhookEvents.has(event.id)) {
-        log.info(`[Stripe Webhook] Duplicate event skipped: ${event.type} (${event.id})`);
+      // ── Idempotency: skip duplicate events (DB-backed + in-memory fallback) ──
+      if (await isWebhookEventProcessed(event.id)) {
+        log.info("[Stripe Webhook] Duplicate event skipped: " + event.type + " (" + event.id + ")");
         return res.json({ received: true, duplicate: true });
       }
-      processedWebhookEvents.add(event.id);
-      // Evict old entries to prevent memory leak (keep last 5000)
-      if (processedWebhookEvents.size > 5000) {
-        const iter = processedWebhookEvents.values();
-        for (let i = 0; i < 1000; i++) iter.next();
-        const cutoff = iter.next().value;
-        if (cutoff) {
-          for (const id of processedWebhookEvents) {
-            if (id === cutoff) break;
-            processedWebhookEvents.delete(id);
-          }
-        }
-      }
+      await markWebhookEventProcessed(event.id);
 
       log.info(`[Stripe Webhook] Received event: ${event.type} (${event.id})`);
 
