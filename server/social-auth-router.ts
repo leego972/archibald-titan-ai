@@ -348,9 +348,12 @@ async function issueSessionAndRedirect(
   const sessionToken = await sdk.createSessionToken(result.openId, { name: result.name, expiresInMs: ONE_YEAR_MS });
   const publicOrigin = getPublicOrigin();
   const callbackOrigin = getOAuthCallbackOrigin();
-  // On Railway, callbackOrigin == publicOrigin (both archibaldtitan.com), so no cross-domain needed
-    // Cross-domain only applies when running on manus.space with a different public domain
-    const isCrossDomain = callbackOrigin !== publicOrigin;
+  // Always use the token-exchange endpoint to deliver the session cookie.
+  // Setting Set-Cookie on a 302 redirect is dropped by Safari ITP when the
+  // redirect chain originates from a third-party OAuth provider (Google/GitHub).
+  // The token-exchange is a dedicated first-party GET request; cookies set on
+  // that response are stored reliably in all browsers and Railway's proxy layer.
+  const isCrossDomain = true;
   log.info(`[Auth] publicOrigin=${publicOrigin}, callbackOrigin=${callbackOrigin}, isCrossDomain=${isCrossDomain}`);
 
   // Clear the OAuth state cookie now that login is complete
