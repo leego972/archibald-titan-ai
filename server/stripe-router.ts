@@ -4,7 +4,7 @@ import { eq, and, isNotNull, ne, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { ENV } from "./_core/env";
 import { getDb } from "./db";
-import { subscriptions, users, creditBalances, creditEscalation, creditTransactions } from "../drizzle/schema";
+import { subscriptions, users, creditBalances, creditEscalation, creditTransactions, auditLogs } from "../drizzle/schema";
 import { PRICING_TIERS, INTERNAL_TIERS, CREDIT_PACKS, type PlanId } from "../shared/pricing";
 import { addCredits, processMonthlyRefill, getCreditBalance } from "./credit-service";
 import { referralCodes } from "../drizzle/schema";
