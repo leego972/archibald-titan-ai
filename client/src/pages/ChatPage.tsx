@@ -977,6 +977,8 @@ export default function ChatPage() {
   const vadSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vadRafRef = useRef<number | null>(null);
   const vadHasSpokenRef = useRef(false); // true once volume exceeded threshold
+  const liveVolumeRef = useRef(0);
+  const [liveVolume, setLiveVolume] = useState(0);
 
   // ── Sidebar VoiceMode integration ──────────────────────────────────────────
   const { enabled: sidebarVoiceEnabled, phase: sidebarVoicePhase, setConversationId: setSidebarVoiceConvId } = useVoiceMode();
@@ -1000,6 +1002,13 @@ export default function ChatPage() {
 
   // Keep voiceModeRef in sync
   useEffect(() => { voiceModeRef.current = voiceModeActive; }, [voiceModeActive]);
+  useEffect(() => {
+    if (!voiceModeActive) { setLiveVolume(0); return; }
+    let _raf: number;
+    const _tick = () => { setLiveVolume(liveVolumeRef.current); _raf = requestAnimationFrame(_tick); };
+    _raf = requestAnimationFrame(_tick);
+    return () => cancelAnimationFrame(_raf);
+  }, [voiceModeActive]);
   // ── Template URL param: pre-fill input when navigating from Builder Templates page ──
   useEffect(() => {
     try {
@@ -1082,6 +1091,18 @@ export default function ChatPage() {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
+      const _ttsAn = ctx.createAnalyser();
+      _ttsAn.fftSize = 512; _ttsAn.smoothingTimeConstant = 0.4;
+      source.connect(_ttsAn);
+      const _ttsPcm = new Uint8Array(_ttsAn.frequencyBinCount);
+      const _readTts = () => {
+        if (!audioSourceRef.current) { liveVolumeRef.current = 0; return; }
+        _ttsAn.getByteTimeDomainData(_ttsPcm);
+        let _s = 0; for (let _i = 0; _i < _ttsPcm.length; _i++) { const _v = (_ttsPcm[_i]-128)/128; _s+=_v*_v; }
+        liveVolumeRef.current = Math.min(Math.sqrt(_s/_ttsPcm.length)*8,1);
+        requestAnimationFrame(_readTts);
+      };
+      requestAnimationFrame(_readTts);
       audioSourceRef.current = source;
 
       source.onended = () => {
@@ -1371,6 +1392,7 @@ export default function ChatPage() {
               sum += v * v;
             }
             const rms = Math.sqrt(sum / dataArray.length) * 100;
+            liveVolumeRef.current = Math.min(rms / 30, 1);
             if (rms > SILENCE_THRESHOLD) {
               // User is speaking
               if (!vadHasSpokenRef.current) {
@@ -3761,11 +3783,11 @@ export default function ChatPage() {
           {/* Destro face — emotion + lip-sync driven by voice phase */}
           <div className="w-full bg-black/90 border-t border-white/10" style={{ height: 'min(48vw, 14rem)' }}>
             <DestroFace
-              volume={voiceStatus === 'speaking' ? 0.6 : voiceStatus === 'listening' ? 0.2 : 0}
+              volume={liveVolume}
               emotion={
-                voiceStatus === 'listening' ? 'thinking'       :
-                voiceStatus === 'thinking'  ? 'thinking'       :
-                voiceStatus === 'speaking'  ? 'friendly_stern' :
+                voiceStatus === 'listening' ? 'thinking'      :
+                voiceStatus === 'thinking'  ? 'concerned'     :
+                voiceStatus === 'speaking'  ? 'friendly_stern':
                 'neutral'
               }
             />
