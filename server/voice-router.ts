@@ -81,6 +81,78 @@ export const voiceRouter = router({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: result.error,
+
+  // ── List available ElevenLabs voices ──────────────────────────────────────
+  listVoices: protectedProcedure
+    .query(async () => {
+      const elKey = ENV.elevenLabsApiKey;
+      if (!elKey) return { voices: [] };
+      try {
+        const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+          headers: { "xi-api-key": elKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) return { voices: [] };
+        const data = await res.json() as { voices: Array<{ voice_id: string; name: string; labels: Record<string, string>; preview_url: string }> };
+        return {
+          voices: (data.voices || []).map(v => ({
+            id: v.voice_id,
+            name: v.name,
+            labels: v.labels || {},
+            previewUrl: v.preview_url,
+          })),
+        };
+      } catch {
+        return { voices: [] };
+      }
+    }),
+
+  // ── TTS TRPC procedure — with credit deduction + voice/emotion selection ──
+  speak: protectedProcedure
+    .input(
+      z.object({
+        text:    z.string().max(5000),
+        voiceId: z.string().optional(), // ElevenLabs voice_id (defaults to George)
+        emotion: z.enum(["neutral", "calm", "excited", "serious", "urgent"]).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const _cr = await consumeCredits(ctx.user.id, "voice_action", "TTS synthesis");
+      if (!_cr.success) throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient credits for TTS." });
+
+      const elKey = ENV.elevenLabsApiKey;
+      if (!elKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "TTS not configured" });
+
+      // Emotion → voice settings mapping
+      const emotionSettings: Record<string, { stability: number; similarity_boost: number; style: number }> = {
+        neutral:  { stability: 0.50, similarity_boost: 0.85, style: 0.40 },
+        calm:     { stability: 0.80, similarity_boost: 0.75, style: 0.15 },
+        excited:  { stability: 0.25, similarity_boost: 0.90, style: 0.75 },
+        serious:  { stability: 0.70, similarity_boost: 0.85, style: 0.20 },
+        urgent:   { stability: 0.30, similarity_boost: 0.90, style: 0.65 },
+      };
+      const voiceSettings = emotionSettings[input.emotion || "neutral"];
+
+      // Quality-adaptive model: turbo for >500 chars (better quality), flash for short text
+      const modelId = input.text.length > 500 ? "eleven_turbo_v2_5" : "eleven_flash_v2_5";
+      const voiceId = input.voiceId || "JBFqnCBsd6RMkjVDRZzb"; // default: George
+
+      const elRes = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?optimize_streaming_latency=3&output_format=mp3_44100_64`,
+        {
+          method: "POST",
+          headers: { "xi-api-key": elKey, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+          body: JSON.stringify({ text: input.text, model_id: modelId, voice_settings: { ...voiceSettings, use_speaker_boost: true } }),
+          signal: AbortSignal.timeout(30000),
+        }
+      );
+      if (!elRes.ok) {
+        const err = await elRes.text().catch(() => "");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `TTS failed: ${err.slice(0, 200)}` });
+      }
+      const audioBuffer = Buffer.from(await elRes.arrayBuffer());
+      return { audioBase64: audioBuffer.toString("base64"), mimeType: "audio/mpeg", model: modelId };
+    }),
           });
         }
         // Deduct credits for voice transcription
@@ -329,9 +401,9 @@ export function registerVoiceTTSRoute(app: Express) {
       const elevenLabsKey = ENV.elevenLabsApiKey;
       if (elevenLabsKey) {
         try {
-          const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // George — deep British English male
+      const { text: _text, voiceId: _voiceId, emotion: _emotion, speed: _speed } = req.body || {};
           const elRes = await fetch(
-            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream?optimize_streaming_latency=3&output_format=mp3_44100_64`,
+            `https://api.elevenlabs.io/v1/text-to-speech/${(_voiceId || "JBFqnCBsd6RMkjVDRZzb")}/stream?optimize_streaming_latency=3&output_format=mp3_44100_64`,
             {
               method: "POST",
               headers: {
@@ -341,11 +413,11 @@ export function registerVoiceTTSRoute(app: Express) {
               },
               body: JSON.stringify({
                 text: trimmedText,
-                model_id: "eleven_flash_v2_5",  // Flash v2.5 — ~75ms TTFB for real-time chat
+                model_id: _model,  // Flash v2.5 — ~75ms TTFB for real-time chat
                 voice_settings: {
-                  stability: 0.50,          // slightly lower = more dramatic delivery
-                  similarity_boost: 0.85,   // stay true to voice
-                  style: 0.40,              // expressive but flash-friendly
+                  stability: _vs.stability,
+                  similarity_boost: _vs.similarity_boost,
+                  style: _vs.style,
                   use_speaker_boost: true,  // enhanced presence
                 },
               }),
