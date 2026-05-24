@@ -156,7 +156,17 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
-    return new TextEncoder().encode(secret);
+    const encoded = new TextEncoder().encode(secret);
+    // jose v6 enforces a minimum 256-bit (32-byte) key for HS256.
+    // Pad the secret deterministically when shorter so sign() and jwtVerify()
+    // never throw JWKInvalid on Railway where JWT_SECRET may be less than 32 chars.
+    if (encoded.length >= 32) return encoded;
+    const padded = new Uint8Array(32);
+    padded.set(encoded);
+    for (let i = encoded.length; i < 32; i++) {
+      padded[i] = (encoded[i % Math.max(encoded.length, 1)] ^ (i + 1)) & 0xff;
+    }
+    return padded;
   }
 
   /**
