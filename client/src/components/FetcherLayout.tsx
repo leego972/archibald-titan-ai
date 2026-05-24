@@ -198,14 +198,18 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
   ];
 }
 
-export default function FetcherLayout({ children }: { children: React.ReactNode }) {
+function LoginRedirect() {
+    useEffect(() => {
+      window.location.href = getLoginUrl();
+    }, []);
+    return null;
+  }
+
+  export default function FetcherLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) return <DashboardLayoutSkeleton />;
-  if (!user) {
-    window.location.href = getLoginUrl();
-    return null;
-  }
+  if (!user) return <LoginRedirect />;
 
   return (
     <SidebarProvider>
