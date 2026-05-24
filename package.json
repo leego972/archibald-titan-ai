@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:push": "./node_modules/.bin/drizzle-kit generate && ./node_modules/.bin/drizzle-kit migrate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
