@@ -204,8 +204,8 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   function DashboardRouter() {
   return (
     <Suspense fallback={<DashboardLayoutSkeleton />}>
+    <RouteErrorBoundary>
     <FetcherLayout>
-      <RouteErrorBoundary>
       <Switch>
         {/* Main Dashboard - Builder Chat */}
         <Route path="/dashboard" component={ChatPage} />
@@ -351,8 +351,8 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 
         <Route component={NotFound} />
       </Switch>
-      </RouteErrorBoundary>
     </FetcherLayout>
+    </RouteErrorBoundary>
     </Suspense>
   );
 }
