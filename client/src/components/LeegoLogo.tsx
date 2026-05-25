@@ -34,7 +34,7 @@ export default function LeegoLogo({ idleClassName = "h-20 w-20" }: LeegoLogoProp
     const ctx = el.getContext("2d")!;
     const cols = Math.floor(el.width / 14);
     const drops: number[] = Array(cols).fill(1);
-    const chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノ";
+    const chars = "01";
 
     const draw = () => {
       ctx.fillStyle = "rgba(0,0,0,0.07)";
