@@ -1005,7 +1005,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!voiceModeActive) { setLiveVolume(0); return; }
     let _raf: number;
-    const _tick = () => { setLiveVolume(liveVolumeRef.current); _raf = requestAnimationFrame(_tick); };
+    const _tick = () => { liveVolumeRef.current *= 0.88; setLiveVolume(liveVolumeRef.current); _raf = requestAnimationFrame(_tick); };
     _raf = requestAnimationFrame(_tick);
     return () => cancelAnimationFrame(_raf);
   }, [voiceModeActive]);
