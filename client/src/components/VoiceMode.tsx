@@ -40,10 +40,12 @@
     useRef,
     useCallback,
     useEffect,
+    Suspense,
     type ReactNode,
   } from "react";
   import { trpc } from "@/lib/trpc";
   import { toast } from "sonner";
+  import { DestroFace, type Emotion } from "./3d/DestroFace";
 
   // ─── Constants ────────────────────────────────────────────────────────────────
   const SPEECH_THRESHOLD  = 0.018;   // RMS above this = speech
@@ -101,8 +103,44 @@
     );
   }
 
-  // ─── Provider ─────────────────────────────────────────────────────────────────
-  export function VoiceModeProvider({ children }: { children: ReactNode }) {
+  // ─── Context detection ────────────────────────────────────────────────────────
+    const CYBER_KEYWORDS = [
+      'hack','exploit','malware','payload','vulnerability','firewall','phishing',
+      'breach','cve','penetration','pentest','metasploit','evilginx','proxy',
+      'credential','encrypt','decrypt','botnet','ransomware','sql injection',
+      'xss','csrf','reverse shell','nmap','wireshark','zero-day','trojan',
+      'rootkit','spyware','brute force','command and control',
+    ];
+    const CINEMA_KEYWORDS = [
+      'film','movie','cinema','director','actor','actress','screenplay','scene',
+      'shot','production','cinematograph','hollywood','documentary','script',
+      'cast','producer','trailer','premiere','blockbuster','box office',
+      'editing','montage','storyboard','animation','vfx','special effects',
+      'streaming','netflix','disney','indie film','genre',
+    ];
+
+    function detectContext(text: string): 'cyber' | 'cinema' | null {
+      const lower = text.toLowerCase();
+      if (CYBER_KEYWORDS.some(k => lower.includes(k))) return 'cyber';
+      if (CINEMA_KEYWORDS.some(k => lower.includes(k))) return 'cinema';
+      return null;
+    }
+
+    function phaseToEmotion(phase: VoicePhase, ctx: 'cyber' | 'cinema' | null): Emotion {
+      if (ctx === 'cyber')  return phase === 'processing' ? 'thinking' : 'cyber';
+      if (ctx === 'cinema') return 'cinema';
+      switch (phase) {
+        case 'active':     return 'neutral';
+        case 'standby':    return 'thinking';
+        case 'recording':  return 'serious';
+        case 'processing': return 'thinking';
+        case 'speaking':   return 'smiling';
+        default:           return 'neutral';
+      }
+    }
+
+    // ─── Provider ─────────────────────────────────────────────────────────────────
+    export function VoiceModeProvider({ children }: { children: ReactNode }) {
     const [enabled, setEnabledState] = useState(false);
     const [phase, setPhase] = useState<VoicePhase>("off");
     const [transcript, setTranscript] = useState("");
@@ -140,6 +178,11 @@
 
     // Forward-ref for enterStandby — breaks the circular dep with resetStandbyTimer
     const enterStandbyRef = useRef<() => void>(() => { /* populated after mount */ });
+
+    // Volume tracking for DestroFace jaw-sync
+    const volumeRef          = useRef(0);
+    const vadFrameCounterRef = useRef(0);
+    const [displayVolume, setDisplayVolume] = useState(0);
 
     // Keep phaseRef / enabledRef in sync with state
     useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -464,6 +507,8 @@
         let sum = 0;
         for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
         const rms = Math.sqrt(sum / buf.length);
+        volumeRef.current = rms;
+        if (++vadFrameCounterRef.current % 6 === 0) setDisplayVolume(Math.min(rms * 10, 1));
         const now = Date.now();
 
         if (currentPhase === "active") {
@@ -630,10 +675,49 @@
       conversationIdRef.current = id;
     }, []);
 
-    return (
-      <VoiceModeContext.Provider value={{ enabled, phase, transcript, lastReply, setEnabled, setConversationId }}>
-        {children}
-      </VoiceModeContext.Provider>
-    );
-  }
-  
+      const activeCtx = detectContext(lastReply) ?? detectContext(transcript);
+      const emotion   = phaseToEmotion(phase, activeCtx);
+      const accentColor =
+        activeCtx === 'cyber'  ? '#ff2200' :
+        activeCtx === 'cinema' ? '#00ff44' : '#00ffff';
+      const phaseLabel: Record<VoicePhase, string> = {
+        off: '', active: '◎  Ready — just speak', standby: '◌  Say "Titan" to wake',
+        recording: '●  Listening...', processing: '◌  Thinking...', speaking: '▶  Speaking',
+      };
+
+      return (
+        <VoiceModeContext.Provider value={{ enabled, phase, transcript, lastReply, setEnabled, setConversationId }}>
+          {enabled && (
+            <div
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.93)', backdropFilter: 'blur(10px)' }}
+            >
+              <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
+                <Suspense fallback={null}>
+                  <DestroFace volume={displayVolume} emotion={emotion} />
+                </Suspense>
+              </div>
+              <p
+                className="mt-5 text-xs font-mono uppercase tracking-widest transition-colors duration-500"
+                style={{ color: accentColor }}
+              >
+                {phaseLabel[phase]}
+              </p>
+              {transcript && (
+                <p className="mt-2 text-white/60 text-sm max-w-xs text-center px-6 italic">
+                  &ldquo;{transcript}&rdquo;
+                </p>
+              )}
+              <button
+                onClick={() => setEnabled(false)}
+                className="mt-8 px-5 py-2 rounded-full border border-white/10 text-white/40 text-xs font-mono uppercase tracking-widest hover:text-white/80 hover:border-white/30 transition-all duration-200"
+              >
+                ✕ &nbsp;Close Voice Mode
+              </button>
+            </div>
+          )}
+          {children}
+        </VoiceModeContext.Provider>
+      );
+    }
+    
