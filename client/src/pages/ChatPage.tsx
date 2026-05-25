@@ -1172,6 +1172,7 @@ export default function ChatPage() {
     vadAnalyserRef.current = null;
     if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
     if (vadSilenceTimerRef.current) { clearTimeout(vadSilenceTimerRef.current); vadSilenceTimerRef.current = null; }
+    liveVolumeRef.current = 0; // reset jaw — stops stale position during 'thinking' phase
     // Stop recording timer
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     // Stop any active recording
@@ -1189,6 +1190,7 @@ export default function ChatPage() {
     setIsRecording(false);
     setRecordingDuration(0);
     setVoiceStatus('idle');
+    liveVolumeRef.current = 0; // reset jaw on full exit
     // Deactivate voice mode overlay — chat page is revealed underneath
     setVoiceModeActive(false);
   };
