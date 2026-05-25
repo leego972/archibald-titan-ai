@@ -210,43 +210,49 @@ export const voiceRouter = router({
  * Transcribe audio directly from a buffer (no URL needed)
  */
 async function transcribeAudioFromBuffer(
-  buffer: Buffer,
-  mimeType: string,
-  language?: string,
-  prompt?: string
-): Promise<{ text: string; language: string; duration: number } | { error: string }> {
-  const apiKey = process.env.OPENAI_API_KEY || "";
-  if (!apiKey) {
-    return { error: "Voice transcription not configured — set OPENAI_API_KEY" };
+    buffer: Buffer,
+    mimeType: string,
+    language?: string,
+    prompt?: string
+  ): Promise<{ text: string; language: string; duration: number } | { error: string }> {
+    // Prefer Venice (OpenAI-compatible), fall back to OpenAI
+    const veniceKey = process.env.VENICE_API_KEY || "";
+    const openaiKey = process.env.OPENAI_API_KEY || "";
+    const apiKey = veniceKey || openaiKey;
+    const transcribeUrl = veniceKey
+      ? "https://api.venice.ai/api/v1/audio/transcriptions"
+      : "https://api.openai.com/v1/audio/transcriptions";
+
+    if (!apiKey) {
+      return { error: "Voice transcription not configured — set VENICE_API_KEY or OPENAI_API_KEY" };
+    }
+
+    const ext = getExtFromMime(mimeType);
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
+    formData.append("file", blob, `audio.${ext}`);
+    formData.append("model", "whisper-1");
+    formData.append("response_format", "verbose_json");
+
+    if (language && language !== "auto") {
+      formData.append("language", language);
+    }
+    formData.append("prompt", prompt || "Transcribe the user's voice command for a chat assistant");
+
+    const response = await fetch(transcribeUrl, {
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "Accept-Encoding": "identity" },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      return { error: `Transcription failed: ${response.status} ${errText}` };
+    }
+
+    const data = await response.json() as { text: string; language: string; duration: number };
+    return { text: data.text, language: data.language || "en", duration: data.duration || 0 };
   }
-
-  const ext = getExtFromMime(mimeType);
-  const formData = new FormData();
-  const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
-  formData.append("file", blob, `audio.${ext}`);
-  formData.append("model", "whisper-1");
-  formData.append("response_format", "verbose_json");
-
-  if (language && language !== "auto") {
-    formData.append("language", language);
-  }
-  formData.append("prompt", prompt || "Transcribe the user's voice command for a chat assistant");
-
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "Accept-Encoding": "identity" },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    return { error: `Transcription failed: ${response.status} ${errText}` };
-  }
-
-  const data = await response.json() as { text: string; language: string; duration: number };
-  return { text: data.text, language: data.language || "en", duration: data.duration || 0 };
-}
-
 /**
  * Express route to serve temporary audio files for transcription
  * GET /api/voice/temp/:id
