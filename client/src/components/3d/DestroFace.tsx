@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
   import { Canvas, useFrame } from '@react-three/fiber';
-  import { Float, PerspectiveCamera } from '@react-three/drei';
+  import { Float, PerspectiveCamera, Environment } from '@react-three/drei';
   import * as THREE from 'three';
 
   export type Emotion =
@@ -22,129 +22,191 @@ import React, { useRef } from 'react';
   }
 
   const DestroMask = ({ volume = 0, emotion = 'neutral' }: DestroMaskProps) => {
-    const meshRef = useRef<THREE.Mesh>(null);
+    const meshRef    = useRef<THREE.Mesh>(null);
     const leftEyeRef = useRef<THREE.Mesh>(null);
-    const rightEyeRef = useRef<THREE.Mesh>(null);
-    const jawRef = useRef<THREE.Mesh>(null);
+    const rightEyeRef= useRef<THREE.Mesh>(null);
+    const jawRef     = useRef<THREE.Mesh>(null);
 
     useFrame((state) => {
       if (!meshRef.current) return;
-      const time = state.clock.getElapsedTime();
+      const t = state.clock.getElapsedTime();
 
-      meshRef.current.position.y = Math.sin(time * 0.5) * 0.05;
+      // Gentle breathing float
+      meshRef.current.position.y = Math.sin(t * 0.5) * 0.05;
 
-      let eyeColor = '#00ffff';
-      let glowIntensity = 2 + volume * 15;
-      let jawScaleX = 0.6;
+      // ── Defaults ─────────────────────────────────────────────────────────────
+      let eyeColor   = '#00cc55'; // green  = idle / task complete
+      let glowInt    = 2.2 + Math.sin(t * 0.9) * 0.4;
+      let jawScaleX  = 0.60;
+      let distort    = 0.10;
 
+      // ── Per-emotion overrides ────────────────────────────────────────────────
       switch (emotion) {
-        case 'cyber':
-          eyeColor = '#ff2200';
-          glowIntensity = 4 + volume * 20 + Math.sin(time * 8) * 1.5;
-          jawScaleX = 0.62;
-          break;
-        case 'cinema':
-          eyeColor = '#00ff44';
-          glowIntensity = 3 + volume * 12 + Math.sin(time * 3) * 0.8;
-          jawScaleX = 0.68;
-          break;
+        // LISTENING → metallic blue
         case 'thinking':
-          eyeColor = '#00ccff';
-          glowIntensity = 1.5 + Math.sin(time * 2) * 1;
+          eyeColor  = '#1a7fff';
+          glowInt   = 3.5 + volume * 14 + Math.sin(t * 1.5) * 0.8;
+          distort   = 0.16 + volume * 0.1;
           break;
+
+        // WORKING / THINKING → fire red
         case 'concerned':
-          eyeColor = '#44ccff';
-          glowIntensity = 1.2 + volume * 5;
+          eyeColor  = '#ff3300';
+          glowInt   = 4.5 + volume * 20 + Math.sin(t * 3) * 1.5;
+          distort   = 0.28 + volume * 0.25;
           jawScaleX = 0.55;
           break;
-        case 'amused':
-          eyeColor = '#00ffff';
-          glowIntensity = 3 + volume * 18;
-          jawScaleX = 0.7;
-          break;
+
+        // SPEAKING → electric teal
         case 'friendly_stern':
-          eyeColor = '#00eebb';
-          glowIntensity = 2.5 + volume * 10;
+          eyeColor  = '#00eedd';
+          glowInt   = 2.8 + volume * 11;
           jawScaleX = 0.65;
           break;
+
+        // IDLE / COMPLETE → soft green (explicit)
+        case 'neutral':
+          eyeColor  = '#00cc55';
+          glowInt   = 1.8 + Math.sin(t * 0.8) * 0.5;
+          distort   = 0.10;
+          break;
+
+        case 'cyber':
+          eyeColor  = '#ff2200';
+          glowInt   = 4 + volume * 20 + Math.sin(t * 8) * 1.5;
+          distort   = 0.35 + volume * 0.3;
+          break;
+        case 'cinema':
+          eyeColor  = '#00ff44';
+          glowInt   = 3 + volume * 12;
+          jawScaleX = 0.68;
+          break;
+        case 'amused':
+          eyeColor  = '#00eedd';
+          glowInt   = 3 + volume * 18;
+          jawScaleX = 0.70;
+          distort   = 0.28;
+          break;
         case 'laughing':
-          eyeColor = '#00ffff';
-          glowIntensity = 5 + Math.sin(time * 15) * 3;
-          jawScaleX = 0.9;
+          eyeColor  = '#00eedd';
+          glowInt   = 5 + Math.sin(t * 15) * 3;
+          jawScaleX = 0.90;
+          distort   = 0.38;
           break;
         case 'smiling':
-          jawScaleX = 0.8;
+          eyeColor  = '#00cc55';
+          jawScaleX = 0.80;
           break;
         case 'serious':
-          eyeColor = '#0088ff';
-          glowIntensity = 1 + volume * 4;
+          eyeColor  = '#1a7fff';
+          glowInt   = 1 + volume * 4;
           break;
         case 'empathetic':
-          eyeColor = '#00ffaa';
-          glowIntensity = 1.5 + volume * 8;
+          eyeColor  = '#00cc88';
+          glowInt   = 1.5 + volume * 8;
           break;
       }
 
+      // Apply eye colours
       if (leftEyeRef.current && rightEyeRef.current) {
         const matL = leftEyeRef.current.material as THREE.MeshStandardMaterial;
         const matR = rightEyeRef.current.material as THREE.MeshStandardMaterial;
-        matL.color.set(eyeColor);
-        matL.emissive.set(eyeColor);
-        matL.emissiveIntensity = glowIntensity;
-        matR.color.set(eyeColor);
-        matR.emissive.set(eyeColor);
-        matR.emissiveIntensity = glowIntensity;
+        matL.color.set(eyeColor);  matL.emissive.set(eyeColor);  matL.emissiveIntensity = glowInt;
+        matR.color.set(eyeColor);  matR.emissive.set(eyeColor);  matR.emissiveIntensity = glowInt;
       }
 
+      // Jaw / lip-sync
       if (jawRef.current) {
-        const jawTarget = -0.6 - (volume * 0.6);
+        const jawTarget = -0.6 - volume * 0.6;
         jawRef.current.position.y = THREE.MathUtils.lerp(jawRef.current.position.y, jawTarget, 0.2);
-        jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, jawScaleX, 0.1);
-        if (emotion === 'laughing') {
-          jawRef.current.position.y -= Math.sin(time * 25) * 0.08;
-        }
+        jawRef.current.scale.x    = THREE.MathUtils.lerp(jawRef.current.scale.x,    jawScaleX, 0.1);
+        if (emotion === 'laughing') jawRef.current.position.y -= Math.sin(t * 25) * 0.08;
+      }
+
+      // Subtle face distortion via rotation (MeshPhysicalMaterial has no distort prop)
+      if (meshRef.current) {
+        meshRef.current.rotation.y = Math.sin(t * 0.3) * 0.06 * (1 + distort * 2);
       }
     });
 
     return (
       <group>
+        {/* ── Face — mother-of-pearl MeshPhysicalMaterial ─────────────────── */}
         <mesh ref={meshRef} scale={[1, 1.2, 0.8]}>
-          <sphereGeometry args={[1, 64, 64]} />
-          <meshStandardMaterial color="#b8b8c8" roughness={0.08} metalness={0.95} />
+          <sphereGeometry args={[1, 128, 128]} />
+          <meshPhysicalMaterial
+            color="#dde0ec"
+            roughness={0.04}
+            metalness={0.85}
+            iridescence={1}
+            iridescenceIOR={1.65}
+            iridescenceThicknessRange={[120, 800] as [number, number]}
+            clearcoat={1}
+            clearcoatRoughness={0.04}
+            reflectivity={1}
+            sheen={0.6}
+            sheenRoughness={0.3}
+            sheenColor="#b0c0ff"
+          />
         </mesh>
-        <mesh ref={leftEyeRef} position={[-0.35, 0.4, 0.6]}>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={2} />
+
+        {/* ── Eyes ─────────────────────────────────────────────────────────── */}
+        <mesh ref={leftEyeRef} position={[-0.35, 0.38, 0.65]}>
+          <sphereGeometry args={[0.095, 24, 24]} />
+          <meshStandardMaterial color="#00cc55" emissive="#00cc55" emissiveIntensity={2.2} />
         </mesh>
-        <mesh ref={rightEyeRef} position={[0.35, 0.4, 0.6]}>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={2} />
+        <mesh ref={rightEyeRef} position={[0.35, 0.38, 0.65]}>
+          <sphereGeometry args={[0.095, 24, 24]} />
+          <meshStandardMaterial color="#00cc55" emissive="#00cc55" emissiveIntensity={2.2} />
         </mesh>
-        <mesh ref={jawRef} position={[0, -0.6, 0.3]} scale={[0.6, 0.4, 0.4]}>
-          <sphereGeometry args={[1, 32, 32]} />
-          <meshStandardMaterial color="#707080" metalness={0.95} roughness={0.15} />
+
+        {/* ── Jaw — matching pearl finish, slightly darker ──────────────────── */}
+        <mesh ref={jawRef} position={[0, -0.6, 0.28]} scale={[0.60, 0.40, 0.40]}>
+          <sphereGeometry args={[1, 48, 48]} />
+          <meshPhysicalMaterial
+            color="#c8cce0"
+            roughness={0.06}
+            metalness={0.80}
+            iridescence={0.9}
+            iridescenceIOR={1.55}
+            iridescenceThicknessRange={[100, 600] as [number, number]}
+            clearcoat={0.85}
+            clearcoatRoughness={0.06}
+          />
         </mesh>
       </group>
     );
   };
 
-  export const DestroFace = ({ volume = 0, emotion = 'neutral' }: { volume?: number; emotion?: Emotion }) => {
-    return (
-      <div style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}>
-        <Canvas
-          gl={{ preserveDrawingBuffer: true, antialias: false, powerPreference: 'default' }}
-          dpr={[1, 2]}
-          style={{ display: 'block', width: '100%', height: '100%' }}
-        >
-          <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-          <ambientLight intensity={0.6} />
-          <pointLight position={[10, 10, 10]} intensity={1.2} color="#ffffff" />
-          <pointLight position={[-10, 5, 5]} intensity={0.6} color="#00ffff" />
-          <Float speed={1.8} rotationIntensity={0.4} floatIntensity={0.4}>
-            <DestroMask volume={volume} emotion={emotion} />
-          </Float>
-        </Canvas>
-      </div>
-    );
-  };
+  export const DestroFace = ({
+    volume  = 0,
+    emotion = 'neutral',
+  }: {
+    volume?:  number;
+    emotion?: Emotion;
+  }) => (
+    <div style={{ width: '100%', height: '100%', background: '#000', display: 'block' }}>
+      <Canvas
+        gl={{ preserveDrawingBuffer: true, antialias: true, powerPreference: 'default' }}
+        dpr={[1, 2]}
+        style={{ display: 'block', width: '100%', height: '100%' }}
+      >
+        <PerspectiveCamera makeDefault position={[0, 0, 4.5]} />
+
+        {/* Rich multi-angle lighting to bring out the pearl iridescence */}
+        <ambientLight intensity={0.35} />
+        <pointLight position={[6, 8, 6]}   intensity={2.5} color="#ffffff" />
+        <pointLight position={[-6, 4, 4]}  intensity={1.2} color="#d0e8ff" />
+        <pointLight position={[3, -5, 3]}  intensity={0.8} color="#ffe8d0" />
+        <pointLight position={[0, 2, -6]}  intensity={0.6} color="#e8d0ff" />
+
+        {/* HDR environment — essential for clearcoat + iridescence reflections */}
+        <Environment preset="studio" />
+
+        <Float speed={1.6} rotationIntensity={0.35} floatIntensity={0.35}>
+          <DestroMask volume={volume} emotion={emotion} />
+        </Float>
+      </Canvas>
+    </div>
+  );
   
