@@ -3786,12 +3786,12 @@ export default function ChatPage() {
                 style={{
                   background:
                     voiceStatus === 'listening'
-                      ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(0,200,255,0.10) 0%, transparent 70%)'
+                      ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(26,127,255,0.13) 0%, transparent 70%)'
                       : voiceStatus === 'speaking'
                       ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(168,85,247,0.10) 0%, transparent 70%)'
                       : voiceStatus === 'thinking'
-                      ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(245,158,11,0.07) 0%, transparent 70%)'
-                      : 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(80,80,100,0.05) 0%, transparent 70%)',
+                      ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(255,51,0,0.11) 0%, transparent 70%)'
+                      : 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(0,180,70,0.08) 0%, transparent 70%)',
                   transition: 'background 1.2s ease',
                   zIndex: 1,
                 }}
@@ -3825,7 +3825,7 @@ export default function ChatPage() {
                     <div
                       className="absolute inset-0 rounded-full animate-ping"
                       style={{
-                        background: voiceStatus === 'listening' ? 'rgba(0,200,255,0.40)' : 'rgba(168,85,247,0.40)',
+                        background: voiceStatus === 'listening' ? 'rgba(26,127,255,0.42)' : 'rgba(255,51,0,0.42)',
                         animationDuration: voiceStatus === 'speaking' ? '0.9s' : '1.3s',
                       }}
                     />
@@ -3835,14 +3835,14 @@ export default function ChatPage() {
                     style={{
                       width: 8, height: 8,
                       background:
-                        voiceStatus === 'listening' ? '#00c8ff'
+                        voiceStatus === 'listening' ? '#1a7fff'
                         : voiceStatus === 'speaking' ? '#a855f7'
                         : voiceStatus === 'thinking' ? '#f59e0b'
-                        : 'rgba(255,255,255,0.22)',
+                        : '#00cc55',
                       boxShadow:
-                        voiceStatus === 'listening' ? '0 0 8px rgba(0,200,255,0.9)'
-                        : voiceStatus === 'speaking' ? '0 0 8px rgba(168,85,247,0.9)'
-                        : voiceStatus === 'thinking' ? '0 0 6px rgba(245,158,11,0.7)'
+                        voiceStatus === 'listening' ? '0 0 10px rgba(26,127,255,0.95)'
+                        : voiceStatus === 'speaking' ? '0 0 8px rgba(0,238,221,0.85)'
+                        : voiceStatus === 'thinking' ? '0 0 10px rgba(255,51,0,0.95)'
                         : 'none',
                       transition: 'background 0.4s, box-shadow 0.4s',
                     }}
@@ -3855,10 +3855,10 @@ export default function ChatPage() {
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
                     color:
-                      voiceStatus === 'listening' ? 'rgba(0,200,255,0.85)'
-                      : voiceStatus === 'speaking' ? 'rgba(168,85,247,0.85)'
-                      : voiceStatus === 'thinking' ? 'rgba(245,158,11,0.85)'
-                      : 'rgba(255,255,255,0.32)',
+                      voiceStatus === 'listening' ? 'rgba(26,127,255,0.92)'
+                      : voiceStatus === 'speaking' ? 'rgba(0,238,221,0.90)'
+                      : voiceStatus === 'thinking' ? 'rgba(255,51,0,0.90)'
+                      : 'rgba(0,204,85,0.85)',
                     transition: 'color 0.4s',
                   }}
                 >
