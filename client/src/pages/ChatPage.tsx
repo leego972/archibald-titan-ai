@@ -2303,6 +2303,7 @@ export default function ChatPage() {
             onClick={handleChatClick}
             data-chat-scroll
             className={`absolute inset-0 overflow-y-auto ${isMobile ? 'px-3 py-3' : 'px-4 py-4 scroll-smooth'}`}
+              style={voiceModeActive ? { paddingTop: 'calc(44vh + 0.5rem)' } : undefined}
           >
             <div className="w-full max-w-5xl mx-auto space-y-4">
               {showEmptyState ? (
@@ -3772,21 +3773,14 @@ export default function ChatPage() {
             {sidebarVoicePhase === 'active' && (
               <>
                 <Mic className="h-3.5 w-3.5 text-blue-400 shrink-0 animate-pulse" />
-                <span className="text-xs text-blue-300">Voice ON — just speak to Titan</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Voice Mode — cinematic full-screen overlay */}
+                <span className="text-xs text-blue-300">Voice ON — just speak t      {/* Voice Mode — face pinned to top, chat scrolls live beneath */}
         {voiceModeActive && (
           <div
-            className="fixed inset-0 z-[90] flex flex-col"
-            style={{ background: 'linear-gradient(180deg, #000000 0%, #060810 100%)' }}
+            className="fixed top-0 left-0 right-0 z-[90] flex flex-col"
+            style={{ height: '44vh', background: 'linear-gradient(180deg, #000000 0%, #060810 100%)' }}
           >
-            {/* Face (top 60%) */}
-            <div className="relative" style={{ flex: '0 0 60%', minHeight: 0 }}>
+            {/* Face fills available space */}
+            <div className="relative flex-1 min-h-0">
               <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
@@ -3797,7 +3791,7 @@ export default function ChatPage() {
                       ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(168,85,247,0.10) 0%, transparent 70%)'
                       : voiceStatus === 'thinking'
                       ? 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(245,158,11,0.07) 0%, transparent 70%)'
-                      : 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(80,80,100,0.06) 0%, transparent 70%)',
+                      : 'radial-gradient(ellipse 70% 60% at 50% 55%, rgba(80,80,100,0.05) 0%, transparent 70%)',
                   transition: 'background 1.2s ease',
                   zIndex: 1,
                 }}
@@ -3813,152 +3807,130 @@ export default function ChatPage() {
               />
             </div>
 
-            {/* Status badge */}
-            <div className="flex items-center justify-center gap-3 shrink-0 py-3">
-              <div className="relative flex items-center justify-center" style={{ width: 20, height: 20 }}>
-                {(voiceStatus === 'listening' || voiceStatus === 'speaking') && (
+            {/* Slim controls bar at bottom of face panel */}
+            <div
+              className="flex items-center justify-between shrink-0 px-5"
+              style={{
+                paddingTop: '0.45rem',
+                paddingBottom: '0.55rem',
+                background: 'rgba(0,0,0,0.55)',
+                backdropFilter: 'blur(14px)',
+                borderTop: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              {/* Status orb + label */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex items-center justify-center" style={{ width: 16, height: 16 }}>
+                  {(voiceStatus === 'listening' || voiceStatus === 'speaking') && (
+                    <div
+                      className="absolute inset-0 rounded-full animate-ping"
+                      style={{
+                        background: voiceStatus === 'listening' ? 'rgba(0,200,255,0.40)' : 'rgba(168,85,247,0.40)',
+                        animationDuration: voiceStatus === 'speaking' ? '0.9s' : '1.3s',
+                      }}
+                    />
+                  )}
                   <div
-                    className="absolute inset-0 rounded-full animate-ping"
+                    className="rounded-full"
                     style={{
+                      width: 8, height: 8,
                       background:
-                        voiceStatus === 'listening' ? 'rgba(0,200,255,0.35)' : 'rgba(168,85,247,0.35)',
-                      animationDuration: voiceStatus === 'speaking' ? '0.9s' : '1.3s',
+                        voiceStatus === 'listening' ? '#00c8ff'
+                        : voiceStatus === 'speaking' ? '#a855f7'
+                        : voiceStatus === 'thinking' ? '#f59e0b'
+                        : 'rgba(255,255,255,0.22)',
+                      boxShadow:
+                        voiceStatus === 'listening' ? '0 0 8px rgba(0,200,255,0.9)'
+                        : voiceStatus === 'speaking' ? '0 0 8px rgba(168,85,247,0.9)'
+                        : voiceStatus === 'thinking' ? '0 0 6px rgba(245,158,11,0.7)'
+                        : 'none',
+                      transition: 'background 0.4s, box-shadow 0.4s',
                     }}
                   />
-                )}
-                <div
-                  className="rounded-full"
+                </div>
+                <span
                   style={{
-                    width: 9, height: 9,
-                    background:
-                      voiceStatus === 'listening' ? '#00c8ff'
-                      : voiceStatus === 'speaking' ? '#a855f7'
-                      : voiceStatus === 'thinking' ? '#f59e0b'
-                      : 'rgba(255,255,255,0.25)',
-                    boxShadow:
-                      voiceStatus === 'listening' ? '0 0 10px rgba(0,200,255,0.9)'
-                      : voiceStatus === 'speaking' ? '0 0 10px rgba(168,85,247,0.9)'
-                      : voiceStatus === 'thinking' ? '0 0 8px rgba(245,158,11,0.7)'
-                      : 'none',
-                    transition: 'background 0.4s, box-shadow 0.4s',
+                    fontSize: 10,
+                    fontWeight: 500,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color:
+                      voiceStatus === 'listening' ? 'rgba(0,200,255,0.85)'
+                      : voiceStatus === 'speaking' ? 'rgba(168,85,247,0.85)'
+                      : voiceStatus === 'thinking' ? 'rgba(245,158,11,0.85)'
+                      : 'rgba(255,255,255,0.32)',
+                    transition: 'color 0.4s',
                   }}
-                />
+                >
+                  {voiceStatus === 'listening' ? 'Listening'
+                   : voiceStatus === 'thinking' ? 'Thinking'
+                   : voiceStatus === 'speaking' ? 'Speaking'
+                   : 'Ready'}
+                </span>
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  letterSpacing: '0.20em',
-                  textTransform: 'uppercase',
-                  color:
-                    voiceStatus === 'listening' ? 'rgba(0,200,255,0.85)'
-                    : voiceStatus === 'speaking' ? 'rgba(168,85,247,0.85)'
-                    : voiceStatus === 'thinking' ? 'rgba(245,158,11,0.85)'
-                    : 'rgba(255,255,255,0.35)',
-                  transition: 'color 0.4s',
-                }}
-              >
-                {voiceStatus === 'listening' ? 'Listening'
-                 : voiceStatus === 'thinking' ? 'Thinking'
-                 : voiceStatus === 'speaking' ? 'Speaking'
-                 : 'Ready'}
-              </span>
-            </div>
 
-            {/* Recent messages */}
-            <div
-              className="flex-1 min-h-0 overflow-y-auto px-4 space-y-1.5 pb-2"
-              style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 100%)' }}
-            >
-              {localMessages.slice(-8).map((msg) => (
-                <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                  <div
+              {/* Action buttons */}
+              <div className="flex items-center gap-2">
+                {voiceStatus === 'idle' && (
+                  <button
+                    onClick={() => { startRecording(); setVoiceStatus('listening'); }}
                     style={{
-                      maxWidth: '82%',
-                      padding: '6px 12px',
-                      borderRadius: 16,
-                      fontSize: 14,
-                      lineHeight: 1.5,
-                      background: msg.role === 'user'
-                        ? 'rgba(0,180,255,0.10)' : 'rgba(255,255,255,0.05)',
-                      color: msg.role === 'user'
-                        ? 'rgba(150,225,255,0.85)' : 'rgba(255,255,255,0.60)',
-                      border: msg.role === 'user'
-                        ? '1px solid rgba(0,180,255,0.14)' : '1px solid rgba(255,255,255,0.06)',
+                      touchAction: 'manipulation', width: 36, height: 36, borderRadius: '50%',
+                      background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.30)',
+                      color: '#00c8ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    {typeof msg.content === 'string'
-                      ? msg.content.slice(0, 180) + (msg.content.length > 180 ? '…' : '')
-                      : ''}
+                    <Mic className="h-4 w-4" />
+                  </button>
+                )}
+                {voiceStatus === 'listening' && (
+                  <button
+                    onClick={stopRecording}
+                    style={{
+                      touchAction: 'manipulation', width: 36, height: 36, borderRadius: '50%',
+                      background: 'rgba(239,68,68,0.10)', border: '1.5px solid rgba(239,68,68,0.32)',
+                      color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    aria-label="Stop recording"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  </button>
+                )}
+                {voiceStatus === 'speaking' && (
+                  <button
+                    onClick={() => { stopTtsPlayback(); setIsSpeaking(false); setSpeakingMsgId(null); setVoiceStatus('idle'); }}
+                    style={{
+                      touchAction: 'manipulation', width: 36, height: 36, borderRadius: '50%',
+                      background: 'rgba(168,85,247,0.10)', border: '1.5px solid rgba(168,85,247,0.30)',
+                      color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <VolumeX className="h-4 w-4" />
+                  </button>
+                )}
+                {voiceStatus === 'thinking' && (
+                  <div
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: 'rgba(245,158,11,0.07)', border: '1.5px solid rgba(245,158,11,0.22)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Controls */}
-            <div
-              className="flex items-center justify-center gap-5 shrink-0"
-              style={{ paddingBottom: 'max(1.75rem, env(safe-area-inset-bottom))', paddingTop: '0.5rem' }}
-            >
-              {voiceStatus === 'idle' && (
+                )}
                 <button
-                  onClick={() => { startRecording(); setVoiceStatus('listening'); }}
+                  onClick={exitVoiceMode}
                   style={{
-                    touchAction: 'manipulation', width: 58, height: 58, borderRadius: '50%',
-                    background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.30)',
-                    color: '#00c8ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    touchAction: 'manipulation', width: 36, height: 36, borderRadius: '50%',
+                    background: 'rgba(239,68,68,0.13)', border: '1.5px solid rgba(239,68,68,0.38)',
+                    color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
+                  aria-label="End voice mode"
                 >
-                  <Mic className="h-5 w-5" />
+                  <PhoneOff className="h-4 w-4" />
                 </button>
-              )}
-              {voiceStatus === 'listening' && (
-                <button
-                  onClick={stopRecording}
-                  style={{
-                    touchAction: 'manipulation', width: 58, height: 58, borderRadius: '50%',
-                    background: 'rgba(239,68,68,0.10)', border: '1.5px solid rgba(239,68,68,0.32)',
-                    color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}
-                  aria-label="Stop recording"
-                >
-                  <Square className="h-4 w-4 fill-current" />
-                </button>
-              )}
-              {voiceStatus === 'speaking' && (
-                <button
-                  onClick={() => { stopTtsPlayback(); setIsSpeaking(false); setSpeakingMsgId(null); setVoiceStatus('idle'); }}
-                  style={{
-                    touchAction: 'manipulation', width: 58, height: 58, borderRadius: '50%',
-                    background: 'rgba(168,85,247,0.10)', border: '1.5px solid rgba(168,85,247,0.30)',
-                    color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}
-                >
-                  <VolumeX className="h-5 w-5" />
-                </button>
-              )}
-              {voiceStatus === 'thinking' && (
-                <div
-                  style={{
-                    width: 58, height: 58, borderRadius: '50%',
-                    background: 'rgba(245,158,11,0.07)', border: '1.5px solid rgba(245,158,11,0.22)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}
-                >
-                  <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
-                </div>
-              )}
-              <button
-                onClick={exitVoiceMode}
-                style={{
-                  touchAction: 'manipulation', width: 58, height: 58, borderRadius: '50%',
-                  background: 'rgba(239,68,68,0.13)', border: '1.5px solid rgba(239,68,68,0.38)',
-                  color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}
-                aria-label="End voice mode"
-              >
-                <PhoneOff className="h-5 w-5" />
-              </button>
+              </div>
             </div>
           </div>
         )}
