@@ -3796,17 +3796,18 @@ export default function ChatPage() {
                   zIndex: 1,
                 }}
               />
-              <DestroFace
-                volume={liveVolume}
-                emotion={
-                  voiceStatus === 'listening' ? 'thinking' :
-                  voiceStatus === 'thinking'  ? 'concerned' :
-                  voiceStatus === 'speaking'  ? 'friendly_stern' :
-                  'neutral'
-                }
-              />
-            </div>
-
+              <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+                  <DestroFace
+                    volume={liveVolume}
+                    emotion={
+                      voiceStatus === 'listening' ? 'thinking' :
+                      voiceStatus === 'thinking'  ? 'concerned' :
+                      voiceStatus === 'speaking'  ? 'friendly_stern' :
+                      'neutral'
+                    }
+                  />
+                </div>
+              </div>
             {/* Slim controls bar at bottom of face panel */}
             <div
               className="flex items-center justify-between shrink-0 px-5"
