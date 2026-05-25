@@ -13,3 +13,4 @@ dependsOn = ["install"]
 
 [start]
 cmd = "bash start.sh"
+# trigger redeploy
