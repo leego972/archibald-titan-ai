@@ -3773,7 +3773,9 @@ export default function ChatPage() {
             {sidebarVoicePhase === 'active' && (
               <>
                 <Mic className="h-3.5 w-3.5 text-blue-400 shrink-0 animate-pulse" />
-                <span className="text-xs text-blue-300">Voice ON — just speak t      {/* Voice Mode — face pinned to top, chat scrolls live beneath */}
+                <span className="text-xs text-blue-300">Voice ON — just speak</span>
+              </>
+            )}
         {voiceModeActive && (
           <div
             className="fixed top-0 left-0 right-0 z-[90] flex flex-col"
