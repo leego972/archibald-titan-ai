@@ -44,6 +44,7 @@ import { registerChatStreamRoutes } from "../chat-stream";
 import { registerContentStreamRoutes } from "../content-stream";
 import { registerChatUploadRoute } from "../chat-upload";
 import { registerProjectDownloadRoutes } from "../project-download-router";
+import titanBuilderRouter from "../routes/titanBuilder";
 import { registerMarketplaceFileRoutes } from "../marketplace-files";
 import { registerBundleSyncRoutes } from "../bundle-sync";
 import { runHealthCheck, createSnapshot } from "../self-improvement-engine";
@@ -274,6 +275,7 @@ async function startServer() {
   app.use('/api/', csrfValidationMiddleware);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  app.use("/api/titan", titanBuilderRouter);
   // Email/password authentication endpoints
   registerEmailAuthRoutes(app);
   // Independent GitHub & Google OAuth (no Manus proxy)
