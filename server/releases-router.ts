@@ -329,15 +329,26 @@ export const releasesRouter = router({
           .where(eq(releases.version, version))
           .limit(1);
 
+        // Extract binary download URLs from release assets
+        const ghAssets: any[] = Array.isArray(ghRelease.assets) ? ghRelease.assets : [];
+        const findGhAsset = (pred: (n: string) => boolean) => {
+          const hit = ghAssets.find((a: any) => pred(String(a?.name ?? "")));
+          return hit ? String(hit.browser_download_url) : null;
+        };
+        const trpcDlWin = findGhAsset(n => n.toLowerCase().endsWith(".exe"));
+        const trpcDlMac = findGhAsset(n => n.toLowerCase().endsWith(".dmg"));
+        const trpcDlLinux = findGhAsset(n => n.toLowerCase().endsWith(".appimage")) || findGhAsset(n => n.toLowerCase().endsWith(".deb"));
+        const trpcDlAndroid = findGhAsset(n => n.toLowerCase().endsWith(".apk"));
+
+        const trpcUpdatePayload: any = { title, changelog, isPrerelease, isLatest, publishedAt: new Date(ghRelease.published_at) };
+        if (trpcDlWin) trpcUpdatePayload.downloadUrlWindows = trpcDlWin;
+        if (trpcDlMac) trpcUpdatePayload.downloadUrlMac = trpcDlMac;
+        if (trpcDlLinux) trpcUpdatePayload.downloadUrlLinux = trpcDlLinux;
+        if (trpcDlAndroid) trpcUpdatePayload.downloadUrlAndroid = trpcDlAndroid;
+
         if (existing) {
           // Update existing release
-          await db.update(releases).set({
-            title,
-            changelog,
-            isPrerelease,
-            isLatest,
-            publishedAt: new Date(ghRelease.published_at),
-          }).where(eq(releases.id, existing.id));
+          await db.update(releases).set(trpcUpdatePayload).where(eq(releases.id, existing.id));
         } else {
           // Insert new release
           // First, clear isLatest from all other releases if this is the latest
@@ -538,12 +549,29 @@ export function registerGitHubSyncRoute(app: Express) {
         const isPrerelease = ghRelease.prerelease ? 1 : 0;
         const isLatest = version === latestVersion ? 1 : 0;
 
+        // Extract binary download URLs from release assets
+        const assets: any[] = Array.isArray(ghRelease.assets) ? ghRelease.assets : [];
+        const findAsset = (pred: (n: string) => boolean) => {
+          const hit = assets.find((a: any) => pred(String(a?.name ?? "")));
+          return hit ? String(hit.browser_download_url) : null;
+        };
+        const dlWindows = findAsset(n => n.toLowerCase().endsWith(".exe")) || null;
+        const dlMac = findAsset(n => n.toLowerCase().endsWith(".dmg")) || null;
+        const dlLinux = findAsset(n => n.toLowerCase().endsWith(".appimage")) || findAsset(n => n.toLowerCase().endsWith(".deb")) || null;
+        const dlAndroid = findAsset(n => n.toLowerCase().endsWith(".apk")) || null;
+
         const [existing] = await db.select().from(releases).where(eq(releases.version, version)).limit(1);
+        const updatePayload: any = { title, changelog, isPrerelease, isLatest, publishedAt: new Date(ghRelease.published_at) };
+        if (dlWindows) updatePayload.downloadUrlWindows = dlWindows;
+        if (dlMac) updatePayload.downloadUrlMac = dlMac;
+        if (dlLinux) updatePayload.downloadUrlLinux = dlLinux;
+        if (dlAndroid) updatePayload.downloadUrlAndroid = dlAndroid;
+
         if (existing) {
-          await db.update(releases).set({ title, changelog, isPrerelease, isLatest, publishedAt: new Date(ghRelease.published_at) }).where(eq(releases.id, existing.id));
+          await db.update(releases).set(updatePayload).where(eq(releases.id, existing.id));
         } else {
           if (isLatest) await db.update(releases).set({ isLatest: 0 }).where(eq(releases.isLatest, 1));
-          await db.insert(releases).values({ version, title, changelog, isPrerelease, isLatest, publishedAt: new Date(ghRelease.published_at) });
+          await db.insert(releases).values({ version, title, changelog, isPrerelease, isLatest, publishedAt: new Date(ghRelease.published_at), ...updatePayload });
         }
         synced++;
       }
