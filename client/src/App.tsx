@@ -48,6 +48,7 @@ import DesktopBillingCallbackPage from "./pages/DesktopBillingCallbackPage";
 import DesktopSettingsPage from "./pages/DesktopSettingsPage";
 import BuilderTemplatesPage from "./pages/BuilderTemplatesPage";
 import AttackGraphPage from "./pages/AttackGraphPage";
+import TitanBuilder from "./pages/TitanBuilder";
 import PaymentSetupPage from "./pages/PaymentSetupPage";
 
 // Dashboard / Builder
@@ -222,6 +223,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         <Route path="/project-files" component={ProjectFilesViewer} />
         <Route path="/project-files/:projectId" component={ProjectFilesViewer} />
         <Route path="/bridge" component={BridgeAIPage} />
+        <Route path="/titan-builder" component={TitanBuilder} />
 
         {/* Security */}
         <Route path="/fetcher/totp-vault" component={TotpVaultPage} />
@@ -465,6 +467,7 @@ function Router() {
       <Route path="/exploitpack" component={DashboardRouter} />
       <Route path="/builder-templates" component={DashboardRouter} />
       <Route path="/bridge" component={DashboardRouter} />
+      <Route path="/titan-builder" component={DashboardRouter} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
