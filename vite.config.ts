@@ -150,9 +150,20 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+export default defineConfig(({ command }) => {
+  // jsxLocPlugin and vitePluginManusRuntime are Replit-only dev tools.
+  // They MUST NOT run during production builds — vitePluginManusRuntime injects
+  // a duplicate inline React bundle, causing two competing React instances and
+  // a blank screen on Railway.
+  const isDevServer = command === "serve";
+  const plugins = [
+    react(),
+    tailwindcss(),
+    ...(isDevServer ? [jsxLocPlugin(), vitePluginManusRuntime()] : []),
+    vitePluginManusDebugCollector(),
+  ];
 
-export default defineConfig({
+  return {
   plugins,
   resolve: {
     alias: {
@@ -226,4 +237,5 @@ export default defineConfig({
         }
       : {}),
     },
+};
 });
