@@ -37,18 +37,18 @@ RUN mkdir /var/run/sshd && \
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 
-# Install Evilginx3 v3.3.0
-# Uses curl (follows GitHub CDN redirects) with 3 retries.
-# Extracts to a temp dir; find locates the binary regardless of ZIP layout.
+# Install Evilginx3 v3.3.0 — non-fatal: download failure won't break the build.
+# Evilginx can be installed at runtime if the build-time download fails.
 RUN mkdir -p /tmp/evilginx-extract /opt/evilginx && \
-    curl -fsSL --retry 3 --retry-delay 5 \
-        https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip \
-        -o /tmp/evilginx.zip && \
-    unzip -q /tmp/evilginx.zip -d /tmp/evilginx-extract && \
-    find /tmp/evilginx-extract -name "evilginx" -type f | head -1 | xargs -I{} cp {} /usr/local/bin/evilginx && \
-    chmod +x /usr/local/bin/evilginx && \
-    ln -sf /usr/local/bin/evilginx /opt/evilginx/evilginx && \
-    rm -rf /tmp/evilginx.zip /tmp/evilginx-extract
+    ( curl -fsSL --retry 3 --retry-delay 5 --max-time 120 \
+          https://github.com/kgretzky/evilginx2/releases/download/v3.3.0/evilginx-v3.3.0-linux-64bit.zip \
+          -o /tmp/evilginx.zip && \
+      unzip -q /tmp/evilginx.zip -d /tmp/evilginx-extract && \
+      find /tmp/evilginx-extract -name "evilginx" -type f | head -1 | xargs -I{} cp {} /usr/local/bin/evilginx && \
+      chmod +x /usr/local/bin/evilginx && \
+      ln -sf /usr/local/bin/evilginx /opt/evilginx/evilginx && \
+      rm -rf /tmp/evilginx.zip /tmp/evilginx-extract ) || \
+    echo "Warning: Evilginx download failed — install manually at runtime with /opt/titan/install-evilginx.sh"
 
 # Create base directory for Titan users
 RUN mkdir -p /opt/titan/users
@@ -58,6 +58,8 @@ COPY start.sh /start.sh
 COPY install-metasploit.sh /opt/titan/install-metasploit.sh
 RUN chmod +x /start.sh /opt/titan/install-metasploit.sh
 
-EXPOSE 22
+# Railway needs an HTTP port to confirm the service is alive.
+# We expose both SSH (22) and the health-check port (default 8080).
+EXPOSE 22 8080
 
 CMD ["/start.sh"]
