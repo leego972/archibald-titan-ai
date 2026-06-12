@@ -40,9 +40,10 @@ function getStripe(): Stripe {
 export const creditRouter = router({
   /** Get current user's credit balance */
   getBalance: protectedProcedure.query(async ({ ctx }) => {
-    // Attempt monthly refill on every balance check
+    if (isAdminRole(ctx.user.role)) {
+      return { credits: -1, isUnlimited: true, lifetimeUsed: 0, lifetimeAdded: 0, lastRefillAt: null, dailyFreeCredits: 0, dailyFreeLastGrantedAt: null };
+    }
     await processMonthlyRefill(ctx.user.id);
-    // Award daily login bonus (free tier only, 5 credits/day, 150/month cap)
     await processDailyLoginBonus(ctx.user.id);
     return getCreditBalance(ctx.user.id);
   }),
