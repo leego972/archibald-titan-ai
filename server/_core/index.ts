@@ -224,6 +224,12 @@ async function startServer() {
   app.use('/api/trpc/stripe.', stripeLimiter);
   // Desktop license activation is a password login — restrict to 20/min to prevent brute-force
   app.use('/api/trpc/desktopLicense.activate', authLimiter);
+    // tRPC email-auth procedures — same authLimiter (20/min): login, register, password reset
+    app.use('/api/trpc/emailAuth.login', authLimiter);
+    app.use('/api/trpc/emailAuth.register', authLimiter);
+    app.use('/api/trpc/emailAuth.sendPasswordReset', authLimiter);
+    app.use('/api/trpc/emailAuth.resetPassword', authLimiter);
+    app.use('/api/trpc/twoFactor.', authLimiter);
   // Contact form: 5 submissions per 10 minutes per IP (prevents notification spam)
   const contactLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many contact submissions. Please wait before trying again.' } });
   app.use('/api/trpc/contact.submit', contactLimiter);

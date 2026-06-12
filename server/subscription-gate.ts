@@ -88,7 +88,10 @@ export async function getUserPlan(userId: number): Promise<UserPlan> {
   }
 
   const planId = sub[0].plan as PlanId;
-  const tier = PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId) || proTier;
+  // "trial" is not in PRICING_TIERS — map to pro access for the 7-day trial period
+    const tier = planId === "trial"
+      ? (PRICING_TIERS.find((t) => t.id === "pro") ?? proTier)
+      : (PRICING_TIERS.find((t) => t.id === planId) || INTERNAL_TIERS.find((t) => t.id === planId) || proTier);
   const isActive = sub[0].status === "active" || sub[0].status === "trialing";
 
   // If subscription is past_due or incomplete, treat as free
