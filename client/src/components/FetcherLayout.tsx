@@ -21,6 +21,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
+import { isDesktop } from "@/lib/desktop";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
   LayoutDashboard,
@@ -176,7 +177,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
         { icon: Network, label: "Credential Health", path: "/fetcher/credential-health" },
         { icon: Vault, label: "TOTP Vault", path: "/fetcher/totp-vault" },
         { icon: Bell, label: "Expiry Watchdog", path: "/fetcher/watchdog" },
-        { icon: Monitor, label: "Desktop Settings", path: "/desktop-settings" },
+        ...(isDesktop() ? [{ icon: Monitor, label: "Desktop Settings", path: "/desktop-settings" }] : []),
       ],
     },
     {

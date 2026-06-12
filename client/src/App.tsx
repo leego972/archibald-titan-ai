@@ -248,7 +248,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         <Route path="/affiliate" component={AffiliateDashboard} />
         <Route path="/seo" component={() => <AdminRoute component={SeoDashboard} />} />
         <Route path="/blog-admin" component={() => <AdminRoute component={BlogAdmin} />} />
-        <Route path="/marketing" component={() => <AdminRoute component={MarketingPage} />} />
+        <Route path="/marketing" component={MarketingPage} />
 
         {/* Account & Settings */}
         <Route path="/dashboard/subscription" component={SubscriptionPage} />

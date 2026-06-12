@@ -687,6 +687,7 @@ export const stripeRouter = router({
       customer: customerId,
       client_reference_id: ctx.user.id.toString(),
       mode: "subscription",
+      payment_method_collection: "if_required",
       allow_promotion_codes: true,
       line_items: [{
         price: await (async () => {

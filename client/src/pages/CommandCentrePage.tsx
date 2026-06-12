@@ -134,7 +134,7 @@ export default function CommandCentrePage() {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] rounded-lg border border-white/[0.05]">
               <Zap className="w-3.5 h-3.5 text-amber-400/60" />
               <span className="text-xs font-bold text-white/60">
-                {credits ? ((credits as any).balance ?? 0).toLocaleString() : "0"} Credits
+                {credits?.isUnlimited ? "∞" : (credits?.credits ?? 0).toLocaleString()} Credits
               </span>
             </div>
             <Button variant="outline" size="sm" onClick={() => refetchCredits()} className="border-white/10 bg-white/5 text-white/40 hover:text-white h-8 sm:h-10 px-3 sm:px-4 font-bold">
