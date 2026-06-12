@@ -54,75 +54,73 @@ import { isAdminRole } from "@shared/const";
   };
 
   const menuItems: MenuItem[] = [
-    // ── Core ──────────────────────────────────────────────────────────
-    { icon: LayoutDashboard, label: "Dashboard",       path: "/",                group: "Core" },
-    { icon: Bot,             label: "Titan AI",        path: "/dashboard",        group: "Core" },
-    { icon: Terminal,        label: "Builder",         path: "/builder",          group: "Core" },
-    { icon: Zap,             label: "BridgeAI",         path: "/bridge",           group: "Core" },
-    { icon: ShoppingBag,     label: "Marketplace",     path: "/marketplace",      group: "Core" },
-    { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
+      // ── Core ──────────────────────────────────────────────────────────
+      { icon: LayoutDashboard, label: "Dashboard",       path: "/",                group: "Core" },
+      { icon: Bot,             label: "Titan AI",        path: "/dashboard",        group: "Core" },
+      { icon: Terminal,        label: "Builder",         path: "/builder",          group: "Core" },
+      { icon: Zap,             label: "BridgeAI",        path: "/bridge",           group: "Core" },
+      { icon: ShoppingBag,     label: "Marketplace",     path: "/marketplace",      group: "Core" },
+      { icon: FolderOpen,      label: "Project Files",   path: "/project-files",    group: "Core" },
 
-    // ── Offensive Security ────────────────────────────────────────────
-    { icon: Radar,           label: "Argus",           path: "/argus",            group: "Offensive Security", cyberOnly: true },
-    { icon: Bug,             label: "Astra",           path: "/astra",            group: "Offensive Security", cyberOnly: true },
-    { icon: Crosshair,       label: "Metasploit",      path: "/metasploit",       group: "Offensive Security", cyberOnly: true },
-    { icon: Fish,            label: "EvilGinx",        path: "/evilginx",         group: "Offensive Security", cyberOnly: true },
-    { icon: Globe2,          label: "BlackEye",        path: "/blackeye",         group: "Offensive Security", cyberOnly: true },
-    { icon: Cpu,             label: "CyberMCP",        path: "/cybermcp",         group: "Offensive Security", cyberOnly: true },
-    { icon: AlertTriangle,   label: "Exploit Pack",    path: "/exploitpack",      group: "Offensive Security", cyberOnly: true },
+      // ── Specialized — Offensive tools, top-tier access only ───────────
+      { icon: Radar,           label: "Argus",           path: "/argus",            group: "Specialized", cyberOnly: true },
+      { icon: Bug,             label: "Astra",           path: "/astra",            group: "Specialized", cyberOnly: true },
+      { icon: Crosshair,       label: "Metasploit",      path: "/metasploit",       group: "Specialized", cyberOnly: true },
+      { icon: Fish,            label: "EvilGinx",        path: "/evilginx",         group: "Specialized", cyberOnly: true },
+      { icon: Globe2,          label: "BlackEye",        path: "/blackeye",         group: "Specialized", cyberOnly: true },
+      { icon: Cpu,             label: "CyberMCP",        path: "/cybermcp",         group: "Specialized", cyberOnly: true },
+      { icon: AlertTriangle,   label: "Exploit Pack",    path: "/exploitpack",      group: "Specialized", cyberOnly: true },
+      { icon: GitBranch,       label: "Attack Graph",    path: "/attack-graph",     group: "Specialized", cyberOnly: true },
+      { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Specialized", cyberOnly: true },
+      { icon: ScanSearch,      label: "Proxy Interceptor", path: "/proxy-interceptor", group: "Specialized", cyberOnly: true },
 
-    // ── Privacy & Network ─────────────────────────────────────────────
-    { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network",  cyberOnly: true },
-    { icon: Wifi,            label: "Proxy Network",   path: "/vpn",              group: "Privacy & Network",  cyberOnly: true },
-    { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network",  cyberOnly: true },
-    { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network",  cyberOnly: true },
-    { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network",  cyberOnly: true },
-    { icon: Shuffle,         label: "Proxy Rotation",  path: "/proxy-rotation",   group: "Privacy & Network",  cyberOnly: true },
-    { icon: Monitor,         label: "Isolated Browser",path: "/isolated-browser", group: "Privacy & Network",  cyberOnly: true },
-    { icon: CreditCard,      label: "BIN Checker",     path: "/bin-checker",      group: "Privacy & Network",  cyberOnly: true },
+      // ── Privacy & Network ─────────────────────────────────────────────
+      { icon: Network,         label: "VPN Chain",       path: "/vpn-chain",        group: "Privacy & Network", cyberOnly: true },
+      { icon: Wifi,            label: "Proxy Network",   path: "/vpn",              group: "Privacy & Network", cyberOnly: true },
+      { icon: Globe,           label: "Tor Gateway",     path: "/tor",              group: "Privacy & Network", cyberOnly: true },
+      { icon: Server,          label: "Proxy Maker",     path: "/proxy-maker",      group: "Privacy & Network", cyberOnly: true },
+      { icon: RefreshCw,       label: "IP Rotation",     path: "/ip-rotation",      group: "Privacy & Network", cyberOnly: true },
+      { icon: Shuffle,         label: "Proxy Rotation",  path: "/proxy-rotation",   group: "Privacy & Network", cyberOnly: true },
+      { icon: Monitor,         label: "Isolated Browser",path: "/isolated-browser", group: "Privacy & Network", cyberOnly: true },
+      { icon: CreditCard,      label: "BIN Checker",     path: "/bin-checker",      group: "Privacy & Network", cyberOnly: true },
 
-    // ── Security Ops ──────────────────────────────────────────────────
-    { icon: Terminal,        label: "Command Centre",  path: "/command-centre",   group: "Security Ops" },
-    { icon: Store,           label: "Security Market", path: "/security-marketplace", group: "Security Ops", adminOnly: true },
-    { icon: GitBranch,       label: "Attack Graph",    path: "/attack-graph",     group: "Security Ops",       cyberOnly: true },
-    { icon: BookOpen,        label: "Red Team Playbooks", path: "/red-team-playbooks", group: "Security Ops",  cyberOnly: true },
-    { icon: BarChart3,       label: "SIEM Integration", path: "/siem-integration", group: "Security Ops",     adminOnly: true },
-    { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
-    { icon: ScanSearch,      label: "Proxy Interceptor",path: "/proxy-interceptor",  group: "Security Ops",       cyberOnly: true },
+      // ── Security Ops ──────────────────────────────────────────────────
+      { icon: Terminal,        label: "Command Centre",  path: "/command-centre",   group: "Security Ops" },
+      { icon: FileText,        label: "Compliance",      path: "/compliance-reports", group: "Security Ops" },
 
-    // ── Intelligence ──────────────────────────────────────────────────
-    { icon: Globe,           label: "Smart Fetch",     path: "/fetcher/smart-fetch",    group: "Intelligence" },
-    { icon: Database,        label: "Credentials",     path: "/fetcher/credentials",    group: "Intelligence" },
-    { icon: ScanSearch,      label: "Leak Scanner",    path: "/fetcher/leak-scanner",   group: "Intelligence" },
-    { icon: Activity,        label: "Provider Health", path: "/fetcher/provider-health",group: "Intelligence" },
-    { icon: Eye,             label: "Watchdog",        path: "/fetcher/watchdog",       group: "Intelligence" },
-    { icon: Lock,            label: "TOTP Vault",      path: "/fetcher/totp-vault",     group: "Intelligence" },
-    { icon: Radio,           label: "Web Agent",       path: "/web-agent",              group: "Intelligence",  cyberOnly: true },
-    { icon: Monitor,         label: "Site Monitor",    path: "/site-monitor",           group: "Intelligence" },
+      // ── Intelligence ──────────────────────────────────────────────────
+      { icon: Globe,           label: "Smart Fetch",     path: "/fetcher/smart-fetch",     group: "Intelligence" },
+      { icon: Database,        label: "Credentials",     path: "/fetcher/credentials",     group: "Intelligence" },
+      { icon: ScanSearch,      label: "Leak Scanner",    path: "/fetcher/leak-scanner",    group: "Intelligence" },
+      { icon: Activity,        label: "Provider Health", path: "/fetcher/provider-health", group: "Intelligence" },
+      { icon: Eye,             label: "Watchdog",        path: "/fetcher/watchdog",        group: "Intelligence" },
+      { icon: Lock,            label: "TOTP Vault",      path: "/fetcher/totp-vault",      group: "Intelligence" },
+      { icon: Radio,           label: "Web Agent",       path: "/web-agent",               group: "Intelligence", cyberOnly: true },
+      { icon: Monitor,         label: "Site Monitor",    path: "/site-monitor",            group: "Intelligence" },
+      { icon: BarChart3,       label: "SIEM Integration",path: "/siem-integration",        group: "Intelligence", adminOnly: true },
 
-    // ── Growth ────────────────────────────────────────────────────────
-    { icon: DollarSign,      label: "Grants",          path: "/grants",           group: "Growth" },
-    { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth",             adminOnly: true },
-    { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth",             adminOnly: true },
-    { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth",             adminOnly: true },
-    { icon: Brain,           label: "Growth Suite",    path: "/growth-suite",     group: "Growth",             adminOnly: true },
-    { icon: Share2,          label: "Affiliate",       path: "/affiliate",        group: "Growth" },
-    { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth",             adminOnly: true },
+      // ── Growth ────────────────────────────────────────────────────────
+      { icon: DollarSign,      label: "Grants",          path: "/grants",           group: "Growth" },
+      { icon: TrendingUp,      label: "Master Growth",   path: "/master-growth",    group: "Growth",  adminOnly: true },
+      { icon: Megaphone,       label: "Advertising",     path: "/advertising",      group: "Growth",  adminOnly: true },
+      { icon: Search,          label: "SEO",             path: "/seo",              group: "Growth",  adminOnly: true },
+      { icon: Brain,           label: "Growth Suite",    path: "/growth-suite",     group: "Growth",  adminOnly: true },
+      { icon: Share2,          label: "Affiliate",       path: "/affiliate",        group: "Growth" },
+      { icon: BookOpen,        label: "Blog Admin",      path: "/blog-admin",       group: "Growth",  adminOnly: true },
 
-    // ── Business ──────────────────────────────────────────────────────
-    { icon: Users2,          label: "Companies",       path: "/companies",        group: "Business" },
-    { icon: FileText,        label: "Business Plans",  path: "/business-plans",   group: "Business" },
-    { icon: Zap,             label: "Crowdfunding",    path: "/crowdfunding",     group: "Business" },
-    { icon: Users,           label: "Referrals",       path: "/referrals",        group: "Business" },
+      // ── Business ──────────────────────────────────────────────────────
+      { icon: Users2,          label: "Companies",       path: "/companies",        group: "Business" },
+      { icon: FileText,        label: "Business Plans",  path: "/business-plans",   group: "Business" },
+      { icon: Zap,             label: "Crowdfunding",    path: "/crowdfunding",     group: "Business" },
+      { icon: Users,           label: "Referrals",       path: "/referrals",        group: "Business" },
 
-    // ── Account ───────────────────────────────────────────────────────
-    { icon: Crown,           label: "Subscription",    path: "/dashboard/subscription", group: "Account" },
-    { icon: CreditCard,      label: "Credits",         path: "/dashboard/credits",group: "Account" },
-    { icon: UserCog,         label: "Account Settings",path: "/fetcher/account",  group: "Account" },
-    { icon: Key,             label: "API Access",      path: "/fetcher/api-access",group: "Account" },
-    { icon: Settings,        label: "Settings",        path: "/fetcher/settings", group: "Account" },
-  ];
-
+      // ── Account ───────────────────────────────────────────────────────
+      { icon: Crown,           label: "Subscription",    path: "/dashboard/subscription", group: "Account" },
+      { icon: CreditCard,      label: "Credits",         path: "/dashboard/credits",      group: "Account" },
+      { icon: UserCog,         label: "Account Settings",path: "/fetcher/account",        group: "Account" },
+      { icon: Key,             label: "API Access",      path: "/fetcher/api-access",     group: "Account" },
+      { icon: Settings,        label: "Settings",        path: "/fetcher/settings",       group: "Account" },
+    ];
   const GROUPS = ["Core", "Offensive Security", "Privacy & Network", "Security Ops", "Intelligence", "Growth", "Business", "Account"] as const;
 
   const SIDEBAR_WIDTH_KEY = "sidebar-width";
