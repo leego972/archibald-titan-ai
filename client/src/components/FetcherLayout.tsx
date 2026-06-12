@@ -343,6 +343,13 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
                 <span className="text-xs font-bold text-white/60">{(sub?.fetchesRemaining === -1 ? "∞" : sub?.fetchesRemaining?.toLocaleString()) ?? 0}</span>
                 <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">Fetches</span>
               </div>
+              {(sub as any)?.isTrial && (
+                <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/80">7-Day Trial</span>
+                </div>
+              )}
+              </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
