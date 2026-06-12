@@ -30,7 +30,7 @@
  * - This pricing structure naturally pushes heavy users toward upgrading.
  */
 
-export type PlanId = "free" | "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
+export type PlanId = "free" | "trial" | "pro" | "enterprise" | "cyber" | "cyber_plus" | "titan";
 
 export interface PricingTier {
   id: PlanId;
@@ -754,3 +754,11 @@ export const COMPARISON_FEATURES: ComparisonFeature[] = [
   { name: "Compliance certifications", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: "SOC2, ISO 27001" },
   { name: "Data residency options", category: "Infrastructure & Support", pro: false, enterprise: false, cyber: false, cyber_plus: false, titan: true },
 ];
+
+// Trial plan — 7-day free trial with limited features (no card required)
+export const TRIAL_PLAN = {
+  id: "trial" as const,
+  name: "Free Trial",
+  trialDays: 7,
+  limits: { fetchesPerMonth: 20, aiCredits: 50, teamMembers: 1 },
+};
