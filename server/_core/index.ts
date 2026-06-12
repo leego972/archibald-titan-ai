@@ -139,6 +139,9 @@ async function startServer() {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+      res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     // HSTS: enforce HTTPS for 1 year, include subdomains, allow preload submission
     if (process.env.NODE_ENV === 'production') {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
