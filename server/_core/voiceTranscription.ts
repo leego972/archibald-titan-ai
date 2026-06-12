@@ -100,6 +100,21 @@
       });
 
       if (!response.ok) {
+        // On 401/403 from Venice, retry automatically with OpenAI if available
+        if ((response.status === 401 || response.status === 403) && url.includes("venice")) {
+          const fallbackKey = process.env.OPENAI_API_KEY || "";
+          if (fallbackKey) {
+            const fallback = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+              method: "POST",
+              headers: { authorization: `Bearer ${fallbackKey}`, "Accept-Encoding": "identity" },
+              body: formData,
+            });
+            if (fallback.ok) {
+              const fb = await fallback.json() as WhisperResponse;
+              if (fb.text && typeof fb.text === "string") return fb;
+            }
+          }
+        }
         const errorText = await response.text().catch(() => "");
         return { error: "Transcription failed", code: "TRANSCRIPTION_FAILED", details: `${response.status}: ${errorText}` };
       }
