@@ -120,6 +120,7 @@ export function useSubscription(): SubscriptionState {
       isPaid: isAdmin || planId !== "free",
       isFree: !isAdmin && planId === "free",
       isPro: planId === "pro",
+      isTrial: planId === "trial",
       isEnterprise: isAdmin || ["enterprise", "cyber", "cyber_plus", "titan"].includes(planId),
       isCyber: isAdmin || ["cyber", "cyber_plus", "titan"].includes(planId),
       fetchesUsed: usage?.fetchesUsedThisMonth ?? 0,

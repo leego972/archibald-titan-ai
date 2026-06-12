@@ -118,6 +118,20 @@ async function startServer() {
   // ── Helmet Security Headers ────────────────────────────────────
   app.use(helmet({ contentSecurityPolicy: false })); // CSP is handled manually below
 
+    // ── CORS ──────────────────────────────────────────────────────────────────
+    app.use((req, res, next) => {
+      const origin = req.headers.origin as string | undefined;
+      const allowed = ["https://www.archibaldtitan.com", "https://archibaldtitan.com"];
+      if (!origin || allowed.includes(origin) || process.env.NODE_ENV !== "production") {
+        res.setHeader("Access-Control-Allow-Origin", origin || "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-CSRF-Token,X-Correlation-ID");
+      }
+      if (req.method === "OPTIONS") return res.sendStatus(204);
+      next();
+    });
+
   // ── Security Headers ──────────────────────────────────────────
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');

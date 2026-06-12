@@ -90,6 +90,11 @@ export default function SubscriptionPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  const trialMutation = trpc.stripe.createTrialSetup.useMutation({
+    onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
+    onError: (err) => toast.error(err.message),
+  });
+
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [selectedNewPlan, setSelectedNewPlan] = useState<PlanId | null>(null);
@@ -194,9 +199,14 @@ export default function SubscriptionPage() {
 
             <div className="flex flex-wrap gap-3 pt-2">
               {sub.isFree ? (
-                <Button onClick={() => setLocation("/pricing")} className="bg-blue-600 hover:bg-blue-500">
-                  <Zap className="h-4 w-4 mr-2" />Upgrade Plan
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => trialMutation.mutate()} disabled={trialMutation.isPending} className="bg-emerald-600 hover:bg-emerald-500">
+                    <Zap className="h-4 w-4 mr-2" />{trialMutation.isPending ? "Starting…" : "Start 7-Day Free Trial"}
+                  </Button>
+                  <Button onClick={() => setLocation("/pricing")} className="bg-blue-600 hover:bg-blue-500">
+                    Upgrade Plan
+                  </Button>
+                </div>
               ) : (
                 <>
                   <Button variant="outline" onClick={() => setChangePlanOpen(true)}>
