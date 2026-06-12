@@ -514,6 +514,7 @@ function ConversationSidebar({
           onClick={onNew}
           className="p-2 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
           title="New conversation"
+          style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -526,7 +527,7 @@ function ConversationSidebar({
       <div className="p-3 border-b border-border/50 flex items-center justify-between">
         <h3 className="text-sm font-semibold">Conversations</h3>
         <div className="flex items-center gap-1">
-          <button onClick={onNew} className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors" title="New conversation">
+          <button onClick={onNew} className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors" title="New conversation" style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}>
             <Plus className="h-4 w-4" />
           </button>
           <button onClick={onToggle} className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors" title="Collapse sidebar">
@@ -2289,6 +2290,7 @@ export default function ChatPage() {
                 onClick={handleNewConversation}
                 className="p-2 rounded-lg hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors touch-target"
                 title="New conversation"
+                style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
               >
                 <Plus className="h-4 w-4" />
               </button>
