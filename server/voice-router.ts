@@ -215,13 +215,10 @@ async function transcribeAudioFromBuffer(
     language?: string,
     prompt?: string
   ): Promise<{ text: string; language: string; duration: number } | { error: string }> {
-    // Prefer Venice (OpenAI-compatible), fall back to OpenAI
-    const veniceKey = process.env.VENICE_API_KEY || "";
+    // Venice does not support Whisper — use OpenAI only for audio transcription
     const openaiKey = process.env.OPENAI_API_KEY || "";
-    const apiKey = veniceKey || openaiKey;
-    const transcribeUrl = veniceKey
-      ? "https://api.venice.ai/api/v1/audio/transcriptions"
-      : "https://api.openai.com/v1/audio/transcriptions";
+    const apiKey = openaiKey;
+    const transcribeUrl = "https://api.openai.com/v1/audio/transcriptions";
 
     if (!apiKey) {
       return { error: "Voice transcription not configured — set VENICE_API_KEY or OPENAI_API_KEY" };
