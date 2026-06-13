@@ -5,7 +5,6 @@
     "dockerfilePath": "titan-server/Dockerfile"
   },
   "deploy": {
-    "startCommand": "/start.sh",
     "healthcheckPath": "/",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
