@@ -62,4 +62,4 @@ RUN chmod +x /start.sh /opt/titan/install-metasploit.sh
 # We expose both SSH (22) and the health-check port (default 8080).
 EXPOSE 22 8080
 
-CMD ["/start.sh"]
+ENTRYPOINT ["/start.sh"]
