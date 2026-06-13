@@ -10,9 +10,8 @@ import { useState } from "react";
   import { openExternalUrl } from "@/lib/desktop";
   import { UpgradeBanner } from "@/components/UpgradePrompt";
 
-  const BRIDGE_AI_URL =
-    import.meta.env.VITE_BRIDGE_AI_URL ??
-    "https://archibaldtitan.com/bridge-ai/";
+  // Set VITE_BRIDGE_AI_URL in Railway to your deployed bridge-ai service URL
+  const BRIDGE_AI_URL: string | null = import.meta.env.VITE_BRIDGE_AI_URL ?? null;
 
   const PROVIDERS = [
     { name: "ChatGPT",      provider: "OpenAI",        role: "Strategic Planning", icon: Brain,  color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
@@ -55,6 +54,22 @@ import { useState } from "react";
       return (
         <div className="flex flex-col h-full min-h-0 items-center justify-center">
           <div className="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+        </div>
+      );
+    }
+
+    if (!BRIDGE_AI_URL) {
+      return (
+        <div className="flex flex-col h-full min-h-0 items-center justify-center gap-4 p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+            <Zap className="h-6 w-6 text-amber-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm">BridgeAI URL not configured</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
+              Set <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BRIDGE_AI_URL</code> in Railway environment variables to your deployed BridgeAI service URL.
+            </p>
+          </div>
         </div>
       );
     }
@@ -229,7 +244,7 @@ import { useState } from "react";
 
             <iframe
               key={iframeKey}
-              src={BRIDGE_AI_URL}
+              src={BRIDGE_AI_URL ?? "about:blank"}
               className="w-full h-full border-0"
               title="BridgeAI"
               allow="clipboard-read; clipboard-write; microphone"

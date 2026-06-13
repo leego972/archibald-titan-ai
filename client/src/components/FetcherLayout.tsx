@@ -87,6 +87,7 @@ function buildMenuGroups(t: (key: string) => string): MenuGroup[] {
       items: [
         { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
         { icon: Terminal, label: "Titan Builder", path: "/dashboard" },
+        { icon: Zap, label: "BridgeAI", path: "/bridge" },
         { icon: Monitor, label: "Command Centre", path: "/command-centre" },
         { icon: FolderOpen, label: "Project Files", path: "/project-files" },
       ],
