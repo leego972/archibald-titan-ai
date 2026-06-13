@@ -3,7 +3,11 @@
   dockerfilePath = "Dockerfile"
 
 [deploy]
-  healthcheckPath = "/api/healthz"
+  healthcheckPath = "/api/health"
   healthcheckTimeout = 300
   restartPolicyType = "ON_FAILURE"
   restartPolicyMaxRetries = 3
+
+  [variables]
+  TITAN_INFERENCE_URL = "http://titan-server.railway.internal:8080"
+  

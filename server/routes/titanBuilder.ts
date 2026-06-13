@@ -15,7 +15,7 @@ router.get("/health", async (_req: Request, res: Response) => {
     const data = await r.json() as Record<string, unknown>;
     res.json({ status: "ok", model: data });
   } catch {
-    res.status(503).json({ status: "offline", message: "Titan inference server unreachable" });
+    res.status(503).json({ status: "offline", message: "Titan inference server unreachable. Set TITAN_INFERENCE_URL environment variable to connect." });
   }
 });
 

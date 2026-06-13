@@ -40,4 +40,4 @@ run_migrations &
 
 # Start the server immediately — it has its own DB connection retry logic
 echo "[Startup] Starting server..."
-exec node dist/index.js
+exec node --enable-source-maps dist/index.js
