@@ -349,7 +349,6 @@ function FetcherLayoutContent({ user, children }: { user: any; children: React.R
                   <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/80">7-Day Trial</span>
                 </div>
               )}
-              </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
