@@ -106,7 +106,7 @@ export default function TitanBuilder() {
       <div className="border-t border-cyan-900/30 p-4">
         {status === "offline" && (
           <p className="text-red-400 text-xs text-center mb-3 font-mono">
-            ⚠ Inference server offline — run: python inference/infer.py --serve
+            ⚠ Titan AI offline — configure VENICE_API_KEY or OPENAI_API_KEY to enable
           </p>
         )}
         <div className="flex gap-2">

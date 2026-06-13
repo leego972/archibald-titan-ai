@@ -8,6 +8,5 @@
   restartPolicyType = "ON_FAILURE"
   restartPolicyMaxRetries = 3
 
-  [variables]
-  TITAN_INFERENCE_URL = "http://titan-server.railway.internal:8080"
-  
+[variables]
+TITAN_SERVER_HOST = "titan-server.railway.internal"
