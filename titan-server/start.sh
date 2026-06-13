@@ -17,18 +17,49 @@ mkdir -p /opt/titan/users
 
 # Minimal HTTP health server so Railway's health check passes.
 # Responds 200 {"ok":true} on $PORT (default 8080). Runs in background.
-HEALTH_PORT="${PORT:-8080}"
+# Includes retry logic to handle transient "Address already in use" errors.
+sleep 1
 python3 -c "
-import http.server, os
+import http.server, os, socket, time, sys
+
+port = int(os.environ.get('PORT', 8080))
+print(f'[health] Starting health server on 0.0.0.0:{port}', flush=True)
+
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-Type','application/json')
         self.end_headers()
-        self.wfile.write(b'{"ok":true,"service":"titan-server"}')
+        self.wfile.write(b'{\"ok\":true,\"service\":\"titan-server\"}')
     def log_message(self, *a): pass
-http.server.HTTPServer(('0.0.0.0', int(os.environ.get('PORT', 8080))), H).serve_forever()
+
+class ReusableHTTPServer(http.server.HTTPServer):
+    allow_reuse_address = True
+    allow_reuse_port = True
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except (AttributeError, OSError):
+            pass
+        super().server_bind()
+
+for attempt in range(5):
+    try:
+        server = ReusableHTTPServer(('0.0.0.0', port), H)
+        print(f'[health] Listening on 0.0.0.0:{port}', flush=True)
+        server.serve_forever()
+    except OSError as e:
+        print(f'[health] Attempt {attempt+1}/5 failed: {e}', flush=True)
+        if attempt < 4:
+            time.sleep(2)
+        else:
+            print('[health] FATAL: Could not start health server', flush=True)
+            sys.exit(1)
 " &
+
+# Give the health server a moment to bind before starting sshd
+sleep 1
 
 # Start SSH daemon
 exec /usr/sbin/sshd -D
