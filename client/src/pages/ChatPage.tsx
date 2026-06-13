@@ -3782,12 +3782,14 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Voice Mode — cinematic full-screen overlay */}
+      {/* Voice Mode — floating panel (page stays visible behind) */}
         {voiceModeActive && (
-          <div
-            className="fixed inset-0 z-[90] flex flex-col"
-            style={{ background: 'linear-gradient(180deg, #000000 0%, #060810 100%)' }}
-          >
+          <>
+            <div className="fixed inset-0 z-[89] bg-black/70 backdrop-blur-sm" onClick={exitVoiceMode} />
+            <div
+              className="fixed inset-x-3 top-3 bottom-3 z-[90] flex flex-col rounded-2xl overflow-hidden sm:left-1/2 sm:-translate-x-1/2 sm:inset-x-auto sm:w-[420px]"
+              style={{ background: 'rgba(3,5,15,0.97)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}
+            >
             {/* Face (top 60%) */}
             <div className="relative" style={{ flex: '0 0 60%', minHeight: 0 }}>
               <div
@@ -3805,15 +3807,20 @@ export default function ChatPage() {
                   zIndex: 1,
                 }}
               />
-              <DestroFace
-                volume={liveVolume}
-                emotion={
-                  voiceStatus === 'listening' ? 'thinking' :
-                  voiceStatus === 'thinking'  ? 'concerned' :
-                  voiceStatus === 'speaking'  ? 'friendly_stern' :
-                  'neutral'
-                }
-              />
+                <DestroFace
+                  volume={liveVolume}
+                  voiceState={
+                    voiceStatus === 'listening' ? 'listening' :
+                    voiceStatus === 'speaking'  ? 'speaking'  :
+                    'idle'
+                  }
+                  emotion={
+                    voiceStatus === 'listening' ? 'thinking' :
+                    voiceStatus === 'thinking'  ? 'concerned' :
+                    voiceStatus === 'speaking'  ? 'friendly_stern' :
+                    'neutral'
+                  }
+                />
             </div>
 
             {/* Status badge */}
@@ -3964,6 +3971,7 @@ export default function ChatPage() {
               </button>
             </div>
           </div>
+          </>
         )}
       </div>
     );
