@@ -54,18 +54,24 @@ import React from 'react';
       const pulsing    = voiceState === 'listening'
         || emotion === 'smiling' || emotion === 'laughing' || emotion === 'amused';
 
-      // Wide diffuse halo — soft light spilling from deep in the socket
+      // Glow sits ON TOP of the face image (zIndex 2) with mix-blend-mode:screen.
+      // Screen blend: bright silver areas of the mask wash out the glow (looks hidden),
+      // dark eye-socket areas let the glow show through brightly — giving a
+      // "glowing from within the sockets" effect without needing image transparency.
+
+      // Wide diffuse halo — soft spill around the socket
       const haloStyle = (side: 'left' | 'right'): React.CSSProperties => ({
         position:      'absolute',
-        zIndex:        0,
-        top:           '33%',
-        ...(side === 'left' ? { left: '17%' } : { right: '17%' }),
-        width:         '30%',
-        height:        '14%',
+        zIndex:        2,
+        top:           '29%',
+        ...(side === 'left' ? { left: '20%' } : { right: '20%' }),
+        width:         '26%',
+        height:        '10%',
         background:    eyeColor,
         borderRadius:  '50%',
-        filter:        'blur(18px)',
-        opacity:       eyeOpacity * 0.75,
+        filter:        'blur(14px)',
+        opacity:       eyeOpacity * 0.7,
+        mixBlendMode:  'screen',
         pointerEvents: 'none',
         transition:    'opacity 0.3s ease, background 0.3s ease',
         animation:     pulsing
@@ -73,18 +79,19 @@ import React from 'react';
           : 'none',
       });
 
-      // Tight bright core — the concentrated light source inside the socket
+      // Tight bright core — concentrated inside the socket
       const coreStyle = (side: 'left' | 'right'): React.CSSProperties => ({
         position:      'absolute',
-        zIndex:        0,
-        top:           '36%',
-        ...(side === 'left' ? { left: '21%' } : { right: '21%' }),
-        width:         '22%',
-        height:        '7%',
-        background:    `radial-gradient(ellipse 80% 60% at 50% 50%, ${eyeColor} 0%, ${eyeColor}ee 30%, ${eyeColor}88 60%, transparent 100%)`,
+        zIndex:        2,
+        top:           '31%',
+        ...(side === 'left' ? { left: '23%' } : { right: '23%' }),
+        width:         '18%',
+        height:        '6%',
+        background:    `radial-gradient(ellipse 80% 60% at 50% 50%, ${eyeColor} 0%, ${eyeColor}dd 30%, ${eyeColor}66 65%, transparent 100%)`,
         borderRadius:  '50%',
-        filter:        'blur(3px)',
+        filter:        'blur(2px)',
         opacity:       eyeOpacity,
+        mixBlendMode:  'screen',
         pointerEvents: 'none',
         transition:    'opacity 0.3s ease, background 0.3s ease',
         animation:     pulsing
@@ -92,9 +99,9 @@ import React from 'react';
           : 'none',
       });
 
-      const hOp  = eyeOpacity * 0.75;
-      const hMax = Math.min(eyeOpacity * 1.0, 1);
-      const cMax = Math.min(eyeOpacity * 1.35, 1);
+      const hOp  = eyeOpacity * 0.7;
+      const hMax = Math.min(eyeOpacity * 0.95, 1);
+      const cMax = Math.min(eyeOpacity * 1.3, 1);
 
       return (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -111,13 +118,7 @@ import React from 'react';
             aspectRatio: '1/1',
             animation:   'titan-float 3.8s ease-in-out infinite',
           }}>
-            {/* ── Glow layers — z-index 0, rendered BEHIND the face image ── */}
-            <div style={haloStyle('left')}  />
-            <div style={coreStyle('left')}  />
-            <div style={haloStyle('right')} />
-            <div style={coreStyle('right')} />
-
-            {/* Face image — z-index 1, sits on top; transparent eye sockets let the glow bleed through */}
+            {/* Face image — z-index 1, solid on top of background */}
             <img
               src="/destro-face.png"
               alt=""
@@ -133,11 +134,18 @@ import React from 'react';
               }}
             />
 
-            {/* Ambient eye-colour rim on the whole mask */}
+            {/* Glow layers — z-index 2, mix-blend-mode:screen over the face.
+                Bright silver areas wash the glow out; dark eye sockets let it bleed through. */}
+            <div style={haloStyle('left')}  />
+            <div style={coreStyle('left')}  />
+            <div style={haloStyle('right')} />
+            <div style={coreStyle('right')} />
+
+            {/* Ambient outer glow rim */}
             <div style={{
               position:     'absolute',
               inset:        0,
-              zIndex:       2,
+              zIndex:       3,
               borderRadius: '50%',
               boxShadow:    `0 0 40px 6px ${eyeColor}22`,
               pointerEvents:'none',
