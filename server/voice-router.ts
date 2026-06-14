@@ -215,20 +215,25 @@ async function transcribeAudioFromBuffer(
     language?: string,
     prompt?: string
   ): Promise<{ text: string; language: string; duration: number } | { error: string }> {
-    // Venice does not support Whisper — use OpenAI only for audio transcription
+    // Prefer Groq (free tier, fast Whisper-v3-turbo) — OpenAI-compatible API
+    const groqKey   = process.env.GROQ_API_KEY  || "";
     const openaiKey = process.env.OPENAI_API_KEY || "";
-    const apiKey = openaiKey;
-    const transcribeUrl = "https://api.openai.com/v1/audio/transcriptions";
+    const apiKey    = groqKey || openaiKey;
 
     if (!apiKey) {
-      return { error: "Voice transcription not configured — set VENICE_API_KEY or OPENAI_API_KEY" };
+      return { error: "Voice transcription not configured — set GROQ_API_KEY or OPENAI_API_KEY" };
     }
+
+    const transcribeUrl = groqKey
+      ? "https://api.groq.com/openai/v1/audio/transcriptions"
+      : "https://api.openai.com/v1/audio/transcriptions";
+    const model = groqKey ? "whisper-large-v3-turbo" : "whisper-1";
 
     const ext = getExtFromMime(mimeType);
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
     formData.append("file", blob, `audio.${ext}`);
-    formData.append("model", "whisper-1");
+    formData.append("model", model);
     formData.append("response_format", "verbose_json");
 
     if (language && language !== "auto") {
