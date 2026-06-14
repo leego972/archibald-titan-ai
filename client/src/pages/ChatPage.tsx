@@ -3157,7 +3157,6 @@ export default function ChatPage() {
                 </span>
               )}
             </div>
-            </>
           )}
 
           {/* Footer hint — hidden on mobile to save space */}
