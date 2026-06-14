@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
     export type Emotion =
       | 'neutral' | 'smiling' | 'laughing' | 'serious' | 'empathetic'
@@ -40,6 +40,44 @@ import React from 'react';
       neutral:        0.50,
     };
 
+    // Pixel coords of eye socket centres in the 1254×1254 source image.
+    // Used both for canvas punching and CSS alignment.
+    const EYE_L = { cx: 430, cy: 488, rx: 82, ry: 28 };
+    const EYE_R = { cx: 824, cy: 488, rx: 77, ry: 28 };
+    const IMG_SIZE = 1254;
+
+    /** Cut transparent eye-socket holes via canvas destination-out compositing. */
+    function useTransparentFace(src: string): string {
+      const [dataUrl, setDataUrl] = useState(src);
+      useEffect(() => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width  = img.naturalWidth  || IMG_SIZE;
+            canvas.height = img.naturalHeight || IMG_SIZE;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.drawImage(img, 0, 0);
+            // Soft feathered punch-out
+            ctx.filter = 'blur(7px)';
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.ellipse(EYE_L.cx, EYE_L.cy, EYE_L.rx, EYE_L.ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(EYE_R.cx, EYE_R.cy, EYE_R.rx, EYE_R.ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            setDataUrl(canvas.toDataURL('image/png'));
+          } catch {
+            // Fallback: show original if canvas fails
+          }
+        };
+        img.src = src;
+      }, [src]);
+      return dataUrl;
+    }
+
     export const DestroFace = ({
       volume: _volume = 0,
       emotion = 'neutral',
@@ -49,29 +87,36 @@ import React from 'react';
       emotion?: Emotion;
       voiceState?: VoiceState;
     }) => {
+      const faceSrc = useTransparentFace('/destro-face.png');
+
       const eyeColor   = voiceState ? VOICE_COLOR[voiceState] : (EYE_COLOR[emotion]     ?? '#00cc55');
       const eyeOpacity = voiceState ? 1.0                     : (EYE_INTENSITY[emotion] ?? 0.5);
       const pulsing    = voiceState === 'listening'
         || emotion === 'smiling' || emotion === 'laughing' || emotion === 'amused';
 
-      // Glow sits ON TOP of the face image (zIndex 2) with mix-blend-mode:screen.
-      // Screen blend: bright silver areas of the mask wash out the glow (looks hidden),
-      // dark eye-socket areas let the glow show through brightly — giving a
-      // "glowing from within the sockets" effect without needing image transparency.
+      // CSS positions derived from pixel coords so glow aligns with the canvas holes.
+      // left/right = center% minus half-width%; top = center% minus half-height%.
+      // Shifted ~2% up and ~2% closer together per user feedback.
+      const haloW = 27; // % width of halo div
+      const coreW = 19; // % width of core div
+      const eyeLPct  = (EYE_L.cx / IMG_SIZE) * 100; // 34.3%
+      const eyeRPct  = ((IMG_SIZE - EYE_R.cx) / IMG_SIZE) * 100; // 34.3% from right
+      const eyeYPct  = (EYE_L.cy / IMG_SIZE) * 100; // 38.9%
 
-      // Wide diffuse halo — soft spill around the socket
+      // Halo
       const haloStyle = (side: 'left' | 'right'): React.CSSProperties => ({
         position:      'absolute',
-        zIndex:        2,
-        top:           '29%',
-        ...(side === 'left' ? { left: '20%' } : { right: '20%' }),
-        width:         '26%',
-        height:        '10%',
+        zIndex:        0,
+        top:           `${eyeYPct - 7}%`,   // slightly above center
+        ...(side === 'left'
+          ? { left: `${eyeLPct - haloW / 2 + 2}%` }   // +2 = closer together
+          : { right: `${eyeRPct - haloW / 2 + 2}%` }),
+        width:         `${haloW}%`,
+        height:        '11%',
         background:    eyeColor,
         borderRadius:  '50%',
-        filter:        'blur(14px)',
-        opacity:       eyeOpacity * 0.7,
-        mixBlendMode:  'screen',
+        filter:        'blur(16px)',
+        opacity:       eyeOpacity * 0.95,
         pointerEvents: 'none',
         transition:    'opacity 0.3s ease, background 0.3s ease',
         animation:     pulsing
@@ -79,19 +124,20 @@ import React from 'react';
           : 'none',
       });
 
-      // Tight bright core — concentrated inside the socket
+      // Core
       const coreStyle = (side: 'left' | 'right'): React.CSSProperties => ({
         position:      'absolute',
-        zIndex:        2,
-        top:           '31%',
-        ...(side === 'left' ? { left: '23%' } : { right: '23%' }),
-        width:         '18%',
+        zIndex:        0,
+        top:           `${eyeYPct - 3}%`,
+        ...(side === 'left'
+          ? { left: `${eyeLPct - coreW / 2 + 2}%` }
+          : { right: `${eyeRPct - coreW / 2 + 2}%` }),
+        width:         `${coreW}%`,
         height:        '6%',
-        background:    `radial-gradient(ellipse 80% 60% at 50% 50%, ${eyeColor} 0%, ${eyeColor}dd 30%, ${eyeColor}66 65%, transparent 100%)`,
+        background:    `radial-gradient(ellipse 85% 65% at 50% 50%, ${eyeColor} 0%, ${eyeColor}ee 25%, ${eyeColor}88 55%, transparent 100%)`,
         borderRadius:  '50%',
         filter:        'blur(2px)',
         opacity:       eyeOpacity,
-        mixBlendMode:  'screen',
         pointerEvents: 'none',
         transition:    'opacity 0.3s ease, background 0.3s ease',
         animation:     pulsing
@@ -99,17 +145,17 @@ import React from 'react';
           : 'none',
       });
 
-      const hOp  = eyeOpacity * 0.7;
-      const hMax = Math.min(eyeOpacity * 0.95, 1);
-      const cMax = Math.min(eyeOpacity * 1.3, 1);
+      const hOp  = eyeOpacity * 0.95;
+      const hMax = Math.min(eyeOpacity * 1.15, 1);
+      const cMax = Math.min(eyeOpacity * 1.4,  1);
 
       return (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <style>{`
-            @keyframes dfHaloL { 0%,100%{ opacity:${hOp}; } 50%{ opacity:${hMax}; } }
-            @keyframes dfHaloR { 0%,100%{ opacity:${hOp}; } 50%{ opacity:${hMax}; } }
-            @keyframes dfCoreL { 0%,100%{ opacity:${eyeOpacity}; } 50%{ opacity:${cMax}; } }
-            @keyframes dfCoreR { 0%,100%{ opacity:${eyeOpacity}; } 50%{ opacity:${cMax}; } }
+            @keyframes dfHaloL { 0%,100%{ opacity:${hOp};         } 50%{ opacity:${hMax}; } }
+            @keyframes dfHaloR { 0%,100%{ opacity:${hOp};         } 50%{ opacity:${hMax}; } }
+            @keyframes dfCoreL { 0%,100%{ opacity:${eyeOpacity};  } 50%{ opacity:${cMax}; } }
+            @keyframes dfCoreR { 0%,100%{ opacity:${eyeOpacity};  } 50%{ opacity:${cMax}; } }
           `}</style>
 
           <div style={{
@@ -118,9 +164,15 @@ import React from 'react';
             aspectRatio: '1/1',
             animation:   'titan-float 3.8s ease-in-out infinite',
           }}>
-            {/* Face image — z-index 1, solid on top of background */}
+            {/* Glow layers — zIndex 0, sit BEHIND the face */}
+            <div style={haloStyle('left')}  />
+            <div style={coreStyle('left')}  />
+            <div style={haloStyle('right')} />
+            <div style={coreStyle('right')} />
+
+            {/* Face — zIndex 1, canvas-punched eye socket holes let the glow through */}
             <img
-              src="/destro-face.png"
+              src={faceSrc}
               alt=""
               style={{
                 position:     'absolute',
@@ -134,18 +186,11 @@ import React from 'react';
               }}
             />
 
-            {/* Glow layers — z-index 2, mix-blend-mode:screen over the face.
-                Bright silver areas wash the glow out; dark eye sockets let it bleed through. */}
-            <div style={haloStyle('left')}  />
-            <div style={coreStyle('left')}  />
-            <div style={haloStyle('right')} />
-            <div style={coreStyle('right')} />
-
-            {/* Ambient outer glow rim */}
+            {/* Ambient outer rim glow */}
             <div style={{
               position:     'absolute',
               inset:        0,
-              zIndex:       3,
+              zIndex:       2,
               borderRadius: '50%',
               boxShadow:    `0 0 40px 6px ${eyeColor}22`,
               pointerEvents:'none',
