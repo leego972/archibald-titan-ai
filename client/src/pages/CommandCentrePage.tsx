@@ -10,6 +10,7 @@ import {
   ShieldCheck, Vault, Network, Terminal, Monitor
 } from "lucide-react";
 import { useLocation } from "wouter";
+  import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type EngineStatus = "online" | "running" | "idle" | "error" | "offline";
