@@ -10,6 +10,7 @@ import {
   ShieldCheck, Vault, Network, Terminal, Monitor
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
   import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,9 +70,20 @@ export default function CommandCentrePage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   // ── Data Queries ───────────────────────────────────────────────────────────
-  const { data: credits, refetch: refetchCredits } = trpc.credits.getBalance.useQuery(undefined, {
-    refetchInterval: 30000,
-  });
+  const { data: credits, refetch: refetchCredits, isFetching: syncingCredits } = trpc.credits.getBalance.useQuery(undefined, {
+      refetchInterval: 30000,
+    });
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    async function handleSync() {
+      setIsSyncing(true);
+      try {
+        await refetchCredits();
+        toast.success("Status synced");
+      } finally {
+        setIsSyncing(false);
+      }
+    }
 
   const { data: argusStatus } = trpc.argus.getStatus.useQuery(undefined, { retry: false });
   const { data: astraStatus } = trpc.astra.getStatus.useQuery(undefined, { retry: false });
