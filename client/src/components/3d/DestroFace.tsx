@@ -12,12 +12,6 @@ import React from 'react';
     speaking:  '#22C55E',
   };
 
-  const VOICE_INTENSITY: Record<VoiceState, number> = {
-    idle:      0.85,
-    listening: 0.95,
-    speaking:  0.95,
-  };
-
   const EYE_COLOR: Record<Emotion, string> = {
     thinking:       '#1a7fff',
     serious:        '#1a7fff',
@@ -55,59 +49,62 @@ import React from 'react';
     emotion?: Emotion;
     voiceState?: VoiceState;
   }) => {
-    const eyeColor   = voiceState ? VOICE_COLOR[voiceState]     : (EYE_COLOR[emotion]     ?? '#00cc55');
-    const eyeOpacity = voiceState ? VOICE_INTENSITY[voiceState] : (EYE_INTENSITY[emotion] ?? 0.5);
+    const eyeColor   = voiceState ? VOICE_COLOR[voiceState] : (EYE_COLOR[emotion]     ?? '#00cc55');
+    const eyeOpacity = voiceState ? 1.0                     : (EYE_INTENSITY[emotion] ?? 0.5);
     const pulsing    = voiceState === 'listening'
       || emotion === 'smiling' || emotion === 'laughing' || emotion === 'amused';
 
-    // Outer blurred halo — light spills outward from the socket
-    const eyeHalo = (side: 'left' | 'right'): React.CSSProperties => ({
-      position:   'absolute',
-      top:        '35%',
-      ...(side === 'left' ? { left: '20%' } : { right: '20%' }),
-      width:      '26%',
-      height:     '12%',
-      background: eyeColor,
-      borderRadius: '50%',
-      filter:     'blur(11px)',
-      opacity:    eyeOpacity * 0.55,
-      mixBlendMode: 'screen',
+    // Glow layers render BEFORE the face image so they sit behind it.
+    // The face image uses mix-blend-mode:screen — dark socket areas let the
+    // glow bleed through while the bright metallic surface stays intact.
+
+    // Wide diffuse halo — soft light spilling from deep in the socket
+    const haloStyle = (side: 'left' | 'right'): React.CSSProperties => ({
+      position:      'absolute',
+      top:           '33%',
+      ...(side === 'left' ? { left: '17%' } : { right: '17%' }),
+      width:         '30%',
+      height:        '14%',
+      background:    eyeColor,
+      borderRadius:  '50%',
+      filter:        'blur(18px)',
+      opacity:       eyeOpacity * 0.75,
       pointerEvents: 'none',
-      transition: 'opacity 0.35s ease, background 0.35s ease',
-      animation:  pulsing
-        ? `arcEyeHalo${side === 'right' ? '2' : ''} 1.1s ease-in-out infinite${side === 'right' ? ' 0.05s' : ''}`
+      transition:    'opacity 0.3s ease, background 0.3s ease',
+      animation:     pulsing
+        ? `dfHalo${side === 'right' ? 'R' : 'L'} 1.1s ease-in-out infinite${side === 'right' ? ' 0.06s' : ''}`
         : 'none',
     });
 
-    // Inner bright core — sits exactly inside the socket
-    const eyeCore = (side: 'left' | 'right'): React.CSSProperties => ({
-      position:   'absolute',
-      top:        '37%',
-      ...(side === 'left' ? { left: '23%' } : { right: '23%' }),
-      width:      '19%',
-      height:     '5.5%',
-      background: `radial-gradient(ellipse 78% 55% at 50% 50%, ${eyeColor} 0%, ${eyeColor}cc 35%, ${eyeColor}55 65%, transparent 100%)`,
-      borderRadius: '50%',
-      opacity:    eyeOpacity,
-      mixBlendMode: 'screen',
+    // Tight bright core — the concentrated light source inside the socket
+    const coreStyle = (side: 'left' | 'right'): React.CSSProperties => ({
+      position:      'absolute',
+      top:           '36%',
+      ...(side === 'left' ? { left: '21%' } : { right: '21%' }),
+      width:         '22%',
+      height:        '7%',
+      background:    `radial-gradient(ellipse 80% 60% at 50% 50%, ${eyeColor} 0%, ${eyeColor}ee 30%, ${eyeColor}88 60%, transparent 100%)`,
+      borderRadius:  '50%',
+      filter:        'blur(3px)',
+      opacity:       eyeOpacity,
       pointerEvents: 'none',
-      transition: 'opacity 0.35s ease, background 0.35s ease',
-      animation:  pulsing
-        ? `arcEyePulse${side === 'right' ? '2' : ''} 1.1s ease-in-out infinite${side === 'right' ? ' 0.05s' : ''}`
+      transition:    'opacity 0.3s ease, background 0.3s ease',
+      animation:     pulsing
+        ? `dfCore${side === 'right' ? 'R' : 'L'} 1.1s ease-in-out infinite${side === 'right' ? ' 0.06s' : ''}`
         : 'none',
     });
 
-    const haloOp  = eyeOpacity * 0.55;
-    const haloMax = Math.min(eyeOpacity * 0.8, 1);
-    const coreMax = Math.min(eyeOpacity * 1.4, 1);
+    const hOp  = eyeOpacity * 0.75;
+    const hMax = Math.min(eyeOpacity * 1.0, 1);
+    const cMax = Math.min(eyeOpacity * 1.35, 1);
 
     return (
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
-          @keyframes arcEyeHalo  { 0%,100%{ opacity: ${haloOp}; } 50%{ opacity: ${haloMax}; } }
-          @keyframes arcEyeHalo2 { 0%,100%{ opacity: ${haloOp}; } 50%{ opacity: ${haloMax}; } }
-          @keyframes arcEyePulse  { 0%,100%{ opacity: ${eyeOpacity}; } 50%{ opacity: ${coreMax}; } }
-          @keyframes arcEyePulse2 { 0%,100%{ opacity: ${eyeOpacity}; } 50%{ opacity: ${coreMax}; } }
+          @keyframes dfHaloL { 0%,100%{ opacity:${hOp}; } 50%{ opacity:${hMax}; } }
+          @keyframes dfHaloR { 0%,100%{ opacity:${hOp}; } 50%{ opacity:${hMax}; } }
+          @keyframes dfCoreL { 0%,100%{ opacity:${eyeOpacity}; } 50%{ opacity:${cMax}; } }
+          @keyframes dfCoreR { 0%,100%{ opacity:${eyeOpacity}; } 50%{ opacity:${cMax}; } }
         `}</style>
 
         <div style={{
@@ -115,28 +112,37 @@ import React from 'react';
           width:       '76%',
           aspectRatio: '1/1',
           animation:   'titan-float 3.8s ease-in-out infinite',
-          filter:      'drop-shadow(0 8px 32px rgba(30,40,80,0.70))',
         }}>
+          {/* ── Glow layers — rendered BEHIND the face image ── */}
+          <div style={haloStyle('left')}  />
+          <div style={coreStyle('left')}  />
+          <div style={haloStyle('right')} />
+          <div style={coreStyle('right')} />
+
+          {/* Face image — screen blend lets dark socket areas transmit the glow behind */}
           <img
             src="/destro-face.png"
             alt=""
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none' }}
+            style={{
+              position:     'absolute',
+              inset:        0,
+              width:        '100%',
+              height:       '100%',
+              objectFit:    'cover',
+              userSelect:   'none',
+              pointerEvents:'none',
+              mixBlendMode: 'screen',
+            }}
           />
 
-          {/* Left eye: blurred outer halo + sharp inner core */}
-          <div style={eyeHalo('left')} />
-          <div style={eyeCore('left')} />
-
-          {/* Right eye: blurred outer halo + sharp inner core */}
-          <div style={eyeHalo('right')} />
-          <div style={eyeCore('right')} />
-
-          {/* Subtle rim tint matching eye colour */}
+          {/* Ambient eye-colour rim on the whole mask */}
           <div style={{
-            position: 'absolute', inset: 0, borderRadius: '50%',
-            boxShadow: `0 0 28px 2px ${eyeColor}18`,
-            pointerEvents: 'none',
-            transition: 'box-shadow 0.4s ease',
+            position:     'absolute',
+            inset:        0,
+            borderRadius: '50%',
+            boxShadow:    `0 0 40px 6px ${eyeColor}22`,
+            pointerEvents:'none',
+            transition:   'box-shadow 0.4s ease',
           }} />
         </div>
       </div>
