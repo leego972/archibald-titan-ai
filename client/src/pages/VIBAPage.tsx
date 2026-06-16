@@ -10,7 +10,7 @@ import { useState } from "react";
   import { openExternalUrl } from "@/lib/desktop";
   import { UpgradeBanner } from "@/components/UpgradePrompt";
 
-  // Set VITE_BRIDGE_AI_URL in Railway to your deployed VIBA - AI Manager service URL
+  // Set VITE_BRIDGE_AI_URL in Railway to your deployed VIBA - Collaborative Multi-Agent Orchestration System service URL
   const BRIDGE_AI_URL: string | null = import.meta.env.VITE_BRIDGE_AI_URL ?? null;
 
   const PROVIDERS = [
@@ -67,7 +67,7 @@ import { useState } from "react";
           <div>
             <p className="font-semibold text-sm">VIBA URL not configured</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
-              Set <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BRIDGE_AI_URL</code> in Railway environment variables to your deployed VIBA - AI Manager service URL.
+              Set <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BRIDGE_AI_URL</code> in Railway environment variables to your deployed VIBA - Collaborative Multi-Agent Orchestration System service URL.
             </p>
           </div>
         </div>
@@ -82,7 +82,7 @@ import { useState } from "react";
               <Zap className="h-4 w-4 text-blue-400" />
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold leading-none">VIBA - AI Manager</h1>
+              <h1 className="text-lg font-bold leading-none">VIBA - Collaborative Multi-Agent Orchestration System</h1>
               <Badge variant="secondary" className="text-[10px]">Enterprise</Badge>
             </div>
             <Badge variant="outline" className="ml-auto text-xs text-muted-foreground capitalize">{planName}</Badge>
@@ -145,7 +145,7 @@ import { useState } from "react";
             <Zap className="h-4 w-4 text-blue-400" />
           </div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold leading-none">VIBA - AI Manager</h1>
+            <h1 className="text-lg font-bold leading-none">VIBA - Collaborative Multi-Agent Orchestration System</h1>
             <Badge variant="secondary" className="text-[10px]">Beta</Badge>
           </div>
 
@@ -246,7 +246,7 @@ import { useState } from "react";
               key={iframeKey}
               src={BRIDGE_AI_URL ?? "about:blank"}
               className="w-full h-full border-0"
-              title="VIBA - AI Manager"
+              title="VIBA - Collaborative Multi-Agent Orchestration System"
               allow="clipboard-read; clipboard-write; microphone"
               onLoad={handleIframeLoad}
               onError={handleIframeError}
@@ -257,7 +257,7 @@ import { useState } from "react";
         {view === "launcher" && (
           <div className="flex-1 overflow-y-auto pb-6 space-y-6">
             <p className="text-sm text-muted-foreground">
-              VIBA - AI Manager orchestrates multiple AI providers in a single session. Click a provider card or open VIBA to get started.
+              VIBA - Collaborative Multi-Agent Orchestration System orchestrates multiple AI providers in a single session. Click a provider card or open VIBA to get started.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
