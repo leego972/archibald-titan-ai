@@ -285,7 +285,7 @@ import { useState } from "react";
                 className="bg-blue-600 hover:bg-blue-500 gap-2"
                 onClick={() => setView("embed")}
               >
-                <Zap className="h-4 w-4" /> Launch BridgeAI
+                <Zap className="h-4 w-4" /> Launch VIBA
               </Button>
             </div>
           </div>
