@@ -125,7 +125,7 @@ const SelfImprovementDashboard = lazy(() => import("./pages/SelfImprovementDashb
 
 // Project Files
 import ProjectFilesViewer from "./pages/ProjectFilesViewer";
-import BridgeAIPage from "./pages/BridgeAI";
+import VIBAPage from "./pages/VIBAPage";
 
 // Site Monitor
 import SiteMonitorPage from "./pages/SiteMonitorPage";
@@ -222,7 +222,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
         <Route path="/marketplace/:rest*" component={MarketplacePage} />
         <Route path="/project-files" component={ProjectFilesViewer} />
         <Route path="/project-files/:projectId" component={ProjectFilesViewer} />
-        <Route path="/bridge" component={BridgeAIPage} />
+        <Route path="/bridge" component={VIBAPage} />
         <Route path="/titan-builder" component={TitanBuilder} />
 
         {/* Security */}
