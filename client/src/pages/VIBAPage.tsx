@@ -3,35 +3,44 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Bot, Brain, Code2, ExternalLink, Globe, Search, Zap,
-  ArrowRight, Maximize2, Minimize2, RefreshCw, Loader2, AlertCircle,
+  Bot,
+  Brain,
+  Code2,
+  ExternalLink,
+  Globe,
+  Search,
+  Zap,
+  ArrowRight,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  ShieldCheck,
+  Bug,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { openExternalUrl } from "@/lib/desktop";
 import { UpgradeBanner } from "@/components/UpgradePrompt";
 
-// Set VITE_BRIDGE_AI_URL in Railway to your deployed VIBA service URL
-const BRIDGE_AI_URL: string | null = import.meta.env.VITE_BRIDGE_AI_URL ?? null;
-
-// Archibald Titan bypass token — set VITE_VIBA_BYPASS_TOKEN in Railway.
-// This must match ARCHIBALD_BYPASS_TOKEN in the VIBA Railway deployment.
-// When set, the VIBA subscription gate is skipped for embedded users.
-const BYPASS_TOKEN: string | undefined = import.meta.env.VITE_VIBA_BYPASS_TOKEN || undefined;
-
-function buildIframeSrc(base: string | null): string {
-  if (!base) return "about:blank";
-  if (!BYPASS_TOKEN) return base;
-  const separator = base.includes("?") ? "&" : "?";
-  return `${base}${separator}bypass=${encodeURIComponent(BYPASS_TOKEN)}`;
-}
+// beta7 is the rebranded VIBA / BridgeAI orchestration feature.
+// Backwards compatibility: VITE_BRIDGE_AI_URL remains supported while the Railway service/envs are renamed.
+const BETA7_URL: string | null =
+  import.meta.env.VITE_BETA7_URL ?? import.meta.env.VITE_BRIDGE_AI_URL ?? null;
 
 const PROVIDERS = [
-  { name: "ChatGPT",      provider: "OpenAI",        role: "Strategic Planning", icon: Brain,  color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-  { name: "Claude",       provider: "Anthropic",     role: "Code Review",        icon: Code2,  color: "text-violet-400",  bg: "bg-violet-500/10 border-violet-500/20"  },
-  { name: "Replit Agent", provider: "Replit",        role: "Build & Execute",    icon: Zap,    color: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/20"      },
-  { name: "Perplexity",   provider: "Perplexity AI", role: "Research",           icon: Search, color: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/20"    },
-  { name: "Gemini",       provider: "Google",        role: "UX & Design",        icon: Globe,  color: "text-sky-400",     bg: "bg-sky-500/10 border-sky-500/20"        },
-  { name: "Manus",        provider: "Manus AI",      role: "Autonomous Agent",   icon: Bot,    color: "text-pink-400",    bg: "bg-pink-500/10 border-pink-500/20"      },
+  { name: "ChatGPT", provider: "OpenAI", role: "Strategic Planning", icon: Brain, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+  { name: "Claude", provider: "Anthropic", role: "Code Review", icon: Code2, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
+  { name: "Replit Agent", provider: "Replit", role: "Build & Execute", icon: Zap, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+  { name: "Perplexity", provider: "Perplexity AI", role: "Research", icon: Search, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+  { name: "Gemini", provider: "Google", role: "UX & Design", icon: Globe, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+  { name: "Manus", provider: "Manus AI", role: "Autonomous Agent", icon: Bot, color: "text-pink-400", bg: "bg-pink-500/10 border-pink-500/20" },
+] as const;
+
+const BETA7_CAPABILITIES = [
+  { title: "Multi-agent orchestration", desc: "Routes planning, review, build, research and UX tasks to the right AI role instead of forcing one model to do everything.", icon: Brain },
+  { title: "Beta-testing workflow", desc: "Uses the Zippyfixer-style beta-test concept: scan, log, reproduce, classify, report, then repair only when the user has paid access.", icon: Bug },
+  { title: "Approval-gated execution", desc: "High-risk actions such as deploy, merge, file deletion, credentials, auth, billing and database changes require explicit approval.", icon: ShieldCheck },
 ] as const;
 
 type ViewMode = "embed" | "launcher";
@@ -44,8 +53,8 @@ export default function VIBAPage() {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
 
+  // Existing enterprise feature flag retained so current subscription logic does not break.
   const hasAccess = canUse("bridge_ai");
-  const iframeSrc = buildIframeSrc(BRIDGE_AI_URL);
 
   function handleIframeLoad() {
     setIframeLoading(false);
@@ -71,16 +80,16 @@ export default function VIBAPage() {
     );
   }
 
-  if (!BRIDGE_AI_URL) {
+  if (!BETA7_URL) {
     return (
       <div className="flex flex-col h-full min-h-0 items-center justify-center gap-4 p-8 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
-          <Zap className="h-6 w-6 text-amber-400" />
-        </div>
+        <img src="/beta7-logo.svg" alt="beta7" className="h-20 w-20 rounded-2xl shadow-lg" />
         <div>
-          <p className="font-semibold text-sm">VIBA URL not configured</p>
-          <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
-            Set <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BRIDGE_AI_URL</code> in Railway environment variables to your deployed VIBA service URL.
+          <p className="font-semibold text-sm">beta7 service URL not configured</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm leading-relaxed">
+            Set <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BETA7_URL</code> in Railway to your deployed beta7 orchestration service URL.
+            <br />
+            Backwards compatibility: <code className="bg-white/5 px-1 rounded text-amber-300">VITE_BRIDGE_AI_URL</code> is still accepted during migration.
           </p>
         </div>
       </div>
@@ -91,52 +100,43 @@ export default function VIBAPage() {
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex items-center gap-3 pb-6 shrink-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Zap className="h-4 w-4 text-blue-400" />
-          </div>
+          <img src="/beta7-logo.svg" alt="beta7" className="h-10 w-10 rounded-xl" />
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold leading-none">VIBA - Collaborative Multi-Agent Orchestration System</h1>
-            <Badge variant="secondary" className="text-[10px]">Enterprise</Badge>
+            <h1 className="text-lg font-bold leading-none">beta7 — Multi-Agent Build & Beta-Test Orchestrator</h1>
+            <Badge variant="secondary" className="text-[10px]">Pro</Badge>
           </div>
           <Badge variant="outline" className="ml-auto text-xs text-muted-foreground capitalize">{planName}</Badge>
         </div>
 
         <div className="space-y-6 flex-1 overflow-y-auto pb-6">
           <UpgradeBanner
-            feature="VIBA — Multi-Agent AI Orchestration"
+            feature="beta7 — Multi-Agent Build & Beta-Test Orchestration"
             requiredPlan="enterprise"
-            description="Coordinate GPT-4o, Claude, Gemini, Perplexity and more in a single unified session. Each model handles the task type it excels at — strategy, code review, research, and execution — saving you 40–60% on token costs versus running everything through one model."
+            description="Coordinate multiple AI agents for planning, code review, build execution, research, UX checks and beta-test reporting. Trial users can inspect and report; repair, deploy, commit and pull-request actions remain locked behind paid access."
           />
 
-          <div className="opacity-40 pointer-events-none select-none">
-            <h2 className="text-sm font-semibold mb-3">Supported AI Providers</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
-                <Card key={name} className={`border ${bg} bg-card/40`}>
-                  <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bg}`}>
-                      <Icon className={`h-4 w-4 ${color}`} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold leading-none">{name}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{provider} · {role}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 opacity-50 pointer-events-none select-none">
+            {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
+              <Card key={name} className={`border ${bg} bg-card/40`}>
+                <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3">
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-none">{name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{provider} · {role}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { icon: Brain,  color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20", title: "Smart Routing",       desc: "Automatically assigns each task to the most capable — and cheapest — model available." },
-              { icon: Zap,    color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/20",     title: "40–60% Cost Savings", desc: "Multi-model sessions cost far less than running everything through GPT-4o or Claude alone." },
-              { icon: Bot,    color: "text-emerald-400",bg: "bg-emerald-500/10 border-emerald-500/20",title: "Human-in-the-Loop",  desc: "Pause any agent run for your review before high-stakes actions are executed." },
-            ].map(({ icon: Icon, color, bg, title, desc }) => (
-              <Card key={title} className={`border ${bg} bg-card/40`}>
+            {BETA7_CAPABILITIES.map(({ icon: Icon, title, desc }) => (
+              <Card key={title} className="border bg-card/40">
                 <CardContent className="pt-5 pb-5 px-5 flex flex-col gap-3">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${bg}`}>
-                    <Icon className={`h-4 w-4 ${color}`} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20">
+                    <Icon className="h-4 w-4 text-blue-400" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{title}</p>
@@ -154,11 +154,9 @@ export default function VIBAPage() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center gap-3 pb-3 shrink-0 flex-wrap">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20">
-          <Zap className="h-4 w-4 text-blue-400" />
-        </div>
+        <img src="/beta7-logo.svg" alt="beta7" className="h-10 w-10 rounded-xl" />
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold leading-none">VIBA - Collaborative Multi-Agent Orchestration System</h1>
+          <h1 className="text-lg font-bold leading-none">beta7 — Multi-Agent Build & Beta-Test Orchestrator</h1>
           <Badge variant="secondary" className="text-[10px]">Beta</Badge>
         </div>
 
@@ -180,7 +178,7 @@ export default function VIBAPage() {
 
           {view === "embed" && (
             <>
-              <Button size="sm" variant="ghost" onClick={reloadIframe} title="Reload VIBA" disabled={iframeLoading}>
+              <Button size="sm" variant="ghost" onClick={reloadIframe} title="Reload beta7" disabled={iframeLoading}>
                 {iframeLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setFullscreen((f) => !f)} title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
@@ -189,7 +187,7 @@ export default function VIBAPage() {
             </>
           )}
 
-          <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-500" onClick={() => openExternalUrl(BRIDGE_AI_URL)}>
+          <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-500" onClick={() => openExternalUrl(BETA7_URL)}>
             <ExternalLink className="h-3.5 w-3.5" />
             Open in tab
           </Button>
@@ -201,7 +199,7 @@ export default function VIBAPage() {
           {iframeLoading && !iframeError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm z-10">
               <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-              <p className="text-sm text-muted-foreground">Loading VIBA…</p>
+              <p className="text-sm text-muted-foreground">Loading beta7…</p>
             </div>
           )}
 
@@ -211,16 +209,16 @@ export default function VIBAPage() {
                 <AlertCircle className="h-6 w-6 text-red-400" />
               </div>
               <div>
-                <p className="font-semibold text-sm">VIBA failed to load</p>
+                <p className="font-semibold text-sm">beta7 failed to load</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                  The app could not be embedded. This is usually a browser security policy (CSP / X-Frame-Options).
+                  The app could not be embedded. This is usually a browser security policy such as CSP or X-Frame-Options.
                 </p>
               </div>
               <div className="flex gap-2 flex-wrap justify-center">
                 <Button size="sm" variant="outline" onClick={reloadIframe}>
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Try again
                 </Button>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-500 gap-1.5" onClick={() => openExternalUrl(BRIDGE_AI_URL)}>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-500 gap-1.5" onClick={() => openExternalUrl(BETA7_URL)}>
                   <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
                 </Button>
               </div>
@@ -237,9 +235,9 @@ export default function VIBAPage() {
 
           <iframe
             key={iframeKey}
-            src={iframeSrc}
+            src={BETA7_URL}
             className="w-full h-full border-0"
-            title="VIBA - Collaborative Multi-Agent Orchestration System"
+            title="beta7 Multi-Agent Build and Beta-Test Orchestrator"
             allow="clipboard-read; clipboard-write; microphone"
             onLoad={handleIframeLoad}
             onError={handleIframeError}
@@ -250,15 +248,11 @@ export default function VIBAPage() {
       {view === "launcher" && (
         <div className="flex-1 overflow-y-auto pb-6 space-y-6">
           <p className="text-sm text-muted-foreground">
-            VIBA orchestrates multiple AI providers in a single session. Click a provider card or open VIBA to get started.
+            beta7 is the rebranded VIBA / BridgeAI feature source: multi-agent orchestration combined with Zippyfixer-style scan, beta-test, log and report workflows.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {PROVIDERS.map(({ name, provider, role, icon: Icon, color, bg }) => (
-              <Card
-                key={name}
-                className={`border ${bg} bg-card/50 cursor-pointer hover:bg-card/80 transition-colors`}
-                onClick={() => { setView("embed"); reloadIframe(); }}
-              >
+              <Card key={name} className={`border ${bg} bg-card/50 cursor-pointer hover:bg-card/80 transition-colors`} onClick={() => { setView("embed"); reloadIframe(); }}>
                 <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3">
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}>
                     <Icon className={`h-4 w-4 ${color}`} />
@@ -273,9 +267,21 @@ export default function VIBAPage() {
             ))}
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {BETA7_CAPABILITIES.map(({ icon: Icon, title, desc }) => (
+              <Card key={title} className="border bg-card/40">
+                <CardContent className="pt-5 pb-5 px-5 flex flex-col gap-3">
+                  <Icon className="h-5 w-5 text-blue-400" />
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           <div className="flex justify-center pt-2">
             <Button className="bg-blue-600 hover:bg-blue-500 gap-2" onClick={() => setView("embed")}>
-              <Zap className="h-4 w-4" /> Launch VIBA
+              <Zap className="h-4 w-4" /> Launch beta7
             </Button>
           </div>
         </div>
